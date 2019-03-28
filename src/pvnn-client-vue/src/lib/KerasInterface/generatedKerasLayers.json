@@ -1,0 +1,4414 @@
+{
+    "Input": {
+        "category": "Input / Output",
+        "parameters": {
+            "shape": {
+                "type": "tuple_int"
+            },
+            "batch_shape": {
+                "type": "tuple_int"
+            },
+            "name": {
+                "type": "string"
+            },
+            "dtype": {
+                "type": "string"
+            },
+            "sparse": {
+                "type": "boolean"
+            }
+        },
+        "input": {},
+        "output": {}
+    },
+    "Output": {
+        "category": "Input / Output",
+        "parameters": {},
+        "input": {},
+        "output": {}
+    },
+    "Dense": {
+        "category": "Core",
+        "parameters": {
+            "units": {
+                "type": "int",
+                "conditions": [
+                    ">0"
+                ]
+            },
+            "activation": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "softmax",
+                    "elu",
+                    "selu",
+                    "softplus",
+                    "softsign",
+                    "relu",
+                    "tanh",
+                    "sigmoid",
+                    "hard_sigmoid",
+                    "linear"
+                ]
+            },
+            "use_bias": {
+                "type": "boolean"
+            },
+            "kernel_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "bias_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "kernel_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "bias_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "activity_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "kernel_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "bias_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            }
+        },
+        "input": {
+            "shape": "2D_Tensor"
+        },
+        "output": {
+            "shape": "2D_Tensor"
+        }
+    },
+    "Activation": {
+        "category": "Core",
+        "parameters": {
+            "activation": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "softmax",
+                    "elu",
+                    "selu",
+                    "softplus",
+                    "softsign",
+                    "relu",
+                    "tanh",
+                    "sigmoid",
+                    "hard_sigmoid",
+                    "linear"
+                ]
+            }
+        },
+        "input": {
+            "shape": "Arbitrary"
+        },
+        "output": {
+            "shape": "Arbitrary"
+        }
+    },
+    "Dropout": {
+        "category": "Core",
+        "parameters": {
+            "rate": {
+                "type": "float",
+                "conditions": [
+                    ">=0",
+                    "<=1"
+                ]
+            },
+            "noise_shape": {
+                "type": "list",
+                "list": [
+                    "None"
+                ]
+            },
+            "seed": {
+                "type": "int"
+            }
+        },
+        "input": {
+            "shape": "Arbitrary"
+        },
+        "output": {
+            "shape": "Arbitrary"
+        }
+    },
+    "Flatten": {
+        "category": "Core",
+        "parameters": {
+            "data_format": {
+                "type": "list",
+                "list": [
+                    "channels_last",
+                    "channels_first"
+                ]
+            }
+        },
+        "input": {
+            "shape": "Arbitrary"
+        },
+        "output": {
+            "shape": "Arbitrary"
+        }
+    },
+    "Reshape": {
+        "category": "Core",
+        "parameters": {
+            "target_shape": {
+                "type": "tuple_int"
+            }
+        },
+        "input": {
+            "shape": "Arbitrary"
+        },
+        "output": {
+            "shape": "Arbitrary"
+        }
+    },
+    "Permute": {
+        "category": "Core",
+        "parameters": {
+            "dims": {
+                "type": "tuple_int",
+                "conditions": [
+                    ">=1"
+                ]
+            }
+        },
+        "input": {
+            "shape": "Arbitrary"
+        },
+        "output": {
+            "shape": "Arbitrary"
+        }
+    },
+    "RepeatVector": {
+        "category": "Core",
+        "parameters": {
+            "n": {
+                "type": "int"
+            }
+        },
+        "input": {
+            "shape": "2D_Tensor"
+        },
+        "output": {
+            "shape": "3D_Tensor"
+        }
+    },
+    "Lambda": {
+        "category": "Core",
+        "parameters": {
+            "function": {
+                "type": "function"
+            }
+        },
+        "input": {
+            "shape": "Arbitrary"
+        },
+        "output": {
+            "shape": "Arbitrary"
+        }
+    },
+    "ActivityRegularization": {
+        "category": "Core",
+        "parameters": {
+            "l1": {
+                "type": "float",
+                "conditions": [
+                    ">=0"
+                ]
+            },
+            "l2": {
+                "type": "float",
+                "conditions": [
+                    ">=0"
+                ]
+            }
+        },
+        "input": {
+            "shape": "Arbitrary"
+        },
+        "output": {
+            "shape": "Arbitrary"
+        }
+    },
+    "Masking": {
+        "category": "Core",
+        "parameters": {},
+        "input": {}
+    },
+    "Conv1D": {
+        "category": "Convolutional",
+        "parameters": {
+            "filters": {
+                "type": "int"
+            },
+            "kernel_size": {
+                "type": "tuple_int"
+            },
+            "strides": {
+                "type": "tuple_int"
+            },
+            "padding": {
+                "type": "list",
+                "list": [
+                    "valid",
+                    "causal",
+                    "same"
+                ]
+            },
+            "dilation_rate": {
+                "type": "tuple_int"
+            },
+            "activation": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "softmax",
+                    "elu",
+                    "selu",
+                    "softplus",
+                    "softsign",
+                    "relu",
+                    "tanh",
+                    "sigmoid",
+                    "hard_sigmoid",
+                    "linear"
+                ]
+            },
+            "use_bias": {
+                "type": "boolean"
+            },
+            "kernel_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "bias_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "kernel_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "bias_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "activity_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "kernel_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "bias_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            }
+        },
+        "input": {
+            "shape": "3D_Tensor"
+        },
+        "output": {
+            "shape": "3D_Tensor"
+        }
+    },
+    "Conv2D": {
+        "category": "Convolutional",
+        "parameters": {
+            "filters": {
+                "type": "int"
+            },
+            "kernel_size": {
+                "type": "tuple_int"
+            },
+            "strides": {
+                "type": "tuple_int"
+            },
+            "padding": {
+                "type": "list",
+                "list": [
+                    "valid",
+                    "same"
+                ]
+            },
+            "data_format": {
+                "type": "list",
+                "list": [
+                    "channels_last",
+                    "channels_first"
+                ]
+            },
+            "dilation_rate": {
+                "type": "tuple_int"
+            },
+            "activation": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "softmax",
+                    "elu",
+                    "selu",
+                    "softplus",
+                    "softsign",
+                    "relu",
+                    "tanh",
+                    "sigmoid",
+                    "hard_sigmoid",
+                    "linear"
+                ]
+            },
+            "use_bias": {
+                "type": "boolean"
+            },
+            "kernel_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "bias_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "kernel_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "bias_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "activity_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "kernel_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "bias_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            }
+        },
+        "input": {
+            "shape": "4D_Tensor"
+        },
+        "output": {
+            "shape": "4D_Tensor"
+        }
+    },
+    "SeparableConv1D": {
+        "category": "Convolutional",
+        "parameters": {
+            "filters": {
+                "type": "int"
+            },
+            "kernel_size": {
+                "type": "tuple_int"
+            },
+            "strides": {
+                "type": "tuple_int"
+            },
+            "padding": {
+                "type": "list",
+                "list": [
+                    "valid",
+                    "same"
+                ]
+            },
+            "data_format": {
+                "type": "list",
+                "list": [
+                    "channels_last",
+                    "channels_first"
+                ]
+            },
+            "depth_multiplier": {
+                "type": "int"
+            },
+            "activation": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "softmax",
+                    "elu",
+                    "selu",
+                    "softplus",
+                    "softsign",
+                    "relu",
+                    "tanh",
+                    "sigmoid",
+                    "hard_sigmoid",
+                    "linear"
+                ]
+            },
+            "use_bias": {
+                "type": "boolean"
+            },
+            "depthwise_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "pointwise_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "bias_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "depthwise_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "pointwise_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "bias_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "activity_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "depthwise_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "pointwise_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "bias_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            }
+        },
+        "input": {
+            "shape": "3D_Tensor"
+        },
+        "output": {
+            "shape": "3D_Tensor"
+        }
+    },
+    "SeparableConv2D": {
+        "category": "Convolutional",
+        "parameters": {
+            "filters": {
+                "type": "int"
+            },
+            "kernel_size": {
+                "type": "tuple_int"
+            },
+            "strides": {
+                "type": "tuple_int"
+            },
+            "padding": {
+                "type": "list",
+                "list": [
+                    "valid",
+                    "same"
+                ]
+            },
+            "data_format": {
+                "type": "list",
+                "list": [
+                    "channels_last",
+                    "channels_first"
+                ]
+            },
+            "depth_multiplier": {
+                "type": "int"
+            },
+            "activation": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "softmax",
+                    "elu",
+                    "selu",
+                    "softplus",
+                    "softsign",
+                    "relu",
+                    "tanh",
+                    "sigmoid",
+                    "hard_sigmoid",
+                    "linear"
+                ]
+            },
+            "use_bias": {
+                "type": "boolean"
+            },
+            "depthwise_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "pointwise_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "bias_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "depthwise_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "pointwise_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "bias_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "activity_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "depthwise_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "pointwise_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "bias_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            }
+        },
+        "input": {
+            "shape": "4D_Tensor"
+        },
+        "output": {
+            "shape": "4D_Tensor"
+        }
+    },
+    "Conv2DTranspose": {
+        "category": "Convolutional",
+        "parameters": {
+            "filters": {
+                "type": "int"
+            },
+            "kernel_size": {
+                "type": "tuple_int"
+            },
+            "strides": {
+                "type": "tuple_int"
+            },
+            "padding": {
+                "type": "list",
+                "list": [
+                    "valid",
+                    "same"
+                ]
+            },
+            "data_format": {
+                "type": "list",
+                "list": [
+                    "channels_last",
+                    "channels_first"
+                ]
+            },
+            "dilation_rate": {
+                "type": "tuple_int"
+            },
+            "activation": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "softmax",
+                    "elu",
+                    "selu",
+                    "softplus",
+                    "softsign",
+                    "relu",
+                    "tanh",
+                    "sigmoid",
+                    "hard_sigmoid",
+                    "linear"
+                ]
+            },
+            "use_bias": {
+                "type": "boolean"
+            },
+            "kernel_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "bias_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "kernel_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "bias_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "activity_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "kernel_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "bias_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            }
+        },
+        "input": {
+            "shape": "4D_Tensor"
+        },
+        "output": {
+            "shape": "4D_Tensor"
+        }
+    },
+    "Conv3D": {
+        "category": "Convolutional",
+        "parameters": {
+            "filters": {
+                "type": "int"
+            },
+            "kernel_size": {
+                "type": "tuple_int"
+            },
+            "strides": {
+                "type": "tuple_int"
+            },
+            "padding": {
+                "type": "list",
+                "list": [
+                    "valid",
+                    "same"
+                ]
+            },
+            "data_format": {
+                "type": "list",
+                "list": [
+                    "channels_last",
+                    "channels_first"
+                ]
+            },
+            "dilation_rate": {
+                "type": "tuple_int"
+            },
+            "activation": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "softmax",
+                    "elu",
+                    "selu",
+                    "softplus",
+                    "softsign",
+                    "relu",
+                    "tanh",
+                    "sigmoid",
+                    "hard_sigmoid",
+                    "linear"
+                ]
+            },
+            "use_bias": {
+                "type": "boolean"
+            },
+            "kernel_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "bias_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "kernel_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "bias_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "activity_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "kernel_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "bias_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            }
+        },
+        "input": {
+            "shape": "5D_Tensor"
+        },
+        "output": {
+            "shape": "5D_Tensor"
+        }
+    },
+    "Cropping1D": {
+        "category": "Convolutional",
+        "parameters": {
+            "cropping": {
+                "type": "tuple_int",
+                "elements_number": 2
+            }
+        },
+        "input": {
+            "shape": "3D_Tensor"
+        },
+        "output": {
+            "shape": "3D_Tensor"
+        }
+    },
+    "Cropping2D": {
+        "category": "Convolutional",
+        "parameters": {
+            "cropping": {
+                "type": "tuple_int",
+                "conditions": [
+                    "<=2"
+                ]
+            },
+            "data_format": {
+                "type": "list",
+                "list": [
+                    "channels_last",
+                    "channels_first"
+                ]
+            }
+        },
+        "input": {
+            "shape": "4D_Tensor"
+        },
+        "output": {
+            "shape": "4D_Tensor"
+        }
+    },
+    "Cropping3D": {
+        "category": "Convolutional",
+        "parameters": {
+            "cropping": {
+                "type": "type_selecter",
+                "dict": {
+                    "same for depth, height, width": {
+                        "type": "int"
+                    },
+                    "different symmetrical values": {
+                        "type": "tuple_int",
+                        "elements_number": 3
+                    },
+                    "different for all": {
+                        "type": "tuple_tuple_int",
+                        "fields": {
+                            "depth": {
+                                "type": "tuple_int",
+                                "elements_number": 2
+                            },
+                            "height": {
+                                "type": "tuple_int",
+                                "elements_number": 2
+                            },
+                            "width": {
+                                "type": "tuple_int",
+                                "elements_number": 2
+                            }
+                        }
+                    }
+                }
+            },
+            "data_format": {
+                "type": "list",
+                "list": [
+                    "channels_last",
+                    "channels_first"
+                ]
+            }
+        },
+        "input": {
+            "shape": "5D_Tensor"
+        },
+        "output": {
+            "shape": "5D_Tensor"
+        }
+    },
+    "UpSampling1D": {
+        "category": "Convolutional",
+        "parameters": {
+            "size": {
+                "type": "int"
+            }
+        },
+        "input": {
+            "shape": "3D_Tensor"
+        },
+        "output": {
+            "shape": "3D_Tensor"
+        }
+    },
+    "UpSampling2D": {
+        "category": "Convolutional",
+        "parameters": {
+            "size": {
+                "type": "tuple_int",
+                "elements_number": 2
+            },
+            "data_format": {
+                "type": "list",
+                "list": [
+                    "channels_last",
+                    "channels_first"
+                ]
+            }
+        },
+        "input": {
+            "shape": "4D_Tensor"
+        },
+        "output": {
+            "shape": "4D_Tensor"
+        }
+    },
+    "UpSampling3D": {
+        "category": "Convolutional",
+        "parameters": {
+            "size": {
+                "type": "tuple_int",
+                "elements_number": 3
+            },
+            "data_format": {
+                "type": "list",
+                "list": [
+                    "channels_last",
+                    "channels_first"
+                ]
+            }
+        },
+        "input": {
+            "shape": "5D_Tensor"
+        },
+        "output": {
+            "shape": "5D_Tensor"
+        }
+    },
+    "ZeroPadding1D": {
+        "category": "Convolutional",
+        "parameters": {
+            "padding": {
+                "type": "tuple_int",
+                "elements_number": 2
+            }
+        },
+        "input": {
+            "shape": "3D_Tensor"
+        },
+        "output": {
+            "shape": "3D_Tensor"
+        }
+    },
+    "ZeroPadding2D": {
+        "category": "Convolutional",
+        "parameters": {
+            "data_format": {
+                "type": "list",
+                "list": [
+                    "channels_last",
+                    "channels_first"
+                ]
+            }
+        },
+        "input": {
+            "shape": "4D_Tensor"
+        },
+        "output": {
+            "shape": "4D_Tensor"
+        }
+    },
+    "ZeroPadding3D": {
+        "category": "Convolutional",
+        "parameters": {
+            "data_format": {
+                "type": "list",
+                "list": [
+                    "channels_last",
+                    "channels_first"
+                ]
+            }
+        },
+        "input": {
+            "shape": "5D_Tensor"
+        },
+        "output": {
+            "shape": "5D_Tensor"
+        }
+    },
+    "MaxPooling1D": {
+        "category": "Pooling",
+        "parameters": {
+            "pool_size": {
+                "type": "int"
+            },
+            "strides": {
+                "type": "int"
+            },
+            "padding": {
+                "type": "list",
+                "list": [
+                    "valid",
+                    "same"
+                ]
+            }
+        },
+        "input": {
+            "shape": "3D_Tensor"
+        },
+        "output": {
+            "shape": "3D_Tensor"
+        }
+    },
+    "MaxPooling2D": {
+        "category": "Pooling",
+        "parameters": {
+            "pool_size": {
+                "type": "tuple_int",
+                "elements_max_number": 2
+            },
+            "strides": {
+                "type": "tuple_int",
+                "elements_max_number": 2
+            },
+            "padding": {
+                "type": "list",
+                "list": [
+                    "valid",
+                    "same"
+                ]
+            },
+            "data_format": {
+                "type": "list",
+                "list": [
+                    "channels_last",
+                    "channels_first"
+                ]
+            }
+        },
+        "input": {
+            "shape": "4D_Tensor"
+        },
+        "output": {
+            "shape": "4D_Tensor"
+        }
+    },
+    "MaxPooling3D": {
+        "category": "Pooling",
+        "parameters": {
+            "pool_size": {
+                "type": "tuple_int",
+                "conditions": [
+                    "<=3"
+                ]
+            },
+            "strides": {
+                "type": "tuple_int",
+                "conditions": [
+                    "<=3"
+                ]
+            },
+            "padding": {
+                "type": "list",
+                "list": [
+                    "valid",
+                    "same"
+                ]
+            },
+            "data_format": {
+                "type": "list",
+                "list": [
+                    "channels_last",
+                    "channels_first"
+                ]
+            }
+        },
+        "input": {
+            "shape": "5D_Tensor"
+        },
+        "output": {
+            "shape": "5D_Tensor"
+        }
+    },
+    "AveragePooling1D": {
+        "category": "Pooling",
+        "parameters": {
+            "pool_size": {
+                "type": "int"
+            },
+            "strides": {
+                "type": "int"
+            },
+            "padding": {
+                "type": "list",
+                "list": [
+                    "valid",
+                    "same"
+                ]
+            }
+        },
+        "input": {
+            "shape": "3D_Tensor"
+        },
+        "output": {
+            "shape": "3D_Tensor"
+        }
+    },
+    "AveragePooling2D": {
+        "category": "Pooling",
+        "parameters": {
+            "pool_size": {
+                "type": "tuple_int",
+                "conditions": [
+                    "<=2"
+                ]
+            },
+            "strides": {
+                "type": "tuple_int",
+                "conditions": [
+                    "<=2"
+                ]
+            },
+            "padding": {
+                "type": "list",
+                "list": [
+                    "valid",
+                    "same"
+                ]
+            },
+            "data_format": {
+                "type": "list",
+                "list": [
+                    "channels_last",
+                    "channels_first"
+                ]
+            }
+        },
+        "input": {
+            "shape": "4D_Tensor"
+        },
+        "output": {
+            "shape": "4D_Tensor"
+        }
+    },
+    "AveragePooling3D": {
+        "category": "Pooling",
+        "parameters": {
+            "pool_size": {
+                "type": "tuple_int",
+                "conditions": [
+                    "<=3"
+                ]
+            },
+            "strides": {
+                "type": "tuple_int",
+                "conditions": [
+                    "<=3"
+                ]
+            },
+            "padding": {
+                "type": "list",
+                "list": [
+                    "valid",
+                    "same"
+                ]
+            },
+            "data_format": {
+                "type": "list",
+                "list": [
+                    "channels_last",
+                    "channels_first"
+                ]
+            }
+        },
+        "input": {
+            "shape": "5D_Tensor"
+        },
+        "output": {
+            "shape": "5D_Tensor"
+        }
+    },
+    "GlobalMaxPooling1D": {
+        "category": "Pooling",
+        "parameters": {
+            "data_format": {
+                "type": "list",
+                "list": [
+                    "channels_last",
+                    "channels_first"
+                ]
+            }
+        },
+        "input": {
+            "shape": "3D_Tensor"
+        },
+        "output": {
+            "shape": "2D_Tensor"
+        }
+    },
+    "GlobalAveragePooling1D": {
+        "category": "Pooling",
+        "parameters": {
+            "data_format": {
+                "type": "list",
+                "list": [
+                    "channels_last",
+                    "channels_first"
+                ]
+            }
+        },
+        "input": {
+            "shape": "3D_Tensor"
+        },
+        "output": {
+            "shape": "2D_Tensor"
+        }
+    },
+    "GlobalMaxPooling2D": {
+        "category": "Pooling",
+        "parameters": {
+            "data_format": {
+                "type": "list",
+                "list": [
+                    "channels_last",
+                    "channels_first"
+                ]
+            }
+        },
+        "input": {
+            "shape": "4D_Tensor"
+        },
+        "output": {
+            "shape": "2D_Tensor"
+        }
+    },
+    "GlobalAveragePooling2D": {
+        "category": "Pooling",
+        "parameters": {
+            "data_format": {
+                "type": "list",
+                "list": [
+                    "channels_last",
+                    "channels_first"
+                ]
+            }
+        },
+        "input": {
+            "shape": "4D_Tensor"
+        },
+        "output": {
+            "shape": "2D_Tensor"
+        }
+    },
+    "GlobalMaxPooling3D": {
+        "category": "Pooling",
+        "parameters": {
+            "data_format": {
+                "type": "list",
+                "list": [
+                    "channels_last",
+                    "channels_first"
+                ]
+            }
+        },
+        "input": {
+            "shape": "5D_Tensor"
+        },
+        "output": {
+            "shape": "2D_Tensor"
+        }
+    },
+    "GlobalAveragePooling3D": {
+        "category": "Pooling",
+        "parameters": {
+            "data_format": {
+                "type": "list",
+                "list": [
+                    "channels_last",
+                    "channels_first"
+                ]
+            }
+        },
+        "input": {
+            "shape": "5D_Tensor"
+        },
+        "output": {
+            "shape": "2D_Tensor"
+        }
+    },
+    "LocallyConnected1D": {
+        "category": "Locally Connected",
+        "parameters": {
+            "filters": {
+                "type": "int"
+            },
+            "kernel_size": {
+                "type": "tuple_int"
+            },
+            "strides": {
+                "type": "tuple_int"
+            },
+            "padding": {
+                "type": "list",
+                "list": [
+                    "valid"
+                ]
+            },
+            "activation": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "softmax",
+                    "elu",
+                    "selu",
+                    "softplus",
+                    "softsign",
+                    "relu",
+                    "tanh",
+                    "sigmoid",
+                    "hard_sigmoid",
+                    "linear"
+                ]
+            },
+            "use_bias": {
+                "type": "boolean"
+            },
+            "kernel_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "bias_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "kernel_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "bias_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "activity_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "kernel_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "bias_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            }
+        },
+        "input": {
+            "shape": "3D_Tensor"
+        },
+        "output": {
+            "shape": "3D_Tensor"
+        }
+    },
+    "LocallyConnected2D": {
+        "category": "Locally Connected",
+        "parameters": {
+            "filters": {
+                "type": "int"
+            },
+            "kernel_size": {
+                "type": "tuple_int"
+            },
+            "strides": {
+                "type": "tuple_int"
+            },
+            "padding": {
+                "type": "list",
+                "list": [
+                    "valid"
+                ]
+            },
+            "data_format": {
+                "type": "list",
+                "list": [
+                    "channels_last",
+                    "channels_first"
+                ]
+            },
+            "activation": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "softmax",
+                    "elu",
+                    "selu",
+                    "softplus",
+                    "softsign",
+                    "relu",
+                    "tanh",
+                    "sigmoid",
+                    "hard_sigmoid",
+                    "linear"
+                ]
+            },
+            "use_bias": {
+                "type": "boolean"
+            },
+            "kernel_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "bias_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "kernel_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "bias_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "activity_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "kernel_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "bias_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            }
+        },
+        "input": {
+            "shape": "4D_Tensor"
+        },
+        "output": {
+            "shape": "4D_Tensor"
+        }
+    },
+    "rnn": {
+        "category": "Recurrent",
+        "parameters": {
+            "cell": {
+                "type": "rnn"
+            },
+            "return_sequences": {
+                "type": "boolean"
+            },
+            "return_state": {
+                "type": "boolean"
+            },
+            "go_backwards": {
+                "type": "boolean"
+            },
+            "stateful": {
+                "type": "boolean"
+            },
+            "unroll": {
+                "type": "boolean"
+            },
+            "input_dim": {
+                "type": "int"
+            },
+            "input_length": {
+                "type": "int"
+            }
+        },
+        "input": {
+            "shape": "3D_Tensor"
+        },
+        "output": {
+            "shape": [
+                "2D_Tensor",
+                "3D_Tensor"
+            ]
+        }
+    },
+    "simple_rnn": {
+        "category": "Recurrent",
+        "parameters": {
+            "units": {
+                "type": "int",
+                "conditions": [
+                    ">=0"
+                ]
+            },
+            "activation": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "softmax",
+                    "elu",
+                    "selu",
+                    "softplus",
+                    "softsign",
+                    "relu",
+                    "tanh",
+                    "sigmoid",
+                    "hard_sigmoid",
+                    "linear"
+                ]
+            },
+            "use_bias": {
+                "type": "boolean"
+            },
+            "kernel_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "reccurent_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "bias_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "kernel_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "reccurent_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "bias_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "activity_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "kernel_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "reccurent_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "bias_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "dropout": {
+                "type": "float",
+                "conditions": [
+                    ">=0",
+                    "<=1"
+                ]
+            },
+            "reccurent_dropout": {
+                "type": "float",
+                "conditions": [
+                    ">=0",
+                    "<=1"
+                ]
+            },
+            "return_sequences": {
+                "type": "boolean"
+            },
+            "return_state": {
+                "type": "boolean"
+            },
+            "go_backwards": {
+                "type": "boolean"
+            },
+            "stateful": {
+                "type": "boolean"
+            },
+            "unroll": {
+                "type": "boolean"
+            }
+        },
+        "input": {
+            "shape": "Arbitrary"
+        },
+        "output": {
+            "shape": "Arbitrary"
+        }
+    },
+    "gru": {
+        "category": "Recurrent",
+        "parameters": {
+            "units": {
+                "type": "int",
+                "conditions": [
+                    ">=0"
+                ]
+            },
+            "activation": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "softmax",
+                    "elu",
+                    "selu",
+                    "softplus",
+                    "softsign",
+                    "relu",
+                    "tanh",
+                    "sigmoid",
+                    "hard_sigmoid",
+                    "linear"
+                ]
+            },
+            "reccurent_activation": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "softmax",
+                    "elu",
+                    "selu",
+                    "softplus",
+                    "softsign",
+                    "relu",
+                    "tanh",
+                    "sigmoid",
+                    "hard_sigmoid",
+                    "linear"
+                ]
+            },
+            "use_bias": {
+                "type": "boolean"
+            },
+            "kernel_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "reccurent_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "bias_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "kernel_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "reccurent_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "bias_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "activity_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "kernel_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "reccurent_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "bias_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "dropout": {
+                "type": "float",
+                "conditions": [
+                    ">=0",
+                    "<=1"
+                ]
+            },
+            "reccurent_dropout": {
+                "type": "float",
+                "conditions": [
+                    ">=0",
+                    "<=1"
+                ]
+            },
+            "implementation": {
+                "type": "int",
+                "conditions": [
+                    ">=1",
+                    "<=2"
+                ]
+            },
+            "return_sequences": {
+                "type": "boolean"
+            },
+            "return_state": {
+                "type": "boolean"
+            },
+            "go_backwards": {
+                "type": "boolean"
+            },
+            "stateful": {
+                "type": "boolean"
+            },
+            "unroll": {
+                "type": "boolean"
+            },
+            "reset_after": {
+                "type": "boolean"
+            }
+        },
+        "input": {
+            "shape": "Arbitrary"
+        },
+        "output": {
+            "shape": "Arbitrary"
+        }
+    },
+    "lstm": {
+        "category": "Recurrent",
+        "parameters": {
+            "units": {
+                "type": "int",
+                "conditions": [
+                    ">=0"
+                ]
+            },
+            "activation": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "softmax",
+                    "elu",
+                    "selu",
+                    "softplus",
+                    "softsign",
+                    "relu",
+                    "tanh",
+                    "sigmoid",
+                    "hard_sigmoid",
+                    "linear"
+                ]
+            },
+            "reccurent_activation": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "softmax",
+                    "elu",
+                    "selu",
+                    "softplus",
+                    "softsign",
+                    "relu",
+                    "tanh",
+                    "sigmoid",
+                    "hard_sigmoid",
+                    "linear"
+                ]
+            },
+            "use_bias": {
+                "type": "boolean"
+            },
+            "kernel_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "reccurent_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "bias_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "unit_forget_bias": {
+                "type": "boolean"
+            },
+            "kernel_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "reccurent_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "bias_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "activity_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "kernel_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "reccurent_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "bias_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "dropout": {
+                "type": "float",
+                "conditions": [
+                    ">=0",
+                    "<=1"
+                ]
+            },
+            "reccurent_dropout": {
+                "type": "float",
+                "conditions": [
+                    ">=0",
+                    "<=1"
+                ]
+            },
+            "implementation": {
+                "type": "int",
+                "conditions": [
+                    ">=1",
+                    "<=2"
+                ]
+            },
+            "return_sequences": {
+                "type": "boolean"
+            },
+            "return_state": {
+                "type": "boolean"
+            },
+            "go_backwards": {
+                "type": "boolean"
+            },
+            "stateful": {
+                "type": "boolean"
+            },
+            "unroll": {
+                "type": "boolean"
+            }
+        },
+        "input": {
+            "shape": "Arbitrary"
+        },
+        "output": {
+            "shape": "Arbitrary"
+        }
+    },
+    "conv_lstm_2d": {
+        "category": "Recurrent",
+        "parameters": {
+            "filters": {
+                "type": "int"
+            },
+            "kernel_size": {
+                "type": "tuple_int"
+            },
+            "strides": {
+                "type": "tuple_int"
+            },
+            "padding": {
+                "type": "list",
+                "list": [
+                    "valid",
+                    "same"
+                ]
+            },
+            "data_format": {
+                "type": "list",
+                "list": [
+                    "channels_last",
+                    "channels_first"
+                ]
+            },
+            "dilation_rate": {
+                "type": "tuple_int"
+            },
+            "activation": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "softmax",
+                    "elu",
+                    "selu",
+                    "softplus",
+                    "softsign",
+                    "relu",
+                    "tanh",
+                    "sigmoid",
+                    "hard_sigmoid",
+                    "linear"
+                ]
+            },
+            "reccurent_activation": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "softmax",
+                    "elu",
+                    "selu",
+                    "softplus",
+                    "softsign",
+                    "relu",
+                    "tanh",
+                    "sigmoid",
+                    "hard_sigmoid",
+                    "linear"
+                ]
+            },
+            "use_bias": {
+                "type": "boolean"
+            },
+            "kernel_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "reccurent_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "bias_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "unit_forget_bias": {
+                "type": "boolean"
+            },
+            "kernel_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "reccurent_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "bias_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "activity_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "kernel_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "reccurent_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "bias_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "return_sequences": {
+                "type": "boolean"
+            },
+            "go_backwards": {
+                "type": "boolean"
+            },
+            "stateful": {
+                "type": "boolean"
+            },
+            "dropout": {
+                "type": "float",
+                "conditions": [
+                    ">=0",
+                    "<=1"
+                ]
+            },
+            "reccurent_dropout": {
+                "type": "float",
+                "conditions": [
+                    ">=0",
+                    "<=1"
+                ]
+            }
+        },
+        "input": {
+            "shape": "5D_Tensor"
+        },
+        "output": {
+            "shape": [
+                "5D_Tensor",
+                "4D_Tensor"
+            ]
+        }
+    },
+    "simple_rnn_cell": {
+        "category": "Recurrent",
+        "parameters": {
+            "units": {
+                "type": "int",
+                "conditions": [
+                    ">0"
+                ]
+            },
+            "activation": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "softmax",
+                    "elu",
+                    "selu",
+                    "softplus",
+                    "softsign",
+                    "relu",
+                    "tanh",
+                    "sigmoid",
+                    "hard_sigmoid",
+                    "linear"
+                ]
+            },
+            "use_bias": {
+                "type": "boolean"
+            },
+            "kernel_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "reccurent_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "bias_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "kernel_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "reccurent_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "bias_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "kernel_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "reccurent_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "bias_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "dropout": {
+                "type": "float",
+                "conditions": [
+                    ">=0",
+                    "<=1"
+                ]
+            },
+            "reccurent_dropout": {
+                "type": "float",
+                "conditions": [
+                    ">=0",
+                    "<=1"
+                ]
+            }
+        },
+        "input": {
+            "shape": "Arbitrary"
+        },
+        "output": {
+            "shape": "Arbitrary"
+        }
+    },
+    "gru_cell": {
+        "category": "Recurrent",
+        "parameters": {
+            "units": {
+                "type": "int",
+                "conditions": [
+                    ">0"
+                ]
+            },
+            "activation": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "softmax",
+                    "elu",
+                    "selu",
+                    "softplus",
+                    "softsign",
+                    "relu",
+                    "tanh",
+                    "sigmoid",
+                    "hard_sigmoid",
+                    "linear"
+                ]
+            },
+            "reccurent_activation": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "softmax",
+                    "elu",
+                    "selu",
+                    "softplus",
+                    "softsign",
+                    "relu",
+                    "tanh",
+                    "sigmoid",
+                    "hard_sigmoid",
+                    "linear"
+                ]
+            },
+            "use_bias": {
+                "type": "boolean"
+            },
+            "kernel_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "reccurent_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "bias_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "kernel_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "reccurent_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "bias_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "kernel_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "reccurent_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "bias_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "dropout": {
+                "type": "float",
+                "conditions": [
+                    ">=0",
+                    "<=1"
+                ]
+            },
+            "reccurent_dropout": {
+                "type": "float",
+                "conditions": [
+                    ">=0",
+                    "<=1"
+                ]
+            },
+            "implementation": {
+                "type": "int",
+                "conditions": [
+                    ">=1",
+                    "<=2"
+                ]
+            },
+            "reset_after": {
+                "type": "boolean"
+            }
+        },
+        "input": {
+            "shape": "Arbitrary"
+        },
+        "output": {
+            "shape": "Arbitrary"
+        }
+    },
+    "lstm_cell": {
+        "category": "Recurrent",
+        "parameters": {
+            "units": {
+                "type": "int",
+                "conditions": [
+                    ">0"
+                ]
+            },
+            "activation": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "softmax",
+                    "elu",
+                    "selu",
+                    "softplus",
+                    "softsign",
+                    "relu",
+                    "tanh",
+                    "sigmoid",
+                    "hard_sigmoid",
+                    "linear"
+                ]
+            },
+            "reccurent_activation": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "softmax",
+                    "elu",
+                    "selu",
+                    "softplus",
+                    "softsign",
+                    "relu",
+                    "tanh",
+                    "sigmoid",
+                    "hard_sigmoid",
+                    "linear"
+                ]
+            },
+            "use_bias": {
+                "type": "boolean"
+            },
+            "kernel_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "reccurent_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "bias_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "unit_forget_bias": {
+                "type": "boolean"
+            },
+            "kernel_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "reccurent_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "bias_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "kernel_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "reccurent_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "bias_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "dropout": {
+                "type": "float",
+                "conditions": [
+                    ">=0",
+                    "<=1"
+                ]
+            },
+            "reccurent_dropout": {
+                "type": "float",
+                "conditions": [
+                    ">=0",
+                    "<=1"
+                ]
+            },
+            "implementation": {
+                "type": "int",
+                "conditions": [
+                    ">=1",
+                    "<=2"
+                ]
+            }
+        },
+        "input": {
+            "shape": "Arbitrary"
+        },
+        "output": {
+            "shape": "Arbitrary"
+        }
+    },
+    "cudnn_gru": {
+        "category": "Recurrent",
+        "parameters": {
+            "units": {
+                "type": "int",
+                "conditions": [
+                    ">0"
+                ]
+            },
+            "kernel_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "reccurent_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "bias_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "kernel_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "reccurent_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "bias_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "activity_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "kernel_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "reccurent_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "bias_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "return_sequences": {
+                "type": "boolean"
+            },
+            "return_state": {
+                "type": "boolean"
+            },
+            "stateful": {
+                "type": "boolean"
+            }
+        },
+        "input": {
+            "shape": "Arbitrary"
+        },
+        "output": {
+            "shape": "Arbitrary"
+        }
+    },
+    "cudnn_lstm": {
+        "category": "Recurrent",
+        "parameters": {
+            "units": {
+                "type": "int",
+                "conditions": [
+                    ">0"
+                ]
+            },
+            "kernel_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "unit_forget_bias": {
+                "type": "boolean"
+            },
+            "reccurent_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "bias_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "kernel_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "reccurent_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "bias_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "activity_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "kernel_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "reccurent_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "bias_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "return_sequences": {
+                "type": "boolean"
+            },
+            "return_state": {
+                "type": "boolean"
+            },
+            "stateful": {
+                "type": "boolean"
+            }
+        },
+        "input": {
+            "shape": "Arbitrary"
+        },
+        "output": {
+            "shape": "Arbitrary"
+        }
+    },
+    "embedding": {
+        "category": "Embedding",
+        "parameters": {
+            "input_dim": {
+                "type": "int",
+                "conditions": [
+                    ">0"
+                ]
+            },
+            "output_dim": {
+                "type": "int",
+                "conditions": [
+                    ">=0"
+                ]
+            },
+            "embeddings_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "embeddings_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "embeddings_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "mask_zero": {
+                "type": "boolean"
+            },
+            "input_length": {
+                "type": "int"
+            }
+        },
+        "input": {
+            "shape": "2D_Tensor"
+        },
+        "output": {
+            "shape": "3D_Tensor"
+        }
+    },
+    "Add": {
+        "category": "Merge",
+        "parameters": {},
+        "input": {
+            "shape": "Tab",
+            "size": [
+                ">=2"
+            ]
+        },
+        "output": {
+            "shape": [
+                "2D_Tensor",
+                "3D_Tensor",
+                "4D_Tensor",
+                "5D_Tensor"
+            ]
+        }
+    },
+    "Substract": {
+        "category": "Merge",
+        "parameters": {},
+        "input": {
+            "shape": "Tab",
+            "size": [
+                "2"
+            ]
+        },
+        "output": {
+            "shape": [
+                "2D_Tensor",
+                "3D_Tensor",
+                "4D_Tensor",
+                "5D_Tensor"
+            ]
+        }
+    },
+    "Multiply": {
+        "category": "Merge",
+        "parameters": {},
+        "input": {
+            "shape": "Tab",
+            "size": [
+                ">=2"
+            ]
+        },
+        "output": {
+            "shape": [
+                "2D_Tensor",
+                "3D_Tensor",
+                "4D_Tensor",
+                "5D_Tensor"
+            ]
+        }
+    },
+    "Average": {
+        "category": "Merge",
+        "parameters": {},
+        "input": {
+            "shape": "Tab",
+            "size": [
+                ">=2"
+            ]
+        },
+        "output": {
+            "shape": [
+                "2D_Tensor",
+                "3D_Tensor",
+                "4D_Tensor",
+                "5D_Tensor"
+            ]
+        }
+    },
+    "Maximum": {
+        "category": "Merge",
+        "parameters": {},
+        "input": {
+            "shape": "Tab",
+            "size": [
+                ">=2"
+            ]
+        },
+        "output": {
+            "shape": [
+                "2D_Tensor",
+                "3D_Tensor",
+                "4D_Tensor",
+                "5D_Tensor"
+            ]
+        }
+    },
+    "Minimum": {
+        "category": "Merge",
+        "parameters": {},
+        "input": {
+            "shape": "Tab",
+            "size": [
+                ">=2"
+            ]
+        },
+        "output": {
+            "shape": [
+                "2D_Tensor",
+                "3D_Tensor",
+                "4D_Tensor",
+                "5D_Tensor"
+            ]
+        }
+    },
+    "Concatenate": {
+        "category": "Merge",
+        "parameters": {
+            "axis": {
+                "type": "int"
+            }
+        },
+        "input": {
+            "shape": "Tab",
+            "size": [
+                ">=2"
+            ]
+        },
+        "output": {
+            "shape": [
+                "2D_Tensor",
+                "3D_Tensor",
+                "4D_Tensor",
+                "5D_Tensor"
+            ]
+        }
+    },
+    "Dot": {
+        "category": "Merge",
+        "parameters": {
+            "axes": {
+                "type": "int"
+            },
+            "normalize": {
+                "type": "boolean"
+            }
+        },
+        "input": {
+            "shape": "Tab",
+            "size": [
+                ">=2"
+            ]
+        },
+        "output": {
+            "shape": [
+                "2D_Tensor",
+                "3D_Tensor",
+                "4D_Tensor",
+                "5D_Tensor"
+            ]
+        }
+    },
+    "leaky_relu": {
+        "category": "Advanced Activation",
+        "parameters": {
+            "alpha": {
+                "type": "float",
+                "conditions": [
+                    ">=0"
+                ]
+            }
+        },
+        "input": {
+            "shape": "Arbitrary"
+        },
+        "output": {
+            "shape": "Arbitrary"
+        }
+    },
+    "prelu": {
+        "category": "Advanced Activation",
+        "parameters": {
+            "alpha_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "alpha_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "alpha_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "shared_axes": {
+                "type": "int"
+            }
+        },
+        "input": {
+            "shape": "Arbitrary"
+        },
+        "output": {
+            "shape": "Arbitrary"
+        }
+    },
+    "elu": {
+        "category": "Advanced Activation",
+        "parameters": {
+            "alpha": {
+                "type": "float"
+            }
+        },
+        "input": {
+            "shape": "Arbitrary"
+        },
+        "output": {
+            "shape": "Arbitrary"
+        }
+    },
+    "thresholded_relu": {
+        "category": "Advanced Activation",
+        "parameters": {
+            "theta": {
+                "type": "float",
+                "conditions": [
+                    ">=0"
+                ]
+            }
+        },
+        "input": {
+            "shape": "Arbitrary"
+        },
+        "output": {
+            "shape": "Arbitrary"
+        }
+    },
+    "softmax": {
+        "category": "Advanced Activation",
+        "parameters": {
+            "axis": {
+                "type": "int"
+            }
+        },
+        "input": {
+            "shape": "Arbitrary"
+        },
+        "output": {
+            "shape": "Arbitrary"
+        }
+    },
+    "ReLU": {
+        "category": "Advanced Activation",
+        "parameters": {
+            "max_value": {
+                "type": "int"
+            },
+            "negative_slope": {
+                "type": "float"
+            },
+            "threshold": {
+                "type": "float"
+            }
+        },
+        "input": {
+            "shape": "Arbitrary"
+        },
+        "output": {
+            "shape": "Arbitrary"
+        }
+    },
+    "batch_normalization": {
+        "category": "Normalization",
+        "parameters": {
+            "axis": {
+                "type": "int"
+            },
+            "momentum": {
+                "type": "float"
+            },
+            "epsilon": {
+                "type": "float"
+            },
+            "center": {
+                "type": "boolean"
+            },
+            "scale": {
+                "type": "boolean"
+            },
+            "beta_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "gamma_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "moving_mean_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "moving_variance_initializer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "Initializer",
+                    "Zeros",
+                    "Ones",
+                    "Constant",
+                    "RandomNormal",
+                    "RandomUniform",
+                    "TruncatedNormal",
+                    "VarianceScaling",
+                    "Orthogonal",
+                    "Identity",
+                    "lecun_uniform",
+                    "glorot_normal",
+                    "glorot_uniform",
+                    "he_normal",
+                    "lecun_normal",
+                    "he_uniform"
+                ]
+            },
+            "beta_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "gamma_regularizer": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "l1",
+                    "l2",
+                    "l1_l2"
+                ]
+            },
+            "beta_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            },
+            "gamma_constraint": {
+                "type": "list",
+                "list": [
+                    "None",
+                    "max_norm",
+                    "non_neg",
+                    "unit_norm",
+                    "min_max_norm"
+                ]
+            }
+        },
+        "input": {
+            "shape": "Arbitrary"
+        },
+        "output": {
+            "shape": "Arbitrary"
+        }
+    },
+    "gaussian_noise": {
+        "category": "Noise",
+        "parameters": {
+            "stddev": {
+                "type": "float"
+            }
+        },
+        "input": {
+            "shape": "Arbitrary"
+        },
+        "output": {
+            "shape": "Arbitrary"
+        }
+    },
+    "gaussian_dropout": {
+        "category": "Noise",
+        "parameters": {
+            "stddev": {
+                "type": "float"
+            }
+        },
+        "input": {
+            "shape": "Arbitrary"
+        },
+        "output": {
+            "shape": "Arbitrary"
+        }
+    },
+    "alpha_dropout": {
+        "category": "Noise",
+        "parameters": {
+            "stddev": {
+                "type": "float"
+            },
+            "shape": {
+                "type": "int"
+            },
+            "seed": {
+                "type": "int"
+            }
+        },
+        "input": {
+            "shape": "Arbitrary"
+        },
+        "output": {
+            "shape": "Arbitrary"
+        }
+    }
+}
