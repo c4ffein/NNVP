@@ -1,14 +1,23 @@
 
-# Lancement du projet :
-## Pré-requis :
-- Installer docker
-- Installer docker-compose
+# How to run :
+## Prerequisites :
+- Install docker
+- Install docker-compose
 
 ## Instructions :
-Depuis le répertoire du projet, exécuter le script launch_docker.sh
+From the project directory, execute launch_docker.sh
 
-# Lancement des tests :
-- Depuis le répertoire src/pvnn-client-vue :
-  - exécuter npm install puis npm run server
-  - dans un autre terminal, toujours dans le même répertoire lancer npm run test:e2e
-  - attention, pour utiliser un autre navigateur modifier la cible test:e2e du fichier package.json en remplacant firefox par un navigateur installé sur votre machine
+# Launch the tests :
+- From the src/pvnn-client-vue directory :
+  - Execute npm install then npm run server
+  - In another terminal, still in the same directory, launch npm run test:e2e
+  - Warning : to use another browser, change test:e2e target of the package.json file, replacing firefox by another browser installed locally
+
+# Credits :
+- c4ffein
+- Firstein
+- leducLouis
+- nezoutcarl
+- elbo
+- ChemouneAlaeddine
+- aliuc
