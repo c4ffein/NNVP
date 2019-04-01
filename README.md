@@ -25,10 +25,10 @@ Hence, we decided to re-code the client from scratch, this time using Vue.js for
 We only adapted backend for our new client, which was now simpler as we didn't need to work with the files saved from our Draw.io fork.
 
 ## People who worked on it at the university
-- [c4ffein](/c4ffein) : Both university projects, most of back-end except the file describing all types of Keras layers. As for the client, interface between the Vue.js and D3.js code, code managing the Keras layers, top bar and left bar components, Docker.
-- [Firstein](/Firstein) : Most of the D3 codebase.
-- [aliuc](/aliuc) : Only participated in the first project, wrote the initial file describing Keras layers.
-- [leducLouis](/leducLouis) : Re-wrote most of this file to specify input and output types, some missing parameter types.
-- [nezoutcarl](/nezoutcarl) : Right Bar and initial version of most of the Parameter components, e2e tests.
-- [elbo](/elbo) : D3 functionalities, e2e tests.
-- [ChemouneAlaeddine](/ChemouneAlaeddine) : D3 functionalities, e2e tests.
+- [c4ffein](https://github.com/c4ffein) : Both university projects, most of back-end except the file describing all types of Keras layers. As for the client, interface between the Vue.js and D3.js code, code managing the Keras layers, top bar and left bar components, Docker.
+- [Firstein](https://github.com/Firstein) : Most of the D3 codebase.
+- [aliuc](https://github.com/aliuc) : Only participated in the first project, wrote the initial file describing Keras layers.
+- [leducLouis](https://github.com/leducLouis) : Re-wrote most of this file to specify input and output types, some missing parameter types.
+- [nezoutcarl](https://github.com/nezoutcarl) : Right Bar and initial version of most of the Parameter components, e2e tests.
+- [elbo](https://github.com/elbo) : D3 functionalities, e2e tests.
+- [ChemouneAlaeddine](https://github.com/ChemouneAlaeddine) : D3 functionalities, e2e tests.
