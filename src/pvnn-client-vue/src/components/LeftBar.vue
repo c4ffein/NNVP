@@ -1,13 +1,13 @@
 <template>
   <div class="LeftBar">
-    <button
+    <!--button
       id="interfaceTest"
       v-on:click="
         $kerasInterface.load(
           {'TestLayer': {'category': 'Test Layers', 'parameters': {}, }, }
         );
         $forceUpdate();"
-    >Interface Test Add</button>
+    >Interface Test Add</button-->
     <input id="layerSearchBox" v-model="searchBox" placeholder="Search">
     <div
       v-for="(layers, categoryName) in $kerasInterface.getCategories()"
