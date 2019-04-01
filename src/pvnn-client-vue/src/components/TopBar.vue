@@ -44,8 +44,9 @@ export default {
           template3: () => { },
         },
         Save() { this.$d3Interface.saveBoard(); },
-        // TODO : Change next Url
-        Generate() { this.$d3Interface.generatePython('/api/generate'); },
+        // TODO : if connected to backend, should call
+        // generatePythonOnBackend('/api/generate') instead
+        Generate() { this.$d3Interface.generatePythonInBrowser(this.$kerasInterface); },
       },
       Edit: {
         Undo() { this.$d3Interface.undo(); },

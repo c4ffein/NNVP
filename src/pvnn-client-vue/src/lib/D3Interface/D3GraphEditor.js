@@ -630,11 +630,20 @@ D3GraphEditor.prototype.saveBoard = function () {
 };
 
 /**
+ * Generates Python code directly on the client.
+ * Cannot profit from Keras validation for now.
+ */
+D3GraphEditor.prototype.generatePythonInBrowser = function (kerasInterface) {
+  const generatedPython = kerasInterface.generatePython(this.toJSON());
+  saveAs(new Blob([generatedPython]), "myModel.py");
+}
+
+/**
  * Generates Python code from current state of the graph
  * @param backendUrl address to the backend
  * @returns a Python file
  */
-D3GraphEditor.prototype.generatePython = function (backendUrl) {
+D3GraphEditor.prototype.generatePythonOnBackend = function (backendUrl) {
   let toJSON = [];
   this.d3Layers.forEach(layer => {
     if (layer.class === "D3Layer") {

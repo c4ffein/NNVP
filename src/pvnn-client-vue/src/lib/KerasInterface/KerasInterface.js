@@ -1,5 +1,7 @@
 import KerasLayer from './KerasLayer';
+import KerasPythonGenerator from './KerasPythonGenerator';
 
+/* eslint class-methods-use-this: ["error", { "exceptMethods": ["generatePython"] }] */
 // class KerasInterface {
 export default class {
   constructor(json) {
@@ -25,7 +27,6 @@ export default class {
 
   load(json) {
     const layerNames = Object.keys(json);
-    // console.log(layerNames);
     for (let i = 0; i < layerNames.length; i += 1) {
       const layerName = layerNames[i];
       const layerParameters = json[layerName].parameters;
@@ -46,5 +47,12 @@ export default class {
       }
       this.categories[json[layerName].category][layerName] = layer;
     }
+  }
+
+  generatePython(d3Json) {
+    let graphJson;
+    if (typeof d3Json === 'string') graphJson = JSON.parse(d3Json);
+    else graphJson = d3Json;
+    return new KerasPythonGenerator(graphJson).generatePythonFromGraph();
   }
 }

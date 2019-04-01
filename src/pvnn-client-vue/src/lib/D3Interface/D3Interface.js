@@ -72,9 +72,15 @@ export default class {
     }
   }
 
-  generatePython(backendUrl) {
+  generatePythonInBrowser(kerasInterface) {
     if (this.activeGraph !== undefined) {
-      this.activeGraph.generatePython(backendUrl);
+      this.activeGraph.generatePythonInBrowser(kerasInterface);
+    }
+  }
+
+  generatePythonOnBackend(backendUrl) {
+    if (this.activeGraph !== undefined) {
+      this.activeGraph.generatePythonOnBackend(backendUrl);
     }
   }
 
