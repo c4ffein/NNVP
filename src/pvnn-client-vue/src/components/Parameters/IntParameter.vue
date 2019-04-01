@@ -1,27 +1,27 @@
 <template>
-  <div id="parameters-block">
-    <span>
-        {{name}} :
+  <div class="parameter-block">
+    <label class="parameter-name">
+      {{name}}
+      <input
+        v-if="isConditionsNotRanged()"
+        type="number"
+        v-bind:min="minCond"
+        v-bind:max="maxCond"
+        placeholder="Enter Int Value"
+        @change="updateParamFromKerasLayer"
+        v-model="valueContainer"
+      >
+      <div v-else>
         <input
-          v-if="isConditionsNotRanged()"
-          type="number"
+          type="range"
           v-bind:min="minCond"
           v-bind:max="maxCond"
-          placeholder="Enter Int Value"
           @change="updateParamFromKerasLayer"
           v-model="valueContainer"
         >
-        <div v-else>
-          <input
-            type="range"
-            v-bind:min="minCond"
-            v-bind:max="maxCond"
-            @change="updateParamFromKerasLayer"
-            v-model="valueContainer"
-          >
-           : {{valueContainer}}
-        </div>
-    </span>
+         : {{valueContainer}}
+      </div>
+    </label>
   </div>
 </template>
 
@@ -79,7 +79,7 @@ export default {
           const strMaxCond = this.conditions[1];
           if (strMaxCond.slice(0, 2) === '<=') {
             this.maxCond = parseInt(strMaxCond.slice(2), 10);
-          } else { // cas du inférieur stricte
+          } else { // cas du inférieur strict
             this.maxCond = parseInt(strMaxCond.slice(1), 10) - 1;
           }
         }
@@ -90,7 +90,12 @@ export default {
 // TODO Maybe manage int range in the component getting spec from parameter Details
 </script>
 
-<!-- Add "scoped" attribute to limit CSS to this component only -->
-<style >
-
+<style>
+.parameter-select > input::-ms-expand {
+  display: none;
+}
+.parameter-select > input{
+  -webkit-appearance: none;
+  appearance: none;
+}
 </style>

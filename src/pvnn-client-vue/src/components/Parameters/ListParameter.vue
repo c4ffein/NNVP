@@ -1,11 +1,13 @@
 <template>
-  <div id="parameters-block">
-    <span>
-      {{name}} :
-      <select v-model="selectedParameterValue" @change="updateParamFromKerasLayer">
-        <option v-bind:key="item" v-for="item in valueList" v-bind:value="item">{{item}}</option>
-      </select>
-    </span>
+  <div class="parameter-block">
+    <label>
+      {{name}}
+      <div class="parameter-select list-parameter">
+        <select v-model="selectedParameterValue" @change="updateParamFromKerasLayer">
+          <option v-bind:key="item" v-for="item in valueList" v-bind:value="item">{{item}}</option>
+        </select>
+      </div>
+    </label>
   </div>
 </template>
 
@@ -31,6 +33,14 @@ export default {
 };
 </script>
 
-<!-- Add "scoped" attribute to limit CSS to this component only -->
-<style >
+<style>
+.parameter-select.list-parameter {
+  width: 100%;
+  display: block;
+}
+.parameter-select.list-parameter > select {
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+}
 </style>
