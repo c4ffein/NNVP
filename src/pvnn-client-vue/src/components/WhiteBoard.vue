@@ -43,7 +43,7 @@ export default {
   padding: 0;
 }
 #backgroud {
-  fill: grey;
+  fill: rgba(240, 240, 240, 0.8);;
 }
 #whitePage {
   fill: white;
@@ -54,7 +54,7 @@ export default {
   shape-rendering: crispEdges;
 }
 .borderClass {
-  fill: grey;
+  fill: rgba(240, 240, 240, 0.8);
   stroke: none;
 }
 .borderClass.active {
@@ -62,8 +62,8 @@ export default {
   stroke: none;
 }
 .borderListerClass{
-  fill: grey;
-  stroke: grey;
+  fill: rgba(240, 240, 240, 0.8);
+  stroke: rgba(240, 240, 240, 0.8);
   opacity: 0.1;
 }
 .d3Layer rect {
