@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="RightBar">
     <h4 v-if="selectedNode.e.length === 0">No layers selected</h4>
     <div id="rightbar-block" class="rightbar-block" v-if="nodeIsSelected()">
       <div
@@ -61,7 +61,6 @@
             <br>
           </div>
         </div>
-
       </div>
     </div>
   </div>
@@ -143,10 +142,22 @@ export default {
   font-family: "Roboto Thin";
   src: url("/assets/fonts/Roboto-Thin-webfont.woff") format("woff");
 }
+.RightBar {
+  height: 100%;
+  box-sizing: border-box;
+  -moz-box-sizing: border-box;
+  -webkit-box-sizing: border-box;
+  border-left: 1px solid rgba(100, 100, 100, 0.3);
+  background-color: rgba(255, 255, 255, 0.8);
+}
+.RightBar > h4 {
+  display: inline-block;
+}
 .rightbar-block {
   font-family: "Roboto Thin";
   font-size: 15px;
   user-select: none;
+  min-height: 100%;
 }
 .rightbar-block > .layerBlock > .title {
   background-color: rgba(200, 200, 200, 0.2);
@@ -179,16 +190,37 @@ export default {
 .rightbar-block > .layerBlock.closed > .title > .arrow {
   transform: rotate(90deg) translateY(-10%);
 }
+.rightbar-block > .layerBlock > .parametersList {
+  padding-left: 1px;
+  padding-right: 1px;
+}
 .rightbar-block > .layerBlock.closed > .parametersList {
   height: 0;
   overflow: hidden;
 }
 .rightbar-block > .layerBlock > .parametersList > .layer {
   text-align: left;
-  padding: 3px;
+  padding: 4px;
 }
-.rightbar-block > .layerBlock > .parametersList > .layer:hover {
-  outline: 1px solid rgba(150, 150, 150, 0.8);
+button, input[type="button"], input[type="submit"], input, select {
+  color: #000000;
+  font-family: 'Avenir', Helvetica, Arial, sans-serif;
+  background-color: #FFFFFF;
+  border: 1px solid;
+  border-color: rgba(200,200,200,0.8);
+  //width: 100%;
 }
-
+input.arrows {
+  color: #FFFFFF;
+  background-color: #FFFFFF;
+  border: 1px solid;
+  border-color: rgba(200,200,200,0.8);
+}
+select:-moz-focusring {
+  color: transparent;
+  text-shadow: 0 0 0 #000000;
+}
+option:not(:checked) {
+  color: black; /* prevent <option>s from becoming transparent as well */
+}
 </style>
