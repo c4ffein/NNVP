@@ -1,4 +1,4 @@
-# pvnn-client-vue
+# nnvp-client-vue
 
 ## Project setup
 ```

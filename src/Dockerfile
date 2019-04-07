@@ -1,5 +1,5 @@
 FROM node AS builder
-ENV CLIENTFOLDER pvnn-client-vue
+ENV CLIENTFOLDER nnvp-client-vue
 
 COPY $CLIENTFOLDER/package.json $CLIENTFOLDER/package-lock.json ./
 #COPY $CLIENTFOLDER/package.json ./
