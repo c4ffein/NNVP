@@ -147,8 +147,6 @@ export default {
   box-sizing: border-box;
   -moz-box-sizing: border-box;
   -webkit-box-sizing: border-box;
-  border-left: 1px solid rgba(100, 100, 100, 0.3);
-  background-color: rgba(255, 255, 255, 0.8);
 }
 .RightBar > h4 {
   display: inline-block;

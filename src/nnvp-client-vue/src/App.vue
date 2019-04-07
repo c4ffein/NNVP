@@ -25,6 +25,10 @@ export default {
 </script>
 
 <style>
+body,html {
+  position: fixed; /* disable scroll bounce effect for Safari */
+}
+
 #app {
   height: 100vh;
   width: 100vw;
@@ -64,6 +68,7 @@ export default {
   background-color: rgba(240, 240, 240, 1);
   font-family: 'Avenir', Helvetica, Arial, sans-serif;
   text-align: center;
+  border-right: 1px solid rgba(100, 100, 100, 0.3);
 }
 #app > .rightBar {
   width: 223px;
@@ -72,6 +77,8 @@ export default {
   font-family: 'Avenir', Helvetica, Arial, sans-serif;
   text-align: center;
   color: #2c3e50;
+  border-left: 1px solid rgba(100, 100, 100, 0.3);
+  background-color: rgba(255, 255, 255, 0.8);
 }
 #app > .whiteBoard {
   max-width: 100%;
