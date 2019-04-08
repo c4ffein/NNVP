@@ -60,7 +60,6 @@ export default function D3GraphEditor(svg, d3Layers, d3Edges) {
   thisGraph.selectedNodes = [];
   thisGraph.selectedEdge = null;
   thisGraph.mouseover_node = null;
-  thisGraph.lastKeyDown = -1;
   thisGraph.selectedText = null;
   thisGraph.layerDrag = false;
 
@@ -72,7 +71,6 @@ export default function D3GraphEditor(svg, d3Layers, d3Edges) {
   // Keylistener
   d3.select(window)
     .on("keydown", () => thisGraph.svgKeyDown.call(thisGraph))
-    .on("keyup", () => thisGraph.svgKeyUp.call(thisGraph));
 
   // Svg is the html tag svg selected with d3.select()
   thisGraph.svg = svg;
@@ -125,8 +123,8 @@ export default function D3GraphEditor(svg, d3Layers, d3Edges) {
     .scaleExtent([0.5, 2.5])
     .on("start", () => {
       //transformOrigin = {x: d3.event.transform.x, y: d3.event.transform.y};
-      // If CTRL_KEY is push, event multiple selection is triggered
-      if (thisGraph.lastKeyDown === D3GraphEditor.CTRL_KEY) {
+      // If shiftKey is down, trigger multiple selection
+      if (window.event.shiftKey) {
         thisGraph.svgG.append("g").attr("id", "selectionRect").selectAll("rect")
           .data([origineSelection = {x:d3.mouse(thisGraph.svgG.node())[0], y:d3.mouse(thisGraph.svgG.node())[1]}])
           .enter()
@@ -139,11 +137,11 @@ export default function D3GraphEditor(svg, d3Layers, d3Edges) {
     })
     .on("zoom", () => {
       // During the zoom (drag + wheel on mouse)
-      // If CTRL_KEY isn't push, call, apply the transformation on all the svgG using attribute transform
-      if (!(thisGraph.lastKeyDown === D3GraphEditor.CTRL_KEY)) {
+      // If shiftKey isn't down, apply the transformation on all the svgG using attribute transform
+      if (!(window.event.shiftKey)) {
         thisGraph.zoomed.call(thisGraph);
       }
-      // If CTRL_KEY is push, extend or reduce the selection's rectangle
+      // else, extend or reduce the selection's rectangle
       else {
         d3.select("#selectionRect").selectAll("rect")
           .attr("x", d =>
@@ -423,18 +421,20 @@ D3GraphEditor.prototype.updateGraph = function () {
  */
 D3GraphEditor.prototype.svgKeyDown = function () {
   var thisGraph = this;
-  D3GraphEditor.keyDownArray.push(d3.event.keyCode);
-  let firstKey = D3GraphEditor.keyDownArray[0];
-  let secondKey = D3GraphEditor.keyDownArray[1] || null;
-  // make sure repeated key presses don't register for each keydown
-  if (thisGraph.lastKeyDown !== -1 && secondKey == null) return;
+  let modKeyPressed;
+  const isApple = navigator.platform.match(/(Mac|iPhone|iPod|iPad)/i);
+  if(isApple) {
+    modKeyPressed = d3.event.metaKey;
+  }
+  else {
+    modKeyPressed = d3.event.ctrlKey;
+  }
   // check if an input element isn't focused
   let inputs = ['input', 'select', 'button', 'textarea'];
-  if (document.activeElement && inputs.indexOf(document.activeElement.tagName.toLowerCase()) !== -1) {
+  if (document.activeElement && inputs.includes(document.activeElement.tagName.toLowerCase())) {
     return false;
   }
-  thisGraph.lastKeyDown = d3.event.keyCode;
-  switch(firstKey) {
+  switch(d3.event.keyCode) {
     // Case when we want to delete some layer
     case D3GraphEditor.BACKSPACE_KEY:
     case D3GraphEditor.DELETE_KEY:
@@ -460,31 +460,24 @@ D3GraphEditor.prototype.svgKeyDown = function () {
         thisGraph.selectedEdge = null;
       }
       break;
-  case D3GraphEditor.CTRL_KEY:
-    if(secondKey == D3GraphEditor.C_Key) {
-      /*
-      thisGraph.nodesCopy = [];
-      thisGraph.selectedNodes.forEach(val => {thisGraph.nodesCopy.push(val);});
-      */
-      console.log("Ctrl-C not implemented");
-    }
-    else if(secondKey == D3GraphEditor.V_Key)  {
-      /*
-      thisGraph.nodesCopy.forEach(val => this.addLayer(val.kerasLayer, val.x + val.width /2, val.y+ val.height));
-      */
-      console.log("Ctrl-V not implemented");
-    }
-    break;
+    case D3GraphEditor.C_Key:
+      if(modKeyPressed) {
+        /*
+        thisGraph.nodesCopy = [];
+        thisGraph.selectedNodes.forEach(val => {thisGraph.nodesCopy.push(val);});
+        */
+        console.log("Ctrl-C not implemented");
+      }
+      break;
+    case D3GraphEditor.V_Key:
+      if(modKeyPressed)  {
+        /*
+        thisGraph.nodesCopy.forEach(val => this.addLayer(val.kerasLayer, val.x + val.width /2, val.y+ val.height));
+        */
+        console.log("Ctrl-V not implemented");
+      }
+      break;
   }
-};
-
-/**
- * Call to handle a key unlock, sometime d3 element can handle this themselves
- * But when they can't, use this function to implement what to do
- */
-D3GraphEditor.prototype.svgKeyUp = function () {
-  this.lastKeyDown = -1;
-  D3GraphEditor.keyDownArray = [];
 };
 
 D3GraphEditor.prototype.dragged = function (layer) {

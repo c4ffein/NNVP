@@ -167,7 +167,7 @@ D3Layer.prototype.drawLayer = function (d3node, graph) {
 
   gElement
     .on("click", () => {
-      if (graph.lastKeyDown === D3GraphEditor.CTRL_KEY) {
+      if (d3.event.shiftKey) {
         graph.selectOnNode.call(graph, thisLayer);
       }
       else {
