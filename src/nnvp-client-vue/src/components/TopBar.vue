@@ -3,9 +3,10 @@ export default {
   name: 'TopBar',
   render(h) { // eslint-disable-line
     const generateMenu = (menu, level) => {
-      if (typeof (menu) !== 'function') {
+      if (typeof (menu) !== 'function' && !Array.isArray(menu)) {
         const rows = Object.entries(menu).map((entry, i) => (
-          <li class="menuItem TopBar" key={i}
+          <li key={i}
+            class={`menuItem TopBar ${this.isItemDisabled(entry[0], entry[1]) ? 'disabled' : ''}`}
             onClick={() => this.levelNClickHandler(entry[0], entry[1])}
             onMouseover={event => this.levelNHoverHandler(entry[0], entry[1], event, level)}
           >
@@ -33,31 +34,35 @@ export default {
       </ul>
     );
   },
-  data: () => ({
-    menu: {
-      File: {
-        New() { this.$d3Interface.clearBoard(); },
-        Load() { this.$d3Interface.loadBoard(); },
-        OpenRecent: {
-          template1: () => { },
-          template2: () => { },
-          template3: () => { },
+  data() {
+    return {
+      menu: {
+        File: {
+          New() { this.$d3Interface.clearBoard(); },
+          Load() { this.$d3Interface.loadBoard(); },
+          OpenRecent: {
+            template1: () => { },
+            template2: () => { },
+            template3: () => { },
+          },
+          Save() { this.$d3Interface.saveBoard(); },
+          // TODO : if connected to backend, should call
+          // generatePythonOnBackend('/api/generate') instead
+          Generate() { this.$d3Interface.generatePythonInBrowser(this.$kerasInterface); },
         },
-        Save() { this.$d3Interface.saveBoard(); },
-        // TODO : if connected to backend, should call
-        // generatePythonOnBackend('/api/generate') instead
-        Generate() { this.$d3Interface.generatePythonInBrowser(this.$kerasInterface); },
+        Edit: {
+          Undo: [() => this.$d3Interface.undo(), () => (this.undoStackContainer.e.length === 0)],
+          Redo: [() => this.$d3Interface.redo(), () => (this.redoStackContainer.e.length === 0)],
+          Group() { this.$d3Interface.createGroup(); },
+        },
+        Help: () => { },
       },
-      Edit: {
-        Undo() { this.$d3Interface.undo(); },
-        Redo() { this.$d3Interface.redo(); },
-        Group() { this.$d3Interface.createGroup(); },
-      },
-      Help: () => { },
-    },
-    activatedState: false,
-    activatedChain: [],
-  }),
+      activatedState: false,
+      activatedChain: [],
+      undoStackContainer: this.$d3Interface.getUndoStackContainer(),
+      redoStackContainer: this.$d3Interface.getRedoStackContainer(),
+    };
+  },
   methods: {
     level0ClickHandler(menuTitle, menuContent, event) {
       if (typeof (menuContent) === 'function') {
@@ -91,8 +96,12 @@ export default {
       }
     },
     levelNClickHandler(menuTitle, menuContent) {
-      if (typeof (menuContent) === 'function') {
-        menuContent.apply(this);
+      if (this.isItemDisabled(menuTitle, menuContent)) {
+        return;
+      }
+      const content = Array.isArray(menuContent) ? menuContent[0] : menuContent;
+      if (typeof (content) === 'function') {
+        content.apply(this);
         this.deactivateChain();
       }
     },
@@ -106,11 +115,17 @@ export default {
       while (this.$data.activatedChain.length > level) {
         this.$data.activatedChain.pop().classList.remove('activated');
       }
-      if (typeof (menuContent) !== 'function') {
+      if (typeof (menuContent) !== 'function' && !Array.isArray(menuContent)) {
         element.classList.add('activated');
         this.$data.activatedChain.push(element);
       }
       event.stopPropagation();
+    },
+    isItemDisabled(menuTitle, menuContent) {
+      if (!Array.isArray(menuContent)) {
+        return false;
+      }
+      return menuContent[1]();
     },
     deactivateChain() {
       for (let i = 0; i < this.$data.activatedChain.length; i += 1) {
@@ -187,6 +202,9 @@ export default {
  margin: 2px 2px 2px 2px;
  border-radius: 2px;
  transition: 0.2s;
+}
+.menuItem.disabled {
+  color: grey;
 }
 #TopBar .menuItem > .dropdown-content {
   left: 100%;

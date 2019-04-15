@@ -546,7 +546,8 @@ D3GraphEditor.prototype.layerMouseUp = function (layer) {
  */
 D3GraphEditor.prototype.saveState = function () {
   let thisGraph = this;
-  thisGraph.redoStack = [];
+  // Next line is implemented that way to keep Vue getters and setters
+  thisGraph.redoStack.splice(0, thisGraph.redoStack.length);
   thisGraph.undoStack.push(thisGraph.toJSON());
 };
 

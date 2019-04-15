@@ -2,7 +2,9 @@ export default class {
   constructor() {
     this.graphEditors = [];
     this.activeGraph = null;
-    this.activeElements = { e: [] };
+    this.activeElementsContainer = { e: [] };
+    this.undoStackContainer = { e: [] };
+    this.redoStackContainer = { e: [] };
     // TODO : next line, boolean to know if there is data?
     window.onbeforeunload = () => 'Warning : all unsaved data will be lost';
   }
@@ -14,11 +16,21 @@ export default class {
 
   setActiveGraphEditor(graphEditor) {
     this.activeGraph = graphEditor;
-    this.activeElements.e = this.activeGraph.selectedNodes;
+    this.activeElementsContainer.e = this.activeGraph.selectedNodes;
+    this.undoStackContainer.e = this.activeGraph.undoStack;
+    this.redoStackContainer.e = this.activeGraph.redoStack;
   }
 
   getActiveElementsContainer() {
-    return this.activeElements;
+    return this.activeElementsContainer;
+  }
+
+  getUndoStackContainer() {
+    return this.undoStackContainer;
+  }
+
+  getRedoStackContainer() {
+    return this.redoStackContainer;
   }
 
   getActiveElements() {
