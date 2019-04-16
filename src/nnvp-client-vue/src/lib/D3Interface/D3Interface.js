@@ -40,6 +40,12 @@ export default class {
     return null;
   }
 
+  deleteSelectedElements() {
+    if (this.activeGraph !== undefined) {
+      this.activeGraph.deleteSelectedElements();
+    }
+  }
+
   addGraphEditor(graphEditor) {
     this.graphEditors.push(graphEditor);
     if (this.graphEditors.length === 1) this.setActiveGraphEditor(graphEditor);

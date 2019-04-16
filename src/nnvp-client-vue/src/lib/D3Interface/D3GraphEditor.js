@@ -68,10 +68,6 @@ export default function D3GraphEditor(svg, d3Layers, d3Edges) {
 
   thisGraph.nodesCopy = []
 
-  // Keylistener
-  d3.select(window)
-    .on("keydown", () => thisGraph.svgKeyDown.call(thisGraph))
-
   // Svg is the html tag svg selected with d3.select()
   thisGraph.svg = svg;
 
@@ -187,16 +183,6 @@ export default function D3GraphEditor(svg, d3Layers, d3Edges) {
     thisGraph.undoSelection();
   });
 };
-
-// Define Global for keyID
-D3GraphEditor.BACKSPACE_KEY = 8;
-D3GraphEditor.DELETE_KEY = 46;
-D3GraphEditor.ENTER_KEY = 13;
-D3GraphEditor.CTRL_KEY = 17;
-D3GraphEditor.C_Key = 67;
-D3GraphEditor.V_Key = 86;
-
-D3GraphEditor.keyDownArray = [];
 
 /**
  * Call when a rectangle for multiple selction is apply
@@ -415,68 +401,28 @@ D3GraphEditor.prototype.updateGraph = function () {
   D3Background.updateBackground(thisGraph);
 };
 
-/**
- * Call to handle a key push, sometime d3 element can handle this themselves
- * But when they can't, use this function to implement what to do
- */
-D3GraphEditor.prototype.svgKeyDown = function () {
+D3GraphEditor.prototype.deleteSelectedElements = function () {
   var thisGraph = this;
-  let modKeyPressed;
-  const isApple = navigator.platform.match(/(Mac|iPhone|iPod|iPad)/i);
-  if(isApple) {
-    modKeyPressed = d3.event.metaKey;
+  if (thisGraph.selectedNodes.length > 0) {
+    // Before change occur save the cuurent State - needed to allow undo;
+    thisGraph.saveState();
+    thisGraph.selectedNodes.forEach( selectedNode => {
+      let old_edges = thisGraph.d3Edges.filter(edge => edge.source == selectedNode || edge.target == selectedNode);
+      thisGraph.d3Edges = thisGraph.d3Edges.filter(edge => edge.source != selectedNode && edge.target != selectedNode);
+      thisGraph.d3Layers = thisGraph.d3Layers.filter(layer => layer != selectedNode);
+      // delete operation need to be call after the change occur on d3Edges and d3Layers
+      selectedNode.delete(thisGraph);
+      old_edges.forEach(edge => edge.delete(thisGraph));
+    })
+    // Next line is implemented that way to keep Vue getters and setters
+    thisGraph.selectedNodes.splice(0, thisGraph.selectedNodes.length);
+    D3Background.updateBackground(thisGraph);
   }
-  else {
-    modKeyPressed = d3.event.ctrlKey;
-  }
-  // check if an input element isn't focused
-  let inputs = ['input', 'select', 'button', 'textarea'];
-  if (document.activeElement && inputs.includes(document.activeElement.tagName.toLowerCase())) {
-    return false;
-  }
-  switch(d3.event.keyCode) {
-    // Case when we want to delete some layer
-    case D3GraphEditor.BACKSPACE_KEY:
-    case D3GraphEditor.DELETE_KEY:
-      if (thisGraph.selectedNodes.length > 0) {
-        // Before change occur save the cuurent State - needed to allow undo;
-        thisGraph.saveState();
-        thisGraph.selectedNodes.forEach( selectedNode => {
-          let old_edges = thisGraph.d3Edges.filter(edge => edge.source == selectedNode || edge.target == selectedNode);
-          thisGraph.d3Edges = thisGraph.d3Edges.filter(edge => edge.source != selectedNode && edge.target != selectedNode);
-          thisGraph.d3Layers = thisGraph.d3Layers.filter(layer => layer != selectedNode);
-          // delete operation need to be call after the change occur on d3Edges and d3Layers
-          selectedNode.delete(thisGraph);
-          old_edges.forEach(edge => edge.delete(thisGraph));
-        })
-        // Next line is implemented that way to keep Vue getters and setters
-        thisGraph.selectedNodes.splice(0, thisGraph.selectedNodes.length);
-        D3Background.updateBackground(thisGraph);
-      }
-      if (thisGraph.selectedEdge !== null) {
-        this.saveState();
-        thisGraph.d3Edges.splice(thisGraph.d3Edges.indexOf(thisGraph.selectedEdge), 1);
-        thisGraph.selectedEdge.delete(thisGraph);
-        thisGraph.selectedEdge = null;
-      }
-      break;
-    case D3GraphEditor.C_Key:
-      if(modKeyPressed) {
-        /*
-        thisGraph.nodesCopy = [];
-        thisGraph.selectedNodes.forEach(val => {thisGraph.nodesCopy.push(val);});
-        */
-        console.log("Ctrl-C not implemented");
-      }
-      break;
-    case D3GraphEditor.V_Key:
-      if(modKeyPressed)  {
-        /*
-        thisGraph.nodesCopy.forEach(val => this.addLayer(val.kerasLayer, val.x + val.width /2, val.y+ val.height));
-        */
-        console.log("Ctrl-V not implemented");
-      }
-      break;
+  if (thisGraph.selectedEdge !== null) {
+    this.saveState();
+    thisGraph.d3Edges.splice(thisGraph.d3Edges.indexOf(thisGraph.selectedEdge), 1);
+    thisGraph.selectedEdge.delete(thisGraph);
+    thisGraph.selectedEdge = null;
   }
 };
 
