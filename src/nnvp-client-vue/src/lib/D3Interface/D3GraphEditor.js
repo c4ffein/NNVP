@@ -527,7 +527,6 @@ D3GraphEditor.prototype.loadState = function (txtRes) {
 D3GraphEditor.prototype.undo = function () {
   let thisGraph = this;
   if (thisGraph.undoStack.length <= 0) {
-    alert("Cannot undo more");
     return;
   }
   thisGraph.redoStack.push(thisGraph.toJSON());
@@ -541,7 +540,6 @@ D3GraphEditor.prototype.undo = function () {
 D3GraphEditor.prototype.redo = function () {
   let thisGraph = this;
   if (thisGraph.redoStack.length <= 0) {
-      alert("Cannot redo more");
       return;
   };
   thisGraph.undoStack.push(thisGraph.toJSON());
