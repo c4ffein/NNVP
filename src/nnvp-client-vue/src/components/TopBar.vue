@@ -55,7 +55,7 @@ export default {
           Redo: [() => this.$d3Interface.redo(), () => (this.redoStackContainer.e.length === 0)],
           Group() { this.$d3Interface.createGroup(); },
         },
-        Help: () => { },
+        Help: () => { window.open('https://nnvp.io'); },
       },
       activatedState: false,
       activatedChain: [],
