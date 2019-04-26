@@ -767,8 +767,11 @@ D3GraphEditor.prototype.addEventHandlerDragOnHtmlClass = function (layer, htmlEl
       )
       .on("end", () => {
         thisGraph.layerDrag = false;
-        if((origine.x !== d3.event.x || origine.y !== d3.event.y))
-          thisGraph.addLayer(layer, d3.mouse(thisGraph.svgG.node())[0], d3.mouse(thisGraph.svgG.node())[1]);
+        const targetElement = d3.event.sourceEvent.target;
+        for(let el = targetElement; el != null; el = el.parentElement){
+          if(el.id == "svgWrapper")
+            thisGraph.addLayer(layer, d3.mouse(thisGraph.svgG.node())[0], d3.mouse(thisGraph.svgG.node())[1]);
+        }
         d3.select("#dragFromLeftbar").selectAll("rect").remove();
       })
     );
