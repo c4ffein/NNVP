@@ -39,6 +39,9 @@ body,html {
     'topBar topBar topBar'
     'leftBar whiteBoard rightBar';
   background-color: #FFFFFF;
+  user-select: none;
+  /* still needed for some details with safari */
+  -webkit-user-select: none;
 }
 .topBar { grid-area: topBar; }
 .leftBar { grid-area: leftBar; }
