@@ -41,7 +41,7 @@ export default {
   height: 100%;
   margin: 0;
   padding: 0;
-  position: relative; /* Needed so first layer don't sometimes glitch with Safari */
+  position: relative; /* Needed so first layer doesn't glitch on Safari */
 }
 #backgroud {
   fill: #EEEEEE;
