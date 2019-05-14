@@ -41,9 +41,10 @@ export default {
   height: 100%;
   margin: 0;
   padding: 0;
+  position: relative; /* Needed so first layer don't sometimes glitch with Safari */
 }
 #backgroud {
-  fill: rgba(240, 240, 240, 0.8);;
+  fill: #EEEEEE;
 }
 #whitePage {
   fill: white;
@@ -54,7 +55,7 @@ export default {
   shape-rendering: crispEdges;
 }
 .borderClass {
-  fill: rgba(240, 240, 240, 0.8);
+  fill: #EEEEEE;
   stroke: none;
 }
 .borderClass.active {
@@ -62,8 +63,8 @@ export default {
   stroke: none;
 }
 .borderListerClass{
-  fill: rgba(240, 240, 240, 0.8);
-  stroke: rgba(240, 240, 240, 0.8);
+  fill: #EEEEEE;
+  stroke: #EEEEEE;
   opacity: 0.1;
 }
 .d3Layer rect {
