@@ -6,15 +6,15 @@
       <div id="parameters-block-list">
         <div
           class="layer-input-item"
-          v-for="item in inputListLayers"
-          :key="item.id"
-          :number="item.id"
+          v-for="id in inputList"
+          :key="id"
+          :number="id"
           draggable="true"
-          v-on:dragstart="itemDragStart(item.id, $event)"
-          v-on:dragover="$event.preventDefault()"
-          v-on:drop="itemDragDrop(item.id, $event)"
+          v-on:dragstart="itemDragStart(id, $event)"
+          v-on:dragover="itemDragOver(id, $event)"
+          v-on:drop="itemDragDrop(id, $event)"
         >
-          {{item.kerasLayer.name}}(id:{{item.id}})
+          {{$d3Interface.getLayerById(id).kerasLayer.name}}(id:{{id}})
         </div>
       </div>
     </span>
@@ -26,37 +26,34 @@ export default {
   name: 'InputOrderParameter',
   props: {
     name: String,
-    // value: {},
     activeLayer: null,
     inputLayers: null,
   },
   data() {
     return {
-      // valueList: this.value,
-      // inputListData: this.inputLayers,
-      inputListData: this.activeLayer.inputLayers,
+      inputList: this.activeLayer.inputLayers,
       draggedId: null,
     };
-  },
-  computed: {
-    inputListLayers() {
-      const ret = [];
-      for (let i = 0; i < this.inputListData.length; i += 1) {
-        ret.push(this.$d3Interface.getLayerById(this.inputListData[i]));
-      }
-      return ret;
-    },
   },
   methods: {
     itemDragStart(layerId, event) {
       this.draggedId = layerId;
       event.dataTransfer.setData('text/html', this.draggedId);
     },
+    itemDragOver(targetId, event) {
+      event.preventDefault();
+      const sourceId = this.draggedId;
+      this.reorderList(this.inputList, sourceId, targetId);
+    },
     itemDragDrop(targetId, event) {
       event.preventDefault();
       const sourceId = this.draggedId;
-      const idList = this.inputListData;
-      if (idList.indexOf(sourceId) > idList.indexOf(targetId)) {
+      this.reorderList(this.inputList, sourceId, targetId);
+    },
+    reorderList(idList, sourceId, targetId) {
+      if (idList.indexOf(sourceId) === idList.indexOf(targetId)) {
+        return;
+      } if (idList.indexOf(sourceId) > idList.indexOf(targetId)) {
         idList.splice(idList.indexOf(sourceId), 1);
         idList.splice(idList.indexOf(targetId), 0, sourceId);
       } else {
