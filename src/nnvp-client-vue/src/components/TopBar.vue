@@ -152,6 +152,7 @@ export default {
 #TopBar {
   height: 100%;
   user-select: none;
+  cursor: default;
   font-family: "Roboto Thin";
   font-size: 15px;
   box-sizing: border-box;
