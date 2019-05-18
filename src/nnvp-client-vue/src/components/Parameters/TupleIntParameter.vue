@@ -2,11 +2,10 @@
   <div id="parameters-block">
     <span>
         {{name}} :
-        <!-- TODO implement tuple int render field -->
-        <input v-model="inputValue" type="number" placeholder="1">
-        <button @click="addValueToTupleArray(inputValue)">Add </button>
-        <button @click="clearValues">Clear</button>
-        {{values}}
+        <button @click="addElementToArray">Add</button>
+        <button @click="removeElementToArray">Delete</button>
+        <input v-for="i of values.keys()" :key="i"
+          v-model.number="values[i]" type="number" placeholder="1">
     </span>
   </div>
 </template>
@@ -25,29 +24,31 @@ export default {
     };
   },
   methods: {
-    addValueToTupleArray(val) {
+    addElementToArray() {
       if (this.values === undefined) {
         this.values = [];
       }
-      // console.log(`last Val :: ${val}`);
-      this.values.push(parseInt(val, 10));
+      this.values.push(parseInt(1, 10));
       this.updateParamFromKerasLayer();
     },
-    clearValues() {
-      this.values = [];
+    removeElementToArray() {
+      if (this.values === undefined) {
+        this.values = [];
+      }
+      this.values.splice(-1);
       this.updateParamFromKerasLayer();
     },
-
     updateParamFromKerasLayer() {
       this.activeLayer.setParameterValue(this.name, this.values);
     },
-
+  },
+  created() {
+    if (this.values === undefined) {
+      this.values = [];
+    }
   },
 };
-
 </script>
 
-<!-- Add "scoped" attribute to limit CSS to this component only -->
 <style >
-
 </style>
