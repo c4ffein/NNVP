@@ -9,7 +9,7 @@
 
 <script>
 import TopBar from './components/TopBar.vue';
-import LeftBar from './components/LeftBar.vue';
+import LeftBar from './components/LeftBar/LeftBar.vue';
 import RightBar from './components/RightBar.vue';
 import WhiteBoard from './components/WhiteBoard.vue';
 
@@ -55,6 +55,7 @@ body,html {
   margin: 0;
   padding: 0;
   overflow: hidden;
+  user-select: none;
 }
 
 #app > .topBar {

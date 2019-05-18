@@ -5,6 +5,7 @@ export default class {
     this.activeElementsContainer = { e: [] };
     this.undoStackContainer = { e: [] };
     this.redoStackContainer = { e: [] };
+    this.leftBarRemountCallback = () => false;
     // TODO : next line, boolean to know if there is data?
     window.onbeforeunload = () => 'Warning : all unsaved data will be lost';
   }
@@ -19,6 +20,7 @@ export default class {
     this.activeElementsContainer.e = this.activeGraph.selectedNodes;
     this.undoStackContainer.e = this.activeGraph.undoStack;
     this.redoStackContainer.e = this.activeGraph.redoStack;
+    this.leftBarRemountCallback();
   }
 
   getActiveElementsContainer() {
@@ -34,14 +36,14 @@ export default class {
   }
 
   getActiveElements() {
-    if (this.activeGraph !== undefined) {
+    if (this.activeGraph !== null) {
       return this.activeGraph.selectedNodes;
     }
     return null;
   }
 
   deleteSelectedElements() {
-    if (this.activeGraph !== undefined) {
+    if (this.activeGraph !== null) {
       this.activeGraph.deleteSelectedElements();
     }
   }
@@ -52,58 +54,62 @@ export default class {
   }
 
   addLayer(kerasLayer) {
-    if (this.activeGraph !== undefined) {
+    if (this.activeGraph !== null) {
       this.activeGraph.addLayer(kerasLayer);
     }
   }
 
+  setLeftBarRemountCallback(func) {
+    this.leftBarRemountCallback = func;
+  }
+
   addEventHandlerDragOnHtmlClass(layer, element) {
-    if (this.activeGraph !== undefined) {
+    if (this.activeGraph !== null) {
       this.activeGraph.addEventHandlerDragOnHtmlClass(layer, element);
     }
   }
 
   // Undo and Redo
   undo() {
-    if (this.activeGraph !== undefined) {
+    if (this.activeGraph !== null) {
       this.activeGraph.undo();
     }
   }
 
   redo() {
-    if (this.activeGraph !== undefined) {
+    if (this.activeGraph !== null) {
       this.activeGraph.redo();
     }
   }
 
   // Group layers
   createGroup() {
-    if (this.activeGraph !== undefined) {
+    if (this.activeGraph !== null) {
       this.activeGraph.createComposite();
     }
   }
 
   // Menu functions
   saveBoard() {
-    if (this.activeGraph !== undefined) {
+    if (this.activeGraph !== null) {
       this.activeGraph.saveBoard();
     }
   }
 
   generatePythonInBrowser(kerasInterface) {
-    if (this.activeGraph !== undefined) {
+    if (this.activeGraph !== null) {
       this.activeGraph.generatePythonInBrowser(kerasInterface);
     }
   }
 
   generatePythonOnBackend(backendUrl) {
-    if (this.activeGraph !== undefined) {
+    if (this.activeGraph !== null) {
       this.activeGraph.generatePythonOnBackend(backendUrl);
     }
   }
 
   loadBoard() {
-    if (this.activeGraph !== undefined) {
+    if (this.activeGraph !== null) {
       document.getElementById('hidden-file-upload').click();
     }
   }
@@ -113,7 +119,7 @@ export default class {
   //  whiteboard.activeGraph.uploadToBoard(uploadFileEvent);
   // });
   clearBoard() {
-    if (this.activeGraph !== undefined) {
+    if (this.activeGraph !== null) {
       this.activeGraph.clearBoard(false);
     }
   }

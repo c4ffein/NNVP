@@ -1,5 +1,5 @@
 <template>
-  <div class="LeftBar">
+  <div class="LeftBar" :key="reloadKey">
     <!--button
       id="interfaceTest"
       v-on:click="
@@ -24,24 +24,24 @@
         <div class="arrow">▲</div>
       </div>
       <div class="layerList">
-        <div
-          class="layer"
+        <LayerTemplate
           v-for="(layerContent, layerName) in filteredSearchList(layers)"
-          v-bind:key="layerName.id"
-          v-bind:id="'layer-template-' + layerName"
-          draggable="true"
-          @mouseover="addDragAndDropToCanvas(layerContent, $event.target)"
-          v-on:dragstart="$event.dataTransfer.setData('text/html', '<h1>test</h1>')"
-          @click="$d3Interface.addLayer(layerContent.clone())"
-        >{{ layerName }}</div>
+          v-bind:layerName="layerName" v-bind:layerContent="layerContent"
+          :key="layerName.id" :id="'layer-template-' + layerName"
+        />
       </div>
     </div>
   </div>
 </template>
 
 <script>
+import LayerTemplate from './LayerTemplate.vue';
+
 export default {
   name: 'LeftBar',
+  components: {
+    LayerTemplate,
+  },
   methods: {
     toggleCategory: categoryDiv => document.getElementById(categoryDiv).classList.toggle('closed'),
     divId: categoryName => `category_${categoryName.replace(' ', '_')}`,
@@ -81,13 +81,17 @@ export default {
       }
       return false;
     },
-    addDragAndDropToCanvas(layer, element) {
-      this.$d3Interface.addEventHandlerDragOnHtmlClass(layer.clone(), element);
+    remount() {
+      this.reloadKey += 1;
     },
   },
   data: () => ({
     searchBox: '',
+    reloadKey: 0, // Quick hack to reload LeftBar when selected GraphEditor changes
   }),
+  mounted() {
+    this.$d3Interface.setLeftBarRemountCallback(this.remount);
+  },
 };
 </script>
 
@@ -104,6 +108,7 @@ export default {
   font-family: "Roboto Thin";
   font-size: 15px;
   user-select: none;
+  -webkit-user-select: none;
 }
 #layerSearchBox {
   background-color: #ffffff;
@@ -157,8 +162,5 @@ export default {
 }
 .LeftBar > .layerCategory > .layerList > .layer:hover {
   outline: 1px solid rgba(150, 150, 150, 0.8);
-}
-.LeftBar > #hidden-file-upload {
-  display: none;
 }
 </style>
