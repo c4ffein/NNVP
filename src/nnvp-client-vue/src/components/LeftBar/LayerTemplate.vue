@@ -27,14 +27,6 @@ export default {
 </script>
 
 <style>
-@font-face {
-  font-family: "Roboto Regular";
-  src: url("/assets/fonts/Roboto-Regular-webfont.woff") format("woff");
-}
-@font-face {
-  font-family: "Roboto Thin";
-  src: url("/assets/fonts/Roboto-Thin-webfont.woff") format("woff");
-}
 .LayerTemplate {
   text-align: left;
   padding: 3px;
