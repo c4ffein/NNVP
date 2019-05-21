@@ -120,7 +120,7 @@ export default function D3GraphEditor(svg, d3Layers, d3Edges) {
     .on("start", () => {
       //transformOrigin = {x: d3.event.transform.x, y: d3.event.transform.y};
       // If shiftKey is down, trigger multiple selection
-      if (window.event.shiftKey) {
+      if (d3.event.sourceEvent.shiftKey) {
         thisGraph.svgG.append("g").attr("id", "selectionRect").selectAll("rect")
           .data([origineSelection = {x:d3.mouse(thisGraph.svgG.node())[0], y:d3.mouse(thisGraph.svgG.node())[1]}])
           .enter()
@@ -134,7 +134,7 @@ export default function D3GraphEditor(svg, d3Layers, d3Edges) {
     .on("zoom", () => {
       // During the zoom (drag + wheel on mouse)
       // If shiftKey isn't down, apply the transformation on all the svgG using attribute transform
-      if (!(window.event.shiftKey)) {
+      if (!(d3.event.sourceEvent.shiftKey)) {
         thisGraph.zoomed.call(thisGraph);
       }
       // else, extend or reduce the selection's rectangle
