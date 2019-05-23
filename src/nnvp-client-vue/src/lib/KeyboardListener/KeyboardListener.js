@@ -3,7 +3,7 @@ export default class {
     const isApple = navigator.platform.match(/(Mac|iPhone|iPod|iPad)/i);
     const inputs = ['input', 'select', 'button', 'textarea'];
 
-    const onKeyPress = (event) => {
+    const onKeyDown = (event) => {
       if (document.activeElement && inputs.includes(document.activeElement.tagName.toLowerCase())) {
         return false;
       }
@@ -53,6 +53,6 @@ export default class {
       }
       return true;
     };
-    window.addEventListener('keypress', onKeyPress);
+    window.addEventListener('keydown', onKeyDown);
   }
 }
