@@ -3,20 +3,23 @@ export default class {
     const isApple = navigator.platform.match(/(Mac|iPhone|iPod|iPad)/i);
     const inputs = ['input', 'select', 'button', 'textarea'];
 
-    const onKeyDown = (event) => {
+    const isModKeyPressed = (event) => {
+      if (isApple) {
+        return event.metaKey;
+      }
+      return event.ctrlKey;
+    };
+
+    // Need to listen to keypress for exemple for Cmd-Z on Safari,
+    // which doesn't prevent default behaviour with keydown...
+    const onKeyPress = (event) => {
       if (document.activeElement && inputs.includes(document.activeElement.tagName.toLowerCase())) {
         return false;
       }
 
-      let modKeyPressed;
-      if (isApple) {
-        modKeyPressed = event.metaKey;
-      } else {
-        modKeyPressed = event.ctrlKey;
-      }
+      const modKeyPressed = isModKeyPressed(event);
 
       switch (event.code) {
-        case 'Backspace':
         case 'Delete':
           d3Interface.deleteSelectedElements();
           break;
@@ -47,6 +50,23 @@ export default class {
             d3Interface.redo();
             event.preventDefault();
           }
+          break;
+        default:
+          return false;
+      }
+      return true;
+    };
+    window.addEventListener('keypress', onKeyPress);
+
+    // Need to listen to keydown for exemple for backspace on Chrome, don't send event otherwise
+    const onKeyDown = (event) => {
+      if (document.activeElement && inputs.includes(document.activeElement.tagName.toLowerCase())) {
+        return false;
+      }
+
+      switch (event.code) {
+        case 'Backspace':
+          d3Interface.deleteSelectedElements();
           break;
         default:
           return false;
