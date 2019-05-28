@@ -51,6 +51,12 @@ export default class {
             event.preventDefault();
           }
           break;
+        case 'KeyG':
+          if (modKeyPressed) {
+            d3Interface.createGroup();
+            event.preventDefault();
+          }
+          break;
         default:
           return false;
       }
