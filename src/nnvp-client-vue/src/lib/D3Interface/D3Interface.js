@@ -96,6 +96,12 @@ export default class {
     }
   }
 
+  generatePython(kerasInterface) { // Will act accordingly to setup on later versions
+    if (this.activeGraph !== null) {
+      this.activeGraph.generatePythonInBrowser(kerasInterface);
+    }
+  }
+
   generatePythonInBrowser(kerasInterface) {
     if (this.activeGraph !== null) {
       this.activeGraph.generatePythonInBrowser(kerasInterface);

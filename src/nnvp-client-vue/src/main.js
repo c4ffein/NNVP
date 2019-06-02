@@ -10,10 +10,11 @@ Vue.config.productionTip = false;
 // This file is generated from api/keras_layers.py. Temporary file for early
 // development versions, should later be automatically generated at build time.
 
-Object.defineProperty(Vue.prototype, '$kerasInterface', { value: new KerasInterface(jsonLayersFile) });
+const kerasInterface = new KerasInterface(jsonLayersFile);
+Object.defineProperty(Vue.prototype, '$kerasInterface', { value: kerasInterface });
 const d3Interface = new D3Interface();
 Object.defineProperty(Vue.prototype, '$d3Interface', { value: d3Interface });
-Object.defineProperty(Vue.prototype, '$keyboardListener', { value: new KeyboardListener(d3Interface) });
+Object.defineProperty(Vue.prototype, '$keyboardListener', { value: new KeyboardListener(d3Interface, kerasInterface) });
 
 new Vue({
   render: h => h(App),

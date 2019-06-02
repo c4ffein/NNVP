@@ -1,5 +1,5 @@
 export default class {
-  constructor(d3Interface) {
+  constructor(d3Interface, kerasInterface) {
     const isApple = navigator.platform.match(/(Mac|iPhone|iPod|iPad)/i);
     const inputs = ['input', 'select', 'button', 'textarea'];
 
@@ -54,6 +54,24 @@ export default class {
         case 'KeyG':
           if (modKeyPressed) {
             d3Interface.createGroup();
+            event.preventDefault();
+          }
+          break;
+        case 'KeyO':
+          if (modKeyPressed) {
+            d3Interface.loadBoard();
+            event.preventDefault();
+          }
+          break;
+        case 'KeyS':
+          if (modKeyPressed) {
+            d3Interface.saveBoard();
+            event.preventDefault();
+          }
+          break;
+        case 'KeyX':
+          if (modKeyPressed) {
+            d3Interface.generatePython(kerasInterface);
             event.preventDefault();
           }
           break;
