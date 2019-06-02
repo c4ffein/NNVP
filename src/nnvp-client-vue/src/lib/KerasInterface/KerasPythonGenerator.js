@@ -118,10 +118,8 @@ export default class {
   // Return a list of the different outputs
   findOutputs() {
     const outputs = [];
-    for (const [node, value] of Object.entries(this.graph)) { // eslint-disable-line
-      if (value.keras_data.name === 'Output') {
-        outputs.push(node);
-      }
+    for (const id of this.json.outputs) { // eslint-disable-line
+      outputs.push(id);
     }
     return outputs;
   }
@@ -169,11 +167,7 @@ export default class {
       rs += `${this.nodeName(inputs.splice(-1)[0])}]`;
     }
     rs += ', outputs=';
-    const outputLayers = this.findOutputs();
-    const outputs = [];
-    for (const outputLayer of outputLayers) { // eslint-disable-line
-      outputs.push(this.graph[outputLayer].sources);
-    }
+    const outputs = this.findOutputs();
     if (outputs.length === 1) {
       rs += this.nodeName(outputs[0]);
     } else if (outputs.length > 1) {

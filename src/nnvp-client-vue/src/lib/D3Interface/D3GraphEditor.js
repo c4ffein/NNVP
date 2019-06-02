@@ -3,7 +3,7 @@
 import * as d3 from 'd3';
 import D3Edge from './D3Edge';
 import D3Layer from './D3Layer';
-import D3CompositeLayer from './D3CompositeLayer';
+import D3LayerComposite from './D3LayerComposite';
 import D3Background from './D3Background';
 import D3GraphValidation from './D3GraphValidation';
 
@@ -53,6 +53,9 @@ export default function D3GraphEditor(svg, d3Layers, d3Edges) {
   thisGraph.d3Layers = d3Layers || [];
   thisGraph.d3Edges = d3Edges || [];
 
+  // List of layers considered as outputs for the Keras model
+  thisGraph.modelOutputs = [];
+
   // ID's counter
   thisGraph.nodeId = 0;
 
@@ -92,7 +95,7 @@ export default function D3GraphEditor(svg, d3Layers, d3Edges) {
   // Create the Whiteboard
   D3Background.createWhiteboard(thisGraph.svgG);
 
-  this.svgD3CompositeLayers = thisGraph.svgG.append("g").attr("class", "d3CompositeLayers");
+  this.svgD3LayerComposites = thisGraph.svgG.append("g").attr("class", "d3LayerComposites");
 
   // Init the egde displayed when dragging between nodes
   thisGraph.dragLine = D3Edge.createDragLine(thisGraph.svgG);
@@ -198,7 +201,7 @@ D3GraphEditor.prototype.multipleSelection = function (topX, topY, bottomX, botto
     // Node selected when his LeftTop position can be catch
     // But when when node is above or to the left we need to extend the selection's rectangle with node's height and width
     // If his LeftTop position cannot be catch, the node is not in the selection's rectangle
-    if (node.class !== "D3CompositeLayer") {
+    if (node.class !== "D3LayerComposite") {
       let inX = ((node.x > topX-node.width && node.x < bottomX)? true : false);
       let inY = ((node.y > topY-node.height && node.y < bottomY)? true : false);
       if (inX && inY) {
@@ -294,8 +297,8 @@ D3GraphEditor.prototype.createComposite = function () {
       y = selectedNode.y;
     }
   });
-  let newComposite = new D3CompositeLayer(this.getNodeId(), x, y, this.selectedNodes);
-  newComposite.drawLayer(this.svgD3CompositeLayers, this);
+  let newComposite = new D3LayerComposite(this.getNodeId(), this, this.selectedNodes, x, y);
+  newComposite.drawLayer(this.svgD3LayerComposites, this);
   this.selectedNodes.forEach(selectedNode => {
     this.d3Layers.forEach(layer => {
       if (selectedNode == layer) {
@@ -353,7 +356,7 @@ D3GraphEditor.prototype.endZoomed = function () {
 D3GraphEditor.prototype.addLayer = function (kerasLayer, posX, posY) {
   // Before change occur save the cuurent State - needed to allow undo;
   this.saveState();
-  let newLayer = new D3Layer(kerasLayer, this.getNodeId(), posX || (this.mapX + 10) , posY || (this.mapY + 10))
+  let newLayer = new D3Layer(this.getNodeId(), this, kerasLayer, posX || (this.mapX + 10) , posY || (this.mapY + 10))
   this.d3Layers.push(newLayer);
   newLayer.drawLayer(this.svgG.select("g.d3Layers"), this);
   //this.updateGraph();
@@ -391,8 +394,8 @@ D3GraphEditor.prototype.updateGraph = function () {
     if (layer.class === "D3Layer") {
       layer.drawLayer(thisGraph.svgD3Layers, thisGraph);
     }
-    if (layer.class === "D3CompositeLayer") {
-      layer.drawComposite(thisGraph.svgD3CompositeLayers, thisGraph);
+    if (layer.class === "D3LayerComposite") {
+      layer.drawComposite(thisGraph.svgD3LayerComposites, thisGraph);
     }
   });
   D3GraphValidation.isCycle(thisGraph);
@@ -555,9 +558,11 @@ D3GraphEditor.prototype.toJSON = function () {
   let thisGraph = this;
   let savedEdges = [];
   let savedLayers = [];
+  let savedOutputs = [];
   thisGraph.d3Layers.forEach(layer => savedLayers.push(layer.toJSON()));
   thisGraph.d3Edges.forEach(edge => savedEdges.push(edge.toJSON()));
-  return window.JSON.stringify({ "layers": savedLayers, "edges": savedEdges }, { type: "text/plain;charset=utf-8" });
+  thisGraph.modelOutputs.forEach(output => savedOutputs.push(output.id));
+  return window.JSON.stringify({ "layers": savedLayers, "edges": savedEdges, "outputs": savedOutputs }, { type: "text/plain;charset=utf-8" });
 };
 
 /**
@@ -587,13 +592,11 @@ D3GraphEditor.prototype.generatePythonOnBackend = function (backendUrl) {
     if (layer.class === "D3Layer") {
       toJSON.push(layer.toJSON());
     }
-    if (layer.class === "D3CompositeLayer") {
+    if (layer.class === "D3LayerComposite") {
       layer.getAllContainedJSON().forEach(json => toJSON.push(json));
     }
   });
   let jsonFile = window.JSON.stringify({ "layers": toJSON }, { type: "text/plain;charset=utf-8" });
-  console.log(jsonFile);
-  console.log(backendUrl);
   let paramPost = {
     method: "POST",
     headers: {
@@ -663,8 +666,8 @@ D3GraphEditor.prototype.loadComposite = function (jsonLayer) {
   if (jsonLayer.class === "D3Layer") {
     res = D3Layer.loadJSON(jsonLayer, this);
   }
-  if (jsonLayer.class === "D3CompositeLayer") {
-    res = D3CompositeLayer.loadJSON(jsonLayer, this);
+  if (jsonLayer.class === "D3LayerComposite") {
+    res = D3LayerComposite.loadJSON(jsonLayer, this);
   }
   return res;
 };
@@ -685,12 +688,14 @@ D3GraphEditor.prototype.uploadToBoard = function (uploadFileEvent) {
         var txtRes = filereader.result;
         var jsonObj = JSON.parse(txtRes);
         thisGraph.clearBoard(true);
+
         var jsonLayers = jsonObj.layers;
         var newLayers = [];
         jsonLayers.forEach(jsonLayer =>
           newLayers.push(thisGraph.loadComposite(jsonLayer))
         );
         thisGraph.d3Layers = newLayers;
+
         var newEdges = jsonObj.edges;
         newEdges.forEach(function (e, i) {
           let source = thisGraph.getLayerById(e.source);
@@ -698,6 +703,11 @@ D3GraphEditor.prototype.uploadToBoard = function (uploadFileEvent) {
           newEdges[i] = new D3Edge (source , target);
         });
         thisGraph.d3Edges = newEdges;
+
+        thisGraph.modelOutputs.length = 0;
+        jsonObj.outputs.forEach(function (id) {
+          thisGraph.modelOutputs.push(thisGraph.getLayerById(id));
+        });
         thisGraph.updateGraph();
       }
       catch (error) {
@@ -708,7 +718,7 @@ D3GraphEditor.prototype.uploadToBoard = function (uploadFileEvent) {
     filereader.readAsText(uploadFile);
   }
   else {
-    alert("Your browser won't let you save this graph -- try upgrading your browser to IE 10+ or Chrome or Firefox.");
+    alert("Your browser won't let you save this graph -- try upgrading your browser to the latest version of Chrome or Firefox.");
   }
 };
 
@@ -727,7 +737,7 @@ D3GraphEditor.prototype.clearBoard = function (skipPrompt) {
     thisGraph.d3Edges = [];
     thisGraph.svgD3Edges.selectAll("g").remove();
     thisGraph.svgD3Layers.selectAll("g").remove();
-    thisGraph.svgD3CompositeLayers.selectAll("g").remove();
+    thisGraph.svgD3LayerComposites.selectAll("g").remove();
   }
 };
 

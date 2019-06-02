@@ -4,7 +4,7 @@ import * as d3 from 'd3';
 import d3tip from 'd3-tip';
 import D3GraphEditor from './D3GraphEditor';
 import D3Background from './D3Background';
-import D3ComponentLayer from './D3ComponentLayer';
+import D3LayerComponent from './D3LayerComponent';
 import D3GraphValidation from './D3GraphValidation';
 import KerasLayer from '../KerasInterface/KerasLayer';
 const jsonKeras = require("../KerasInterface/generatedKerasLayers.json");
@@ -17,37 +17,21 @@ const jsonKeras = require("../KerasInterface/generatedKerasLayers.json");
  * @param y the vertical position of the Layer
  * @param name the name of the Layer
  */
-export default function D3Layer(kerasLayer, id, x, y, name) {
-
-  let htmlID = "Layer_" + id;
-  D3ComponentLayer.call(this, id, x, y, name || (name = kerasLayer.name), htmlID);
-
-  // True KerasLayer that contain the Keras paramaters
-  this.kerasLayer = kerasLayer;
+export default function D3Layer(id, parent, kerasLayer, x, y, name, htmlID) {
+  D3LayerComponent.call(this, id, parent, kerasLayer, x, y, name || (name = kerasLayer.name), htmlID);
 
   this.class = "D3Layer";
-
   this.d3node = null;
-
   this.deleteState = false;
 };
 
-D3Layer.prototype = Object.create(D3ComponentLayer.prototype);
-
-/**
- * Clones a Layer
- */
-D3Layer.prototype.clone = function () {
-  let res = new D3Layer(this.kerasLayer.clone(), this.id, this.x, this.y, this.name);
-  this.inputLayers.forEach(inputLayer => res.inputLayers.push(inputLayer));
-  this.outputLayers.forEach(outputLayer => res.outputLayers.push(outputLayer));
-};
+D3Layer.prototype = Object.create(D3LayerComponent.prototype);
 
 /**
  * Converts the Layer to a JSON data
  */
 D3Layer.prototype.toJSON = function () {
-  let res = D3ComponentLayer.prototype.toJSON.call(this);
+  let res = D3LayerComponent.prototype.toJSON.call(this);
   res.kerasLayer = this.kerasLayer;
   return res;
 };
@@ -89,7 +73,7 @@ D3Layer.prototype.update = function (observable) {
  */
 D3Layer.prototype.remove = function () {
   if (D3Layer.tip) D3Layer.tip.hide();
-  D3ComponentLayer.prototype.remove.call(this);
+  D3LayerComponent.prototype.remove.call(this);
 };
 
 /**
@@ -360,8 +344,7 @@ D3Layer.prototype.changeTextOfNode = function(gElement, graph) {
  * @param eventY the vertical position of the Layer
  */
 D3Layer.prototype.dragged = function(eventX, eventY) {
-
-  D3ComponentLayer.prototype.dragged.call(this, eventX, eventY);
+  D3LayerComponent.prototype.dragged.call(this, eventX, eventY);
   let thisLayer = this;
 
   let gElement = d3.select("#" + thisLayer.htmlID);
@@ -440,7 +423,7 @@ D3Layer.prototype.transitionToXY = function (x, y) {
 };
 
 D3Layer.loadJSON = function (json, graph) {
-  let newLayer = new D3Layer(new KerasLayer().load(json.kerasLayer), json.id, json.x, json.y);
+  let newLayer = new D3Layer(json.id, json.parent || graph, new KerasLayer().load(json.kerasLayer), json.x, json.y);
   newLayer.inputLayers = json.inputLayers;
   newLayer.outputLayers = json.outputLayers;
   newLayer.d3node = graph.svgD3Layers;

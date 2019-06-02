@@ -54,7 +54,11 @@
               v-if="isMergeLayer(selectedLayer.kerasLayer.category)"
               v-bind:name="paramK"
               v-bind:activeLayer="selectedLayer"
-              v-bind:value="selectedLayer.inputLayers.length"
+            />
+          </div>
+          <div class="layer" v-if="isOutputLayer(selectedLayer.kerasLayer)">
+            <ModelOutputParameter
+              v-bind:modelOutputs="$d3Interface.activeGraph.modelOutputs"
             />
           </div>
           <div v-if="index != selectedNode.e.length - 1">
@@ -75,6 +79,8 @@ import TupleIntParameter from './Parameters/TupleIntParameter.vue';
 import FloatParameter from './Parameters/FloatParameter.vue';
 import InputOrderParameter from './Parameters/InputOrderParameter.vue';
 import StringParameter from './Parameters/StringParameter.vue';
+import ModelOutputParameter from './Parameters/ModelOutputParameter.vue';
+
 
 export default {
   name: 'RightBar',
@@ -86,6 +92,7 @@ export default {
     TupleIntParameter,
     StringParameter,
     InputOrderParameter,
+    ModelOutputParameter,
   },
   props: {
     msg: String,
@@ -124,6 +131,9 @@ export default {
     },
     isMergeLayer(nodeCategory) {
       return nodeCategory === 'Merge';
+    },
+    isOutputLayer(selectedLayer) {
+      return selectedLayer.name === 'Output';
     },
     toggleLayer(id) {
       document.getElementById(id).classList.toggle('closed');
