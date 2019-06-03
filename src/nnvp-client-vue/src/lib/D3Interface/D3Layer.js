@@ -96,6 +96,12 @@ D3Layer.prototype.delete = function (graph) {
       outputLayer.removeInputLayer(thisLayer);
     }
   });
+  if(this.kerasLayer.name === "Input"){
+    const modelInputs = this.getEditor().modelInputs;
+    if(modelInputs.indexOf(layer) !== -1){
+      modelInputs.splice(modelInputs.indexOf(this), 1);
+    }
+  }
   thisLayer.notifyAll();
 };
 

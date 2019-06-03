@@ -46,6 +46,10 @@ export default function D3LayerComponent(id, parent, kerasLayer, x, y, name, htm
   this.originDrag = {x: x, y: y};
 
   this.class = "D3LayerComponent";
+
+  if(this.kerasLayer.name == "Input"){
+    this.getEditor().modelInputs.push(this);
+  }
 };
 
 /**
@@ -94,9 +98,6 @@ D3LayerComponent.prototype.setParent = function (parent) {
  */
 D3LayerComponent.prototype.addInputLayer = function (layer) {
   this.inputLayers.push(layer.id);
-  if(this.kerasLayer.name == "Input"){
-    this.getEditor().modelInputs.push(layer);
-  }
   if(this.kerasLayer.name == "Output"){
     this.getEditor().modelOutputs.push(layer);
   }
@@ -108,14 +109,6 @@ D3LayerComponent.prototype.addInputLayer = function (layer) {
  */
 D3LayerComponent.prototype.removeInputLayer = function (layer) {
   this.inputLayers = this.inputLayers.filter(inputLayer => inputLayer !== layer.id);
-
-  if(this.kerasLayer.name === "Input"){
-    const modelInputs = this.getEditor().modelInputs;
-    if(modelInputs.indexOf(layer) !== -1){
-      modelInputs.splice(modelInputs.indexOf(layer), 1);
-    }
-  }
-
   if(this.kerasLayer.name === "Output"){
     const modelOutputs = this.getEditor().modelOutputs;
     if(modelOutputs.indexOf(layer) !== -1){
