@@ -50,15 +50,20 @@
               v-bind:name="paramK"
               v-bind:activeLayer="selectedLayer.kerasLayer"
             />
-            <InputOrderParameter
+            <OrderParameter
               v-if="isMergeLayer(selectedLayer.kerasLayer.category)"
-              v-bind:name="paramK"
-              v-bind:activeLayer="selectedLayer"
+              v-bind:title="paramK"
+              v-bind:itemList="selectedLayer.inputLayers"
+              v-bind:idFunc="e => e"
+              v-bind:nameFunc="e => $d3Interface.getLayerById(e).kerasLayer.name"
             />
           </div>
           <div class="layer" v-if="isOutputLayer(selectedLayer.kerasLayer)">
-            <ModelOutputParameter
-              v-bind:modelOutputs="$d3Interface.activeGraph.modelOutputs"
+            <OrderParameter
+              title="Model Outputs :"
+              v-bind:itemList="$d3Interface.activeGraph.modelOutputs"
+              :idFunc="e => e.id"
+              :nameFunc="e => e.name"
             />
           </div>
           <div v-if="index != selectedNode.e.length - 1">
@@ -77,9 +82,8 @@ import IntParameter from './Parameters/IntParameter.vue';
 import BooleanParameter from './Parameters/BooleanParameter.vue';
 import TupleIntParameter from './Parameters/TupleIntParameter.vue';
 import FloatParameter from './Parameters/FloatParameter.vue';
-import InputOrderParameter from './Parameters/InputOrderParameter.vue';
 import StringParameter from './Parameters/StringParameter.vue';
-import ModelOutputParameter from './Parameters/ModelOutputParameter.vue';
+import OrderParameter from './Parameters/OrderParameter.vue';
 
 
 export default {
@@ -91,8 +95,7 @@ export default {
     BooleanParameter,
     TupleIntParameter,
     StringParameter,
-    InputOrderParameter,
-    ModelOutputParameter,
+    OrderParameter,
   },
   props: {
     msg: String,
