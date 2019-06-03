@@ -53,7 +53,8 @@ export default function D3GraphEditor(svg, d3Layers, d3Edges) {
   thisGraph.d3Layers = d3Layers || [];
   thisGraph.d3Edges = d3Edges || [];
 
-  // List of layers considered as outputs for the Keras model
+  // List of layers considered as inputs and outputs for the Keras model
+  thisGraph.modelInputs = [];
   thisGraph.modelOutputs = [];
 
   // ID's counter
@@ -558,11 +559,13 @@ D3GraphEditor.prototype.toJSON = function () {
   let thisGraph = this;
   let savedEdges = [];
   let savedLayers = [];
+  let savedInputs = [];
   let savedOutputs = [];
   thisGraph.d3Layers.forEach(layer => savedLayers.push(layer.toJSON()));
   thisGraph.d3Edges.forEach(edge => savedEdges.push(edge.toJSON()));
+  thisGraph.modelInputs.forEach(output => savedInputs.push(output.id));
   thisGraph.modelOutputs.forEach(output => savedOutputs.push(output.id));
-  return window.JSON.stringify({ "layers": savedLayers, "edges": savedEdges, "outputs": savedOutputs }, { type: "text/plain;charset=utf-8" });
+  return window.JSON.stringify({ "layers": savedLayers, "edges": savedEdges, "inputs": savedInputs, "outputs": savedOutputs }, { type: "text/plain;charset=utf-8" });
 };
 
 /**
@@ -703,6 +706,11 @@ D3GraphEditor.prototype.uploadToBoard = function (uploadFileEvent) {
           newEdges[i] = new D3Edge (source , target);
         });
         thisGraph.d3Edges = newEdges;
+
+        thisGraph.modelInputs.length = 0;
+        jsonObj.inputs.forEach(function (id) {
+          thisGraph.modelInputs.push(thisGraph.getLayerById(id));
+        });
 
         thisGraph.modelOutputs.length = 0;
         jsonObj.outputs.forEach(function (id) {
