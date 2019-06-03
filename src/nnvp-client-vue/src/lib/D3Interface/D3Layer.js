@@ -98,7 +98,7 @@ D3Layer.prototype.delete = function (graph) {
   });
   if(this.kerasLayer.name === "Input"){
     const modelInputs = this.getEditor().modelInputs;
-    if(modelInputs.indexOf(layer) !== -1){
+    if(modelInputs.indexOf(this) !== -1){
       modelInputs.splice(modelInputs.indexOf(this), 1);
     }
   }
