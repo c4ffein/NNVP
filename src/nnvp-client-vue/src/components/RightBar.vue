@@ -58,6 +58,14 @@
               v-bind:nameFunc="e => $d3Interface.getLayerById(e).kerasLayer.name"
             />
           </div>
+          <div class="layer" v-if="isInputLayer(selectedLayer.kerasLayer)">
+            <OrderParameter
+              title="Model Inputs"
+              v-bind:itemList="$d3Interface.activeGraph.modelInputs"
+              :idFunc="e => e.id"
+              :nameFunc="e => e.name"
+            />
+          </div>
           <div class="layer" v-if="isOutputLayer(selectedLayer.kerasLayer)">
             <OrderParameter
               title="Model Outputs"
@@ -135,8 +143,11 @@ export default {
     isMergeLayer(nodeCategory) {
       return nodeCategory === 'Merge';
     },
-    isOutputLayer(selectedLayer) {
-      return selectedLayer.name === 'Output';
+    isInputLayer(kerasLayer) {
+      return kerasLayer.name === 'Input';
+    },
+    isOutputLayer(kerasLayer) {
+      return kerasLayer.name === 'Output';
     },
     toggleLayer(id) {
       document.getElementById(id).classList.toggle('closed');
