@@ -60,7 +60,7 @@
           </div>
           <div class="layer" v-if="isOutputLayer(selectedLayer.kerasLayer)">
             <OrderParameter
-              title="Model Outputs :"
+              title="Model Outputs"
               v-bind:itemList="$d3Interface.activeGraph.modelOutputs"
               :idFunc="e => e.id"
               :nameFunc="e => e.name"
