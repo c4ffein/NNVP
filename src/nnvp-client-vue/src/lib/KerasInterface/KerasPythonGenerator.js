@@ -107,10 +107,8 @@ export default class {
   // Return a list of the different inputs
   findInputs() {
     const inputs = [];
-    for (const [node, value] of Object.entries(this.graph)) { // eslint-disable-line
-      if (value.keras_data.name === 'Input') {
-        inputs.push(node);
-      }
+    for (const id of this.json.inputs) { // eslint-disable-line
+      inputs.push(id);
     }
     return inputs;
   }
