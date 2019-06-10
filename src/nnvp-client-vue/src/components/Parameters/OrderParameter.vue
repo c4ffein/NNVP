@@ -1,23 +1,34 @@
 <template>
   <div id="parameters-block">
-    <span>
+    <span v-if="title">
       {{title}} :
       <br>
-      <div id="parameters-block-list">
-        <div
-          class="input-item"
-          v-for="item in itemList"
-          :key="idFunc(item)"
-          :number="idFunc(item)"
-          draggable="true"
-          v-on:dragstart="itemDragStart(item, $event)"
-          v-on:dragover="itemDragOver(item, $event)"
-          v-on:drop="itemDragDrop(item, $event)"
-        >
-          {{nameFunc(item)}}(id:{{idFunc(item)}})
-        </div>
-      </div>
     </span>
+    <div id="parameters-block-list" v-if="duplicates.length === 0">
+      <div
+        class="input-item"
+        v-for="item in itemList"
+        :key="idFunc(item)"
+        :number="idFunc(item)"
+        draggable="true"
+        v-on:dragstart="itemDragStart(item, $event)"
+        v-on:dragover="itemDragOver(item, $event)"
+        v-on:drop="itemDragDrop(item, $event)"
+      >
+        {{nameFunc(item)}}(id:{{idFunc(item)}})
+      </div>
+    </div>
+    <div id="parameters-block-list" v-else>
+      Warning : found duplicates. Remove them before ordering :
+      <div
+        class="input-item"
+        v-for="item in duplicates"
+        :key="idFunc(item)"
+        :number="idFunc(item)"
+      >
+        {{nameFunc(item)}}(id:{{idFunc(item)}})
+      </div>
+    </div>
   </div>
 </template>
 
@@ -29,6 +40,11 @@ export default {
     itemList: null,
     idFunc: Function,
     nameFunc: Function,
+  },
+  computed: {
+    duplicates() {
+      return this.itemList.filter((e, i, a) => a.indexOf(e) === i && a.lastIndexOf(e) !== i);
+    },
   },
   data() {
     return {
