@@ -30,6 +30,7 @@ Continuing to work on it was proposed as a subject for one of the the second yea
 Modifying the existing codebase to implement new features was still a really difficult task, as Draw.io was totally not designed to run graph algorithms.
 Hence, we decided to re-code the client from scratch, this time using Vue.js for interface components and D3.js for graph visualization and edition.
 We only adapted backend for our new client, which was now simpler as we didn't need to work with the files saved from our Draw.io fork.
+
 We managed to produce a somehow usable tool, missing lots of features and without a satisactory user experience.
 Since then, a lot of the code has been modified. We still need to refactor big parts of it. You can now generate Keras code without backend, we will focus on client and continue to develop backend only to enable training on it.
 
