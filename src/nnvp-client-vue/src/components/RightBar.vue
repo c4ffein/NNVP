@@ -3,16 +3,16 @@
     <h4 v-if="selectedNode.e.length === 0">No layers selected</h4>
     <div id="rightbar-block" class="rightbar-block" v-if="nodeIsSelected()">
       <div
-        v-for="(selectedLayer, index) in selectedNode.e"
+        v-for="(selectedLayer, index) in activeLayers"
         v-bind:key="selectedLayer.id"
         v-bind:id="blockId(selectedLayer.id)"
         class="layerBlock"
       >
-        <div class="title" @click="toggleLayer(blockId(selectedLayer.id))">
+        <div class="rightbar layer-title" @click="toggleLayer(blockId(selectedLayer.id))">
           {{selectedLayer.kerasLayer.name}}
           <div class="arrow">▲</div>
         </div>
-        <div class="parametersList">
+        <div class="layer-params-list">
           <div class="layer"
             :key="paramK"
             v-for="(paramV, paramK) in selectedLayer.kerasLayer.parameterDef"
@@ -58,27 +58,52 @@
               v-bind:nameFunc="e => $d3Interface.getLayerById(e).kerasLayer.name"
             />
           </div>
-          <div class="layer" v-if="isInputLayer(selectedLayer.kerasLayer)">
-            <OrderParameter
-              title="Model Inputs"
-              v-bind:itemList="$d3Interface.activeGraph.modelInputs"
-              :idFunc="e => e.id"
-              :nameFunc="e => e.name"
-            />
-          </div>
-          <div class="layer" v-if="isOutputLayer(selectedLayer.kerasLayer)">
-            <OrderParameter
-              title="Model Outputs"
-              v-bind:itemList="$d3Interface.activeGraph.modelOutputs"
-              :idFunc="e => e.id"
-              :nameFunc="e => e.name"
-            />
-          </div>
           <div v-if="index != selectedNode.e.length - 1">
             <br>
           </div>
         </div>
       </div>
+
+      <div
+        v-if="inputInLayersAndMoreThanOneInModel"
+        id="rightbar-block-input"
+        class="layerBlock"
+      >
+        <div class="rightbar layer-title" @click="toggleLayer('rightbar-block-input')">
+          Model Inputs
+          <div class="arrow">▲</div>
+        </div>
+        <div class="layer-params-list">
+          <div class="layer">
+            <OrderParameter
+              v-bind:itemList="$d3Interface.activeGraph.modelInputs"
+              :idFunc="e => e.id"
+              :nameFunc="e => e.name"
+            />
+          </div>
+        </div>
+      </div>
+      
+      <div
+        v-if="outputInLayers"
+        id="rightbar-block-output"
+        class="layerBlock"
+      >
+        <div class="rightbar layer-title" @click="toggleLayer('rightbar-block-output')">
+          Model Outputs
+          <div class="arrow">▲</div>
+        </div>
+        <div class="layer-params-list">
+          <div class="layer">
+            <OrderParameter
+              v-bind:itemList="$d3Interface.activeGraph.modelOutputs"
+              :idFunc="e => e.id"
+              :nameFunc="e => e.name"
+            />
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -112,6 +137,34 @@ export default {
     return {
       selectedNode: this.$d3Interface.getActiveElementsContainer(),
     };
+  },
+  computed: {
+    activeLayers() {
+      const activeLayers = [];
+      for (const d3Layer of this.selectedNode.e) { // eslint-disable-line
+        if (!this.isOutputLayer(d3Layer.kerasLayer)) activeLayers.push(d3Layer);
+      }
+      return activeLayers;
+    },
+    inputInLayersAndMoreThanOneInModel() {
+      for (const layer of this.selectedNode.e) { // eslint-disable-line
+        if (this.isInputLayer(layer)) {
+          if (this.$d3Interface.activeGraph.modelInputs.length > 1) {
+            return true;
+          }
+          return false;
+        }
+      }
+      return false;
+    },
+    outputInLayers() {
+      for (const layer of this.selectedNode.e) { // eslint-disable-line
+        if (this.isOutputLayer(layer)) {
+          return true;
+        }
+      }
+      return false;
+    },
   },
   methods: {
     nodeIsSelected() {
@@ -181,7 +234,7 @@ export default {
   user-select: none;
   min-height: 100%;
 }
-.rightbar-block > .layerBlock > .title {
+.rightbar.layer-title {
   background-color: rgba(200, 200, 200, 0.2);
   overflow: hidden;
   display: grid;
@@ -190,15 +243,15 @@ export default {
   border-top: 1px solid rgba(200, 200, 200, 0.5);
   border-bottom: 1px solid rgba(200, 200, 200, 0.5);
 }
-.rightbar-block > .layerBlock > .title:hover {
+.rightbar.layer-title:hover {
   background-color: rgba(200, 200, 200, 0.6);
 }
-.rightbar-block > .layerBlock > .title > .text {
+.rightbar.layer-title > .text {
   grid-area: text;
   text-align: left;
   padding: 5px;
 }
-.rightbar-block > .layerBlock > .title > .arrow {
+.rightbar.layer-title > .arrow {
   color: rgba(100, 100, 100, 0.7);
   grid-area: arrow;
   height: 15px;
@@ -209,18 +262,18 @@ export default {
   padding: 5px;
   font-size: 10px;
 }
-.rightbar-block > .layerBlock.closed > .title > .arrow {
+.rightbar-block > .layerBlock.closed > .layer-title > .arrow {
   transform: rotate(90deg) translateY(-10%);
 }
-.rightbar-block > .layerBlock > .parametersList {
+.rightbar-block > .layerBlock > .layer-params-list {
   padding-left: 1px;
   padding-right: 1px;
 }
-.rightbar-block > .layerBlock.closed > .parametersList {
+.rightbar-block > .layerBlock.closed > .layer-params-list {
   height: 0;
   overflow: hidden;
 }
-.rightbar-block > .layerBlock > .parametersList > .layer {
+.rightbar-block > .layerBlock > .layer-params-list > .layer {
   text-align: left;
   padding: 4px;
 }
