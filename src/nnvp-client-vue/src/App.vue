@@ -10,7 +10,7 @@
 <script>
 import TopBar from './components/TopBar.vue';
 import LeftBar from './components/LeftBar/LeftBar.vue';
-import RightBar from './components/RightBar.vue';
+import RightBar from './components/RightBar/RightBar.vue';
 import WhiteBoard from './components/WhiteBoard.vue';
 
 export default {
