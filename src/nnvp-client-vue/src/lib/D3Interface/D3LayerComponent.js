@@ -14,42 +14,7 @@ import D3GraphEditor from './D3Background';
  * @param htmlID the html element's ID
  */
 export default function D3LayerComponent(id, parent, kerasLayer, x, y, name, htmlID) {
-  this.id = id;
-  this.parent = parent;
-  this.kerasLayer = kerasLayer;
-
-  this.htmlID = htmlID || 'd3-layer-' + this.id;
-  this.name = name;
-
-  //Coordinated and dimension for the rect html element
-  this.x = x;
-  this.y = y;
-  this.width = 90;
-  this.height = 40;
-
-  // ALl Observers like edge that need to be update
-  // When moving the layer
-  this.observers = [];
-
-  // Some time order in the input Layer have importance
-  // Also help for some verification and graph's cover
-  this.inputLayers = [];
-  this.outputLayers = [];
-
-  this.childs = [];
-
-  // State of the drag: start, drag, end
-  this.dragState = "end";
-
-  // Needed to find the origine when the drag occurs
-  // So we can move all the selected node according to that origin
-  this.originDrag = {x: x, y: y};
-
-  this.class = "D3LayerComponent";
-
-  if(this.kerasLayer.name == "Input"){
-    this.getEditor().modelInputs.push(this);
-  }
+  D3Layer.call(this, id, parent, kerasLayer, x, y, name, htmlID)
 };
 
 /**
@@ -77,9 +42,8 @@ D3LayerComponent.prototype.toJSON = function () {
     name: this.name,
     inputLayers: this.inputLayers,
     outputLayers: this.outputLayers,
-    childs: []
+    children: []
   };
-  this.childs.forEach(child => res.childs.push(child.toJSON()));
   return res;
 };
 
@@ -133,12 +97,12 @@ D3LayerComponent.prototype.removeOutputLayer = function (layer) {
   this.outputLayers = this.outputLayers.filter(outputLayer => outputLayer !== layer.id);
 };
 
-D3LayerComponent.prototype.getChilds = function () {
-  return this.childs;
+D3LayerComponent.prototype.getChildren = function () {
+  return this.children;
 };
 
 D3LayerComponent.prototype.addChild = function (child) {
-  this.childs.push(child);
+  this.children.push(child);
 };
 
 /**
@@ -208,7 +172,7 @@ D3LayerComponent.prototype.getLayerById = function (id) {
     return this;
   }
   let res = null;
-  this.childs.forEach(layer => {
+  this.children.forEach(layer => {
     let tmp = layer.getLayerById(id);
     if (tmp != null) {
       res = tmp;
@@ -222,7 +186,7 @@ D3LayerComponent.prototype.primeAncestorOfId = function (id) {
     return this;
   }
   let res = null;
-  this.childs.forEach(layer => {
+  this.children.forEach(layer => {
     let tmp = layer.getLayerById(id);
     if (tmp != null) {
       res = layer;

@@ -18,7 +18,46 @@ const jsonKeras = require("../KerasInterface/generatedKerasLayers.json");
  * @param name the name of the Layer
  */
 export default function D3Layer(id, parent, kerasLayer, x, y, name, htmlID) {
-  D3LayerComponent.call(this, id, parent, kerasLayer, x, y, name || (name = kerasLayer.name), htmlID);
+  this.id = id;
+  this.parent = parent;
+  this.kerasLayer = kerasLayer;
+
+  this.htmlID = htmlID || 'd3-layer-' + this.id;
+  this.name = name;
+
+  //Coordinated and dimension for the rect html element
+  this.x = x;
+  this.y = y;
+  this.width = 90;
+  this.height = 40;
+
+  // ALl Observers like edge that need to be update
+  // When moving the layer
+  this.observers = [];
+
+  // Some time order in the input Layer have importance
+  // Also help for some verification and graph's cover
+  this.inputLayers = [];
+  this.outputLayers = [];
+
+  this.children = [];
+
+  // State of the drag: start, drag, end
+  this.dragState = "end";
+
+  // Needed to find the origine when the drag occurs
+  // So we can move all the selected node according to that origin
+  this.originDrag = {x: x, y: y};
+
+  if (this.kerasLayer != null){
+    this.class = "D3LayerComponent";
+
+    this.name = this.name || this.kerasLayer.name;
+
+    if(this.kerasLayer.name == "Input"){
+      this.getEditor().modelInputs.push(this);
+    }
+  }
 
   this.class = "D3Layer";
   this.d3node = null;
