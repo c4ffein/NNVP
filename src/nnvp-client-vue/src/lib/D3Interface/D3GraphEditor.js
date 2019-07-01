@@ -96,11 +96,11 @@ export default function D3GraphEditor(svg, d3Layers, d3Edges) {
   // Create the Whiteboard
   D3Background.createWhiteboard(thisGraph.svgG);
 
-  this.svgD3LayerComposites = thisGraph.svgG.append("g").attr("class", "d3LayerComposites");
-
   // Init the egde displayed when dragging between nodes
   thisGraph.dragLine = D3Edge.createDragLine(thisGraph.svgG);
 
+  // Container specially for composites, define it before layers to temporarily fix legacy bug
+  this.svgD3LayerComposites = thisGraph.svgG.append("g").attr("class", "d3LayerComposites");
   // Create two elements to contain respectively nodes and edges
   this.svgD3Edges = thisGraph.svgG.append("g").attr("class", "d3Edges");
   this.svgD3Layers = thisGraph.svgG.append("g").attr("class", "d3Layers");
@@ -299,7 +299,7 @@ D3GraphEditor.prototype.createComposite = function () {
     }
   });
   let newComposite = new D3LayerComposite(this.getNodeId(), this, this.selectedNodes, x, y);
-  newComposite.drawLayer(this.svgD3LayerComposites, this);
+  newComposite.drawLayer(this);
   this.selectedNodes.forEach(selectedNode => {
     this.d3Layers.forEach(layer => {
       if (selectedNode == layer) {
@@ -359,7 +359,7 @@ D3GraphEditor.prototype.addLayer = function (kerasLayer, posX, posY) {
   this.saveState();
   let newLayer = new D3Layer(this.getNodeId(), this, kerasLayer, posX || (this.mapX + 10) , posY || (this.mapY + 10))
   this.d3Layers.push(newLayer);
-  newLayer.drawLayer(this.svgG.select("g.d3Layers"), this);
+  newLayer.drawLayer(this);
   //this.updateGraph();
   D3Background.updateBackground(this);
 };
@@ -385,20 +385,12 @@ D3GraphEditor.prototype.updateGraph = function () {
 
 
   thisGraph.d3Edges.forEach(edge => edge.remove());
-  // Update D3Edges
   thisGraph.d3Edges.forEach(edge => edge.drawEdge(thisGraph.svgD3Edges, thisGraph));
   //D3Edge.drawEdges(thisGraph.svgG.select("g.d3Edges"), thisGraph);
 
   thisGraph.d3Layers.forEach(layer => layer.remove());
-  // Update D3Layers
-  thisGraph.d3Layers.forEach(layer => {
-    if (layer.class === "D3Layer") {
-      layer.drawLayer(thisGraph.svgD3Layers, thisGraph);
-    }
-    if (layer.class === "D3LayerComposite") {
-      layer.drawComposite(thisGraph.svgD3LayerComposites, thisGraph);
-    }
-  });
+  thisGraph.d3Layers.forEach(layer => layer.drawLayer(thisGraph));
+
   D3GraphValidation.isCycle(thisGraph);
   //D3Layer.drawLayers(thisGraph.svgG.select("g.d3Layers"), thisGraph);
   // Update whiteboard dimension
@@ -511,9 +503,7 @@ D3GraphEditor.prototype.loadState = function (txtRes) {
   thisGraph.clearBoard(true);
   var jsonLayers = jsonObj.layers;
   var newLayers = [];
-  jsonLayers.forEach(jsonLayer =>
-    newLayers.push(thisGraph.loadComposite(jsonLayer))
-  );
+  jsonLayers.forEach(jsonLayer => newLayers.push(D3Layer.loadJSON(jsonLayer, thisGraph)));
   thisGraph.d3Layers = newLayers;
   var newEdges = jsonObj.edges;
   newEdges.forEach(function (e, i) {
@@ -561,6 +551,7 @@ D3GraphEditor.prototype.toJSON = function () {
   let savedLayers = [];
   let savedInputs = [];
   let savedOutputs = [];
+
   thisGraph.d3Layers.forEach(layer => savedLayers.push(layer.toJSON()));
   thisGraph.d3Edges.forEach(edge => savedEdges.push(edge.toJSON()));
   thisGraph.modelInputs.forEach(output => savedInputs.push(output.id));
@@ -658,22 +649,6 @@ D3GraphEditor.prototype.primeAncestorOfId = function (id) {
   return res;
 };
 
-/**
- * Load a composite to the graph
- * @param jsonLayer JSON that contains the set of Layers of the composite
- * @returns a Layer
- */
-D3GraphEditor.prototype.loadComposite = function (jsonLayer) {
-  var thisGraph = this;
-  let res = null;
-  if (jsonLayer.class === "D3Layer") {
-    res = D3Layer.loadJSON(jsonLayer, this);
-  }
-  if (jsonLayer.class === "D3LayerComposite") {
-    res = D3LayerComposite.loadJSON(jsonLayer, this);
-  }
-  return res;
-};
 
 /**
  * load graph
@@ -694,9 +669,7 @@ D3GraphEditor.prototype.uploadToBoard = function (uploadFileEvent) {
 
         var jsonLayers = jsonObj.layers;
         var newLayers = [];
-        jsonLayers.forEach(jsonLayer =>
-          newLayers.push(thisGraph.loadComposite(jsonLayer))
-        );
+        jsonLayers.forEach(jsonLayer => newLayers.push(D3Layer.loadJSON(jsonLayer, thisGraph)));
         thisGraph.d3Layers = newLayers;
 
         var newEdges = jsonObj.edges;

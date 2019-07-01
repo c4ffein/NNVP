@@ -93,6 +93,7 @@ D3GraphValidation.isKerasError = function (graph, edge) {
  * @returns true if there is a cycle in the graph, false else
  */
 D3GraphValidation.isCycle = function (graph) {
+  return false; // TODO : fix this legacy code
 
   let isCycle = false;
   if(graph.d3Edges.length > 2 && graph.d3Layers.length > 2){

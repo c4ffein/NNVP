@@ -2,6 +2,7 @@
 // This class was adapted from backend Python code.
 // It will probably be refactored soon.
 
+/* eslint-disable no-param-reassign */
 /* eslint class-methods-use-this: ["error", { "exceptMethods": ["generateTuple",
                                                                 "jsonToGraph"] }] */
 
@@ -15,6 +16,13 @@ export default class {
   jsonToGraph(json) {
     const result = {};
     for (const layer of json.layers) { // eslint-disable-line
+      this.addLayerToResult(layer, result);
+    }
+    return result;
+  }
+
+  addLayerToResult(layer, result) {
+    if (layer.children === null) {
       const nodeId = layer.id;
       if (!Object.prototype.hasOwnProperty.call(result, nodeId)) {
         result[nodeId] = {
@@ -26,8 +34,11 @@ export default class {
       delete result[nodeId].d3_data.kerasLayer;
       result[nodeId].sources = layer.inputLayers;
       result[nodeId].targets = layer.outputLayers;
+    } else {
+      for (const child of layer.children) { // eslint-disable-line
+        this.addLayerToResult(child, result);
+      }
     }
-    return result;
   }
 
   // Returns the name given to the node in the generated Python code

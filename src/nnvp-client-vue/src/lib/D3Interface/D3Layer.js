@@ -5,19 +5,26 @@ import d3tip from 'd3-tip';
 import D3GraphEditor from './D3GraphEditor';
 import D3Background from './D3Background';
 import D3LayerComponent from './D3LayerComponent';
+import D3LayerComposite from './D3LayerComposite';
 import D3GraphValidation from './D3GraphValidation';
 import KerasLayer from '../KerasInterface/KerasLayer';
 const jsonKeras = require("../KerasInterface/generatedKerasLayers.json");
 
+
 /**
  * Constructor of a Layer
- * @param kerasLayer the Keras type of the Layer
  * @param id the ID of the Layer
+ * @param param the parent layerComposite or the graph which contains it
+ * @param kerasLayer the Keras type of the Layer
  * @param x the horizental position of the Layer
  * @param y the vertical position of the Layer
  * @param name the name of the Layer
  */
 export default function D3Layer(id, parent, kerasLayer, x, y, name, htmlID) {
+  if (kerasLayer !== null){
+    D3LayerComponent.call(this);
+    this.__proto__ = Object.create(D3LayerComponent.prototype);
+  }
   this.id = id;
   this.parent = parent;
   this.kerasLayer = kerasLayer;
@@ -40,7 +47,7 @@ export default function D3Layer(id, parent, kerasLayer, x, y, name, htmlID) {
   this.inputLayers = [];
   this.outputLayers = [];
 
-  this.children = [];
+  this.children = null;
 
   // State of the drag: start, drag, end
   this.dragState = "end";
@@ -50,8 +57,6 @@ export default function D3Layer(id, parent, kerasLayer, x, y, name, htmlID) {
   this.originDrag = {x: x, y: y};
 
   if (this.kerasLayer != null){
-    this.class = "D3LayerComponent";
-
     this.name = this.name || this.kerasLayer.name;
 
     if(this.kerasLayer.name == "Input"){
@@ -60,19 +65,78 @@ export default function D3Layer(id, parent, kerasLayer, x, y, name, htmlID) {
   }
 
   this.class = "D3Layer";
-  this.d3node = null;
+  this.d3nodeContainer = null;
   this.deleteState = false;
 };
 
-D3Layer.prototype = Object.create(D3LayerComponent.prototype);
 
 /**
  * Converts the Layer to a JSON data
  */
 D3Layer.prototype.toJSON = function () {
-  let res = D3LayerComponent.prototype.toJSON.call(this);
-  res.kerasLayer = this.kerasLayer;
+  let res = {
+    class: this.class,
+    x: this.x,
+    y: this.y,
+    width: this.width,
+    height: this.height,
+    id: this.id,
+    htmlID: this.htmlID,
+    name: this.name,
+    inputLayers: this.inputLayers,
+    outputLayers: this.outputLayers,
+    children: this.children ? this.children.map(child => child.toJSON()) : null,
+    kerasLayer: this.kerasLayer,
+    parentID: this.parent instanceof this.constructor ? this.parent.id : null
+  };
   return res;
+};
+
+
+D3Layer.loadJSON = function (json, graph) {
+  if (json.children === null) {
+    let newLayer = new D3Layer(json.id, json.parent || graph, new KerasLayer().load(json.kerasLayer), json.x, json.y);
+    // No need to call addInputLayer or addOutputLayer to set model inputs and outputs
+    newLayer.inputLayers = json.inputLayers;
+    newLayer.outputLayers = json.outputLayers;
+    newLayer.d3nodeContainer = graph.svgD3Layers;
+    return newLayer;
+  }
+  else {
+    return D3LayerComposite.loadJSON(json, graph);
+  }
+};
+
+
+D3Layer.prototype.getEditor = function () {
+  let editor = this.parent;
+  while (! editor instanceof D3GraphEditor){
+    editor = editor.parent;
+  }
+  return editor;
+};
+
+/**
+ * Adds observer to the Layer component
+ * @param o which observer to add
+ */
+D3Layer.prototype.addObserver = function (o) {
+  this.observers.push(o);
+};
+
+/**
+ * Removes observer from the Layer component
+ * @param o which observer to remove
+ */
+D3Layer.prototype.removeObserver = function (o) {
+  this.observers.splice(this.observers.indexOf(o), 1);
+};
+
+/**
+ * Notify all observers of the Layer component to update
+ */
+D3Layer.prototype.notifyAll = function () {
+  this.observers.forEach(o => o.update.call(o, this));
 };
 
 /**
@@ -107,11 +171,16 @@ D3Layer.prototype.update = function (observable) {
   }
 };
 
+D3Layer.prototype.setOrigin = function () {
+  this.originDrag.x = this.x;
+  this.originDrag.y = this.y;
+};
+
 /**
  * Removes the Layer
  */
 D3Layer.prototype.remove = function () {
-  if (D3Layer.tip) D3Layer.tip.hide();
+  if (this.tip) this.tip.hide();
   D3LayerComponent.prototype.remove.call(this);
 };
 
@@ -144,55 +213,71 @@ D3Layer.prototype.delete = function (graph) {
   thisLayer.notifyAll();
 };
 
+
+// Drawer helpers
+D3Layer.prototype.addTransition = function(gElement){
+  return gElement.transition().duration(300);
+};
+
+D3Layer.prototype.setElement = function(element, x, y){
+  return element.attr("x", x).attr("y", y);
+};
+
+D3Layer.prototype.setCircle = function(circle, x, y){
+  return circle.attr("cx", x).attr("cy", y);
+};
+
+D3Layer.prototype.setRect = function(rect){
+  return rect.attr("x", this.x).attr("y", this.y);
+};
+
+D3Layer.prototype.setText = function(text, relativeX = 15, relativeY = 25){
+  return text.attr("x", this.x + relativeX).attr("y", this.y + relativeY);
+};
+
+D3Layer.prototype.setTopPoint = function(topPoint){
+  return topPoint.attr("cx", this.x + this.width / 2).attr("cy", this.y);
+};
+
+D3Layer.prototype.setLeftPoint = function(leftPoint){
+  return leftPoint.attr("cx", this.x).attr("cy", this.y + this.height / 2);
+};
+
+D3Layer.prototype.setRightPoint = function(rightPoint){
+  return rightPoint.attr("cx", this.x + this.width).attr("cy", this.y + this.height / 2);
+};
+
+D3Layer.prototype.setBottomPoint = function(bottomPoint){
+  return bottomPoint.attr("cx", this.x + this.width / 2).attr("cy", this.y + this.height);
+};
+
+D3Layer.prototype.addCircle = function(gElement, classAttr){
+  return gElement.append("circle").attr("class", classAttr).attr("r", 2);
+};
+
 /**
  * Draw a new Layer to the set
- * @param d3node the set of Layers existing
  * @param graph the graph which to add the Layer
  */
-D3Layer.prototype.drawLayer = function (d3node, graph) {
+D3Layer.prototype.drawLayer = function (graph) {
   let thisLayer = this;
+  thisLayer.d3nodeContainer = graph.svgD3Layers;
 
-  thisLayer.d3node = d3node;
-
-  let gElement = d3node.append("g")
+  let gElement = this.d3nodeContainer.append("g")
     .attr("class", "d3Layer " + thisLayer.kerasLayer.name)
     .attr("id", thisLayer.htmlID);
 
-  gElement
+  this.setRect(gElement
     .append('rect')
-    .attr("x", thisLayer.x)
-    .attr("y", thisLayer.y)
     .attr("width", thisLayer.width)
     .attr("height", thisLayer.height)
-    .classed("isolated", D3GraphValidation.isIsolated(graph, thisLayer));
+    .classed("isolated", D3GraphValidation.isIsolated(graph, thisLayer))
+  );
 
-  gElement
-    .append("circle")
-    .attr("class", "top-point")
-    .attr("cx", thisLayer.width/2 + thisLayer.x)
-    .attr("cy", thisLayer.y)
-    .attr("r", 2);
-
-  gElement
-    .append("circle")
-    .attr("class", "right-point")
-    .attr("cx", thisLayer.width + thisLayer.x)
-    .attr("cy", thisLayer.height/2 + thisLayer.y)
-    .attr("r", 2);
-
-  gElement
-    .append("circle")
-    .attr("class", "bottom-point")
-    .attr("cx", thisLayer.width/2 + thisLayer.x)
-    .attr("cy", thisLayer.height + thisLayer.y)
-    .attr("r", 2);
-
-  gElement
-    .append("circle")
-    .attr("class", "left-point")
-    .attr("cx", thisLayer.x)
-    .attr("cy", thisLayer.height/2 + thisLayer.y)
-    .attr("r", 2);
+  this.setTopPoint(this.addCircle(gElement, "top-point"));
+  this.setRightPoint(this.addCircle(gElement, "right-point"));
+  this.setBottomPoint(this.addCircle(gElement, "bottom-point"));
+  this.setLeftPoint(this.addCircle(gElement, "left-point"));
 
   gElement
     .on("click", () => {
@@ -220,7 +305,7 @@ D3Layer.prototype.drawLayer = function (d3node, graph) {
       })
       .on("drag", () => {
         thisLayer.dragState = "drag";
-        D3Layer.tip.hide();
+        if(this.tip) this.tip.hide();
         thisLayer.dragged(d3.event.x, d3.event.y);
         graph.dragged(thisLayer);
         thisLayer.notifyAll();
@@ -246,7 +331,7 @@ D3Layer.prototype.drawLayer = function (d3node, graph) {
     .on("mouseleave", () => {
       gElement.select("rect").classed("over-layer", false);
       graph.mouseover_node = null;
-      D3Layer.tip.hide();
+      if(this.tip) this.tip.hide();
       gElement.selectAll("circle")
         .attr("r", 2);
     });
@@ -295,7 +380,6 @@ D3Layer.prototype.drawLayer = function (d3node, graph) {
     );
 
   thisLayer.appendText(gElement, graph);
-
 };
 
 /**
@@ -319,7 +403,7 @@ D3Layer.prototype.appendText = function (gElement, graph) {
     .on("mouseleave", function () {
       d3.select(this).classed("over-layer", false);
       graph.mouseover_node = null;
-      D3Layer.tip.hide();
+      if(this.tip) this.tip.hide();
       gElement.selectAll("circle")
         .attr("r", 2);
     })
@@ -328,17 +412,8 @@ D3Layer.prototype.appendText = function (gElement, graph) {
     })
     .text(function () {
       thisLayer.width = 9 * thisLayer.name.length + (thisLayer.height - thisLayer.name.length);
-      gElement.select("rect")
-        .attr("width", thisLayer.width);
-      gElement.select(".top-point")
-        .attr("cx", thisLayer.x + (thisLayer.width / 2))
-        .attr("cy", thisLayer.y);
-      gElement.select(".right-point")
-        .attr("cx", thisLayer.x + (thisLayer.width))
-        .attr("cy", thisLayer.y + (thisLayer.height / 2));
-      gElement.select(".bottom-point")
-        .attr("cx", thisLayer.x + (thisLayer.width / 2))
-        .attr("cy", thisLayer.y + (thisLayer.height));
+      gElement.select("rect").attr("width", thisLayer.width);
+      thisLayer.dragged(thisLayer.x, thisLayer.y);
       return thisLayer.name;
     });
 };
@@ -348,7 +423,7 @@ D3Layer.prototype.appendText = function (gElement, graph) {
  * @param gElement the Layer to rename
  * @param graph the graph containig the Layer
  */
-D3Layer.prototype.changeTextOfNode = function(gElement, graph) {
+D3Layer.prototype.changeTextOfNode = function (gElement, graph) {
   let thisLayer = this;
 
   gElement.selectAll("text").remove();
@@ -383,96 +458,68 @@ D3Layer.prototype.changeTextOfNode = function(gElement, graph) {
       sel.addRange(range);
 };
 
+
 /**
  * Updates the position of the Layer and its components when dragging it
  * @param eventX the horizental position of the Layer
  * @param eventY the vertical position of the Layer
  */
-D3Layer.prototype.dragged = function(eventX, eventY) {
-  D3LayerComponent.prototype.dragged.call(this, eventX, eventY);
-  let thisLayer = this;
+D3Layer.prototype.dragged = function (eventX, eventY) {
+  this.x = eventX;
+  this.y = eventY;
 
-  let gElement = d3.select("#" + thisLayer.htmlID);
+  let gElement = d3.select("#" + this.htmlID);
 
-  gElement.select("rect")
-    .attr("x", thisLayer.x)
-    .attr("y", thisLayer.y);
-
-  gElement.select("text")
-    .attr("x", thisLayer.x + 15)
-    .attr("y", thisLayer.y + 25);
-
-  gElement.select(".top-point")
-    .attr("cx", thisLayer.x + thisLayer.width / 2)
-    .attr("cy", thisLayer.y);
-
-  gElement.select(".left-point")
-    .attr("cx", thisLayer.x)
-    .attr("cy", thisLayer.y + thisLayer.height / 2);
-
-  gElement.select(".right-point")
-    .attr("cx", thisLayer.x + thisLayer.width)
-    .attr("cy", thisLayer.y + thisLayer.height / 2);
-
-  gElement.select(".bottom-point")
-    .attr("cx", thisLayer.x + thisLayer.width / 2)
-    .attr("cy", thisLayer.y + thisLayer.height);
-
+  this.setRect(gElement.select("rect"));
+  this.setText(gElement.select("text"));
+  this.setTopPoint(gElement.select(".top-point"));
+  this.setLeftPoint(gElement.select(".left-point"));
+  this.setRightPoint(gElement.select(".right-point"));
+  this.setBottomPoint(gElement.select(".bottom-point"));
 };
 
 /**
  * Adds transition when changing the Layer position
- * @param x the horizental position
- * @param y the vertical position
  */
 D3Layer.prototype.transitionToXY = function (x, y) {
-  let thisLayer = this;
+  this.x = x;
+  this.y = y;
 
-  let gElement = d3.select("#" + thisLayer.htmlID);
+  let gElement = d3.select("#" + this.htmlID);
 
-  gElement.select("rect")
-    .transition()
-    .duration(300)
-    .attr("x", x)
-    .attr("y", y);
-
-  gElement.select("text")
-    .transition()
-    .duration(300)
-    .attr("x", x + 15)
-    .attr("y", y + 25);
-
-  gElement.select(".top-point")
-    .transition()
-    .duration(300)
-    .attr("cx", x + thisLayer.width / 2)
-    .attr("cy", y);
-
-  gElement.select(".left-point")
-    .transition()
-    .duration(300)
-    .attr("cx", x)
-    .attr("cy", y + thisLayer.height / 2);
-
-  gElement.select(".right-point")
-    .transition()
-    .duration(300)
-    .attr("cx", x + thisLayer.width)
-    .attr("cy", y + thisLayer.height / 2);
-
-  gElement.select(".bottom-point")
-    .transition()
-    .duration(300)
-    .attr("cx", x + thisLayer.width / 2)
-    .attr("cy", y + thisLayer.height);
+  this.setRect(this.addTransition(gElement.select("rect")));
+  this.setText(this.addTransition(gElement.select("text")));
+  this.setTopPoint(this.addTransition(gElement.select(".top-point")));
+  this.setLeftPoint(this.addTransition(gElement.select(".left-point")));
+  this.setRightPoint(this.addTransition(gElement.select(".right-point")));
+  this.setBottomPoint(this.addTransition(gElement.select(".bottom-point")));
 };
 
-D3Layer.loadJSON = function (json, graph) {
-  let newLayer = new D3Layer(json.id, json.parent || graph, new KerasLayer().load(json.kerasLayer), json.x, json.y);
-  newLayer.inputLayers = json.inputLayers;
-  newLayer.outputLayers = json.outputLayers;
-  newLayer.d3node = graph.svgD3Layers;
-  return newLayer;
+/**
+ * Make a graphical transition without setting x and y of layer, useful for composite transitions.
+ */
+D3Layer.prototype.tempTransitionToXY = function (x, y) {
+  const foreverX = this.x;
+  const foreverY = this.y;
+  this.transitionToXY(x, y);
+  this.x = foreverX;
+  this.y = foreverY;
+};
+
+D3Layer.prototype.getLayerById = function (id) {
+  if (this.id === id) {
+    return this;
+  }
+  if (this.children === null){
+    return null;
+  }
+  for (const child of this.children){
+    const tmp = child.getLayerById(id);
+    if (tmp !== null){
+      return tmp;
+    }
+  }
+  return null;
 };
 
 
@@ -485,24 +532,24 @@ D3Layer.prototype.mouseOver = function (graph) {
       edges = graph.d3Edges;
   let gElement = d3.select("#" + this.htmlID);
   d3.tip = d3tip;
-  if(D3Layer.tip === undefined) {
-    D3Layer.tip = d3.tip().attr('class', 'd3-tip').offset([-10, 0]);
-    gElement.call(D3Layer.tip);
+  if(this.tip === undefined) {
+    this.tip = d3.tip().attr('class', 'd3-tip').offset([-10, 0]);
+    gElement.call(this.tip);
   }
   if(edges.filter(edge => d3.select("g#"+edge.htmlID).select("path").attr("class").indexOf("linkCycle") >= 0).length > 0){
-    D3Layer.tip
+    this.tip
       .html(function() {
       return "<strong>Incoherence:</strong> <span style='color:red'> Cycle </span>";
     });
-    D3Layer.tip.show(gElement.select("rect").node());
+    this.tip.show(gElement.select("rect").node());
   }
   else {
     if(D3GraphValidation.isIsolated(graph, thisLayer)) {
-      D3Layer.tip
+      this.tip
         .html(function() {
         return "<strong>Incoherence:</strong> <span style='color:red'> is isolated </span>";
       });
-      D3Layer.tip.show(gElement.select("rect").node());
+      this.tip.show(gElement.select("rect").node());
     }
     else {
       if ( thisLayer.observers.length && thisLayer.observers[0].class === "D3Edge" &&
@@ -512,12 +559,12 @@ D3Layer.prototype.mouseOver = function (graph) {
           let className = d3.select("g#"+edge.id).select("path").attr("class");
           if(className.indexOf("linkError") >= 0){
             if (jsonKeras[thisLayer.kerasLayer.name].input.shape !== undefined && jsonKeras[thisLayer.kerasLayer.name].output.shape !== undefined) {
-              D3Layer.tip
+              this.tip
                 .html(function () {
                 return "<strong> Bad Input, should be :</strong> <span style='color:red'>" + jsonKeras[thisLayer.kerasLayer.name].input.shape + "</span>"+"<br>"+
                 "<strong> but is :</strong> <span style='color:red'>" + badOutput + "</span>";
               });
-              D3Layer.tip.show(gElement.select("rect").node());
+              this.tip.show(gElement.select("rect").node());
             }
           }
         });
@@ -526,4 +573,18 @@ D3Layer.prototype.mouseOver = function (graph) {
   }
   gElement.selectAll("circle")
     .attr("r", 4);
+};
+
+D3Layer.prototype.primeAncestorOfId = function (id) {
+  if (this.id === id) {
+    return this;
+  }
+  let res = null;
+  this.children.forEach(layer => {
+    let tmp = layer.getLayerById(id);
+    if (tmp != null) {
+      res = layer;
+    }
+  });
+  return res;
 };

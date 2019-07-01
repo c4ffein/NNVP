@@ -16,23 +16,21 @@ import D3GraphValidation from './D3GraphValidation';
  * @param children the set of observables
  */
 export default function D3LayerComposite(id, parent, children, x, y) {
-  let thisComposite = this;
-
-  D3Layer.call(thisComposite, id, parent, null, x, y, "Block_" + id, "Composite_" + id);
-  thisComposite.class = "D3LayerComposite";
-  thisComposite.d3node = null;
-  thisComposite.isOpen = false;
-  thisComposite.children = [];
+  D3Layer.call(this, id, parent, null, x, y, "Block_" + id, "Composite_" + id);
+  this.class = "D3LayerComposite";
+  this.d3nodeContainer = null;
+  this.isOpen = false;
+  this.children = [];
   children.forEach(child => {
-    thisComposite.children.push(child);
-    child.addObserver(thisComposite);
-    child.setParent(thisComposite);
+    this.children.push(child);
+    child.addObserver(this);
+    child.setParent(this);
   });
-  thisComposite.graph = null;
-  thisComposite.deleteState = false;
+  this.parent = parent;
+  this.deleteState = false;
 };
 
-D3LayerComposite.prototype = Object.create(D3LayerComponent.prototype);
+D3LayerComposite.prototype = Object.create(D3Layer.prototype);
 
 D3LayerComposite.prototype.clone = function () {
   let res = new D3LayerComposite(this.id, this.parent, null, this.x, this.y, this.name, this.htmlID);
@@ -40,15 +38,6 @@ D3LayerComposite.prototype.clone = function () {
   return res;
 };
 
-/**
- * Converts the Layer composite to a JSON data
- * @returns a JSON data
- */
-D3LayerComposite.prototype.toJSON = function () {
-  let res = D3LayerComponent.prototype.toJSON.call(this);
-  res.isOpen = this.isOpen;
-  return res;
-};
 
 /**
  * Updates the Layer compisite
@@ -188,16 +177,15 @@ D3LayerComposite.prototype.removeOutputLayer = function (layer) {
 
 /**
  * Draw a Layer composite
- * @param d3node the set of Layers composite existing
  * @param graph the graph to which add the Layer composite
  */
-D3LayerComposite.prototype.drawLayer = function (d3node, graph) {
+D3LayerComposite.prototype.drawLayer = function (graph) {
   this.graph = graph;
 
   this.width = 180;
   this.height = 60;
 
-  this.d3node = d3node;
+  this.d3nodeContainer = graph.svgD3LayerComposites;
 
   this.children.forEach(child => {
     if (!d3.select("#" + child.htmlID).node()) {
@@ -206,11 +194,8 @@ D3LayerComposite.prototype.drawLayer = function (d3node, graph) {
     if (child.class === "D3LayerComposite") {
       child.close();
     }
-    child.transitionToXY(this.x, this.y);
-    d3.select("#" + child.htmlID)
-      .transition()
-      .delay(300)
-      .remove();
+    child.tempTransitionToXY(this.x, this.y);
+    this.addTransition(d3.select("#" + child.htmlID)).remove();
     child.x = child.x + 20;
     child.y = child.y + this.height;
   });
@@ -245,18 +230,13 @@ D3LayerComposite.prototype.drawLayer = function (d3node, graph) {
     }
   });
 
-  let gElement = this.d3node.append("g");
+  let gElement = this.d3nodeContainer.append("g");
 
   gElement
     .attr("class", "d3Layer D3LayerComposite")
     .attr("id", this.htmlID);
 
-  gElement
-    .append("rect")
-    .attr("x", this.x)
-    .attr("y", this.y)
-    .transition()
-    .delay(300)
+  this.addTransition(gElement.append("rect").attr("x", this.x).attr("y", this.y))
     .attr("width", this.width)
     .attr("height", this.height);
 
@@ -302,19 +282,15 @@ D3LayerComposite.prototype.drawLayer = function (d3node, graph) {
 
   this.setDrag(graph, gElement);
 
-  gElement
-    .select("rect.open")
-    .on("click", () => {
-      this.open(graph);
-      d3.event.stopPropagation();
-    });
+  gElement.select("rect.open").on("click", () => {
+    this.open(graph);
+    d3.event.stopPropagation();
+  });
 
-  gElement
-    .select("text.open")
-    .on("click", () => {
-      this.open(graph);
-      d3.event.stopPropagation();
-    });
+  gElement.select("text.open").on("click", () => {
+    this.open(graph);
+    d3.event.stopPropagation();
+  });
 
   D3Background.updateBackground(graph);
 
@@ -370,29 +346,13 @@ D3LayerComposite.prototype.dragged = function (eventX, eventY) {
 
   let gElement = d3.select("#" + thisComposite.htmlID);
 
-  gElement.select("rect")
-    .attr("x", thisComposite.x)
-    .attr("y", thisComposite.y);
+  this.setRect(gElement.select("rect"));
+  this.setText(gElement.select("text"), 15, 35);
 
-  gElement.select("text")
-    .attr("x", thisComposite.x + 15)
-    .attr("y", thisComposite.y + 35);
-
-  gElement.select("rect.button.open")
-    .attr("x", thisComposite.x + thisComposite.width - 50)
-    .attr("y", thisComposite.y + 5);
-
-  gElement.select("text.button.open")
-    .attr("x", thisComposite.x + thisComposite.width - 45)
-    .attr("y", thisComposite.y + 17);
-
-  gElement.select("rect.button.break")
-    .attr("x", thisComposite.x + thisComposite.width - 50)
-    .attr("y", thisComposite.y + 30);
-
-  gElement.select("text.button.break")
-    .attr("x", thisComposite.x + thisComposite.width - 45)
-    .attr("y", thisComposite.y + 42);
+  this.setElement(gElement.select("rect.button.open"), this.x + this.width - 50, this.y + 5);
+  this.setElement(gElement.select("text.button.open"), this.x + this.width - 45, this.y + 17);
+  this.setElement(gElement.select("rect.button.break"), this.x + this.width - 50, this.y + 30);
+  this.setElement(gElement.select("text.button.break"), this.x + this.width - 45, this.y + 42);
 
   thisComposite.children.forEach(child => {
     let x = child.originDrag.x + thisComposite.x - thisComposite.originDrag.x;
@@ -434,24 +394,15 @@ D3LayerComposite.prototype.open = function (graph) {
 
   let gElement = d3.select("#" + thisComposite.htmlID);
 
-  gElement
-    .select("rect")
-    .transition()
-    .duration(300)
+  this.addTransition(gElement.select("rect"))
     .attr("width", thisComposite.width)
     .attr("height", thisComposite.height);
 
-  gElement
-    .select("rect.open")
-    .transition()
-    .duration(300)
+  this.addTransition(gElement.select("rect.open"))
     .attr("x", thisComposite.x + thisComposite.width - 50)
     .attr("y", thisComposite.y + 5);
 
-  gElement
-    .select("text.open")
-    .transition()
-    .duration(300)
+  this.addTransition(gElement.select("text.open"))
     .attr("x", thisComposite.x + thisComposite.width - 45)
     .attr("y", thisComposite.y + 17)
     .text("close");
@@ -506,7 +457,7 @@ D3LayerComposite.prototype.open = function (graph) {
     });
 
   thisComposite.children.forEach(child =>
-    child.drawLayer(child.d3node, graph)
+    child.drawLayer(graph)
   );
 
   thisComposite.children.forEach(child => {
@@ -566,7 +517,7 @@ D3LayerComposite.prototype.close = function (graph) {
     if (child.class === "D3LayerComposite") {
       child.close();
     }
-    child.transitionToXY(thisComposite.x, thisComposite.y);
+    child.tempTransitionToXY(thisComposite.x, thisComposite.y);
     d3.select("#" + child.htmlID)
       .transition()
       .delay(300)
@@ -605,39 +556,26 @@ D3LayerComposite.prototype.close = function (graph) {
 
   let gElement = d3.select("#" + thisComposite.htmlID);
 
-  gElement
-    .select("rect")
-    .transition()
-    .duration(300)
+  this.addTransition(gElement.select("rect"))
     .attr("width", thisComposite.width)
     .attr("height", thisComposite.height);
 
-  gElement
-    .select("rect.open")
-    .transition()
-    .duration(300)
+  this.addTransition(gElement.select("rect.open"))
     .attr("x", thisComposite.x + thisComposite.width - 50)
     .attr("y", thisComposite.y + 5)
     .attr("width", 45)
     .attr("height", 17)
 
-  gElement
-    .select("text.open")
-    .transition()
-    .duration(300)
+  this.addTransition(gElement.select("text.open"))
     .attr("x", thisComposite.x + thisComposite.width - 45)
     .attr("y", thisComposite.y + 17)
     .attr("width", 20)
     .attr("height", 10)
     .text("open");
 
-  gElement
-    .select("rect.break")
-    .remove();
+  gElement.select("rect.break").remove();
 
-  gElement
-    .select("text.break")
-    .remove();
+  gElement.select("text.break").remove();
 
   gElement
     .select("rect.open")
@@ -680,9 +618,13 @@ D3LayerComposite.prototype.break = function (graph) {
   D3Background.updateBackground(graph);
 };
 
+
+/**
+ * Instanciate a D3LayerComposite from JSON
+ */
 D3LayerComposite.loadJSON = function(json, graph) {
   var newChildren = [];
-  json.children.forEach(child => newChildren.push(graph.loadComposite(child, graph)));
+  json.children.forEach(child => newChildren.push(D3Layer.loadJSON(child, graph)));
   let newLayer = new D3LayerComposite(json.id, json.parent || graph, newChildren, json.x, json.y);
   newChildren.forEach(child => { child.setParent(newLayer); });
   newLayer.inputLayers = json.inputLayers;
@@ -691,7 +633,7 @@ D3LayerComposite.loadJSON = function(json, graph) {
   newLayer.height = json.height;
   newLayer.name = json.name;
   newLayer.isOpen = json.isOpen;
-  newLayer.d3node = graph.svgD3LayerComposites;
+  newLayer.d3nodeContainer = graph.svgD3LayerComposites;
   return newLayer;
 };
 
@@ -724,3 +666,6 @@ D3LayerComposite.prototype.getAllContainedJSON = function () {
   });
   return res;
 };
+
+
+D3LayerComposite.prototype.__proto__ = D3Layer.prototype;
