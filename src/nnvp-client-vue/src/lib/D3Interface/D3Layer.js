@@ -180,7 +180,7 @@ D3Layer.prototype.setOrigin = function () {
  * Removes the Layer
  */
 D3Layer.prototype.remove = function () {
-  if (this.tip) this.tip.hide();
+  if (D3Layer.tip) D3Layer.tip.hide();
   D3LayerComponent.prototype.remove.call(this);
 };
 
@@ -305,7 +305,7 @@ D3Layer.prototype.drawLayer = function (graph) {
       })
       .on("drag", () => {
         thisLayer.dragState = "drag";
-        if(this.tip) this.tip.hide();
+        if(D3Layer.tip) D3Layer.tip.hide();
         thisLayer.dragged(d3.event.x, d3.event.y);
         graph.dragged(thisLayer);
         thisLayer.notifyAll();
@@ -331,7 +331,7 @@ D3Layer.prototype.drawLayer = function (graph) {
     .on("mouseleave", () => {
       gElement.select("rect").classed("over-layer", false);
       graph.mouseover_node = null;
-      if(this.tip) this.tip.hide();
+      if(D3Layer.tip) D3Layer.tip.hide();
       gElement.selectAll("circle")
         .attr("r", 2);
     });
@@ -403,7 +403,7 @@ D3Layer.prototype.appendText = function (gElement, graph) {
     .on("mouseleave", function () {
       d3.select(this).classed("over-layer", false);
       graph.mouseover_node = null;
-      if(this.tip) this.tip.hide();
+      if(D3Layer.tip) D3Layer.tip.hide();
       gElement.selectAll("circle")
         .attr("r", 2);
     })
@@ -532,24 +532,24 @@ D3Layer.prototype.mouseOver = function (graph) {
       edges = graph.d3Edges;
   let gElement = d3.select("#" + this.htmlID);
   d3.tip = d3tip;
-  if(this.tip === undefined) {
-    this.tip = d3.tip().attr('class', 'd3-tip').offset([-10, 0]);
-    gElement.call(this.tip);
+  if(D3Layer.tip === undefined) {
+    D3Layer.tip = d3.tip().attr('class', 'd3-tip').offset([-10, 0]);
+    gElement.call(D3Layer.tip);
   }
   if(edges.filter(edge => d3.select("g#"+edge.htmlID).select("path").attr("class").indexOf("linkCycle") >= 0).length > 0){
-    this.tip
+    D3Layer.tip
       .html(function() {
       return "<strong>Incoherence:</strong> <span style='color:red'> Cycle </span>";
     });
-    this.tip.show(gElement.select("rect").node());
+    D3Layer.tip.show(gElement.select("rect").node());
   }
   else {
     if(D3GraphValidation.isIsolated(graph, thisLayer)) {
-      this.tip
+      D3Layer.tip
         .html(function() {
         return "<strong>Incoherence:</strong> <span style='color:red'> is isolated </span>";
       });
-      this.tip.show(gElement.select("rect").node());
+      D3Layer.tip.show(gElement.select("rect").node());
     }
     else {
       if ( thisLayer.observers.length && thisLayer.observers[0].class === "D3Edge" &&
@@ -559,12 +559,12 @@ D3Layer.prototype.mouseOver = function (graph) {
           let className = d3.select("g#"+edge.id).select("path").attr("class");
           if(className.indexOf("linkError") >= 0){
             if (jsonKeras[thisLayer.kerasLayer.name].input.shape !== undefined && jsonKeras[thisLayer.kerasLayer.name].output.shape !== undefined) {
-              this.tip
+              D3Layer.tip
                 .html(function () {
                 return "<strong> Bad Input, should be :</strong> <span style='color:red'>" + jsonKeras[thisLayer.kerasLayer.name].input.shape + "</span>"+"<br>"+
                 "<strong> but is :</strong> <span style='color:red'>" + badOutput + "</span>";
               });
-              this.tip.show(gElement.select("rect").node());
+              D3Layer.tip.show(gElement.select("rect").node());
             }
           }
         });
