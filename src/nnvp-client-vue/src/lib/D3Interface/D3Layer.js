@@ -180,8 +180,10 @@ D3Layer.prototype.setOrigin = function () {
  * Removes the Layer
  */
 D3Layer.prototype.remove = function () {
-  if (D3Layer.tip) D3Layer.tip.hide();
-  D3LayerComponent.prototype.remove.call(this);
+  if (D3Layer.tip) {
+    D3Layer.tip.hide();
+  }
+  d3.select("#" + this.htmlID).remove();
 };
 
 /**

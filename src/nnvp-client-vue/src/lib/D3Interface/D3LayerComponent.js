@@ -98,11 +98,5 @@ D3LayerComponent.prototype.setOrigin = function () {
   this.originDrag.y = this.y;
 };
 
-/**
- * Removes the Layer component
- */
-D3LayerComponent.prototype.remove = function () {
-  d3.select("#" + this.htmlID).remove();
-};
 
 D3LayerComponent.prototype.__proto__ = D3Layer.prototype;
