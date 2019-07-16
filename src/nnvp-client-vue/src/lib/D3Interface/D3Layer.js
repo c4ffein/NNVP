@@ -372,7 +372,7 @@ D3Layer.prototype.drawLayer = function (graph) {
       .on("start", function () {
         graph.layerMouseDown.call(graph, thisLayer);
       })
-      .on("drag", function () {
+      .on("drag", () => {
         graph.moveDragLine.call(graph, this);
       })
       .on("end", function () {

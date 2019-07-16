@@ -155,44 +155,7 @@ D3Edge.prototype.updateWithTransition = function() {
  * @returns Collection of points (M) the beginning of the path and (L) other points
  */
 D3Edge.prototype.pathAttrD = function () {
-  let edge = this,
-      sourcePoint,
-      targetPoint;
-  if(Math.abs(edge.source.x - edge.target.x) - (edge.source.x < edge.target.x ? edge.source.width : edge.target.width) < Math.abs(edge.source.y - edge.target.y) - edge.source.height) {
-    targetPoint = edge.source.y < edge.target.y ?
-    { x: edge.target.x + (edge.target.width/2), y: edge.target.y} :
-    { x: edge.target.x + (edge.target.width/2), y: edge.target.y + edge.target.height };
-    sourcePoint = edge.source.y < edge.target.y ?
-    { x: edge.source.x + (edge.source.width/2), y: edge.source.y + edge.source.height } :
-    { x: edge.source.x + (edge.source.width/2), y: edge.source.y};
-    let yMiddle = sourcePoint.y + ((targetPoint.y - sourcePoint.y)/2);
-    return "M" + sourcePoint.x + "," + sourcePoint.y +
-      "L" + sourcePoint.x + "," + yMiddle +
-      "L" + targetPoint.x + "," + yMiddle +
-      "L" + targetPoint.x + "," + targetPoint.y;
-  }
-  else {
-    targetPoint = edge.source.x < edge.target.x ?
-      { x: edge.target.x, y: edge.target.y + (edge.target.height / 2) } :
-      { x: edge.target.x + edge.target.width, y: edge.target.y + (edge.target.height / 2) };
-    sourcePoint = edge.source.x < edge.target.x ?
-      { x: edge.source.x + edge.source.width, y: edge.source.y + (edge.source.height / 2) } :
-      { x: edge.source.x, y: edge.source.y + (edge.source.height / 2) };
-    if(Math.abs(edge.target.x - edge.source.x) > (Math.abs(edge.target.y - edge.source.y) + (edge.source.width > edge.target.width ? edge.source.width/2 : edge.target.width/2))) {
-      let xMiddle = sourcePoint.x + ((targetPoint.x - sourcePoint.x)/2);
-      return "M" + sourcePoint.x + "," + sourcePoint.y +
-      "L" + xMiddle + "," + sourcePoint.y +
-      "L" + xMiddle + "," + targetPoint.y +
-      "L" + targetPoint.x + "," + targetPoint.y;
-    } else {
-      sourcePoint = edge.source.y < edge.target.y ?
-      { x: edge.source.x + (edge.source.width / 2), y: edge.source.y + edge.source.height } :
-      { x: edge.source.x + (edge.source.width / 2), y: edge.source.y };
-      return "M" + sourcePoint.x + "," + sourcePoint.y +
-      "L" + sourcePoint.x + "," + targetPoint.y +
-      "L" + targetPoint.x + "," + targetPoint.y;
-    }
-  }
+  return D3Edge.pathAttrD(this);
 };
 
 /**
@@ -201,8 +164,50 @@ D3Edge.prototype.pathAttrD = function () {
  * @param from the origin point to drag from
  * @param target according to the location of the mouse
  */
-D3Edge.moveDragLine = function (dragline, from, target) {
-  let point = {x: d3.select(from).attr("cx"), y: d3.select(from).attr("cy")};
-    dragline.attr('d', "M" + point.x + "," + point.y +
-      "L" + target.x + "," + target.y);
+D3Edge.moveDragLine = function (dragline, source, target) {
+  const edge = {
+    source: source,
+    target: {x: target.x, y: target.y, width: 0, height: 0},
+  };
+  dragline.attr('d', D3Edge.pathAttrD(edge));
+};
+
+D3Edge.pathAttrD = function (edge) {
+  let sourceP, targetP;
+  if(Math.abs(edge.source.x - edge.target.x) - (edge.source.x < edge.target.x ? edge.source.width : edge.target.width) < Math.abs(edge.source.y - edge.target.y) - edge.source.height) {
+    targetP = edge.source.y < edge.target.y ?
+      { x: edge.target.x + (edge.target.width/2), y: edge.target.y} :
+      { x: edge.target.x + (edge.target.width/2), y: edge.target.y + edge.target.height };
+    sourceP = edge.source.y < edge.target.y ?
+      { x: edge.source.x + (edge.source.width/2), y: edge.source.y + edge.source.height } :
+      { x: edge.source.x + (edge.source.width/2), y: edge.source.y};
+    let yMiddle = sourceP.y + ((targetP.y - sourceP.y)/2);
+    return D3Edge.pathFromPoints(sourceP, [sourceP.x, yMiddle], [targetP.x, yMiddle], targetP);
+  }
+  else {
+    targetP = edge.source.x < edge.target.x ?
+      { x: edge.target.x, y: edge.target.y + (edge.target.height / 2) } :
+      { x: edge.target.x + edge.target.width, y: edge.target.y + (edge.target.height / 2) };
+    sourceP = edge.source.x < edge.target.x ?
+      { x: edge.source.x + edge.source.width, y: edge.source.y + (edge.source.height / 2) } :
+      { x: edge.source.x, y: edge.source.y + (edge.source.height / 2) };
+    if(Math.abs(edge.target.x - edge.source.x) > (Math.abs(edge.target.y - edge.source.y) + (edge.source.width > edge.target.width ? edge.source.width/2 : edge.target.width/2))) {
+      let xMiddle = sourceP.x + ((targetP.x - sourceP.x)/2);
+      return D3Edge.pathFromPoints(sourceP, [xMiddle, sourceP.y], [xMiddle, targetP.y], targetP);
+    } else {
+      sourceP = edge.source.y < edge.target.y ?
+        { x: edge.source.x + (edge.source.width / 2), y: edge.source.y + edge.source.height } :
+        { x: edge.source.x + (edge.source.width / 2), y: edge.source.y };
+      return D3Edge.pathFromPoints(sourceP, [sourceP.x, targetP.y], targetP);
+    }
+  }
+};
+
+D3Edge.pathFromPoints = function (...points) {
+  const purified = points.map(p => Array.isArray(p) ? p : [p.x, p.y]);
+  let retStr = "M" + purified[0][0] + "," + purified[0][1];
+  for (let i = 1; i < purified.length; i++){
+    retStr += "L" + purified[i][0] + "," + purified[i][1];
+  }
+  return retStr;
 };
