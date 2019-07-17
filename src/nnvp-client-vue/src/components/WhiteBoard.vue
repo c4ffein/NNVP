@@ -21,6 +21,8 @@ export default {
     d3.select("#hidden-file-upload").on("change", function (d) {
       let uploadFileEvent = this;
       whiteboard.activeGraph.uploadToBoard(uploadFileEvent);
+      // Needed for Chrome/Safari if you re-select the same file, and input event is inconsistent.
+      document.getElementById("hidden-file-upload").value = "";
     });
   }
 };
