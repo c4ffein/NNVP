@@ -368,12 +368,12 @@ D3Background.updateListenerBorder = function (graph) {
  * @param graph the graph which influence on background
  */
 D3Background.updateBackground = function (graph) {
-  if (!graph.d3Layers.length <= 0) {
-    let leftTopX = graph.d3Layers[0].x;
-    let leftTopY = graph.d3Layers[0].y;
-    let rigthBottomX = graph.d3Layers[0].x + graph.d3Layers[0].width;
-    let rigthBottomY = graph.d3Layers[0].y + graph.d3Layers[0].height;
-    graph.d3Layers.forEach( node => {
+  if (!graph.model.d3Layers.length <= 0) {
+    let leftTopX = graph.model.d3Layers[0].x;
+    let leftTopY = graph.model.d3Layers[0].y;
+    let rigthBottomX = graph.model.d3Layers[0].x + graph.model.d3Layers[0].width;
+    let rigthBottomY = graph.model.d3Layers[0].y + graph.model.d3Layers[0].height;
+    graph.model.d3Layers.forEach( node => {
       leftTopX = node.x < leftTopX ? node.x : leftTopX;
       leftTopY = node.y < leftTopY ? node.y : leftTopY;
       rigthBottomX = node.x + node.width > rigthBottomX ?  node.x + node.width : rigthBottomX;

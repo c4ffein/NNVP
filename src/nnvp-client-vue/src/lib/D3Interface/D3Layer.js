@@ -60,7 +60,7 @@ export default function D3Layer(id, parent, kerasLayer, x, y, name, htmlID) {
     this.name = this.name || this.kerasLayer.name;
 
     if(this.kerasLayer.name == "Input"){
-      this.getEditor().modelInputs.push(this);
+      this.getModel().modelInputs.push(this);
     }
   }
 
@@ -107,8 +107,11 @@ D3Layer.loadJSON = function (json, graph) {
   }
 };
 
-
 D3Layer.prototype.getEditor = function () {
+  return this.getModel().editor;
+};
+
+D3Layer.prototype.getModel = function () {
   let editor = this.parent;
   while (! editor instanceof D3GraphEditor){
     editor = editor.parent;
@@ -207,7 +210,7 @@ D3Layer.prototype.delete = function (graph) {
     }
   });
   if(this.kerasLayer.name === "Input"){
-    const modelInputs = this.getEditor().modelInputs;
+    const modelInputs = this.getModel().modelInputs;
     if(modelInputs.indexOf(this) !== -1){
       modelInputs.splice(modelInputs.indexOf(this), 1);
     }
@@ -350,11 +353,11 @@ D3Layer.prototype.drawLayer = function (graph) {
       d3.select(this).attr("r", 2);
     })
     .on("click", function(){
-      if(graph.d3Layers.length > 1){
+      if(graph.model.d3Layers.length > 1){
         let dist = null,
             finalLayer,
             sourceCenter = {x: thisLayer.x + (thisLayer.width/2), y: thisLayer.y + (thisLayer.height/2)};
-        graph.d3Layers.forEach(layer => {
+        graph.model.d3Layers.forEach(layer => {
           let targetCenter = {x: layer.x + (layer.width/2), y: layer.y + (layer.height/2)};
           let newDist = Math.sqrt(Math.abs(sourceCenter.x - targetCenter.x)*Math.abs(sourceCenter.x - targetCenter.x) + Math.abs(sourceCenter.y - targetCenter.y)*Math.abs(sourceCenter.y - targetCenter.y));
           if((!dist || dist > newDist) && layer !== thisLayer){
@@ -531,7 +534,7 @@ D3Layer.prototype.getLayerById = function (id) {
  */
 D3Layer.prototype.mouseOver = function (graph) {
   let thisLayer = this,
-      edges = graph.d3Edges;
+      edges = graph.model.d3Edges;
   let gElement = d3.select("#" + this.htmlID);
   d3.tip = d3tip;
   if(D3Layer.tip === undefined) {

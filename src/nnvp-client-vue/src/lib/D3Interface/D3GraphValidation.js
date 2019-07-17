@@ -13,7 +13,7 @@ export default function D3GraphValidation () {};
  */
 D3GraphValidation.isIsolated = function (graph, layer) {
   let res = true;
-    graph.d3Edges.forEach(edge => {
+    graph.model.d3Edges.forEach(edge => {
       if(layer === edge.source || layer === edge.target){
         res = false;
       }
@@ -96,19 +96,19 @@ D3GraphValidation.isCycle = function (graph) {
   return false; // TODO : fix this legacy code
 
   let isCycle = false;
-  if(graph.d3Edges.length > 2 && graph.d3Layers.length > 2){
+  if(graph.model.d3Edges.length > 2 && graph.model.d3Layers.length > 2){
 
     function isCyclicUtil(node, visited, recStack){
-      let i = graph.d3Layers.indexOf(node);
+      let i = graph.model.d3Layers.indexOf(node);
       if (recStack[i])
         return true;
       if (visited[i])
         return false;
       visited[i] = true;
       recStack[i] = true;
-      for(let j = 0; j < graph.d3Edges.length; j++){
-        if(graph.d3Edges[j].source === node){
-          if (isCyclicUtil(graph.d3Edges[j].target, visited, recStack)){
+      for(let j = 0; j < graph.model.d3Edges.length; j++){
+        if(graph.model.d3Edges[j].source === node){
+          if (isCyclicUtil(graph.model.d3Edges[j].target, visited, recStack)){
             return true;
           }
         }
@@ -120,8 +120,8 @@ D3GraphValidation.isCycle = function (graph) {
     function isCyclic() {
       let visited = [];
       let recStack = [];
-      for (let i = 0; i < graph.d3Layers.length; i++){
-        if (isCyclicUtil(graph.d3Layers[i], visited, recStack)){
+      for (let i = 0; i < graph.model.d3Layers.length; i++){
+        if (isCyclicUtil(graph.model.d3Layers[i], visited, recStack)){
           return true;
         }
       }
@@ -133,7 +133,7 @@ D3GraphValidation.isCycle = function (graph) {
     }
   }
 
-  graph.d3Edges.forEach(edge => {
+  graph.model.d3Edges.forEach(edge => {
     if (d3.select("#" + edge.htmlID).node()) {
       d3.select("#" + edge.htmlID)
         .select("path")

@@ -19,7 +19,7 @@ export default function D3LayerComponent(id, parent, kerasLayer, x, y, name, htm
  * Clones a Layer
  */
 D3LayerComponent.prototype.clone = function () {
-  let res = new D3Layer(this.getEditor().getNodeId(), this.parent, this.kerasLayer.clone(), this.x, this.y, this.name);
+  let res = new D3Layer(this.getModel().getNodeId(), this.parent, this.kerasLayer.clone(), this.x, this.y, this.name);
   this.inputLayers.forEach(inputLayer => res.inputLayers.push(inputLayer));
   this.outputLayers.forEach(outputLayer => res.outputLayers.push(outputLayer));
 };
@@ -40,7 +40,7 @@ D3LayerComponent.prototype.setParent = function (parent) {
 D3LayerComponent.prototype.addInputLayer = function (layer) {
   this.inputLayers.push(layer.id);
   if(this.kerasLayer.name == "Output"){
-    this.getEditor().modelOutputs.push(layer);
+    this.getModel().modelOutputs.push(layer);
   }
 };
 
@@ -51,7 +51,7 @@ D3LayerComponent.prototype.addInputLayer = function (layer) {
 D3LayerComponent.prototype.removeInputLayer = function (layer) {
   this.inputLayers = this.inputLayers.filter(inputLayer => inputLayer !== layer.id);
   if(this.kerasLayer.name === "Output"){
-    const modelOutputs = this.getEditor().modelOutputs;
+    const modelOutputs = this.getModel().modelOutputs;
     if(modelOutputs.indexOf(layer) !== -1){
       modelOutputs.splice(modelOutputs.indexOf(layer), 1);
     }

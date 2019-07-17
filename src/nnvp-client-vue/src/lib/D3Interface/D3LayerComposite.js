@@ -200,29 +200,29 @@ D3LayerComposite.prototype.drawLayer = function (graph) {
     child.y = child.y + this.height;
   });
 
-  graph.d3Edges.filter(edge => true).forEach(edge => {
+  graph.model.d3Edges.filter(edge => true).forEach(edge => {
     let source = this.children.find(child => child == edge.source)? true : false;
     let target = this.children.find(child => child == edge.target)? true : false;
     if (!source && !target) {
       edge.updateWithTransition();
     }
     if (source || target) {
-      graph.d3Edges.splice(graph.d3Edges.indexOf(edge), 1);
+      graph.model.d3Edges.splice(graph.model.d3Edges.indexOf(edge), 1);
       edge.remove();
       edge.source.removeObserver(edge);
       edge.target.removeObserver(edge);
     }
-    if (source && !target && graph.d3Edges.find(e => e.source == this && e.target == edge.target) == null) {
+    if (source && !target && graph.model.d3Edges.find(e => e.source == this && e.target == edge.target) == null) {
       let new_edge = new D3Edge(this, edge.target);
-      graph.d3Edges.push(new_edge);
+      graph.model.d3Edges.push(new_edge);
       new_edge.source = edge.source;
       new_edge.drawEdge(edge.d3node, graph);
       new_edge.source = this;
       new_edge.updateWithTransition();
     }
-    if (!source && target && graph.d3Edges.find(e => e.source == edge.source && e.target == this) == null) {
+    if (!source && target && graph.model.d3Edges.find(e => e.source == edge.source && e.target == this) == null) {
       let new_edge = new D3Edge(edge.source, this);
-      graph.d3Edges.push(new_edge);
+      graph.model.d3Edges.push(new_edge);
       new_edge.taget = edge.taget;
       new_edge.drawEdge(edge.d3node, graph);
       new_edge.taget = this;
@@ -466,9 +466,9 @@ D3LayerComposite.prototype.open = function (graph) {
       while(source != null && source.id != inputLayer && source.isOpen){
         source = source.primeAncestorOfId(inputLayer);
       }
-      if (graph.d3Edges.find(edge => edge.source == source && edge.target == child) == null) {
+      if (graph.model.d3Edges.find(edge => edge.source == source && edge.target == child) == null) {
         let newEdge = new D3Edge(source, child);
-        graph.d3Edges.push(newEdge);
+        graph.model.d3Edges.push(newEdge);
         newEdge.drawEdge(graph.svgG.select("g.d3Edges"), graph);
       }
     });
@@ -477,15 +477,15 @@ D3LayerComposite.prototype.open = function (graph) {
       while(target != null && target.id != outputLayer && target.isOpen){
         target = target.primeAncestorOfId(outputLayer);
       }
-      if (graph.d3Edges.find(edge => edge.source == child && edge.target == target) == null) {
+      if (graph.model.d3Edges.find(edge => edge.source == child && edge.target == target) == null) {
         let newEdge = new D3Edge(child, target);
-        graph.d3Edges.push(newEdge);
+        graph.model.d3Edges.push(newEdge);
         newEdge.drawEdge(graph.svgG.select("g.d3Edges"), graph);
       }
     });
   });
 
-  graph.d3Edges = graph.d3Edges.filter(edge => {
+  graph.model.d3Edges = graph.model.d3Edges.filter(edge => {
     if (edge.source == thisComposite || edge.target == thisComposite) {
       edge.remove(graph);
       return false;
@@ -524,29 +524,29 @@ D3LayerComposite.prototype.close = function (graph) {
       .remove();
   });
 
-  graph.d3Edges.filter(edge => true).forEach(edge => {
+  graph.model.d3Edges.filter(edge => true).forEach(edge => {
     let source = thisComposite.children.find(child => child == edge.source)? true : false;
     let target = thisComposite.children.find(child => child == edge.target)? true : false;
     if (!source && !target) {
       edge.updateWithTransition();
     }
     if (source || target) {
-      graph.d3Edges.splice(graph.d3Edges.indexOf(edge), 1);
+      graph.model.d3Edges.splice(graph.model.d3Edges.indexOf(edge), 1);
       edge.remove();
       edge.source.removeObserver(edge);
       edge.target.removeObserver(edge);
     }
-    if (source && !target && graph.d3Edges.find(e => e.source == thisComposite && e.target == edge.target) == null) {
+    if (source && !target && graph.model.d3Edges.find(e => e.source == thisComposite && e.target == edge.target) == null) {
       let new_edge = new D3Edge(thisComposite, edge.target);
-      graph.d3Edges.push(new_edge);
+      graph.model.d3Edges.push(new_edge);
       new_edge.source = edge.source;
       new_edge.drawEdge(edge.d3node, graph);
       new_edge.source = thisComposite;
       new_edge.updateWithTransition();
     }
-    if (!source && target && graph.d3Edges.find(e => e.source == edge.source && e.target == thisComposite) == null) {
+    if (!source && target && graph.model.d3Edges.find(e => e.source == edge.source && e.target == thisComposite) == null) {
       let new_edge = new D3Edge(edge.source, thisComposite);
-      graph.d3Edges.push(new_edge);
+      graph.model.d3Edges.push(new_edge);
       new_edge.taget = edge.taget;
       new_edge.drawEdge(edge.d3node, graph);
       new_edge.taget = thisComposite;
@@ -606,8 +606,8 @@ D3LayerComposite.prototype.break = function (graph) {
   d3.select("#" + thisComposite.htmlID).remove();
   let container = graph.primeAncestorOfId(thisComposite.id);
   if (container == thisComposite) {
-    graph.d3Layers = graph.d3Layers.filter(layer => layer != thisComposite);
-    thisComposite.children.forEach(child => graph.d3Layers.push(child));
+    graph.model.d3Layers = graph.model.d3Layers.filter(layer => layer != thisComposite);
+    thisComposite.children.forEach(child => graph.model.d3Layers.push(child));
   }
   else {
     container.children = container.children.filter(child => child != thisComposite);

@@ -1,6 +1,7 @@
 /* eslint-disable */
 
 import * as d3 from 'd3';
+import D3Model from './D3Model';
 import D3Edge from './D3Edge';
 import D3Layer from './D3Layer';
 import D3LayerComposite from './D3LayerComposite';
@@ -20,60 +21,47 @@ var MIN_TRANSLATE_X = MAP_X - MAP_WIDTH/2;
 var MAX_TRANSLATE_Y = MAP_Y + MAP_HEIGHT - MARGIN_PAGE;
 var MIN_TRANSLATE_Y = MAP_Y - MAP_HEIGHT/2 ;
 
-/**
- * Constructor of the graph editor
- * @param svg the area where to create the graph
- * @param d3Layers the set of Layers of the graph
- * @param d3Edges the set of edges of the graph
- */
-export default function D3GraphEditor(svg, d3Layers, d3Edges) {
-
+export default function D3GraphEditor(svg, model) {
   let thisGraph = this;
 
   // Whiteboard's dimension and position
-  thisGraph.minHeight = MAP_HEIGHT;
-  thisGraph.minWidth = MAP_WIDTH;
-  thisGraph.mapHeight = MAP_HEIGHT;
-  thisGraph.mapWidth = MAP_WIDTH;
-  thisGraph.mapX = MAP_X;
-  thisGraph.mapY = MAP_Y;
+  this.minHeight = MAP_HEIGHT;
+  this.minWidth = MAP_WIDTH;
+  this.mapHeight = MAP_HEIGHT;
+  this.mapWidth = MAP_WIDTH;
+  this.mapX = MAP_X;
+  this.mapY = MAP_Y;
 
   // Set the default limits out of the whiteboard
   // It's D3Background.updateBackground that really define limits
-  thisGraph.minTranslateX = MIN_TRANSLATE_X;
-  thisGraph.maxTranslateX = MAX_TRANSLATE_X;
-  thisGraph.minTranslateY = MIN_TRANSLATE_Y;
-  thisGraph.maxTranslateY = MAX_TRANSLATE_Y;
+  this.minTranslateX = MIN_TRANSLATE_X;
+  this.maxTranslateX = MAX_TRANSLATE_X;
+  this.minTranslateY = MIN_TRANSLATE_Y;
+  this.maxTranslateY = MAX_TRANSLATE_Y;
   // Help to set the limits out of the whiteboard
-  thisGraph.marginPage = MARGIN_PAGE;
+  this.marginPage = MARGIN_PAGE;
 
-  thisGraph.gTransform = d3.zoomIdentity.translate(0, 0).scale(1);
+  this.gTransform = d3.zoomIdentity.translate(0, 0).scale(1);
 
-  // Graph's edges and nodes
-  thisGraph.d3Layers = d3Layers || [];
-  thisGraph.d3Edges = d3Edges || [];
-
-  // List of layers considered as inputs and outputs for the Keras model
-  thisGraph.modelInputs = [];
-  thisGraph.modelOutputs = [];
+  this.model = model || new D3Model(undefined, undefined, this);
 
   // ID's counter
-  thisGraph.nodeId = 0;
+  this.nodeId = 0;
 
   // The event's variables. Their state change according to certain events
-  thisGraph.selectedNodes = [];
-  thisGraph.selectedEdge = null;
-  thisGraph.mouseover_node = null;
-  thisGraph.selectedText = null;
-  thisGraph.layerDrag = false;
+  this.selectedNodes = [];
+  this.selectedEdge = null;
+  this.mouseover_node = null;
+  this.selectedText = null;
+  this.layerDrag = false;
 
-  thisGraph.undoStack = [];
-  thisGraph.redoStack = [];
+  this.undoStack = [];
+  this.redoStack = [];
 
-  thisGraph.nodesCopy = []
+  this.nodesCopy = []
 
   // Svg is the html tag svg selected with d3.select()
-  thisGraph.svg = svg;
+  this.svg = svg;
 
   // BE CARFUL: order to the next line is IMPORTANT,
   // It create html tag, and the order of the tag's define the priorities
@@ -198,7 +186,7 @@ export default function D3GraphEditor(svg, d3Layers, d3Edges) {
  */
 D3GraphEditor.prototype.multipleSelection = function (topX, topY, bottomX, bottomY) {
   this.undoSelection();
-  this.d3Layers.forEach( node => {
+  this.model.d3Layers.forEach( node => {
     // Node selected when his LeftTop position can be catch
     // But when when node is above or to the left we need to extend the selection's rectangle with node's height and width
     // If his LeftTop position cannot be catch, the node is not in the selection's rectangle
@@ -272,46 +260,6 @@ D3GraphEditor.prototype.selectEdge = function (edge) {
 };
 
 /**
- * Call when we select a Layer composite
- */
-D3GraphEditor.prototype.createComposite = function () {
-  if (this.selectedNodes.length <= 0){
-    return;
-  }
-  let bad_condition = false;
-  this.selectedNodes.forEach(selectedNode => {
-    if (!this.d3Layers.find(layer => layer == selectedNode)) {
-      bad_condition = true;
-    }
-  });
-  if (bad_condition) {
-    alert("Cannot group layer from an other group");
-    return;
-  }
-  let x = this.selectedNodes[0].x;
-  let y = this.selectedNodes[0].y;
-  this.selectedNodes.forEach(selectedNode => {
-    if (selectedNode.x < x) {
-      x = selectedNode.x;
-    }
-    if (selectedNode.y < y) {
-      y = selectedNode.y;
-    }
-  });
-  let newComposite = new D3LayerComposite(this.getNodeId(), this, this.selectedNodes, x, y);
-  newComposite.drawLayer(this);
-  this.selectedNodes.forEach(selectedNode => {
-    this.d3Layers.forEach(layer => {
-      if (selectedNode == layer) {
-        this.d3Layers.splice(this.d3Layers.indexOf(layer), 1);
-      }
-    });
-  });
-  this.d3Layers.push(newComposite);
-  this.undoSelection();
-}
-
-/**
  * Call to move the drag line from source to the target point define by the mouse
  * @param source which Layer to drag from
  */
@@ -357,8 +305,7 @@ D3GraphEditor.prototype.endZoomed = function () {
 D3GraphEditor.prototype.addLayer = function (kerasLayer, posX, posY) {
   // Before change occur save the cuurent State - needed to allow undo;
   this.saveState();
-  let newLayer = new D3Layer(this.getNodeId(), this, kerasLayer, posX || (this.mapX + 10) , posY || (this.mapY + 10))
-  this.d3Layers.push(newLayer);
+  const newLayer = this.model.addLayer(this.getNodeId(), kerasLayer,  posX || (this.mapX + 10) , posY || (this.mapY + 10));
   newLayer.drawLayer(this);
   //this.updateGraph();
   D3Background.updateBackground(this);
@@ -381,44 +328,41 @@ D3GraphEditor.prototype.getNodeId = function () {
  * Updates the graph (Layers and Edges)
  */
 D3GraphEditor.prototype.updateGraph = function () {
-  let thisGraph = this;
-
-
-  thisGraph.d3Edges.forEach(edge => edge.remove());
-  thisGraph.d3Edges.forEach(edge => edge.drawEdge(thisGraph.svgD3Edges, thisGraph));
+  this.model.d3Edges.forEach(edge => edge.remove());
+  this.model.d3Edges.forEach(edge => edge.drawEdge(this.svgD3Edges, this));
   //D3Edge.drawEdges(thisGraph.svgG.select("g.d3Edges"), thisGraph);
 
-  thisGraph.d3Layers.forEach(layer => layer.remove());
-  thisGraph.d3Layers.forEach(layer => layer.drawLayer(thisGraph));
+  this.model.d3Layers.forEach(layer => layer.remove());
+  this.model.d3Layers.forEach(layer => layer.drawLayer(this));
 
-  D3GraphValidation.isCycle(thisGraph);
+  D3GraphValidation.isCycle(this);
   //D3Layer.drawLayers(thisGraph.svgG.select("g.d3Layers"), thisGraph);
   // Update whiteboard dimension
-  D3Background.updateBackground(thisGraph);
+  D3Background.updateBackground(this);
 };
 
 D3GraphEditor.prototype.deleteSelectedElements = function () {
   var thisGraph = this;
   if (thisGraph.selectedNodes.length > 0) {
     // Before change occur save the cuurent State - needed to allow undo;
-    thisGraph.saveState();
-    thisGraph.selectedNodes.forEach( selectedNode => {
-      let old_edges = thisGraph.d3Edges.filter(edge => edge.source == selectedNode || edge.target == selectedNode);
-      thisGraph.d3Edges = thisGraph.d3Edges.filter(edge => edge.source != selectedNode && edge.target != selectedNode);
-      thisGraph.d3Layers = thisGraph.d3Layers.filter(layer => layer != selectedNode);
+    this.saveState();
+    this.selectedNodes.forEach( selectedNode => {
+      let old_edges = this.model.d3Edges.filter(edge => edge.source == selectedNode || edge.target == selectedNode);
+      this.model.d3Edges = this.model.d3Edges.filter(edge => edge.source != selectedNode && edge.target != selectedNode);
+      this.model.d3Layers = this.model.d3Layers.filter(layer => layer != selectedNode);
       // delete operation need to be call after the change occur on d3Edges and d3Layers
-      selectedNode.delete(thisGraph);
-      old_edges.forEach(edge => edge.delete(thisGraph));
+      selectedNode.delete(this);
+      old_edges.forEach(edge => edge.delete(this));
     })
     // Next line is implemented that way to keep Vue getters and setters
-    thisGraph.selectedNodes.splice(0, thisGraph.selectedNodes.length);
-    D3Background.updateBackground(thisGraph);
+    this.selectedNodes.splice(0, this.selectedNodes.length);
+    D3Background.updateBackground(this);
   }
-  if (thisGraph.selectedEdge !== null) {
+  if (this.selectedEdge !== null) {
     this.saveState();
-    thisGraph.d3Edges.splice(thisGraph.d3Edges.indexOf(thisGraph.selectedEdge), 1);
-    thisGraph.selectedEdge.delete(thisGraph);
-    thisGraph.selectedEdge = null;
+    this.model.d3Edges.splice(this.model.d3Edges.indexOf(this.selectedEdge), 1);
+    this.selectedEdge.delete(this);
+    this.selectedEdge = null;
   }
 };
 
@@ -455,7 +399,7 @@ D3GraphEditor.prototype.layerMouseUp = function (layer) {
     return;
   }
   if (thisGraph.mouseDownNode != layer) {
-    let filtRes1 = thisGraph.d3Edges.filter( edge =>
+    let filtRes1 = thisGraph.model.d3Edges.filter( edge =>
       (edge.source == thisGraph.mouseDownNode && edge.target == layer)
     );
     if (filtRes1.length > 0) {
@@ -464,17 +408,17 @@ D3GraphEditor.prototype.layerMouseUp = function (layer) {
     thisGraph.saveState();
     // Remove edge between the two node that already exist
     let newEdge = new D3Edge(thisGraph.mouseDownNode, layer);
-    let filtRes2 = thisGraph.d3Edges.filter( edge =>
+    let filtRes2 = thisGraph.model.d3Edges.filter( edge =>
       (edge.source == newEdge.target && edge.target == newEdge.source)
     );
     filtRes2.forEach( edge => {
-      thisGraph.d3Edges.splice(thisGraph.d3Edges.indexOf(edge), 1);
+      thisGraph.model.d3Edges.splice(thisGraph.model.d3Edges.indexOf(edge), 1);
       edge.delete(thisGraph);
     });
     newEdge.source.addOutputLayer(newEdge.target);
     newEdge.target.addInputLayer(newEdge.source);
     // We're in a different node: create new edge for mousedown edge and add to graph
-    thisGraph.d3Edges.push(newEdge);
+    thisGraph.model.d3Edges.push(newEdge);
     // drawEdge need to be call after the change occur on d3Edges and d3Layers
     newEdge.drawEdge(thisGraph.svgD3Edges, thisGraph);
     //thisGraph.updateGraph();
@@ -487,81 +431,44 @@ D3GraphEditor.prototype.layerMouseUp = function (layer) {
  * Save the current State to allow undo
  */
 D3GraphEditor.prototype.saveState = function () {
-  let thisGraph = this;
   // Next line is implemented that way to keep Vue getters and setters
-  thisGraph.redoStack.splice(0, thisGraph.redoStack.length);
-  thisGraph.undoStack.push(thisGraph.toJSON());
+  this.redoStack.splice(0, this.redoStack.length);
+  this.undoStack.push(this.toJSON());
 };
 
-/**
- * Loads a state of a graph
- * @param txtRes the state of a graph in JSON data
- */
+
 D3GraphEditor.prototype.loadState = function (txtRes) {
-  let thisGraph = this;
-  var jsonObj = JSON.parse(txtRes);
-  thisGraph.clearBoard(true);
-  var jsonLayers = jsonObj.layers;
-  var newLayers = [];
-  jsonLayers.forEach(jsonLayer => newLayers.push(D3Layer.loadJSON(jsonLayer, thisGraph)));
-  thisGraph.d3Layers = newLayers;
-  var newEdges = jsonObj.edges;
-  newEdges.forEach(function (e, i) {
-    let source = thisGraph.getLayerById(e.source);
-    let target = thisGraph.getLayerById(e.target);
-    newEdges[i] = new D3Edge (source , target);
-  });
-  thisGraph.d3Edges = newEdges;
-  thisGraph.updateGraph();
+  this.clearBoard(true);
+  this.model.loadState(txtRes);
+  this.updateGraph();
 };
 
-/**
- * Undo to a state
- */
+
 D3GraphEditor.prototype.undo = function () {
-  let thisGraph = this;
-  if (thisGraph.undoStack.length <= 0) {
+  if (this.undoStack.length <= 0) {
     return;
   }
-  thisGraph.redoStack.push(thisGraph.toJSON());
-  let txtRes = thisGraph.undoStack.pop();
-  thisGraph.loadState(txtRes);
+  this.redoStack.push(this.toJSON());
+  let txtRes = this.undoStack.pop();
+  this.loadState(txtRes);
 };
 
-/**
- * Redo to a state
- */
+
 D3GraphEditor.prototype.redo = function () {
-  let thisGraph = this;
-  if (thisGraph.redoStack.length <= 0) {
+  if (this.redoStack.length <= 0) {
       return;
   };
-  thisGraph.undoStack.push(thisGraph.toJSON());
-  let txtRes = thisGraph.redoStack.pop();
-  thisGraph.loadState(txtRes);
+  this.undoStack.push(this.toJSON());
+  let txtRes = this.redoStack.pop();
+  this.loadState(txtRes);
 };
 
-/**
- * Converts the current state to JSON data
- * @returns a JSON data
- */
+
 D3GraphEditor.prototype.toJSON = function () {
-  let thisGraph = this;
-  let savedEdges = [];
-  let savedLayers = [];
-  let savedInputs = [];
-  let savedOutputs = [];
-
-  thisGraph.d3Layers.forEach(layer => savedLayers.push(layer.toJSON()));
-  thisGraph.d3Edges.forEach(edge => savedEdges.push(edge.toJSON()));
-  thisGraph.modelInputs.forEach(output => savedInputs.push(output.id));
-  thisGraph.modelOutputs.forEach(output => savedOutputs.push(output.id));
-  return window.JSON.stringify({ "layers": savedLayers, "edges": savedEdges, "inputs": savedInputs, "outputs": savedOutputs }, { type: "text/plain;charset=utf-8" });
+  return this.model.toJSON();
 };
 
-/**
- * Save graph to json
- */
+
 D3GraphEditor.prototype.saveBoard = function () {
   saveAs(new Blob([this.toJSON()]), "myModel.json");
 };
@@ -582,7 +489,7 @@ D3GraphEditor.prototype.generatePythonInBrowser = function (kerasInterface) {
  */
 D3GraphEditor.prototype.generatePythonOnBackend = function (backendUrl) {
   let toJSON = [];
-  this.d3Layers.forEach(layer => {
+  this.model.d3Layers.forEach(layer => {
     if (layer.class === "D3Layer") {
       toJSON.push(layer.toJSON());
     }
@@ -623,14 +530,7 @@ D3GraphEditor.prototype.generatePythonOnBackend = function (backendUrl) {
  * @returns true if the Layer exists else null
  */
 D3GraphEditor.prototype.getLayerById = function (id) {
-  let res = null;
-  this.d3Layers.forEach(layer => {
-    let tmp = layer.getLayerById(id);
-    if (tmp) {
-      res = tmp;
-    }
-  });
-  return res;
+  return this.model.getLayerById(id);
 };
 
 /**
@@ -640,7 +540,7 @@ D3GraphEditor.prototype.getLayerById = function (id) {
  */
 D3GraphEditor.prototype.primeAncestorOfId = function (id) {
   let res = null;
-  this.d3Layers.forEach(layer => {
+  this.model.d3Layers.forEach(layer => {
     let tmp = layer.getLayerById(id);
     if (tmp !== null) {
       res = layer;
@@ -657,39 +557,15 @@ D3GraphEditor.prototype.primeAncestorOfId = function (id) {
 D3GraphEditor.prototype.uploadToBoard = function (uploadFileEvent) {
   if (window.File && window.FileReader && window.FileList && window.Blob) {
     var uploadFile = uploadFileEvent.files[0];
-    var thisGraph = this;
     var filereader = new window.FileReader();
 
-    filereader.onload = function () {
+    filereader.onload = () => {
       try {
-        thisGraph.saveState();
+        this.saveState();
+        this.clearBoard(true);
         var txtRes = filereader.result;
-        var jsonObj = JSON.parse(txtRes);
-        thisGraph.clearBoard(true);
-
-        var jsonLayers = jsonObj.layers;
-        var newLayers = [];
-        jsonLayers.forEach(jsonLayer => newLayers.push(D3Layer.loadJSON(jsonLayer, thisGraph)));
-        thisGraph.d3Layers = newLayers;
-
-        var newEdges = jsonObj.edges;
-        newEdges.forEach(function (e, i) {
-          let source = thisGraph.getLayerById(e.source);
-          let target = thisGraph.getLayerById(e.target);
-          newEdges[i] = new D3Edge (source , target);
-        });
-        thisGraph.d3Edges = newEdges;
-
-        thisGraph.modelInputs.length = 0;
-        jsonObj.inputs.forEach(function (id) {
-          thisGraph.modelInputs.push(thisGraph.getLayerById(id));
-        });
-
-        thisGraph.modelOutputs.length = 0;
-        jsonObj.outputs.forEach(function (id) {
-          thisGraph.modelOutputs.push(thisGraph.getLayerById(id));
-        });
-        thisGraph.updateGraph();
+        this.model.loadJSON(txtRes);
+        this.updateGraph();
       }
       catch (error) {
         console.error(error);
@@ -708,17 +584,15 @@ D3GraphEditor.prototype.uploadToBoard = function (uploadFileEvent) {
  * @param skipPrompt if clicked on skip
  */
 D3GraphEditor.prototype.clearBoard = function (skipPrompt) {
-  let thisGraph = this,
-    doDelete = true;
+  let doDelete = true;
   if (!skipPrompt) {
     doDelete = window.confirm("Press OK to delete this graph");
   }
   if (doDelete) {
-    thisGraph.d3Layers = [];
-    thisGraph.d3Edges = [];
-    thisGraph.svgD3Edges.selectAll("g").remove();
-    thisGraph.svgD3Layers.selectAll("g").remove();
-    thisGraph.svgD3LayerComposites.selectAll("g").remove();
+    this.model.clear();
+    this.svgD3Edges.selectAll("g").remove();
+    this.svgD3Layers.selectAll("g").remove();
+    this.svgD3LayerComposites.selectAll("g").remove();
   }
 };
 

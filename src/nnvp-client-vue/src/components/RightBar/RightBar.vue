@@ -60,7 +60,7 @@
       <ParamsBlock title="Model Inputs" v-if="inputInLayersAndMoreThanOneInModel">
         <div class="RightBar param">
           <OrderParameter
-            v-bind:itemList="$d3Interface.activeGraph.modelInputs"
+            v-bind:itemList="$d3Interface.activeGraph.model.modelInputs"
             :idFunc="e => e.id"
             :nameFunc="e => e.name"
         />
@@ -70,7 +70,7 @@
       <ParamsBlock title="Model Outputs" v-if="outputInLayers">
         <div class="RightBar param">
           <OrderParameter
-            v-bind:itemList="$d3Interface.activeGraph.modelOutputs"
+            v-bind:itemList="$d3Interface.activeGraph.model.modelOutputs"
             :idFunc="e => e.id"
             :nameFunc="e => e.name"
           />
@@ -119,7 +119,7 @@ export default {
     inputInLayersAndMoreThanOneInModel() {
       for (const layer of this.selectedNode.e) { // eslint-disable-line
         if (this.isInputLayer(layer)) {
-          if (this.$d3Interface.activeGraph.modelInputs.length > 1) {
+          if (this.$d3Interface.activeGraph.model.modelInputs.length > 1) {
             return true;
           }
           return false;
