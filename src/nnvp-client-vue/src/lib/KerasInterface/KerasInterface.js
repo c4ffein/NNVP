@@ -1,7 +1,8 @@
 import KerasLayer from './KerasLayer';
-import KerasPythonGenerator from './KerasPythonGenerator';
+import KerasGenerator from './KerasGenerator';
 
-/* eslint class-methods-use-this: ["error", { "exceptMethods": ["generatePython"] }] */
+/* eslint class-methods-use-this: ["error", { "exceptMethods": ["generatePython",
+                                                                "generateJavascript"] }] */
 // class KerasInterface {
 export default class {
   constructor(json) {
@@ -53,6 +54,13 @@ export default class {
     let graphJson;
     if (typeof d3Json === 'string') graphJson = JSON.parse(d3Json);
     else graphJson = d3Json;
-    return new KerasPythonGenerator(graphJson).generatePythonFromGraph();
+    return new KerasGenerator(graphJson).generatePythonFromGraph();
+  }
+
+  generateJavascript(d3Json) {
+    let graphJson;
+    if (typeof d3Json === 'string') graphJson = JSON.parse(d3Json);
+    else graphJson = d3Json;
+    return new KerasGenerator(graphJson).generateJavascriptFromGraph();
   }
 }
