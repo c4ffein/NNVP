@@ -470,7 +470,7 @@ D3GraphEditor.prototype.toJSON = function () {
 
 
 D3GraphEditor.prototype.saveBoard = function () {
-  saveAs(new Blob([this.toJSON()]), "myModel.json");
+  saveAs(new Blob(["NNVP\n" + this.toJSON()]), "myModel.nnvp");
 };
 
 /**
@@ -563,8 +563,13 @@ D3GraphEditor.prototype.uploadToBoard = function (uploadFileEvent) {
       try {
         this.saveState();
         this.clearBoard(true);
-        var txtRes = filereader.result;
-        this.model.loadJSON(txtRes);
+        const txtRes = filereader.result;
+        const splited = txtRes.split(/\n(.+)/);
+        if(splited[0] !== "NNVP"){
+          alert("This file doesn't seem to be an NNVP file.");
+          return;
+        }
+        this.model.loadJSON(splited[1]);
         this.updateGraph();
       }
       catch (error) {
@@ -575,7 +580,7 @@ D3GraphEditor.prototype.uploadToBoard = function (uploadFileEvent) {
     filereader.readAsText(uploadFile);
   }
   else {
-    alert("Your browser won't let you save this graph -- try upgrading your browser to the latest version of Chrome or Firefox.");
+    alert("Your browser won't let you open this graph -- try upgrading your browser to the latest version of Chrome or Firefox.");
   }
 };
 
