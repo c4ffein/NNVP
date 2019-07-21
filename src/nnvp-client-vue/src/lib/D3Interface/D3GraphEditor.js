@@ -7,6 +7,7 @@ import D3Layer from './D3Layer';
 import D3LayerComposite from './D3LayerComposite';
 import D3Background from './D3Background';
 import D3GraphValidation from './D3GraphValidation';
+import D3Templates from './D3Templates';
 
 var MARGIN_PAGE = 50;
 
@@ -44,6 +45,7 @@ export default function D3GraphEditor(svg, model) {
   this.gTransform = d3.zoomIdentity.translate(0, 0).scale(1);
 
   this.model = model || new D3Model(undefined, undefined, this);
+  this.templates = new D3Templates();
 
   // ID's counter
   this.nodeId = 0;
@@ -583,6 +585,13 @@ D3GraphEditor.prototype.uploadToBoard = function (uploadFileEvent) {
     alert("Your browser won't let you open this graph -- try upgrading your browser to the latest version of Chrome or Firefox.");
   }
 };
+
+
+D3GraphEditor.prototype.loadTemplate = function (name) {
+  this.saveState();
+  this.loadState(this.templates.get(name));
+};
+
 
 /**
  * Deletes all the graph

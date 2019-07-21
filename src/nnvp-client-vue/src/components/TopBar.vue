@@ -3,6 +3,7 @@ export default {
   name: 'TopBar',
   render(h) { // eslint-disable-line
     const generateMenu = (menu, level) => {
+      if (typeof (menu) === 'string') menu = this[menu] || {}; // eslint-disable-line no-param-reassign
       if (typeof (menu) !== 'function' && !Array.isArray(menu)) {
         const rows = Object.entries(menu).map((entry, i) => (
           <li key={i}
@@ -40,11 +41,7 @@ export default {
         File: {
           New() { this.$d3Interface.clearBoard(); },
           Load() { this.$d3Interface.loadBoard(); },
-          OpenRecent: {
-            template1: () => { },
-            template2: () => { },
-            template3: () => { },
-          },
+          Templates: 'templatesMenu',
           Save() { this.$d3Interface.saveBoard(); },
           // TODO : if connected to backend, should call
           // generatePythonOnBackend('/api/generate') instead
@@ -61,7 +58,20 @@ export default {
       activatedChain: [],
       undoStackContainer: this.$d3Interface.getUndoStackContainer(),
       redoStackContainer: this.$d3Interface.getRedoStackContainer(),
+      templatesNamesContainer: this.$d3Interface.getTemplatesContainer(),
     };
+  },
+  computed: {
+    templatesMenu() {
+      if (this.templatesNamesContainer === undefined
+        || this.templatesNamesContainer.e === undefined
+        || this.templatesNamesContainer.e.length === 0) {
+        return {};
+      }
+      return this.templatesNamesContainer.e
+        .map(name => [name, () => this.$d3Interface.loadTemplate(name)])
+        .reduce((p, c) => { p[c[0]] = c[1]; return p; }, {}); // eslint-disable-line
+    },
   },
   methods: {
     level0ClickHandler(menuTitle, menuContent, event) {

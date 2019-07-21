@@ -5,6 +5,7 @@ export default class {
     this.activeElementsContainer = { e: [] };
     this.undoStackContainer = { e: [] };
     this.redoStackContainer = { e: [] };
+    this.templateIdsContainer = { e: [] };
     this.leftBarRemountCallback = () => false;
     // TODO : next line, boolean to know if there is data?
     window.onbeforeunload = () => 'Warning : all unsaved data will be lost';
@@ -20,6 +21,7 @@ export default class {
     this.activeElementsContainer.e = this.activeGraph.selectedNodes;
     this.undoStackContainer.e = this.activeGraph.undoStack;
     this.redoStackContainer.e = this.activeGraph.redoStack;
+    this.templateIdsContainer.e = this.activeGraph.templates.list();
     this.leftBarRemountCallback();
   }
 
@@ -128,5 +130,16 @@ export default class {
     if (this.activeGraph !== null) {
       this.activeGraph.clearBoard(false);
     }
+  }
+
+  // Templates functions
+  loadTemplate(name) {
+    if (this.activeGraph !== null) {
+      this.activeGraph.loadTemplate(name);
+    }
+  }
+
+  getTemplatesContainer() {
+    return this.templateIdsContainer;
   }
 }
