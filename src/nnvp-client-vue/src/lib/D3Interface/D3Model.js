@@ -95,6 +95,10 @@ D3Model.prototype.loadState = function (txtRes) {
     newEdges[i] = new D3Edge (source , target);
   });
   this.d3Edges = newEdges;
+  this.modelInputs.length = 0;
+  jsonObj.inputs.forEach(jsonInputId => this.modelInputs.push(this.getLayerById(jsonInputId)));
+  this.modelOutputs.length = 0;
+  jsonObj.outputs.forEach(jsonOutputId => this.modelOutputs.push(this.getLayerById(jsonOutputId)));
 };
 
 
