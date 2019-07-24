@@ -3,6 +3,7 @@
 // It will probably be refactored soon.
 
 /* eslint-disable no-param-reassign */
+/* eslint-disable no-continue */
 /* eslint class-methods-use-this: ["error", { "exceptMethods": ["generateTuple",
                                                                 "jsonToGraph"] }] */
 
@@ -17,11 +18,16 @@ export default class KerasGenerator {
     this.inputs = this.findInputs();
     this.outputs = this.findOutputs();
     this.list = this.createTreatmentList();
+    this.sequential = this.isSequential();
     // Too bad we can't easily and cleanly heritate those classes from this one while doing mutual
     // inclusion, we'll have to use composition instead
     this.helper = isJavascript
-      ? new KerasGeneratorJavascriptHelper(this.graph, this.inputs, this.outputs, this.list)
-      : new KerasGeneratorPythonHelper(this.graph, this.inputs, this.outputs, this.list);
+      ? new KerasGeneratorJavascriptHelper(
+        this.graph, this.inputs, this.outputs, this.list, this.sequential,
+      )
+      : new KerasGeneratorPythonHelper(
+        this.graph, this.inputs, this.outputs, this.list, this.sequential,
+      );
   }
 
   // Convert a json from the graph editor to a more adapted object
@@ -100,17 +106,36 @@ export default class KerasGenerator {
     return list;
   }
 
+  // Return true if we can generate a sequential layer, false otherwise
+  isSequential() {
+    if (this.inputs.length !== 1) return false;
+    if (this.outputs.length !== 1) return false;
+    for (const layer of Object.values(this.graph)) { // eslint-disable-line
+      if (layer.sources.length !== 1) {
+        if (!(layer.keras_data.name === 'Input' && layer.sources.length === 0)) return false;
+      }
+      if (layer.targets.length !== 1) {
+        if (!(layer.keras_data.name === 'Output' && layer.targets.length === 0)) return false;
+      }
+
+      if (layer.targets.length !== 1) return false;
+    }
+    return true;
+  }
+
   generateFromGraph() {
     return this.helper.generateFromGraph();
   }
 
   generatePythonFromGraph() {
-    const h = new KerasGeneratorPythonHelper(this.graph, this.inputs, this.outputs, this.list);
-    return h.generate();
+    return new KerasGeneratorPythonHelper(
+      this.graph, this.inputs, this.outputs, this.list, this.sequential,
+    ).generate();
   }
 
   generateJavascriptFromGraph() {
-    const h = new KerasGeneratorJavascriptHelper(this.graph, this.inputs, this.outputs, this.list);
-    return h.generate();
+    return new KerasGeneratorJavascriptHelper(
+      this.graph, this.inputs, this.outputs, this.list, this.sequential,
+    ).generate();
   }
 }

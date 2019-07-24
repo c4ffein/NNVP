@@ -7,11 +7,12 @@
                                                                 "jsonToGraph"] }] */
 
 export default class KerasGeneratorPythonHelper {
-  constructor(graph, inputs, outputs, list) {
+  constructor(graph, inputs, outputs, list, sequential) {
     this.graph = graph;
     this.inputs = inputs;
     this.outputs = outputs;
     this.list = list;
+    this.sequential = sequential || false;
   }
 
   // Returns the name given to the node in the generated Python code
@@ -41,21 +42,10 @@ export default class KerasGeneratorPythonHelper {
     return tupleString;
   }
 
-  // Return a string containing Python instructions to add the node.
-  // Options are set to defaults for now, only 3 layer types are used.
-  generatePythonFromNode(node) {
-    let rs = `${this.nodeName(node)} = `;
-    if (this.graph[node].keras_data.name === 'Output') {
-      return '';
-    }
-
-    rs += 'keras.layers.';
-    rs += this.graph[node].keras_data.name;
-    rs += '(';
+  generateParams(parameterValues) {
     let paramString = '';
-    // TODO : use parametersDef?
     // eslint-disable-next-line
-    for (const [param, value] of Object.entries(this.graph[node].keras_data.parameterValues)) {
+    for (const [param, value] of Object.entries(parameterValues)) {
       if (typeof value === 'string') {
         paramString += `${param}='${value}',`;
       } else if (Array.isArray(value)) {
@@ -66,8 +56,21 @@ export default class KerasGeneratorPythonHelper {
         paramString += `${param}=${value},`;
       }
     }
-    rs += paramString.slice(0, -1);
-    rs += ')';
+    return paramString;
+  }
+
+  // Return a string containing Python instructions to add the node.
+  // Options are set to defaults for now, only 3 layer types are used.
+  generatePythonFromNode(node) {
+    let rs = `${this.nodeName(node)} = `;
+    if (this.graph[node].keras_data.name === 'Output') {
+      return '';
+    }
+
+    rs += 'keras.layers.';
+    rs += this.graph[node].keras_data.name;
+    // TODO : use parametersDef?
+    rs += `(${this.generateParams(this.graph[node].keras_data.parameterValues).slice(0, -1)})`;
 
     if (this.graph[node].sources.length > 0) {
       rs += '(';
@@ -85,6 +88,22 @@ export default class KerasGeneratorPythonHelper {
     }
     rs += '\n';
     return rs;
+  }
+
+  // Easier version we can use if the model can be defined as a sequential one
+  generateSequentialPythonFromNode(node, addModelInput) {
+    if (this.graph[node].keras_data.name === 'Output' || this.graph[node].keras_data.name === 'Input') {
+      return '';
+    }
+    const inputShapeParam = !addModelInput ? ''
+      : `${Object.keys(this.graph[node].keras_data.parameterValues).length === 0 ? '' : ', '}${
+        `input_shape = ${this.generateTuple(
+          this.graph[this.inputs[0]].keras_data.parameterValues.shape || [100, 100],
+        )}`}`;
+
+    return `model.add(keras.layers.${this.graph[node].keras_data.name}(${
+      this.generateParams(this.graph[node].keras_data.parameterValues).slice(0, -1)}${
+      inputShapeParam}))\n`;
   }
 
   // Generate the line responsible for the Keras Model instanciation
@@ -113,18 +132,38 @@ export default class KerasGeneratorPythonHelper {
     return rs;
   }
 
-  generate() {
+  generateFunctional() {
     let rs = 'import keras\n';
     rs += '\n';
     rs += 'def build_model():\n';
-    for (const node of this.list) { // eslint-disable-line
+    this.list.forEach((node) => {
       const pythonLine = this.generatePythonFromNode(node);
       if (pythonLine !== '') {
         rs += `    ${pythonLine}`;
       }
-    }
+    });
     rs += `    ${this.generateModelFunction(this.graph)}`;
     rs += '    return model\n';
     return rs;
+  }
+
+  generateSequential() {
+    let rs = 'import keras\n';
+    rs += '\n';
+    rs += 'def build_model():\n';
+    rs += '    model = keras.models.Sequential()\n';
+    this.list.forEach((node, index) => {
+      const pythonLine = this.generateSequentialPythonFromNode(node, index === 1);
+      if (pythonLine !== '') {
+        rs += `    ${pythonLine}`;
+      }
+    });
+    rs += '    return model\n';
+    return rs;
+  }
+
+  generate(sequential) {
+    sequential = sequential === undefined ? this.sequential : sequential;
+    return sequential ? this.generateSequential() : this.generateFunctional();
   }
 }
