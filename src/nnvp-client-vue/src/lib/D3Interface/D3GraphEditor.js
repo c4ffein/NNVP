@@ -526,6 +526,11 @@ D3GraphEditor.prototype.generatePythonOnBackend = function (backendUrl) {
     });
 };
 
+D3GraphEditor.prototype.generateJavascriptInBrowser = function (kerasInterface) {
+  const generatedJavascript = kerasInterface.generateJavascript(this.toJSON());
+  saveAs(new Blob([generatedJavascript]), "myModel.js");
+}
+
 /**
  * Get a Layer by hid ID
  * @param id the ID of the Layer to get

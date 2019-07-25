@@ -11,7 +11,7 @@ export default {
             onClick={() => this.levelNClickHandler(entry[0], entry[1])}
             onMouseover={event => this.levelNHoverHandler(entry[0], entry[1], event, level)}
           >
-            <div class="TopBar">{entry[0]}</div>
+            <div class="TopBar">{entry[0].replace('_', ' ')}</div>
             {generateMenu(entry[1], level + 1)}
           </li>
         ));
@@ -46,6 +46,9 @@ export default {
           // TODO : if connected to backend, should call
           // generatePythonOnBackend('/api/generate') instead
           Generate() { this.$d3Interface.generatePythonInBrowser(this.$kerasInterface); },
+          Generate_Javascript() {
+            this.$d3Interface.generateJavascriptInBrowser(this.$kerasInterface);
+          },
         },
         Edit: {
           Undo: [() => this.$d3Interface.undo(), () => (this.undoStackContainer.e.length === 0)],
