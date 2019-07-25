@@ -117,8 +117,6 @@ export default class KerasGenerator {
       if (layer.targets.length !== 1) {
         if (!(layer.keras_data.name === 'Output' && layer.targets.length === 0)) return false;
       }
-
-      if (layer.targets.length !== 1) return false;
     }
     return true;
   }
