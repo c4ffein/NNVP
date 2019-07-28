@@ -122,4 +122,31 @@ body,html {
   background-color: rgba(255, 255, 255, 1);
   color: #2c3e50;
 }
+button, input[type="button"], input[type="submit"], input, select {
+  color: #000000;
+  font-family: 'Avenir', Helvetica, Arial, sans-serif;
+  background-color: #FFFFFF;
+  border: 1px solid;
+  border-color: rgba(200,200,200,0.8);
+}
+input.arrows {
+  color: #FFFFFF;
+  background-color: #FFFFFF;
+  border: 1px solid;
+  border-color: rgba(200,200,200,0.8);
+}
+select {
+  -webkit-appearance: none;
+  appearance: none;
+}
+select:focus {
+  outline-width: 0; /* not perfect but better */
+}
+select:-moz-focusring {
+  color: transparent;
+  text-shadow: 0 0 0 #000000;
+}
+option:not(:checked) {
+  color: black; /* prevent <option>s from becoming transparent as well */
+}
 </style>

@@ -40,7 +40,5 @@ export default {
 }
 .parameter-select.list-parameter > select {
   width: 100%;
-  -webkit-appearance: none;
-  appearance: none;
 }
 </style>

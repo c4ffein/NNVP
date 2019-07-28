@@ -196,25 +196,4 @@ export default {
   text-align: left;
   padding: 4px;
 }
-button, input[type="button"], input[type="submit"], input, select {
-  color: #000000;
-  font-family: 'Avenir', Helvetica, Arial, sans-serif;
-  background-color: #FFFFFF;
-  border: 1px solid;
-  border-color: rgba(200,200,200,0.8);
-  //width: 100%;
-}
-input.arrows {
-  color: #FFFFFF;
-  background-color: #FFFFFF;
-  border: 1px solid;
-  border-color: rgba(200,200,200,0.8);
-}
-select:-moz-focusring {
-  color: transparent;
-  text-shadow: 0 0 0 #000000;
-}
-option:not(:checked) {
-  color: black; /* prevent <option>s from becoming transparent as well */
-}
 </style>
