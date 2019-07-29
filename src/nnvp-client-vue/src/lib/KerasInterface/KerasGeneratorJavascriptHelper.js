@@ -18,6 +18,10 @@ export default class KerasGeneratorJavascriptHelper {
     );
   }
 
+  pythonToJsParamName(paramName) {
+    return paramName.replace(/_./g, r => r[1].toUpperCase());
+  }
+
   // Returns the name given to the node in the generated Javascript code
   nodeName(node) {
     if (this.graph[node].keras_data.name === 'Input') {
@@ -49,14 +53,15 @@ export default class KerasGeneratorJavascriptHelper {
     let paramString = '{';
     // eslint-disable-next-line
     for (const [param, value] of Object.entries(parameterValues)) {
+      const paramName = this.pythonToJsParamName(param);
       if (typeof value === 'string') {
-        paramString += `${param}:'${value}',`;
+        paramString += `${paramName}:'${value}',`;
       } else if (Array.isArray(value)) {
-        paramString += `${param}:${this.generateTuple(value)},`;
+        paramString += `${paramName}:${this.generateTuple(value)},`;
       } else if (typeof value === 'boolean') {
-        paramString += `${param}:${value ? 'True' : 'False'},`;
+        paramString += `${paramName}:${value ? 'True' : 'False'},`;
       } else {
-        paramString += `${param}:${value},`;
+        paramString += `${paramName}:${value},`;
       }
     }
     paramString += '}';
