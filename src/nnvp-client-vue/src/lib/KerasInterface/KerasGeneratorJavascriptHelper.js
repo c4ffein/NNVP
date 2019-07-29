@@ -108,7 +108,7 @@ export default class KerasGeneratorJavascriptHelper {
       : this.graph[node].keras_data.parameterValues;
     return `model.add(tf.layers.${
       this.pythonToJsLayerName(this.graph[node].keras_data.name)}(${
-      this.generateParams(params)});\n`;
+      this.generateParams(params)}));\n`;
   }
 
   // Generate the line responsible for the Keras Model instanciation
@@ -154,9 +154,8 @@ export default class KerasGeneratorJavascriptHelper {
   }
 
   generateSequential() {
-    let rs = 'import * as tf from \'@tensorflow/tfjs\';\n';
-    rs += '\n';
-    rs += 'function createModel() {\n';
+    // Could optionally start by let rs = 'import * as tf from \'@tensorflow/tfjs\';\n';
+    let rs = 'function createModel() {\n';
     rs += '    const model = tf.sequential();\n';
     this.list.forEach((node, index) => {
       const jsLine = this.generateSequentialJavascriptFromNode(node, index === 1);
