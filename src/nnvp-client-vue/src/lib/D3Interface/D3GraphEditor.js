@@ -531,6 +531,10 @@ D3GraphEditor.prototype.generateJavascriptInBrowser = function (kerasInterface) 
   saveAs(new Blob([generatedJavascript]), "myModel.js");
 }
 
+D3GraphEditor.prototype.generateJavascriptNoSave = function (kerasInterface) {
+  return kerasInterface.generateJavascript(this.toJSON());
+}
+
 /**
  * Get a Layer by hid ID
  * @param id the ID of the Layer to get

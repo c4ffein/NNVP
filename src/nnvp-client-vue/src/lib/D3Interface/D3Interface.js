@@ -122,6 +122,13 @@ export default class {
     }
   }
 
+  generateJavascriptNoSave(kerasInterface) {
+    if (this.activeGraph !== null) {
+      return this.activeGraph.generateJavascriptNoSave(kerasInterface);
+    }
+    return null;
+  }
+
   loadBoard() {
     if (this.activeGraph !== null) {
       document.getElementById('hidden-file-upload').click();
