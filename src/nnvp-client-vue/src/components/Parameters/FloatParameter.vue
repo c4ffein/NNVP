@@ -51,7 +51,7 @@ export default {
 
   methods: {
     updateParamFromKerasLayer() {
-      this.activeLayer.setParameterValue(this.name, this.valueContainer);
+      this.activeLayer.setParameterValue(this.name, parseFloat(this.valueContainer, 10));
     },
     setStepInputRange() {
       return (this.maxCond - this.minCond) / 100.0;
