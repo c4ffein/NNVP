@@ -49,7 +49,7 @@ export default {
 
   methods: {
     updateParamFromKerasLayer() {
-      this.activeLayer.setParameterValue(this.name, this.valueContainer);
+      this.activeLayer.setParameterValue(this.name, parseInt(this.valueContainer, 10));
     },
     isConditionsNotRanged() {
       const conditionsEmpty = (this.conditions == null);
