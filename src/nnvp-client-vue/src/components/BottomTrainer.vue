@@ -1,31 +1,111 @@
 <template>
   <div id="BottomTrainer" class="BottomTrainer">
     <div id="BottomTrainerBar" class="BottomTrainer">
-      <select id="select-dataset" v-model="selectedDataset">
+      <select class="BottomTrainer bar-button" v-model="selectedDataset">
         <option v-bind:key="key" v-for="(item, key) in loadedDatasets" v-bind:value="key">
           {{key}}
         </option>
       </select>
-      <button id="button-launch-training">Train</button>
+      <button class="BottomTrainer bar-button" v-on:click="startTraining">
+        {{isTraining ? 'Stop' : 'Train'}}
+      </button>
+      <div class="BottomTrainer bar-button" id="experimental-warning">
+        Warning : experimental feature
+      </div>
       <button id="button-close-trainer" v-on:click="$emit('close-trainer')">╳</button>
     </div>
-    <div>Work in progress</div>
-
   </div>
 </template>
 
 <script>
+/* eslint-disable */
+import * as tf from '@tensorflow/tfjs';
+import * as tfvis from '@tensorflow/tfjs-vis';
+
+import { IMAGE_H, IMAGE_W, MnistData } from '../lib/JSDatasets/google-mnist-data';
+
 export default {
   name: 'BottomTrainer',
   data() {
     return {
-      selectedDataset: 'Choice 1',
+      isTraining: false,
+      selectedDataset: 'MNIST Data',
       loadedDatasets: {
-        'Choice 1': 'test1',
-        'Choice 2': 'test2',
-        'Choice 3': 'test3',
+        'MNIST Data': '', // MnistData, empty for now...
       },
     };
+  },
+  methods: {
+    async startTraining() {
+      this.isTraining = !this.isTraining;
+      if (!this.isTraining) return;
+      window.tf = tf;
+      const createModel = eval(
+        `tf=window.tf;\n${this.$d3Interface.generateJavascriptNoSave(this.$kerasInterface)}createModel`,
+      );
+      const model = createModel();
+      const optimizer = 'rmsprop'; // TODO : allow to set
+      model.compile({
+        optimizer,
+        loss: 'categoricalCrossentropy',
+        metrics: ['accuracy'],
+      });
+      // const data = new this.loadedDatasets[this.selectedDataset]();
+      const data = new MnistData();
+      await data.load();
+      async function train(model, data, fitCallbacks) {
+        const BATCH_SIZE = 64;
+        const trainDataSize = 500;
+        const testDataSize = 100;
+        const [trainXs, trainYs] = tf.tidy(() => {
+          const d = data.nextTrainBatch(trainDataSize);
+          return [d.xs.reshape([trainDataSize, 28, 28, 1]), d.labels];
+        });
+        const [testXs, testYs] = tf.tidy(() => {
+          const d = data.nextTestBatch(testDataSize);
+          return [d.xs.reshape([testDataSize, 28, 28, 1]), d.labels];
+        });
+        return model.fit(trainXs, trainYs, {
+          batchSize: BATCH_SIZE,
+          validationData: [testXs, testYs],
+          epochs: 10,
+          shuffle: true,
+          callbacks: fitCallbacks,
+        });
+      }
+      // await train(model, data, i => console.log("hohoho" + i)); // ONO :(
+      async function watchTraining() {
+        const metrics = ['loss', 'val_loss', 'acc', 'val_acc'];
+        const container = {
+          name: 'show.fitCallbacks', tab: 'Training', styles: { height: '1000px' },
+        };
+        const callbacks = tfvis.show.fitCallbacks(container, metrics);
+        return train(model, data, callbacks);
+      }
+      await watchTraining();
+    },
+    switch() {
+      this.isTraining = !this.isTraining;
+    },
+  },
+  mounted() {
+    // You know, I love clean code. Effective, concise, beautiful.
+    // But sometimes, a prototype needs to be written on time.
+    const visorInstance = tfvis.visor();
+    if (!visorInstance.isOpen()) {
+      visorInstance.toggle();
+    }
+    visorInstance.unbindKeys();
+    const visorContainer = document.getElementById('tfjs-visor-container');
+    document.getElementById('BottomTrainer').appendChild(visorContainer);
+    visorContainer.style.height = '100%';
+    visorContainer.children[0].style.position = 'relative';
+    visorContainer.children[0].style.height = '100%';
+    visorContainer.children[0].style.width = '100%';
+    visorContainer.children[0].style.padding = 0;
+    visorContainer.children[0].children[0].style.display = 'none'; // Don't show default controls
+    visorContainer.children[0].children[1].style.display = 'none'; // Don't show default tab switch
+    visorContainer.children[0].children[2].style.padding = 0;
   },
 };
 </script>
@@ -46,6 +126,9 @@ export default {
   font-size: 15px;
   overflow: hidden;
   border-top: 1px solid rgba(100, 100, 100, 0.3);
+  display: flex;
+  flex-flow: column;
+  width: 100%;
 }
 #BottomTrainerBar {
   height: 26px;
@@ -59,7 +142,7 @@ export default {
 #BottomTrainerBar > *:hover {
   background-color: rgba(100, 100, 100, 0.1);
 }
-#select-dataset, #button-launch-training{
+.BottomTrainer.bar-button{
   float: left;
   height: 26px;
   width: 166px;
@@ -68,6 +151,13 @@ export default {
   border-right: 1px solid rgba(100, 100, 100, 0.3);
   background-color: rgba(100, 100, 100, 0);
   padding-left: 10px;
+}
+#experimental-warning {
+  border: none;
+  padding-left: 30px;
+}
+#experimental-warning:hover {
+  background-color: rgba(100, 100, 100, 0.0);
 }
 #button-close-trainer{
   float: right;
