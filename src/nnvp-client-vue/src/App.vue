@@ -38,7 +38,7 @@ export default {
   data() {
     return {
       trainerHeight: 0,
-      trainerOpenHeight: 30,
+      trainerOpenHeight: 50, // TODO : 30 when more efficient
     };
   },
 };
