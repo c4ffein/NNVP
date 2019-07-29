@@ -59,6 +59,7 @@
       "parser": "babel-eslint"
     }
   },
+  "eslintIgnore": ["src/lib/JSDatasets"],
   "jest": {
     "moduleFileExtensions": [
       "js",
