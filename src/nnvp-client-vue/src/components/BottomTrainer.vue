@@ -83,6 +83,11 @@ export default {
           callbacks: fitCallbacks,
         });
       }
+      function resetChart(chart) {
+        chart.data.labels = [];
+        chart.data.datasets.map(dataset => dataset.data = []);
+        chart.update();
+      }
       async function watchTraining(batchChart, epochChart) {
         const batchMetrics = { loss: [], acc: [] };
         const epochMetrics = { loss: [], val_loss: [], acc: [], val_acc: [] };
@@ -110,6 +115,8 @@ export default {
         }
         return train(model, data, callbacks);
       }
+      resetChart(this.batchChart);
+      resetChart(this.epochChart);
       await watchTraining(this.batchChart, this.epochChart);
     },
     switch() {
