@@ -28,8 +28,6 @@
 <script>
 /* eslint-disable */
 import * as tf from '@tensorflow/tfjs';
-import * as tfvis from '@tensorflow/tfjs-vis';
-
 import { IMAGE_H, IMAGE_W, MnistData } from '../lib/JSDatasets/google-mnist-data';
 
 import Chart from 'chart.js';
