@@ -47,13 +47,34 @@ export default {
   },
   methods: {
     async startTraining() {
+      if (this.isTraining) {
+        return;
+      }
       this.isTraining = !this.isTraining;
-      if (!this.isTraining) return;
       window.tf = tf;
-      const createModel = eval(
-        `tf=window.tf;\n${this.$d3Interface.generateJavascriptNoSave(this.$kerasInterface)}createModel`,
-      );
-      const model = createModel();
+      let createModel;
+      try {
+        createModel = eval(
+          `tf=window.tf;\n${this.$d3Interface.generateJavascriptNoSave(this.$kerasInterface)}createModel`,
+        );
+      }
+      catch (error) {
+        alert("Incorrect network : couldn't find Inputs/Outputs, or they weren't connected.");
+        console.log(error);
+        this.isTraining = !this.isTraining;
+        return;
+      }
+      let model;
+      try {
+        model = createModel();
+      }
+      catch (error) {
+        // Param errors
+        alert(error);
+        console.log(error);
+        this.isTraining = !this.isTraining;
+        return;
+      }
       const optimizer = 'rmsprop'; // TODO : allow to set
       model.compile({
         optimizer,
@@ -117,7 +138,13 @@ export default {
       }
       resetChart(this.batchChart);
       resetChart(this.epochChart);
-      await watchTraining(this.batchChart, this.epochChart);
+      try {
+        await watchTraining(this.batchChart, this.epochChart);
+      }
+      catch (error) {
+        alert(error);
+      }
+      this.isTraining = !this.isTraining;
     },
     switch() {
       this.isTraining = !this.isTraining;
