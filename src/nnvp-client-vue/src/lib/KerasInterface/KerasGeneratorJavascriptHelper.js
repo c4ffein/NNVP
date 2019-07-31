@@ -143,9 +143,8 @@ export default class KerasGeneratorJavascriptHelper {
   }
 
   generateFunctional() {
-    let rs = 'import * as tf from \'@tensorflow/tfjs\';\n';
-    rs += '\n';
-    rs += 'function createModel() {\n';
+    // Could optionally start by let rs = 'import * as tf from \'@tensorflow/tfjs\';\n';
+    let rs = 'function createModel() {\n';
     this.list.forEach((node) => {
       const jsLine = this.generateJavascriptFromNode(node);
       if (jsLine !== '') {
