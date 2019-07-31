@@ -71,7 +71,7 @@ export default class KerasGeneratorJavascriptHelper {
   // Return a string containing Javascript instructions to add the node.
   // Options are set to defaults for now, only 3 layer types are used.
   generateJavascriptFromNode(node) {
-    let rs = `${this.nodeName(node)} = `;
+    let rs = `const ${this.nodeName(node)} = `;
     if (this.graph[node].keras_data.name === 'Output') {
       return '';
     }
@@ -118,7 +118,7 @@ export default class KerasGeneratorJavascriptHelper {
 
   // Generate the line responsible for the Keras Model instanciation
   generateModelFunction() {
-    let rs = 'model = tf.models.Model({inputs:';
+    let rs = 'const model = tf.models.Model({inputs:';
     if (this.inputs.length === 1) {
       rs += this.nodeName(this.inputs[0]);
     } else if (this.inputs.length > 1) {
