@@ -118,7 +118,7 @@ export default class KerasGeneratorJavascriptHelper {
 
   // Generate the line responsible for the Keras Model instanciation
   generateModelFunction() {
-    let rs = 'const model = tf.models.Model({inputs:';
+    let rs = 'const model = tf.model({inputs:';
     if (this.inputs.length === 1) {
       rs += this.nodeName(this.inputs[0]);
     } else if (this.inputs.length > 1) {
