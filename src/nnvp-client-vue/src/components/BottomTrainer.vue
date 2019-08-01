@@ -15,11 +15,15 @@
       <button id="button-close-trainer" v-on:click="$emit('close-trainer')">╳</button>
     </div>
     <div id="trainer-canvas-container">
-      <div id="trainer-canvas-container-1">
-        <canvas id="myChart1"></canvas>
+      <div id="trainer-canvas-container-c1">
+        <div class="trainer-canvas-chart-container">
+          <canvas id="myChart1"></canvas>
+        </div>
       </div>
-      <div id="trainer-canvas-container-2">
-        <canvas id="myChart2"></canvas>
+      <div id="trainer-canvas-container-c2">
+        <div class="trainer-canvas-chart-container">
+          <canvas id="myChart2"></canvas>
+        </div>
       </div>
     </div>
   </div>
@@ -159,6 +163,7 @@ export default {
         },
         options: {
           responsive: true,
+          maintainAspectRatio: false,
           title: { display: true, text: chartName },
           tooltips: { mode: 'index', intersect: false },
           elements: { point: { radius: 0 }, line: { tension: 0 } },
@@ -202,16 +207,17 @@ export default {
 }
 #BottomTrainer {
   height: 100%;
+  width: 100%;
   cursor: default;
   font-family: "Roboto Thin";
   font-size: 15px;
   overflow: hidden;
   border-top: 1px solid rgba(100, 100, 100, 0.3);
-  display: flex;
-  flex-flow: column;
-  width: 100%;
+  display: grid;
+  grid-template-rows: 26px 1fr;
 }
 #trainer-bar {
+  grid-rows: 1/2;
   min-height: 26px;
   overflow: hidden;
   border-bottom: 1px solid rgba(100, 100, 100, 0.3);
@@ -247,17 +253,26 @@ export default {
   transform: translate(0, -12%);
 }
 #trainer-canvas-container {
-  flex: 1;
-  padding: 20px;
+  grid-rows: 2/2;
+  display: grid;
+  padding: 1%;
+  grid-template-columns: 50% 50%;
 }
-#trainer-canvas-container-1{
-  width: 40%;
-  height: 800%;
-  float: left;
+#trainer-canvas-container-c1 {
+  grid-column: 1/2;
+  overflow: hidden;
 }
-#trainer-canvas-container-2{
-  width: 40%;
-  height: 80%;
-  float: right;
+#trainer-canvas-container-c2 {
+  grid-column: 2/2;
+  overflow: hidden;
+}
+.trainer-canvas-chart-container {
+  position: relative; height:90% !important; width: 90% !important;
+}
+# myChart1{
+  height: 100% !important; width: 100% !important;
+}
+# myChart2{
+  height: 100% !important; width: 100% !important;
 }
 </style>
