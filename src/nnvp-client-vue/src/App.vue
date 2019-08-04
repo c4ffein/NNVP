@@ -5,7 +5,7 @@
     <div id="whiteBoard" class="whiteBoard"><WhiteBoard/></div>
     <div id="rightBar" class="rightBar"><RightBar msg="NNVP"/></div>
     <div id="bottomTrainer" class="bottomTrainer" v-bind:style="{height: trainerHeight+'vh'}">
-      <BottomTrainer @close-trainer="closeTrainer"/>
+      <BottomTrainer @close-trainer="closeTrainer" :bottomTrainerSize="trainerHeight"/>
     </div>
   </div>
 </template>
