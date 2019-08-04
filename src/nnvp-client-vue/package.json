@@ -14,6 +14,7 @@
     "@vue/babel-helper-vue-jsx-merge-props": "^1.0.0",
     "@vue/babel-preset-jsx": "^1.0.0",
     "chart.js": "^2.8.0",
+    "chartist": "^0.11.3",
     "core-js": "^2.6.9",
     "d3": "^5.9.1",
     "d3-tip": "^0.9.1",
