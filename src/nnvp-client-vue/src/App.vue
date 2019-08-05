@@ -41,6 +41,13 @@ export default {
       trainerOpenHeight: 50, // TODO : 30 when more efficient
     };
   },
+  mounted() {
+    if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+      // eslint-disable-next-line no-alert
+      alert('Mobile browser detected. This site is still not fully compatible with touchscreens.\n'
+          + 'We recommend to use a desktop browser.');
+    }
+  },
 };
 </script>
 
