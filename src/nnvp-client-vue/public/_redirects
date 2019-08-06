@@ -1,0 +1,5 @@
+# Netlify redirects
+# These rules will change if you change your site’s custom domains or HTTPS settings
+
+# Redirect domain aliases to primary domain
+https://demo.nnvp.io/* https://nnvp.io/:splat 301!
