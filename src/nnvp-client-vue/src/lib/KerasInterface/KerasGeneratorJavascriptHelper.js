@@ -49,15 +49,18 @@ export default class KerasGeneratorJavascriptHelper {
     return tupleString;
   }
 
-  generateParams(parameterValues) {
+  generateParams(parameterValues, parameterDefinitions) {
     let paramString = '{';
     // eslint-disable-next-line
     for (const [param, value] of Object.entries(parameterValues)) {
       const paramName = this.pythonToJsParamName(param);
+      const paramDef = parameterDefinitions ? parameterDefinitions[param] : null;
       if (typeof value === 'string') {
         paramString += `${paramName}:'${value}',`;
       } else if (Array.isArray(value)) {
-        paramString += `${paramName}:${this.generateTuple(value)},`;
+        if (paramDef && paramDef.convertToNumber === true && paramDef.value.length === 1) {
+          paramString += `${paramName}:'${value[0]}',`;
+        } else paramString += `${paramName}:${this.generateTuple(value)},`;
       } else if (typeof value === 'boolean') {
         paramString += `${paramName}:${value ? 'True' : 'False'},`;
       } else {
@@ -78,8 +81,10 @@ export default class KerasGeneratorJavascriptHelper {
 
     rs += 'tf.layers.';
     rs += this.pythonToJsLayerName(this.graph[node].keras_data.name);
-    // TODO : use parametersDef?
-    rs += `(${this.generateParams(this.graph[node].keras_data.parameterValues)})`;
+    // TODO : use D3Interface parameterDef if not present in the instance
+    rs += `(${this.generateParams(
+      this.graph[node].keras_data.parameterValues, this.graph[node].keras_data.parameterDef,
+    )})`;
 
     if (this.graph[node].sources.length > 0) {
       rs += '.apply(';
@@ -113,7 +118,7 @@ export default class KerasGeneratorJavascriptHelper {
       : this.graph[node].keras_data.parameterValues;
     return `model.add(tf.layers.${
       this.pythonToJsLayerName(this.graph[node].keras_data.name)}(${
-      this.generateParams(params)}));\n`;
+      this.generateParams(params, this.graph[node].keras_data.parameterDef)}));\n`;
   }
 
   // Generate the line responsible for the Keras Model instanciation
