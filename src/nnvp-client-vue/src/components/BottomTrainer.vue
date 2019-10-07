@@ -15,15 +15,13 @@
       <button id="button-close-trainer" v-on:click="$emit('close-trainer')">╳</button>
     </div>
     <div id="trainer-canvas-container">
-      <div id="trainer-canvas-container-c1">
-        <div class="trainer-canvas-chart-container">
-          <canvas id="myChart1"></canvas>
-        </div>
+      <div id="ct-chart-container-batch" class="ct-chart-container">
+        <div class="ct-chart-title">Batch Results</div>
+        <div id="ct-chart-batch" class="ct-chart"></div>
       </div>
-      <div id="trainer-canvas-container-c2">
-        <div class="trainer-canvas-chart-container">
-          <canvas id="myChart2"></canvas>
-        </div>
+      <div id="ct-chart-container-epoch" class="ct-chart-container">
+        <div class="ct-chart-title">Epoch Results</div>
+        <div id="ct-chart-epoch" class="ct-chart"></div>
       </div>
     </div>
   </div>
@@ -32,9 +30,11 @@
 <script>
 /* eslint-disable */
 import * as tf from '@tensorflow/tfjs';
-import { IMAGE_H, IMAGE_W, MnistData } from '../lib/JSDatasets/google-mnist-data';
+import Dataset from '../lib/JSDatasets/google-data-loader';
 
-import Chart from 'chart.js';
+import * as Chartist from 'chartist';
+require('@/../node_modules/chartist/dist/chartist.min.css')
+import ChartistPluginTip from '@/lib/chartist-plugin-tip/chartist-plugin-tip';
 
 export default {
   name: 'BottomTrainer',
@@ -51,9 +51,7 @@ export default {
   },
   methods: {
     async startTraining() {
-      if (this.isTraining) {
-        return;
-      }
+      if (this.isTraining) return;
       this.isTraining = !this.isTraining;
       window.tf = tf;
       let createModel;
@@ -86,7 +84,7 @@ export default {
         metrics: ['accuracy'],
       });
       // const data = new this.loadedDatasets[this.selectedDataset]();
-      const data = new MnistData();
+      const data = new Dataset();
       await data.load();
       async function train(model, data, fitCallbacks) {
         const BATCH_SIZE = 64;
@@ -109,33 +107,58 @@ export default {
         });
       }
       function resetChart(chart) {
-        chart.data.labels = [];
-        chart.data.datasets.map(dataset => dataset.data = []);
-        chart.update();
+        return;
       }
+      const chartData0 = this.chartData0;
+      const chartData1 = this.chartData1;
       async function watchTraining(batchChart, epochChart) {
+        const batchLabels = [];
         const batchMetrics = { loss: [], acc: [] };
+        const epochLabels = [];
         const epochMetrics = { loss: [], val_loss: [], acc: [], val_acc: [] };
         const callbacks = {
           onBatchEnd(batchNumber, s) {
-            /*batchMetrics.loss.push(s.loss);
-            batchMetrics.acc.push(s.acc);*/
-            batchChart.data.labels.push(batchChart.data.labels.length);
-            batchChart.data.datasets[0].data.push(s.loss);
-            batchChart.data.datasets[1].data.push(s.acc);
-            batchChart.update();
+            batchLabels.push(batchNumber);
+            batchMetrics.loss.push(s.loss);
+            batchMetrics.acc.push(s.acc);
+            const indexArr = [...Array(batchLabels.length).keys()];
+            const moduloVal = (x => x > 25 ? Math.ceil(x / 25) : 1)(indexArr.length);
+            chartData0.labels = indexArr;
+            chartData0.series = [
+              {className: "ct-series-acc", name: "acc", data:batchMetrics.acc},
+              {className: "ct-series-loss", name: "loss", data:batchMetrics.loss},
+            ];
+            const addedOptions = {
+              axisX: { labelInterpolationFnc (value, index) {
+                return index % moduloVal  === 0 ? value : null;
+              },
+              ctTipData: chartData0,
+            }};
+            batchChart.update(chartData0, addedOptions, true);
+            console.log(batchChart);
           },
           onEpochEnd(epochNumber, s) {
-            /*epochMetrics.loss.push(s.loss);
+            epochLabels.push(epochNumber);
+            epochMetrics.loss.push(s.loss);
             epochMetrics.acc.push(s.acc);
-            epochMetrics.val_loss.push(s.loss);
-            epochMetrics.val_acc.push(s.acc);*/
-            epochChart.data.labels.push(epochChart.data.labels.length);
-            epochChart.data.datasets[0].data.push(s.loss);
-            epochChart.data.datasets[1].data.push(s.val_loss);
-            epochChart.data.datasets[2].data.push(s.acc);
-            epochChart.data.datasets[3].data.push(s.val_acc);
-            epochChart.update();
+            epochMetrics.val_loss.push(s.val_loss);
+            epochMetrics.val_acc.push(s.val_acc);
+            const indexArr = [...Array(epochLabels.length).keys()];
+            const moduloVal = (x => x > 25 ? Math.ceil(x / 25) : 1)(indexArr.length);
+            chartData1.labels = indexArr;
+            chartData1.series = [
+              {className: "ct-series-acc", name: "acc", data:epochMetrics.acc},
+              {className: "ct-series-val-acc", name: "val_acc", data:epochMetrics.val_acc},
+              {className: "ct-series-loss", name: "loss", data:epochMetrics.loss},
+              {className: "ct-series-val-loss", name: "val_loss", data:epochMetrics.val_loss},
+            ];
+            const addedOptions = {
+              axisX: { labelInterpolationFnc (value, index) {
+                return index % moduloVal  === 0 ? value : null;
+              },
+              ctTipData: chartData1,
+            }};
+            epochChart.update(chartData1, addedOptions, true);
           }
         }
         return train(model, data, callbacks);
@@ -153,46 +176,35 @@ export default {
     switch() {
       this.isTraining = !this.isTraining;
     },
-    createChart(canvasID, chartName, initialDatasets) {
-      var ctx = document.getElementById(canvasID).getContext('2d');
-      var myChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: [],
-            datasets: initialDatasets,
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          title: { display: true, text: chartName },
-          tooltips: { mode: 'index', intersect: false },
-          elements: { point: { radius: 0 }, line: { tension: 0 } },
-          hover: { mode: 'nearest', intersect: true },
-          scales: {
-            xAxes: [{
-              display: true, /*scaleLabel: { display: true, labelString: xLabel }*/
-            }],
-            yAxes: [{
-              display: true, /*scaleLabel: { display: true, labelString: yLabel }*/
-            }]
-          }
-        }
-      });
-      return myChart;
-    }
   },
   mounted() {
-    this.batchChart = this.createChart('myChart1', 'Batch', [
-      {label: 'loss', data: [], backgroundColor: 'rgba(0, 0, 255, 0.5)', color: 'rgba(0, 0, 255, 1)', borderColor: 'rgba(0, 0, 255, 0.5)', fill: false},
-      {label: 'acc', data: [], backgroundColor: 'rgba(255, 0, 0, 0.5)', color: 'rgba(255, 0, 0, 1)', borderColor: 'rgba(255, 0, 0, 0.5)', fill: false},
-    ]);
-    this.epochChart = this.createChart('myChart2', 'Epoch', [
-      {label: 'loss', data: [], backgroundColor: 'rgba(0, 0, 255, 0.5)', color: 'rgba(0, 0, 255, 1)', borderColor: 'rgba(0, 0, 255, 0.5)', fill: false},
-      {label: 'val_loss', data: [], backgroundColor: 'rgba(0, 64, 255, 0.5)', color: 'rgba(0, 64, 255, 1)', borderColor: 'rgba(0, 64, 255, 0.5)', fill: false},
-      {label: 'acc', data: [], backgroundColor: 'rgba(255, 0, 0, 0.5)', color: 'rgba(255, 0, 0, 1)', borderColor: 'rgba(255, 0, 0, 0.5)', fill: false},
-      {label: 'val_acc', data: [], backgroundColor: 'rgba(255, 64, 0, 0.5)', color: 'rgba(255, 64, 0, 1)', borderColor: 'rgba(255, 64, 0, 0.5)', fill: false},
-    ]);
+    this.chartData0 = {
+      labels: [],
+      series: [{className: "acc", name: "acc", data:[]}, {className: "loss", name: "loss", data:[]}],
+    };
+    this.chartData1 = {
+      labels: [],
+      series: [
+        {className: "ct-series-acc", name: "acc", data:[]},
+        {className: "ct-series-val-acc", name: "val-acc", data:[]},
+        {className: "ct-series-loss", name: "loss", data:[]},
+        {className: "ct-series-val-loss", name: "val-loss", data:[]}
+      ],
+    };
+    const chartistPluginTip = new ChartistPluginTip(window, document, Chartist);
+    this.batchChart = new Chartist.Line('#ct-chart-batch', this.chartData0, {
+      lineSmooth : false, plugins: [Chartist.plugins.ctTip({title: ':value'})]
+    });
+    this.epochChart = new Chartist.Line('#ct-chart-epoch', this.chartData1, {
+      lineSmooth : false, plugins: [Chartist.plugins.ctTip({title: ':value'})]
+    });
   },
+  props: ['bottomTrainerSize'],
+  watch: {
+    bottomTrainerSize (newVal, oldVal) {
+      window.dispatchEvent(new Event('resize')); // Needed for svg resize
+    }
+  }
 };
 </script>
 
@@ -258,21 +270,48 @@ export default {
   padding: 1%;
   grid-template-columns: 50% 50%;
 }
-#trainer-canvas-container-c1 {
+.ct-chart-container {
+  display: grid;
+  grid-template-rows: 20px 1fr;
+}
+#ct-chart-container-batch {
   grid-column: 1/2;
-  overflow: hidden;
 }
-#trainer-canvas-container-c2 {
+#ct-chart-container-epoch {
   grid-column: 2/2;
-  overflow: hidden;
 }
-.trainer-canvas-chart-container {
-  position: relative; height:90% !important; width: 90% !important;
+.ct-chart-title {
+  grid-rows: 1/2;
 }
-# myChart1{
-  height: 100% !important; width: 100% !important;
+.ct-chart {
+  grid-rows: 2/2;
+  margin: 10px;
+  height: 1fr;
+  position: relative; /* Safari. */
 }
-# myChart2{
-  height: 100% !important; width: 100% !important;
+.ct-point {
+  stroke-width: 0; /* No points */
+}
+.ct-line {
+  stroke-width: 3px;
+}
+.ct-chart > svg { /* Fix for Safari... */
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+.ct-series-acc .ct-bar, .ct-series-acc .ct-line, .ct-series-acc .ct-point, .ct-series-acc .ct-slice-donut {
+  stroke: rgba(255, 0, 0, 0.5);
+}
+.ct-series-val-acc .ct-bar, .ct-series-val-acc .ct-line, .ct-series-val-acc .ct-point, .ct-series-val-acc .ct-slice-donut {
+  stroke: rgba(255, 64, 0, 0.5);
+}
+.ct-series-loss .ct-bar, .ct-series-loss .ct-line, .ct-series-loss .ct-point, .ct-series-loss .ct-slice-donut {
+  stroke: rgba(0, 0, 255, 0.5);
+}
+.ct-series-val-loss .ct-bar, .ct-series-val-loss .ct-line, .ct-series-val-loss .ct-point, .ct-series-val-loss .ct-slice-donut {
+  stroke: rgba(0, 64, 255, 0.5);
 }
 </style>

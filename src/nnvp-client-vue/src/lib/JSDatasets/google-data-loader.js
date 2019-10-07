@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  * =============================================================================
+ * Modified by c4ffein to enable loading of other datasets than the original MNIST one.
  */
 
 import * as tf from '@tensorflow/tfjs';
@@ -22,7 +23,6 @@ const NUM_CLASSES = 10;
 const NUM_DATASET_ELEMENTS = 65000;
 
 const NUM_TRAIN_ELEMENTS = 55000;
-const NUM_TEST_ELEMENTS = NUM_DATASET_ELEMENTS - NUM_TRAIN_ELEMENTS;
 
 const MNIST_IMAGES_SPRITE_PATH = 'https://storage.googleapis.com/learnjs-data/model-builder/mnist_images.png';
 const MNIST_LABELS_PATH = 'https://storage.googleapis.com/learnjs-data/model-builder/mnist_labels_uint8';
@@ -33,8 +33,23 @@ const MNIST_LABELS_PATH = 'https://storage.googleapis.com/learnjs-data/model-bui
  * NOTE: This will get much easier. For now, we do data fetching and
  * manipulation manually.
  */
-export class MnistData {
-  constructor() {
+export default class Dataset {
+  constructor(
+    mnistImagesSpritePath = MNIST_IMAGES_SPRITE_PATH,
+    mnistLabelsPath = MNIST_LABELS_PATH,
+    imageSize = IMAGE_SIZE,
+    numClasses = NUM_CLASSES,
+    numDatasetElements = NUM_DATASET_ELEMENTS,
+    numTrainElements = NUM_TRAIN_ELEMENTS,
+    numTestElements,
+  ) {
+    this.mnistImagesSpritePath = mnistImagesSpritePath;
+    this.mnistLabelsPath = mnistLabelsPath;
+    this.imageSize = imageSize;
+    this.numClasses = numClasses;
+    this.numDatasetElements = numDatasetElements;
+    this.numTrainElements = numTrainElements;
+    this.numTestElements = numTestElements || this.numDatasetElements - this.numTrainElements;
     this.shuffledTrainIndex = 0;
     this.shuffledTestIndex = 0;
   }
@@ -50,16 +65,16 @@ export class MnistData {
         img.width = img.naturalWidth;
         img.height = img.naturalHeight;
 
-        const datasetBytesBuffer = new ArrayBuffer(NUM_DATASET_ELEMENTS * IMAGE_SIZE * 4);
+        const datasetBytesBuffer = new ArrayBuffer(this.numDatasetElements * this.imageSize * 4);
 
         const chunkSize = 5000;
         canvas.width = img.width;
         canvas.height = chunkSize;
 
-        for (let i = 0; i < NUM_DATASET_ELEMENTS / chunkSize; i++) {
+        for (let i = 0; i < this.numDatasetElements / chunkSize; i++) {
           const datasetBytesView = new Float32Array(
-            datasetBytesBuffer, i * IMAGE_SIZE * chunkSize * 4,
-            IMAGE_SIZE * chunkSize,
+            datasetBytesBuffer, i * this.imageSize * chunkSize * 4,
+            this.imageSize * chunkSize,
           );
           ctx.drawImage(
             img, 0, i * chunkSize, img.width, chunkSize, 0, 0, img.width,
@@ -78,24 +93,24 @@ export class MnistData {
 
         resolve();
       };
-      img.src = MNIST_IMAGES_SPRITE_PATH;
+      img.src = this.mnistImagesSpritePath;
     });
 
-    const labelsRequest = fetch(MNIST_LABELS_PATH);
+    const labelsRequest = fetch(this.mnistLabelsPath);
     const [imgResponse, labelsResponse] = await Promise.all([imgRequest, labelsRequest]);
 
     this.datasetLabels = new Uint8Array(await labelsResponse.arrayBuffer());
 
     // Create shuffled indices into the train/test set for when we select a
     // random dataset element for training / validation.
-    this.trainIndices = tf.util.createShuffledIndices(NUM_TRAIN_ELEMENTS);
-    this.testIndices = tf.util.createShuffledIndices(NUM_TEST_ELEMENTS);
+    this.trainIndices = tf.util.createShuffledIndices(this.numTrainElements);
+    this.testIndices = tf.util.createShuffledIndices(this.numTestElements);
 
     // Slice the the images and labels into train and test sets.
-    this.trainImages = this.datasetImages.slice(0, IMAGE_SIZE * NUM_TRAIN_ELEMENTS);
-    this.testImages = this.datasetImages.slice(IMAGE_SIZE * NUM_TRAIN_ELEMENTS);
-    this.trainLabels = this.datasetLabels.slice(0, NUM_CLASSES * NUM_TRAIN_ELEMENTS);
-    this.testLabels = this.datasetLabels.slice(NUM_CLASSES * NUM_TRAIN_ELEMENTS);
+    this.trainImages = this.datasetImages.slice(0, this.imageSize * this.numTrainElements);
+    this.testImages = this.datasetImages.slice(this.imageSize * this.numTrainElements);
+    this.trainLabels = this.datasetLabels.slice(0, this.numClasses * this.numTrainElements);
+    this.testLabels = this.datasetLabels.slice(this.numClasses * this.numTrainElements);
   }
 
   nextTrainBatch(batchSize) {
@@ -115,21 +130,21 @@ export class MnistData {
   }
 
   nextBatch(batchSize, data, index) {
-    const batchImagesArray = new Float32Array(batchSize * IMAGE_SIZE);
-    const batchLabelsArray = new Uint8Array(batchSize * NUM_CLASSES);
+    const batchImagesArray = new Float32Array(batchSize * this.imageSize);
+    const batchLabelsArray = new Uint8Array(batchSize * this.numClasses);
 
     for (let i = 0; i < batchSize; i++) {
       const idx = index();
 
-      const image = data[0].slice(idx * IMAGE_SIZE, idx * IMAGE_SIZE + IMAGE_SIZE);
-      batchImagesArray.set(image, i * IMAGE_SIZE);
+      const image = data[0].slice(idx * this.imageSize, idx * this.imageSize + this.imageSize);
+      batchImagesArray.set(image, i * this.imageSize);
 
-      const label = data[1].slice(idx * NUM_CLASSES, idx * NUM_CLASSES + NUM_CLASSES);
-      batchLabelsArray.set(label, i * NUM_CLASSES);
+      const label = data[1].slice(idx * this.numClasses, idx * this.numClasses + this.numClasses);
+      batchLabelsArray.set(label, i * this.numClasses);
     }
 
-    const xs = tf.tensor2d(batchImagesArray, [batchSize, IMAGE_SIZE]);
-    const labels = tf.tensor2d(batchLabelsArray, [batchSize, NUM_CLASSES]);
+    const xs = tf.tensor2d(batchImagesArray, [batchSize, this.imageSize]);
+    const labels = tf.tensor2d(batchLabelsArray, [batchSize, this.numClasses]);
 
     return { xs, labels };
   }
