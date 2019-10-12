@@ -15,7 +15,7 @@ import TopBar from './components/TopBar.vue';
 import LeftBar from './components/LeftBar/LeftBar.vue';
 import RightBar from './components/RightBar/RightBar.vue';
 import WhiteBoard from './components/WhiteBoard.vue';
-import BottomTrainer from './components/BottomTrainer.vue';
+import BottomTrainer from './components/BottomTrainer/BottomTrainer.vue';
 
 export default {
   name: 'app',

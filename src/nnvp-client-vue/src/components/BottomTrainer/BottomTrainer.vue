@@ -30,7 +30,7 @@
 <script>
 /* eslint-disable */
 import * as tf from '@tensorflow/tfjs';
-import Dataset from '../lib/JSDatasets/google-data-loader';
+import Dataset from '../../lib/JSDatasets/google-data-loader';
 
 import * as Chartist from 'chartist';
 require('@/../node_modules/chartist/dist/chartist.min.css')
