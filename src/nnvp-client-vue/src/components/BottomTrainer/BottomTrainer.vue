@@ -51,8 +51,9 @@ export default {
       isTraining: false,
       selectedDataset: 'MNIST Data',
       loadedDatasets: {
-        'MNIST Data': ['', 'Description of the MNIST Dataset'], // MnistData, empty for now...
-        'MNIST Data2': ['', ''],// MnistData, empty for now...
+        'MNIST Data': ['', 'MNIST database of handwritten digits. ' +
+                           'Please provide a [28, 28, 1] input shape.'],
+        'Mocked': ['', ''],// MnistData, empty for now...
       },
       epochChart: null,
       batchChart: null,

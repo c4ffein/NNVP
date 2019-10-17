@@ -2,7 +2,7 @@
   <div id="DatasetSelector" class="DatasetSelector">
     <div id="dataset-selector-and-description">
       <select
-        class="BottomTrainer bar-button dataset-select"
+        class="BottomTrainer dataset-select"
         v-bind:value="value"
         v-on:change="newSelected=$event.target.value;$emit('input', $event.target.value)"
       >
@@ -49,12 +49,12 @@ export default {
   font-size: 15px;
   overflow: hidden;
   display: grid;
-  grid-template-columns: 50% 50%;
+  grid-template-columns: 40% 60%;
 }
 #dataset-selector-and-description {
   grid-columns: 1/2;
   display: grid;
-  grid-template-rows: 30px 1fr;
+  grid-template-rows: auto 1fr;
 }
 #dataset-selector-and-description {
   grid-rows: 1/2;
@@ -63,6 +63,21 @@ export default {
   grid-columns: 2/2;
 }
 .dataset-select {
-  border-bottom: 1px solid rgba(100, 100, 100, 0.3);
+  border: 1px solid rgba(100, 100, 100, 0.3);
+  float: left;
+  height: 26px;
+  width: auto;
+  border-radius: 0;
+  background-color: rgba(100, 100, 100, 0);
+  padding-left: 10px;
+  margin: 20px 10px 15px 10px;
+}
+#dataset-description {
+  margin: 0px 10px 10px 10px;
+  padding: 0;
+  border: 0;
+  text-align: justify;
+  text-justify: auto;
+  overflow: auto;
 }
 </style>
