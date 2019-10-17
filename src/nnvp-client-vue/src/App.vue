@@ -118,14 +118,10 @@ body,html {
   background-color: rgba(255, 255, 255, 0.8);
 }
 #app > .whiteBoard {
-  max-width: 100%;
-  max-height: 100%;
   background-color: rgba(200, 200, 200, 0.8);
   color: #2c3e50;
 }
 #app > .bottomTrainer {
-  width: 100%;
-  overflow-y: auto;
   background-color: rgba(255, 255, 255, 1);
   color: #2c3e50;
 }
