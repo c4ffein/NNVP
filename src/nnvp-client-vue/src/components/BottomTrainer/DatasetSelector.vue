@@ -22,9 +22,7 @@
 </template>
 
 <script>
-/* eslint-disable */
 import * as tf from '@tensorflow/tfjs';
-import Dataset from '../../lib/JSDatasets/google-data-loader';
 
 export default {
   name: 'DatasetSelector',
@@ -37,36 +35,36 @@ export default {
   },
   methods: {
     async datasetSet(name) {
-      this.newestSelected=name;
+      this.newestSelected = name;
       this.$emit('input', name);
       this.$parent.loadDataset(name).then(() => this.fillSamples(name));
     },
     // Mostly from https://storage.googleapis.com/tfjs-vis/mnist/dist/index.html
     async fillSamples(name) {
-      if (this.value != name) return;
-      const drawArea = document.getElementById("samples");
+      if (this.value !== name) return;
+      const drawArea = document.getElementById('samples');
       if (!drawArea) {
         this.neededSamples = name;
         return;
       }
-      drawArea.innerHTML = "";
+      drawArea.innerHTML = '';
       const examples = this.$parent.datasets[name].nextTestBatch(40);
       const numExamples = examples.xs.shape[0];
-      for (let i = 0; i < numExamples; i++) {
-        const imageTensor = tf.tidy(() => {
-          return examples.xs.slice([i, 0], [1, examples.xs.shape[1]]).reshape([28, 28, 1]);
-        });
+      for (let i = 0; i < numExamples; i += 1) {
+        const imageTensor = tf.tidy(
+          () => examples.xs.slice([i, 0], [1, examples.xs.shape[1]]).reshape([28, 28, 1]),
+        );
         const canvas = document.createElement('canvas');
         canvas.width = 28;
         canvas.height = 28;
         canvas.style = 'margin: 4px;';
-        await tf.browser.toPixels(imageTensor, canvas);
+        await tf.browser.toPixels(imageTensor, canvas); // eslint-disable-line
         drawArea.appendChild(canvas);
       }
     },
     refresh() {
-      if(this.neededSamples && this.neededSamples == this.newestSelected) {
-        this.fillSamples(this.neededSamples)
+      if (this.neededSamples && this.neededSamples === this.newestSelected) {
+        this.fillSamples(this.neededSamples);
       }
     },
   },
@@ -74,7 +72,7 @@ export default {
     this.newestSelected = this.value;
     setTimeout(() => this.datasetSet(this.newestSelected), 3000);
   },
-}
+};
 </script>
 
 <style>
