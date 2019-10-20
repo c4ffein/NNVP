@@ -4,19 +4,19 @@
       <select
         class="BottomTrainer dataset-select"
         v-bind:value="value"
-        v-on:change="newSelected=$event.target.value;$emit('input', $event.target.value)"
+        v-on:change="datasetSet($event.target.value)"
       >
-        <option v-bind:key="key" v-for="(item, key) in loadedDatasets" v-bind:value="key">
+        <option v-bind:key="key" v-for="(item, key) in loadableDatasets" v-bind:value="key">
           {{key}}
         </option>
       </select>
       <div id="dataset-description">
-        {{loadedDatasets[value][1]}}
+        {{loadableDatasets[value][1]}}
       </div>
     </div>
     <div id="samples-container">
       <div id="samples-title"></div>
-      <div id="samples">WiP</div>
+      <div id="samples"></div>
     </div>
   </div>
 </template>
@@ -28,7 +28,52 @@ import Dataset from '../../lib/JSDatasets/google-data-loader';
 
 export default {
   name: 'DatasetSelector',
-  props: ['value', 'loadedDatasets'],
+  props: ['value', 'loadableDatasets'],
+  data() {
+    return {
+      newestSelected: null, // Needed to simplify access before propagation
+      neededSamples: null,
+    };
+  },
+  methods: {
+    async datasetSet(name) {
+      this.newestSelected=name;
+      this.$emit('input', name);
+      this.$parent.loadDataset(name).then(() => this.fillSamples(name));
+    },
+    // Mostly from https://storage.googleapis.com/tfjs-vis/mnist/dist/index.html
+    async fillSamples(name) {
+      if (this.value != name) return;
+      const drawArea = document.getElementById("samples");
+      if (!drawArea) {
+        this.neededSamples = name;
+        return;
+      }
+      drawArea.innerHTML = "";
+      const examples = this.$parent.datasets[name].nextTestBatch(40);
+      const numExamples = examples.xs.shape[0];
+      for (let i = 0; i < numExamples; i++) {
+        const imageTensor = tf.tidy(() => {
+          return examples.xs.slice([i, 0], [1, examples.xs.shape[1]]).reshape([28, 28, 1]);
+        });
+        const canvas = document.createElement('canvas');
+        canvas.width = 28;
+        canvas.height = 28;
+        canvas.style = 'margin: 4px;';
+        await tf.browser.toPixels(imageTensor, canvas);
+        drawArea.appendChild(canvas);
+      }
+    },
+    refresh() {
+      if(this.neededSamples && this.neededSamples == this.newestSelected) {
+        this.fillSamples(this.neededSamples)
+      }
+    },
+  },
+  mounted() {
+    this.newestSelected = this.value;
+    setTimeout(() => this.datasetSet(this.newestSelected), 3000);
+  },
 }
 </script>
 
@@ -79,5 +124,8 @@ export default {
   text-align: justify;
   text-justify: auto;
   overflow: auto;
+}
+#samples {
+  margin: 15px 0 0 0;
 }
 </style>

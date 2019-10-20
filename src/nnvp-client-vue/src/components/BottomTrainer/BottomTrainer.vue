@@ -19,9 +19,10 @@
       <keep-alive>
         <component
           v-bind:is="selectedPanel"
+          v-bind:ref="'child'+selectedPanel"
           class="tab"
           v-model="selectedDataset"
-          v-bind:loadedDatasets="loadedDatasets"
+          v-bind:loadableDatasets="loadableDatasets"
         ></component>
       </keep-alive>
     </div>
@@ -49,28 +50,39 @@ export default {
   data() {
     return {
       isTraining: false,
-      selectedDataset: 'MNIST Data',
-      loadedDatasets: {
-        'MNIST Data': ['', 'MNIST database of handwritten digits. ' +
-                           'Please provide a [28, 28, 1] input shape.'],
-        'Mocked': ['', ''],// MnistData, empty for now...
+      selectedDataset: 'MNIST',
+      loadableDatasets: {
+        'MNIST': [
+          {
+            mnistImagesSpritePath: this.cdnDir+"mnist_images.png",
+            mnistLabelsPath: this.cdnDir+"mnist_labels_uint8",
+          },
+          'MNIST database of handwritten digits. ' +
+          'Please provide a [28, 28, 1] input shape.',
+        ],
+        'FashionMNIST': [
+          {
+            mnistImagesSpritePath: this.cdnDir+"fashion_mnist_images.png",
+            mnistLabelsPath: this.cdnDir+"fashion_mnist_labels_uint8",
+          },
+          'Dataset of clothes images. Replacement for MNIST as the clothes can be separated in ' +
+          '10 categories ' +
+          '(T-shirt, Pullover, Dress, Coat, Sandal, Shirt, Sneaker, Bag, Ankle boot). ' +
+          'Please provide a [28, 28, 1] input shape.',
+        ],
       },
-      epochChart: null,
-      batchChart: null,
       selectedPanel: "DatasetSelector",
     };
   },
   methods: {
     datasetClicked() {
-      // Looks stupid, isn't
       if (this.selectedPanel == "DatasetSelector") return;
       this.selectedPanel = "DatasetSelector";
-      // Update charts to redraw them if training ended with another tab selected
-      this.batchChart.update();
-      this.epochChart.update();
+      this.$nextTick(() => {this.$refs.childDatasetSelector.refresh();});
     },
     chartsClicked() {
       this.selectedPanel = "Charts";
+      this.$nextTick(() => {this.batchChart.update();this.epochChart.update();});
     },
     trainClicked() {
       this.chartsClicked();
@@ -109,9 +121,9 @@ export default {
         loss: 'categoricalCrossentropy',
         metrics: ['accuracy'],
       });
-      // const data = new this.loadedDatasets[this.selectedDataset]();
-      const data = new Dataset();
-      await data.load();
+      const datasetName = this.selectedDataset;
+      await this.loadDataset(datasetName);
+      const data = this.datasets[datasetName];
       async function train(model, data, fitCallbacks) {
         const BATCH_SIZE = 64;
         const trainDataSize = 500;
@@ -198,16 +210,34 @@ export default {
       }
       this.isTraining = !this.isTraining;
     },
+    async loadDataset(name) {
+      // TODO : change behaviour when already loading
+      this.datasets = this.datasets || {};
+      if (!(name in this.datasets)){
+        const newDataset = new Dataset(
+          this.loadableDatasets[name][0].mnistImagesSpritePath,
+          this.loadableDatasets[name][0].mnistLabelsPath,
+        );
+        await newDataset.load();
+        this.datasets[name] = newDataset;
+      }
+    },
     switch() {
       this.isTraining = !this.isTraining;
     },
   },
-  props: ['bottomTrainerSize'],
+  props: {
+    bottomTrainerSize: Number,
+    cdnDir: {
+      type: String,
+      default: "https://storage.googleapis.com/learnjs-data/model-builder/",
+    },
+  },
   watch: {
     bottomTrainerSize (newVal, oldVal) {
       window.dispatchEvent(new Event('resize')); // Needed for svg resize
     }
-  }
+  },
 };
 </script>
 

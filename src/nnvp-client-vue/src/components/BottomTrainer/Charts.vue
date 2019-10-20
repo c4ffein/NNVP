@@ -22,17 +22,6 @@ import ChartistPluginTip from '@/lib/chartist-plugin-tip/chartist-plugin-tip';
 
 export default {
   name: 'Charts',
-  data() {
-    return {
-      isTraining: false,
-      selectedDataset: 'MNIST Data',
-      loadedDatasets: {
-        'MNIST Data': '', // MnistData, empty for now...
-      },
-      epochChart: null,
-      batchChart: null,
-    };
-  },
   mounted() {
     this.$parent.chartData0 = {
       labels: [],
