@@ -36,7 +36,6 @@
     "babel-preset-env": "^1.7.0",
     "eslint": "^5.16.0",
     "eslint-plugin-vue": "^5.2.3",
-    "geckodriver": "^1.19.0",
     "jest": "^24.9.0",
     "jest-serializer-vue": "^2.0.2",
     "nightwatch": "^1.2.4",
