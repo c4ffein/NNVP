@@ -536,9 +536,9 @@ D3Layer.prototype.mouseOver = function (graph) {
   let thisLayer = this,
       edges = graph.model.d3Edges;
   let gElement = d3.select("#" + this.htmlID);
-  d3.tip = d3tip;
+  //d3.tip = d3tip;
   if(D3Layer.tip === undefined) {
-    D3Layer.tip = d3.tip().attr('class', 'd3-tip').offset([-10, 0]);
+    D3Layer.tip = d3tip().attr('class', 'd3-tip').offset([-10, 0]);
     gElement.call(D3Layer.tip);
   }
   if(edges.filter(edge => d3.select("g#"+edge.htmlID).select("path").attr("class").indexOf("linkCycle") >= 0).length > 0){
