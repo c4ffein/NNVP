@@ -215,7 +215,7 @@ export default {
     bottomTrainerSize: Number,
     cdnDir: {
       type: String,
-      default: "http://nnvpdemo.tech/datasets/",
+      default: "https://nnvpdemo.tech/datasets/",
     },
   },
   watch: {
