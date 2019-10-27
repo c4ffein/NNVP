@@ -14,15 +14,18 @@
  * limitations under the License.
  * =============================================================================
  * Modified by c4ffein to enable loading of other datasets than the original MNIST one.
- * Heavily modified again to allow multiple sprite paths and usage of fetch to verify checksums.
  */
 
 import * as tf from '@tensorflow/tfjs';
 
+const IMAGE_SIZE = 784;
 const NUM_CLASSES = 10;
 const NUM_DATASET_ELEMENTS = 65000;
 
 const NUM_TRAIN_ELEMENTS = 55000;
+
+const MNIST_IMAGES_SPRITE_PATH = 'https://storage.googleapis.com/learnjs-data/model-builder/mnist_images.png';
+const MNIST_LABELS_PATH = 'https://storage.googleapis.com/learnjs-data/model-builder/mnist_labels_uint8';
 
 /**
  * A class that fetches the sprited MNIST dataset and returns shuffled batches.
@@ -32,20 +35,16 @@ const NUM_TRAIN_ELEMENTS = 55000;
  */
 export default class Dataset {
   constructor(
-    imagesSpritePath,
-    imagesSpriteChecksum = null,
-    labelsPath,
-    labelsSha256 = null,
-    imageSize,
+    mnistImagesSpritePath = MNIST_IMAGES_SPRITE_PATH,
+    mnistLabelsPath = MNIST_LABELS_PATH,
+    imageSize = IMAGE_SIZE,
     numClasses = NUM_CLASSES,
     numDatasetElements = NUM_DATASET_ELEMENTS,
     numTrainElements = NUM_TRAIN_ELEMENTS,
     numTestElements,
   ) {
-    this.imagesSpritePath = imagesSpritePath;
-    this.checksum = imagesSpriteChecksum;
-    this.labelsPath = labelsPath;
-    this.labelsSha256 = labelsSha256;
+    this.mnistImagesSpritePath = mnistImagesSpritePath;
+    this.mnistLabelsPath = mnistLabelsPath;
     this.imageSize = imageSize;
     this.numClasses = numClasses;
     this.numDatasetElements = numDatasetElements;
@@ -56,27 +55,51 @@ export default class Dataset {
   }
 
   async load() {
-    const datasetBytesBuffer = new ArrayBuffer(this.numDatasetElements * this.imageSize * 4);
-    let imgRequests = null;
-    if(typeof(this.imagesSpritePath) === "string") imgRequests = this.buildImgRequest(
-        this.imagesSpritePath, 0, this.numDatasetElements, this.checksum, datasetBytesBuffer
-    );
-    else if(Array.isArray(this.imagesSpritePath)){
-      imgRequests = this.imagesSpritePath.map(
-        ([offset, size, currentSpritePath], index) => this.buildImgRequest(
-          currentSpritePath,
-          offset,
-          size,
-          this.checksum ? this.checksum[index] : null,
-          datasetBytesBuffer,
-        )
-      );
-    }
-    this.datasetImages = new Float32Array(datasetBytesBuffer);
-    const labelsRequest = fetch(this.labelsPath, {integrity: this.labelsSha256}).then(
-      async response => {this.datasetLabels = new Uint8Array(await response.arrayBuffer());}
-    );
-    await Promise.all([...imgRequests, labelsRequest]);
+    // Make a request for the MNIST sprited image.
+    const img = new Image();
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const imgRequest = new Promise((resolve, reject) => {
+      img.crossOrigin = '';
+      img.onload = () => {
+        img.width = img.naturalWidth;
+        img.height = img.naturalHeight;
+
+        const datasetBytesBuffer = new ArrayBuffer(this.numDatasetElements * this.imageSize * 4);
+
+        const chunkSize = 5000;
+        canvas.width = img.width;
+        canvas.height = chunkSize;
+
+        for (let i = 0; i < this.numDatasetElements / chunkSize; i++) {
+          const datasetBytesView = new Float32Array(
+            datasetBytesBuffer, i * this.imageSize * chunkSize * 4,
+            this.imageSize * chunkSize,
+          );
+          ctx.drawImage(
+            img, 0, i * chunkSize, img.width, chunkSize, 0, 0, img.width,
+            chunkSize,
+          );
+
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+          for (let j = 0; j < imageData.data.length / 4; j++) {
+            // All channels hold an equal value since the image is grayscale, so
+            // just read the red channel.
+            datasetBytesView[j] = imageData.data[j * 4] / 255;
+          }
+        }
+        this.datasetImages = new Float32Array(datasetBytesBuffer);
+
+        resolve();
+      };
+      img.src = this.mnistImagesSpritePath;
+    });
+
+    const labelsRequest = fetch(this.mnistLabelsPath);
+    const [imgResponse, labelsResponse] = await Promise.all([imgRequest, labelsRequest]);
+
+    this.datasetLabels = new Uint8Array(await labelsResponse.arrayBuffer());
 
     // Create shuffled indices into the train/test set for when we select a
     // random dataset element for training / validation.
@@ -88,48 +111,6 @@ export default class Dataset {
     this.testImages = this.datasetImages.slice(this.imageSize * this.numTrainElements);
     this.trainLabels = this.datasetLabels.slice(0, this.numClasses * this.numTrainElements);
     this.testLabels = this.datasetLabels.slice(this.numClasses * this.numTrainElements);
-  }
-
-  buildImgRequest(imagesSpritePath, offset, size, imagesSpriteChecksum, datasetBytesBuffer) {
-    return fetch(
-      imagesSpritePath, imagesSpriteChecksum ? {integrity: imagesSpriteChecksum} : {}
-    ).then(response => {
-      if (!response.ok) throw "Failed GET of " + imagesSpritePath;
-      return response.blob();
-    }).then(async responseBlob => {
-      const img = new Image();
-      await (() => new Promise(resolve => {
-        img.onload = () => resolve();
-        img.src = URL.createObjectURL(responseBlob);
-      }))();
-      return img;
-    }).then(img => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      const chunkSize = 5000;
-      canvas.width = img.width;
-      canvas.height = chunkSize;
-
-      for (let i = 0; i < size / chunkSize; i++) {
-        const actualSize = i * chunkSize > size ? (1 - i) * chunkSize + size : chunkSize;
-        const datasetBytesView = new Float32Array(
-          datasetBytesBuffer,
-          i * this.imageSize * chunkSize * 4 + offset * this.imageSize * 4,
-          this.imageSize * chunkSize,
-        );
-        ctx.drawImage(
-          img, 0, i * chunkSize, img.width, actualSize, 0, 0, img.width, actualSize
-        );
-
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-        for (let j = 0; j < imageData.data.length / 4; j++) {
-          // All channels hold an equal value since the image is grayscale, so
-          // just read the red channel.
-          datasetBytesView[j] = imageData.data[j * 4] / 255;
-        }
-      }
-    });
   }
 
   nextTrainBatch(batchSize) {
