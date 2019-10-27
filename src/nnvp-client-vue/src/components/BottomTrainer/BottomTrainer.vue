@@ -33,6 +33,7 @@
 /* eslint-disable */
 import * as tf from '@tensorflow/tfjs';
 import Dataset from '../../lib/JSDatasets/google-data-loader';
+import loadableDatasets from '../../lib/JSDatasets/datasets-sources';
 
 import * as Chartist from 'chartist';
 require('@/../node_modules/chartist/dist/chartist.min.css')
@@ -51,26 +52,7 @@ export default {
     return {
       isTraining: false,
       selectedDataset: 'MNIST',
-      loadableDatasets: {
-        'MNIST': [
-          {
-            mnistImagesSpritePath: this.cdnDir+"mnist_images.png",
-            mnistLabelsPath: this.cdnDir+"mnist_labels_uint8",
-          },
-          'MNIST database of handwritten digits. ' +
-          'Please provide a [28, 28, 1] input shape.',
-        ],
-        'FashionMNIST': [
-          {
-            mnistImagesSpritePath: this.cdnDir+"fashion_mnist_images.png",
-            mnistLabelsPath: this.cdnDir+"fashion_mnist_labels_uint8",
-          },
-          'Dataset of clothes images. Replacement for MNIST as the clothes can be separated in ' +
-          '10 categories ' +
-          '(T-shirt, Pullover, Dress, Coat, Sandal, Shirt, Sneaker, Bag, Ankle boot). ' +
-          'Please provide a [28, 28, 1] input shape.',
-        ],
-      },
+      loadableDatasets: loadableDatasets(this.cdnDir),
       selectedPanel: "DatasetSelector",
     };
   },
@@ -95,7 +77,7 @@ export default {
       let createModel;
       try {
         createModel = eval(
-          `tf=window.tf;\n${this.$d3Interface.generateJavascriptNoSave(this.$kerasInterface)}createModel`,
+          `tf=window.tf;\n${this.$d3Interface.generateJavascriptNoSave(this.$kerasInterface)}createModel`
         );
       }
       catch (error) {
@@ -215,8 +197,11 @@ export default {
       this.datasets = this.datasets || {};
       if (!(name in this.datasets)){
         const newDataset = new Dataset(
-          this.loadableDatasets[name][0].mnistImagesSpritePath,
-          this.loadableDatasets[name][0].mnistLabelsPath,
+          this.loadableDatasets[name][0].imagesSpritePath,
+          this.loadableDatasets[name][0].imagesSpriteChecksum,
+          this.loadableDatasets[name][0].labelsPath,
+          this.loadableDatasets[name][0].labelsChecksum,
+          this.loadableDatasets[name][0].imageSize,
         );
         await newDataset.load();
         this.datasets[name] = newDataset;
@@ -230,7 +215,7 @@ export default {
     bottomTrainerSize: Number,
     cdnDir: {
       type: String,
-      default: "https://storage.googleapis.com/learnjs-data/model-builder/",
+      default: "http://nnvpdemo.tech/datasets/",
     },
   },
   watch: {
