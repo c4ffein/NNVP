@@ -1,19 +1,19 @@
 <template>
   <div id="BottomTrainer" class="BottomTrainer">
     <div id="trainer-bar" class="BottomTrainer">
-      <button class="BottomTrainer bar-button" v-on:click="datasetClicked">
+      <div class="BottomTrainer bar-button" v-on:click="datasetClicked">
         Dataset
-      </button>
-      <button class="BottomTrainer bar-button" v-on:click="chartsClicked">
-        Charts
-      </button>
-      <button class="BottomTrainer bar-button" v-on:click="trainClicked">
-        {{isTraining ? 'Stop' : 'Train'}}
-      </button>
-      <div class="BottomTrainer bar-button" id="experimental-warning">
-        Warning : experimental
       </div>
-      <button id="button-close-trainer" v-on:click="$emit('close-trainer')">╳</button>
+      <div class="BottomTrainer bar-button" v-on:click="compileOptionsClicked">
+        Options
+      </div>
+      <div class="BottomTrainer bar-button" v-on:click="chartsClicked">
+        Charts
+      </div>
+      <div class="BottomTrainer bar-button" v-on:click="trainClicked">
+        {{isTraining ? 'Stop' : 'Train'}}
+      </div>
+      <div id="button-close-trainer" v-on:click="$emit('close-trainer')">╳</div>
     </div>
     <div id="bottom-trainer-selector">
       <keep-alive>
@@ -23,6 +23,11 @@
           class="tab"
           v-model="selectedDataset"
           v-bind:loadableDatasets="loadableDatasets"
+          v-bind:selectedOptimizer="selectedOptimizer"
+          @changeSelectedOptimizer="changeSelectedOptimizer"
+          v-bind:selectableOptimizers="selectableOptimizers"
+          v-bind:epochs="epochs"
+          @changeEpochs="changeEpochs"
         ></component>
       </keep-alive>
     </div>
@@ -39,13 +44,15 @@ import * as Chartist from 'chartist';
 require('@/../node_modules/chartist/dist/chartist.min.css')
 import ChartistPluginTip from '@/lib/chartist-plugin-tip/chartist-plugin-tip';
 
-import DatasetSelector from './DatasetSelector.vue';
 import Charts from './Charts.vue';
+import CompileOptions from './CompileOptions.vue';
+import DatasetSelector from './DatasetSelector.vue';
 
 export default {
   name: 'BottomTrainer',
   components: {
     Charts,
+    CompileOptions,
     DatasetSelector,
   },
   data() {
@@ -53,6 +60,11 @@ export default {
       isTraining: false,
       selectedDataset: 'MNIST',
       loadableDatasets: loadableDatasets(this.cdnDir),
+      selectedOptimizer: 'rmsprop',
+      epochs: 10,
+      selectableOptimizers: [
+        'sgd', 'adagrad', 'adadelta', 'adam', 'adamax', 'rmsprop'
+      ],
       selectedPanel: "DatasetSelector",
     };
   },
@@ -62,6 +74,9 @@ export default {
       this.selectedPanel = "DatasetSelector";
       this.$nextTick(() => {this.$refs.childDatasetSelector.refresh();});
     },
+    compileOptionsClicked() {
+      this.selectedPanel = "CompileOptions";
+    },
     chartsClicked() {
       this.selectedPanel = "Charts";
       this.$nextTick(() => {this.batchChart.update();this.epochChart.update();});
@@ -70,10 +85,18 @@ export default {
       this.chartsClicked();
       this.startTraining();
     },
+    changeSelectedOptimizer(value) {
+      this.selectedOptimizer = value;
+    },
+    changeEpochs(value) {
+      this.epochs = value;
+    },
     async startTraining() {
       if (this.isTraining) return;
       this.isTraining = !this.isTraining;
       window.tf = tf;
+      const optimizer = this.selectedOptimizer;
+      const epochs = this.epochs;
       let createModel;
       try {
         createModel = eval(
@@ -97,7 +120,6 @@ export default {
         this.isTraining = !this.isTraining;
         return;
       }
-      const optimizer = 'rmsprop'; // TODO : allow to set
       model.compile({
         optimizer,
         loss: 'categoricalCrossentropy',
@@ -121,7 +143,7 @@ export default {
         return model.fit(trainXs, trainYs, {
           batchSize: BATCH_SIZE,
           validationData: [testXs, testYs],
-          epochs: 10,
+          epochs: epochs,
           shuffle: true,
           callbacks: fitCallbacks,
         });
@@ -241,17 +263,17 @@ export default {
   cursor: default;
   font-family: "Roboto Thin";
   font-size: 15px;
-  overflow: hidden;
   border-top: 1px solid rgba(100, 100, 100, 0.3);
   display: grid;
-  grid-template-rows: 26px 1fr;
+  grid-template-rows: 24px 1fr;
 }
 #trainer-bar {
+  display: table;
+  table-layout: fixed;
   grid-rows: 1/2;
-  min-height: 26px;
-  overflow: hidden;
   border-bottom: 1px solid rgba(100, 100, 100, 0.3);
   background-color: rgba(100, 100, 100, 0.2);
+  width: 100%;
 }
 #trainer-bar > * {
   background-color: rgba(100, 100, 100, 0);
@@ -260,29 +282,27 @@ export default {
   background-color: rgba(100, 100, 100, 0.1);
 }
 .BottomTrainer.bar-button{
-  float: left;
-  height: 26px;
-  width: 166px;
+  display: table-cell;
+  height: 100%;
   border-radius: 0;
   border: none;
   border-right: 1px solid rgba(100, 100, 100, 0.3);
-  background-color: rgba(100, 100, 100, 0);
-  padding-left: 10px;
-}
-#experimental-warning {
-  border: none;
-  padding-left: 30px;
-}
-#experimental-warning:hover {
-  background-color: rgba(100, 100, 100, 0.0);
+  line-height: 24px; /* Vertical align text*/
 }
 #button-close-trainer{
-  float: right;
+  display: table-cell;
   border: none;
-  line-height: 26px;
-  transform: translate(0, -12%);
+  width: 30px;
 }
 #bottom-trainer-selector {
   grid-rows: 2/2;
+}
+.BottomTrainer select, .BottomTrainer input {
+  border: 1px solid rgba(100, 100, 100, 0.3);
+  height: 26px;
+  width: auto;
+  border-radius: 0;
+  background-color: rgba(100, 100, 100, 0);
+  box-sizing: border-box; /* Needed so that input and select sizes are equals */
 }
 </style>

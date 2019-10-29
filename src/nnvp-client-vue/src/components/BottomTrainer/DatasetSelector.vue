@@ -2,7 +2,7 @@
   <div id="DatasetSelector" class="DatasetSelector">
     <div id="dataset-selector-and-description">
       <select
-        class="BottomTrainer dataset-select"
+        class="DatasetSelector dataset-select"
         v-bind:value="value"
         v-on:change="datasetSet($event.target.value)"
       >
@@ -105,13 +105,8 @@ export default {
 #samples-container {
   grid-columns: 2/2;
 }
-.dataset-select {
-  border: 1px solid rgba(100, 100, 100, 0.3);
+.DatasetSelector.dataset-select {
   float: left;
-  height: 26px;
-  width: auto;
-  border-radius: 0;
-  background-color: rgba(100, 100, 100, 0);
   padding-left: 10px;
   margin: 20px 10px 15px 10px;
 }
