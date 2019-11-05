@@ -2,6 +2,7 @@
   <div class="parameter-block">
     <label>
       {{name}}
+      <div class="list-parameter reset-button" v-on:click="resetParamFromKerasLayer">╳</div>
       <div class="parameter-select list-parameter">
         <select v-model="selectedParameterValue" @change="updateParamFromKerasLayer">
           <option v-bind:key="item" v-for="item in valueList" v-bind:value="item">{{item}}</option>
@@ -28,6 +29,10 @@ export default {
     updateParamFromKerasLayer() {
       this.activeLayer.setParameterValue(this.name, this.selectedParameterValue);
     },
+    resetParamFromKerasLayer() {
+      this.activeLayer.deleteParameterValue(this.name, this.selectedParameterValue);
+      this.selectedParameterValue = undefined;
+    },
   },
 };
 </script>
@@ -39,5 +44,13 @@ export default {
 }
 .parameter-select.list-parameter > select {
   width: 100%;
+}
+.list-parameter.reset-button {
+  float: right;
+  visibility: hidden;
+  font-size: small;
+}
+:hover > * > .list-parameter.reset-button {
+  visibility: visible;
 }
 </style>

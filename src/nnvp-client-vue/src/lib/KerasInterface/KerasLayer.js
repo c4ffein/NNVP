@@ -19,6 +19,10 @@ export default class {
     this.parameterValues[parameterName] = parameterValue;
   }
 
+  deleteParameterValue(parameterName) {
+    delete this.parameterValues[parameterName];
+  }
+
   getParameter() {
     return this.parameterDef;
   }
