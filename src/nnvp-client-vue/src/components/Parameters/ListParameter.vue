@@ -16,12 +16,11 @@ export default {
   name: 'ListParameter',
   props: {
     name: String,
-    value: {},
+    valueList: {},
     activeLayer: null,
   },
   data() {
     return {
-      valueList: this.value,
       selectedParameterValue: this.activeLayer.parameterValues[this.name],
     };
   },

@@ -7,51 +7,22 @@
         v-bind:key="selectedLayer.id"
         v-bind:title="selectedLayer.kerasLayer.name"
       >
-        <div class="RightBar param"
+        <component class="RightBar param"
           :key="paramK"
           v-for="(paramV, paramK) in selectedLayer.kerasLayer.parameterDef"
-        >
-          <ListParameter
-            v-if="isListType(paramV)"
-            v-bind:name="paramK"
-            v-bind:value="paramV.list"
-            v-bind:activeLayer="selectedLayer.kerasLayer"
-          />
-          <IntParameter
-            v-if="isIntType(paramV)"
-            v-bind:name="paramK"
-            v-bind:activeLayer="selectedLayer.kerasLayer"
-            v-bind:conditions="paramV.conditions"
-          />
-          <BooleanParameter
-            v-if="isBooleanType(paramV)"
-            v-bind:name="paramK"
-            v-bind:activeLayer="selectedLayer.kerasLayer"
-          />
-          <TupleIntParameter
-            v-if="isTupleIntType(paramV)"
-            v-bind:name="paramK"
-            v-bind:activeLayer="selectedLayer.kerasLayer"
-          />
-          <FloatParameter
-            v-if="isFloatType(paramV)"
-            v-bind:name="paramK"
-            v-bind:activeLayer="selectedLayer.kerasLayer"
-            v-bind:conditions="paramV.conditions"
-          />
-          <StringParameter
-            v-if="isStringTypeOrTypeSelecter(paramV)"
-            v-bind:name="paramK"
-            v-bind:activeLayer="selectedLayer.kerasLayer"
-          />
-          <OrderParameter
-            v-if="isMergeLayer(selectedLayer.kerasLayer.category)"
-            v-bind:title="paramK"
-            v-bind:itemList="selectedLayer.inputLayers"
-            v-bind:idFunc="e => e"
-            v-bind:nameFunc="e => $d3Interface.getLayerById(e).kerasLayer.name"
-          />
-        </div>
+          v-bind:is="parameterToComponentName(paramV)"
+          v-bind:name="paramK"
+          v-bind:valueList="paramV.list"
+          v-bind:activeLayer="selectedLayer.kerasLayer"
+          v-bind:conditions="paramV.conditions"
+        ></component>
+        <OrderParameter
+          v-if="isMergeLayer(selectedLayer.kerasLayer.category)"
+          v-bind:title="selectedLayer.kerasLayer.parameterDef[1]"
+          v-bind:itemList="selectedLayer.inputLayers"
+          v-bind:idFunc="e => e"
+          v-bind:nameFunc="e => $d3Interface.getLayerById(e).kerasLayer.name"
+        />
         <div v-if="index != selectedNode.e.length - 1">
           <br>
         </div>
@@ -142,23 +113,17 @@ export default {
           && this.selectedNode.e !== null
           && this.selectedNode.e.length > 0;
     },
-    isFloatType(parameter) {
-      return parameter.type === 'float';
-    },
-    isIntType(parameter) {
-      return parameter.type === 'int';
-    },
-    isTupleIntType(parameter) {
-      return parameter.type === 'tuple_int';
-    },
-    isListType(parameter) {
-      return parameter.type === 'list';
-    },
-    isBooleanType(parameter) {
-      return parameter.type === 'boolean';
-    },
-    isStringTypeOrTypeSelecter(parameter) {
-      return (parameter.type === 'string') || (parameter.type === 'type_selecter');
+    parameterToComponentName(parameter) {
+      const typeToName = {
+        float: 'FloatParameter',
+        int: 'IntParameter',
+        tuple_int: 'TupleIntParameter',
+        list: 'ListParameter',
+        boolean: 'BooleanParameter',
+        string: 'StringParameter',
+        type_selecter: 'StringParameter',
+      };
+      return typeToName[parameter.type];
     },
     isMergeLayer(nodeCategory) {
       return nodeCategory === 'Merge';
