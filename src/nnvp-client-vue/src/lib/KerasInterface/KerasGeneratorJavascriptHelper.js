@@ -62,7 +62,7 @@ export default class KerasGeneratorJavascriptHelper {
           paramString += `${paramName}:'${value[0]}',`;
         } else paramString += `${paramName}:${this.generateTuple(value)},`;
       } else if (typeof value === 'boolean') {
-        paramString += `${paramName}:${value ? 'True' : 'False'},`;
+        paramString += `${paramName}:${value ? 'true' : 'false'},`;
       } else {
         paramString += `${paramName}:${value},`;
       }
