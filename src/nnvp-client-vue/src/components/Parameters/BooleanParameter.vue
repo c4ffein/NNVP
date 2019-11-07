@@ -6,10 +6,12 @@
       </div>
       <select
         class="parameter-select parameter-boolean"
-        v-model="valueSelected"
+        v-bind:class="{greyed: selectedValue === undefined}"
+        v-bind:value="selectedValue"
         v-on:click="switchValue()"
         v-on:mousedown="$event.preventDefault()"
       >
+        <option value=undefined>{{defaultValue}}</option>
         <option value=true>True</option>
         <option value=false>False</option>
       </select>
@@ -23,23 +25,25 @@ export default {
   props: {
     name: String,
     value: Boolean,
+    defaultValue: [Boolean, undefined],
     activeLayer: null,
   },
   data() {
     return {
-      valueSelected: this.activeLayer.parameterValues[this.name],
+      selectedValue: this.activeLayer.parameterValues[this.name],
     };
   },
   methods: {
     switchValue() {
-      if (this.activeLayer.parameterValues[this.name] === true) {
+      if (this.activeLayer.parameterValues[this.name] === true || (
+        this.activeLayer.parameterValues[this.name] === undefined && this.defaultValue === true)
+      ) {
         this.activeLayer.setParameterValue(this.name, false);
       } else this.activeLayer.setParameterValue(this.name, true);
-      this.valueSelected = this.activeLayer.parameterValues[this.name];
+      this.selectedValue = this.activeLayer.parameterValues[this.name];
     },
   },
 };
-// TODO Maybe manage int range in the component getting spec from parameter Details
 </script>
 
 <style >
@@ -55,6 +59,9 @@ label.parameter-boolean {
   appearance: none;
   width: 100%;
   align-items: center;
+}
+.parameter-select.parameter-boolean.greyed {
+  color: rgba(0, 0, 0, 0.5);
 }
 .parameter-name-text.parameter-boolean {
   padding-right:4px;
