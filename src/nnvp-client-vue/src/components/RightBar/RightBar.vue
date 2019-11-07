@@ -13,7 +13,7 @@
           v-bind:is="parameterToComponentName(paramV)"
           v-bind:name="paramK"
           v-bind:valueList="paramV.list"
-          v-bind:defaultValue="paramV.default/*undefined*/"
+          v-bind:defaultValue="paramV.default"
           v-bind:activeLayer="selectedLayer.kerasLayer"
           v-bind:conditions="paramV.conditions"
         ></component>

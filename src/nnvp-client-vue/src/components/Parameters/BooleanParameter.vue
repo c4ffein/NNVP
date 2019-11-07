@@ -6,12 +6,12 @@
       </div>
       <select
         class="parameter-select parameter-boolean"
-        v-bind:class="{greyed: selectedValue === undefined}"
+        v-bind:class="{greyed: selectedValue === 'void'}"
         v-bind:value="selectedValue"
         v-on:click="switchValue()"
         v-on:mousedown="$event.preventDefault()"
       >
-        <option value=undefined>{{defaultValue}}</option>
+        <option value=void>{{defaultValue}}</option>
         <option value=true>True</option>
         <option value=false>False</option>
       </select>
@@ -30,7 +30,8 @@ export default {
   },
   data() {
     return {
-      selectedValue: this.activeLayer.parameterValues[this.name],
+      selectedValue: this.activeLayer.parameterValues[this.name] !== undefined
+        ? this.activeLayer.parameterValues[this.name] : 'void', // Ugly, needed for select
     };
   },
   methods: {
