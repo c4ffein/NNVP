@@ -53,7 +53,8 @@
                 ]
             },
             "use_bias": {
-                "type": "boolean"
+                "type": "boolean",
+                "default": true
             },
             "kernel_initializer": {
                 "type": "list",
@@ -97,7 +98,8 @@
                     "he_normal",
                     "lecun_normal",
                     "he_uniform"
-                ]
+                ],
+                "default": "Zeros"
             },
             "kernel_regularizer": {
                 "type": "list",
@@ -2106,7 +2108,8 @@
                     "sigmoid",
                     "hard_sigmoid",
                     "linear"
-                ]
+                ],
+                "default": "tanh"
             },
             "use_bias": {
                 "type": "boolean"
@@ -2303,7 +2306,8 @@
                     "sigmoid",
                     "hard_sigmoid",
                     "linear"
-                ]
+                ],
+                "default": "tanh"
             },
             "reccurent_activation": {
                 "type": "list",
@@ -2319,7 +2323,8 @@
                     "sigmoid",
                     "hard_sigmoid",
                     "linear"
-                ]
+                ],
+                "default": "hard_sigmoid"
             },
             "use_bias": {
                 "type": "boolean"
@@ -2526,7 +2531,8 @@
                     "sigmoid",
                     "hard_sigmoid",
                     "linear"
-                ]
+                ],
+                "default": "tanh"
             },
             "reccurent_activation": {
                 "type": "list",
@@ -2982,7 +2988,8 @@
                     "sigmoid",
                     "hard_sigmoid",
                     "linear"
-                ]
+                ],
+                "default": "tanh"
             },
             "use_bias": {
                 "type": "boolean"
@@ -3155,7 +3162,8 @@
                     "sigmoid",
                     "hard_sigmoid",
                     "linear"
-                ]
+                ],
+                "default": "tanh"
             },
             "reccurent_activation": {
                 "type": "list",
