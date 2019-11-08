@@ -58,6 +58,7 @@ export default {
   data() {
     return {
       isTraining: false,
+      cancelRequested: false,
       selectedDataset: 'MNIST',
       loadableDatasets: loadableDatasets(this.cdnDir),
       selectedOptimizer: 'rmsprop',
@@ -81,9 +82,16 @@ export default {
       this.selectedPanel = "Charts";
       this.$nextTick(() => {this.batchChart.update();this.epochChart.update();});
     },
-    trainClicked() {
+    async trainClicked() {
+      if (this.isTraining) {
+        this.cancelRequested = true;
+        return
+      }
       this.chartsClicked();
-      this.startTraining();
+      this.isTraining = true;
+      await this.startTraining();
+      this.cancelRequested = false;
+      this.isTraining = false;
     },
     changeSelectedOptimizer(value) {
       this.selectedOptimizer = value;
@@ -92,8 +100,6 @@ export default {
       this.epochs = value;
     },
     async startTraining() {
-      if (this.isTraining) return;
-      this.isTraining = !this.isTraining;
       window.tf = tf;
       const optimizer = this.selectedOptimizer;
       const epochs = this.epochs;
@@ -106,7 +112,6 @@ export default {
       catch (error) {
         alert("Incorrect network : couldn't find Inputs/Outputs, or they weren't connected.");
         console.log(error);
-        this.isTraining = !this.isTraining;
         return;
       }
       let model;
@@ -117,7 +122,6 @@ export default {
         // Param errors
         alert(error);
         console.log(error);
-        this.isTraining = !this.isTraining;
         return;
       }
       model.compile({
@@ -148,18 +152,16 @@ export default {
           callbacks: fitCallbacks,
         });
       }
-      function resetChart(chart) {
-        return;
-      }
       const chartData0 = this.chartData0;
       const chartData1 = this.chartData1;
-      async function watchTraining(batchChart, epochChart) {
+      const watchTraining = async (batchChart, epochChart, cancelRequestedContainer) => {
         const batchLabels = [];
         const batchMetrics = { loss: [], acc: [] };
         const epochLabels = [];
         const epochMetrics = { loss: [], val_loss: [], acc: [], val_acc: [] };
         const callbacks = {
           onBatchEnd(batchNumber, s) {
+            if (cancelRequestedAccessor()) throw "cancelRequested";
             batchLabels.push(batchNumber);
             batchMetrics.loss.push(s.loss);
             batchMetrics.acc.push(s.acc);
@@ -179,6 +181,7 @@ export default {
             batchChart.update(chartData0, addedOptions, true);
           },
           onEpochEnd(epochNumber, s) {
+            if (cancelRequestedAccessor()) throw "cancelRequested";
             epochLabels.push(epochNumber);
             epochMetrics.loss.push(s.loss);
             epochMetrics.acc.push(s.acc);
@@ -204,15 +207,14 @@ export default {
         }
         return train(model, data, callbacks);
       }
-      resetChart(this.batchChart);
-      resetChart(this.epochChart);
+      const cancelRequestedAccessor = () => this.cancelRequested;
       try {
-        await watchTraining(this.batchChart, this.epochChart);
+        await watchTraining(this.batchChart, this.epochChart, cancelRequestedAccessor);
       }
       catch (error) {
+        if (error == "cancelRequested") return;
         alert(error);
       }
-      this.isTraining = !this.isTraining;
     },
     async loadDataset(name) {
       // TODO : change behaviour when already loading
@@ -228,9 +230,6 @@ export default {
         await newDataset.load();
         this.datasets[name] = newDataset;
       }
-    },
-    switch() {
-      this.isTraining = !this.isTraining;
     },
   },
   props: {
