@@ -133,17 +133,18 @@ export default {
       const datasetName = this.selectedDataset;
       await this.loadDataset(datasetName);
       const data = this.datasets[datasetName];
+      const shape = this.datasets[datasetName].shape;
       async function train(model, data, fitCallbacks) {
         const BATCH_SIZE = 64;
         const trainDataSize = 500;
         const testDataSize = 100;
         const [trainXs, trainYs] = tf.tidy(() => {
           const d = data.nextTrainBatch(trainDataSize);
-          return [d.xs.reshape([trainDataSize, 28, 28, 1]), d.labels];
+          return [d.xs.reshape([trainDataSize, ...shape]), d.labels];
         });
         const [testXs, testYs] = tf.tidy(() => {
           const d = data.nextTestBatch(testDataSize);
-          return [d.xs.reshape([testDataSize, 28, 28, 1]), d.labels];
+          return [d.xs.reshape([testDataSize, ...shape]), d.labels];
         });
         return model.fit(trainXs, trainYs, {
           batchSize: BATCH_SIZE,
@@ -176,9 +177,12 @@ export default {
         const newDataset = new Dataset(
           this.loadableDatasets[name][0].imagesSpritePath,
           this.loadableDatasets[name][0].imagesSpriteChecksum,
+          this.loadableDatasets[name][0].shape,
           this.loadableDatasets[name][0].labelsPath,
           this.loadableDatasets[name][0].labelsChecksum,
-          this.loadableDatasets[name][0].imageSize,
+          10,
+          this.loadableDatasets[name][0].numDatasetElements,
+          this.loadableDatasets[name][0].numTrainElements,
         );
         await newDataset.load();
         this.datasets[name] = newDataset;

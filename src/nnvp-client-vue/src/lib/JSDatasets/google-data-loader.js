@@ -19,11 +19,6 @@
 
 import * as tf from '@tensorflow/tfjs';
 
-const NUM_CLASSES = 10;
-const NUM_DATASET_ELEMENTS = 65000;
-
-const NUM_TRAIN_ELEMENTS = 55000;
-
 /**
  * A class that fetches the sprited MNIST dataset and returns shuffled batches.
  *
@@ -34,39 +29,43 @@ export default class Dataset {
   constructor(
     imagesSpritePath,
     imagesSpriteChecksum = null,
+    shape = null,
     labelsPath,
     labelsSha256 = null,
-    imageSize,
-    numClasses = NUM_CLASSES,
-    numDatasetElements = NUM_DATASET_ELEMENTS,
-    numTrainElements = NUM_TRAIN_ELEMENTS,
+    numClasses,
+    numDatasetElements,
+    numTrainElements,
     numTestElements,
   ) {
     this.imagesSpritePath = imagesSpritePath;
     this.checksum = imagesSpriteChecksum;
+    this.shape = shape;
     this.labelsPath = labelsPath;
     this.labelsSha256 = labelsSha256;
-    this.imageSize = imageSize;
     this.numClasses = numClasses;
     this.numDatasetElements = numDatasetElements;
     this.numTrainElements = numTrainElements;
     this.numTestElements = numTestElements || this.numDatasetElements - this.numTrainElements;
     this.shuffledTrainIndex = 0;
     this.shuffledTestIndex = 0;
+    this.imagePixelSize = this.shape[0] * this.shape[1];
+    this.imageByteSize = this.shape.reduce((a, b) => a * b);
   }
 
   async load() {
-    const datasetBytesBuffer = new ArrayBuffer(this.numDatasetElements * this.imageSize * 4);
+    const datasetBytesBuffer = new ArrayBuffer(
+      this.numDatasetElements * this.imageByteSize * 4
+    );
     let imgRequests = null;
     if(typeof(this.imagesSpritePath) === "string") imgRequests = this.buildImgRequest(
         this.imagesSpritePath, 0, this.numDatasetElements, this.checksum, datasetBytesBuffer
     );
     else if(Array.isArray(this.imagesSpritePath)){
       imgRequests = this.imagesSpritePath.map(
-        ([offset, size, currentSpritePath], index) => this.buildImgRequest(
+        ([offset, nbElem, currentSpritePath], index) => this.buildImgRequest(
           currentSpritePath,
           offset,
-          size,
+          nbElem,
           this.checksum ? this.checksum[index] : null,
           datasetBytesBuffer,
         )
@@ -84,13 +83,13 @@ export default class Dataset {
     this.testIndices = tf.util.createShuffledIndices(this.numTestElements);
 
     // Slice the the images and labels into train and test sets.
-    this.trainImages = this.datasetImages.slice(0, this.imageSize * this.numTrainElements);
-    this.testImages = this.datasetImages.slice(this.imageSize * this.numTrainElements);
+    this.trainImages = this.datasetImages.slice(0, this.imageByteSize * this.numTrainElements);
+    this.testImages = this.datasetImages.slice(this.imageByteSize * this.numTrainElements);
     this.trainLabels = this.datasetLabels.slice(0, this.numClasses * this.numTrainElements);
     this.testLabels = this.datasetLabels.slice(this.numClasses * this.numTrainElements);
   }
 
-  buildImgRequest(imagesSpritePath, offset, size, imagesSpriteChecksum, datasetBytesBuffer) {
+  buildImgRequest(imagesSpritePath, offset, nbElem, imagesSpriteChecksum, datasetBytesBuffer) {
     return fetch(
       imagesSpritePath, imagesSpriteChecksum ? {integrity: imagesSpriteChecksum} : {}
     ).then(response => {
@@ -106,27 +105,33 @@ export default class Dataset {
     }).then(img => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
-      const chunkSize = 5000;
+      const chunkLength = 1000;
       canvas.width = img.width;
-      canvas.height = chunkSize;
+      canvas.height = chunkLength * this.shape[2];
 
-      for (let i = 0; i < size / chunkSize; i++) {
-        const actualSize = i * chunkSize > size ? (1 - i) * chunkSize + size : chunkSize;
-        const datasetBytesView = new Float32Array(
-          datasetBytesBuffer,
-          i * this.imageSize * chunkSize * 4 + offset * this.imageSize * 4,
-          this.imageSize * chunkSize,
+      for (let i = 0; i < nbElem / chunkLength; i++) {
+        const viewStart = (i * chunkLength + offset) * this.imageByteSize * 4;
+        const viewLength = Math.min(
+          chunkLength * this.imageByteSize * 4,
+          (nbElem - i * chunkLength) * this.imageByteSize * 4,
         );
-        ctx.drawImage(
-          img, 0, i * chunkSize, img.width, actualSize, 0, 0, img.width, actualSize
-        );
+
+        const datasetBytesView = new Float32Array(datasetBytesBuffer, viewStart, viewLength / 4);
+        ctx.drawImage(img, 0, i * chunkLength, img.width, viewLength, 0, 0, img.width, viewLength);
 
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-        for (let j = 0; j < imageData.data.length / 4; j++) {
-          // All channels hold an equal value since the image is grayscale, so
-          // just read the red channel.
-          datasetBytesView[j] = imageData.data[j * 4] / 255;
+        if (this.shape[2] == 1) { // All channels hold an equal value since the image is grayscale,
+          // so just read the red channel.
+          for (let j = 0; j < imageData.data.length / 4; j++) {
+            datasetBytesView[j] = imageData.data[j * 4] / 255;
+          }
+        }
+        else {
+          for (let j = 0; j < imageData.data.length; j++) {
+            if ((j+1)%4 !== 0) {
+              datasetBytesView[Math.floor((j + 1) * 3 / 4)] = imageData.data[j] / 255;
+            }
+          }
         }
       }
     });
@@ -149,20 +154,20 @@ export default class Dataset {
   }
 
   nextBatch(batchSize, data, index) {
-    const batchImagesArray = new Float32Array(batchSize * this.imageSize);
+    const batchImagesArray = new Float32Array(batchSize * this.imageByteSize);
     const batchLabelsArray = new Uint8Array(batchSize * this.numClasses);
 
     for (let i = 0; i < batchSize; i++) {
       const idx = index();
 
-      const image = data[0].slice(idx * this.imageSize, idx * this.imageSize + this.imageSize);
-      batchImagesArray.set(image, i * this.imageSize);
+      const image = data[0].slice(idx * this.imageByteSize, (idx + 1) * this.imageByteSize);
+      batchImagesArray.set(image, i * this.imageByteSize);
 
       const label = data[1].slice(idx * this.numClasses, idx * this.numClasses + this.numClasses);
       batchLabelsArray.set(label, i * this.numClasses);
     }
 
-    const xs = tf.tensor2d(batchImagesArray, [batchSize, this.imageSize]);
+    const xs = tf.tensor2d(batchImagesArray, [batchSize, this.imageByteSize]);
     const labels = tf.tensor2d(batchLabelsArray, [batchSize, this.numClasses]);
 
     return { xs, labels };

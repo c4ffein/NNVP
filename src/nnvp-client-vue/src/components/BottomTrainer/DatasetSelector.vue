@@ -48,15 +48,16 @@ export default {
         return;
       }
       drawArea.innerHTML = '';
-      const examples = this.$parent.datasets[name].nextTestBatch(40);
+      const datasets = this.$parent.datasets[name];
+      const examples = datasets.nextTestBatch(40);
       const numExamples = examples.xs.shape[0];
       for (let i = 0; i < numExamples; i += 1) {
         const imageTensor = tf.tidy(
-          () => examples.xs.slice([i, 0], [1, examples.xs.shape[1]]).reshape([28, 28, 1]),
+          () => examples.xs.slice([i, 0], [1, examples.xs.shape[1]]).reshape(datasets.shape),
         );
         const canvas = document.createElement('canvas');
-        canvas.width = 28;
-        canvas.height = 28;
+        canvas.width = datasets.shape[0]; // eslint-disable-line prefer-destructuring
+        canvas.height = datasets.shape[1]; // eslint-disable-line prefer-destructuring
         canvas.style = 'margin: 4px;';
         await tf.browser.toPixels(imageTensor, canvas); // eslint-disable-line
         drawArea.appendChild(canvas);
