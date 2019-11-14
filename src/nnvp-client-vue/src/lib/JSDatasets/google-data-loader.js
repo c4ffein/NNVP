@@ -52,29 +52,39 @@ export default class Dataset {
     this.imageByteSize = this.shape.reduce((a, b) => a * b);
   }
 
-  async load() {
-    const datasetBytesBuffer = new ArrayBuffer(
-      this.numDatasetElements * this.imageByteSize * 4
-    );
+  async load(progressionCallback) {
+    let total = 1; // For label request
+    let loaded = 0;
+    const incLoaded = () => {
+      loaded = loaded + 1;
+      if (progressionCallback) progressionCallback(loaded / total);
+    };
+    const datasetBytesBuffer = new ArrayBuffer(this.numDatasetElements * this.imageByteSize * 4);
     let imgRequests = null;
-    if(typeof(this.imagesSpritePath) === "string") imgRequests = this.buildImgRequest(
+    if(typeof(this.imagesSpritePath) === "string") {
+      imgRequests = this.buildImgRequest(
         this.imagesSpritePath, 0, this.numDatasetElements, this.checksum, datasetBytesBuffer
-    );
+      ).then(incLoaded)
+      total = 1;
+    }
     else if(Array.isArray(this.imagesSpritePath)){
       imgRequests = this.imagesSpritePath.map(
-        ([offset, nbElem, currentSpritePath], index) => this.buildImgRequest(
-          currentSpritePath,
-          offset,
-          nbElem,
-          this.checksum ? this.checksum[index] : null,
-          datasetBytesBuffer,
-        )
+        ([offset, nbElem, currentSpritePath], index) => {
+          total = total + 1;
+          return this.buildImgRequest(
+            currentSpritePath,
+            offset,
+            nbElem,
+            this.checksum ? this.checksum[index] : null,
+            datasetBytesBuffer,
+          ).then(incLoaded)
+        }
       );
     }
     this.datasetImages = new Float32Array(datasetBytesBuffer);
     const labelsRequest = fetch(this.labelsPath, {integrity: this.labelsSha256}).then(
       async response => {this.datasetLabels = new Uint8Array(await response.arrayBuffer());}
-    );
+    ).then(incLoaded);
     await Promise.all([...imgRequests, labelsRequest]);
 
     // Create shuffled indices into the train/test set for when we select a
