@@ -154,5 +154,6 @@ export default (cdnDir) => {return{
     'The CIFAR-10 dataset contains 60,000 32x32 color images in 10 different classes : ' +
     'airplanes, cars, birds, cats, deer, dogs, frogs, horses, ships, and trucks. ' +
     'Please provide a [32, 32, 3] input shape.',
+    'This dataset is particularly heavy for web browsers. Are you sure you want to load it?',
   ],
 };};
