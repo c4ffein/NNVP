@@ -2,6 +2,7 @@
   <div id="DatasetSelector" class="DatasetSelector">
     <div id="dataset-selector-and-description">
       <select
+        id="dataset-selector-selector"
         class="DatasetSelector dataset-select"
         v-bind:value="value"
         v-on:change="datasetSet($event.target.value)"
@@ -35,9 +36,18 @@ export default {
   },
   methods: {
     async datasetSet(name) {
+      const warningMessage = this.$parent.getWarningMessage(name);
+      if (warningMessage) {
+        // TODO : better than confirm
+        if (!confirm(warningMessage)) { // eslint-disable-line
+          document.getElementById('dataset-selector-selector').value = this.value;
+          this.value = this.newestSelected;
+          return;
+        }
+      }
       this.newestSelected = name;
       this.$emit('input', name);
-      this.$parent.loadDataset(name).then(() => this.fillSamples(name));
+      this.$parent.loadDataset(name /* x => console.log(x) */).then(() => this.fillSamples(name));
     },
     // Mostly from https://storage.googleapis.com/tfjs-vis/mnist/dist/index.html
     async fillSamples(name) {

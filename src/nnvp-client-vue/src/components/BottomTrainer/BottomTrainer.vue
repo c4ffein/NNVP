@@ -170,7 +170,7 @@ export default {
         alert(error);
       }
     },
-    async loadDataset(name) {
+    async loadDataset(name, progressionCallback) {
       // TODO : change behaviour when already loading
       this.datasets = this.datasets || {};
       if (!(name in this.datasets)){
@@ -184,9 +184,12 @@ export default {
           this.loadableDatasets[name][0].numDatasetElements,
           this.loadableDatasets[name][0].numTrainElements,
         );
-        await newDataset.load();
+        await newDataset.load(progressionCallback);
         this.datasets[name] = newDataset;
       }
+    },
+    getWarningMessage(name, progressionCallback) {
+      if (this.loadableDatasets[name].length >= 3) return this.loadableDatasets[name][2];
     },
   },
   props: {
