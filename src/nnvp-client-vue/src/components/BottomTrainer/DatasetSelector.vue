@@ -17,7 +17,13 @@
     </div>
     <div id="samples-container">
       <div id="samples-title"></div>
-      <div id="samples"></div>
+      <div v-if="loadingShown" id="data-selector-loading-bar-container">
+        <div
+          id="data-selector-loading-bar-contained"
+          v-bind:style="{width: loadingPercentage * 100 + '%'}"
+        ></div>
+      </div>
+      <div v-bind:style="{display: loadingShown ? 'none' : 'block'}" id="samples"></div>
     </div>
   </div>
 </template>
@@ -32,6 +38,9 @@ export default {
     return {
       newestSelected: null, // Needed to simplify access before propagation
       neededSamples: null,
+      loadingToken: null, // Will not be needed anymore when loading will be cancellable
+      loadingPercentage: 0,
+      loadingShown: true,
     };
   },
   methods: {
@@ -47,7 +56,20 @@ export default {
       }
       this.newestSelected = name;
       this.$emit('input', name);
-      this.$parent.loadDataset(name /* x => console.log(x) */).then(() => this.fillSamples(name));
+      const randomChecker = Math.random(); // TODO : better solution than using a token
+      this.loadingToken = randomChecker;
+      this.loadingShown = true;
+      const updateProgressCheckRandom = (progress, random) => {
+        if (random !== this.loadingToken) return;
+        this.loadingShown = true;
+        this.loadingPercentage = progress;
+      };
+      this.$parent.loadDataset(name, x => updateProgressCheckRandom(x, randomChecker))
+        .then(async () => {
+          if (this.loadingToken !== randomChecker) return;
+          await this.fillSamples(name);
+          this.loadingShown = false;
+        });
     },
     // Mostly from https://storage.googleapis.com/tfjs-vis/mnist/dist/index.html
     async fillSamples(name) {
@@ -81,7 +103,9 @@ export default {
   },
   mounted() {
     this.newestSelected = this.value;
-    setTimeout(() => this.datasetSet(this.newestSelected), 3000);
+    setTimeout(() => {
+      if (this.newestSelected === this.value) this.datasetSet(this.newestSelected);
+    }, 3000);
   },
 };
 </script>
@@ -116,10 +140,24 @@ export default {
 #samples-container {
   grid-columns: 2/2;
 }
+#data-selector-loading-bar-container {
+  background-color: rgba(100, 100, 100, 0.3);
+  width: calc(100% - 40px);
+  height: 23px;
+  box-sizing: border-box;
+  padding: 1px;
+  margin: 20px;
+}
+#data-selector-loading-bar-contained {
+  background-color: rgba(255, 255, 255, 1);
+  height: 100%;
+}
 .DatasetSelector.dataset-select {
   float: left;
   padding-left: 10px;
   margin: 20px 10px 15px 10px;
+  height: 23px;
+  box-sizing: border-box;
 }
 #dataset-description {
   margin: 0px 10px 10px 10px;
