@@ -189,7 +189,9 @@ export default {
       }
     },
     getWarningMessage(name, progressionCallback) {
-      if (this.loadableDatasets[name].length >= 3) return this.loadableDatasets[name][2];
+      if (this.loadableDatasets[name].length >= 3 && !this.datasets[name]) {
+        return this.loadableDatasets[name][2];
+      }
     },
   },
   props: {
