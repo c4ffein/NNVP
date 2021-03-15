@@ -125,9 +125,9 @@ D3Edge.prototype.drawEdge = function (d3node, graph) {
   D3GraphValidation.isolated(graph, this.target);
 
   gElement
-    .on("click", () => {
+    .on("click", event => {
       graph.selectEdge(thisEdge);
-      d3.event.stopPropagation();
+      event.stopPropagation();
     });
 
 };
@@ -174,7 +174,10 @@ D3Edge.moveDragLine = function (dragline, source, target) {
 
 D3Edge.pathAttrD = function (edge) {
   let sourceP, targetP;
-  if(Math.abs(edge.source.x - edge.target.x) - (edge.source.x < edge.target.x ? edge.source.width : edge.target.width) < Math.abs(edge.source.y - edge.target.y) - edge.source.height) {
+  if(Math.abs(
+    edge.source.x - edge.target.x) - (edge.source.x < edge.target.x ? edge.source.width : edge.target.width)
+    < Math.abs(edge.source.y - edge.target.y) - edge.source.height
+  ) {
     targetP = edge.source.y < edge.target.y ?
       { x: edge.target.x + (edge.target.width/2), y: edge.target.y} :
       { x: edge.target.x + (edge.target.width/2), y: edge.target.y + edge.target.height };
@@ -191,7 +194,13 @@ D3Edge.pathAttrD = function (edge) {
     sourceP = edge.source.x < edge.target.x ?
       { x: edge.source.x + edge.source.width, y: edge.source.y + (edge.source.height / 2) } :
       { x: edge.source.x, y: edge.source.y + (edge.source.height / 2) };
-    if(Math.abs(edge.target.x - edge.source.x) > (Math.abs(edge.target.y - edge.source.y) + (edge.source.width > edge.target.width ? edge.source.width/2 : edge.target.width/2))) {
+    if(
+      Math.abs(edge.target.x - edge.source.x)
+      > (
+        Math.abs(edge.target.y - edge.source.y)
+        + (edge.source.width > edge.target.width ? edge.source.width/2 : edge.target.width/2)
+      )
+    ) {
       let xMiddle = sourceP.x + ((targetP.x - sourceP.x)/2);
       return D3Edge.pathFromPoints(sourceP, [xMiddle, sourceP.y], [xMiddle, targetP.y], targetP);
     } else {

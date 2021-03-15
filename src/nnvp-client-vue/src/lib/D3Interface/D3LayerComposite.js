@@ -269,27 +269,27 @@ D3LayerComposite.prototype.drawLayer = function (graph) {
 
   /*
   gElement
-    .on("click", () => {
+    .on("click", event => {
       if (graph.lastKeyDown === D3GraphEditor.CTRL_KEY) {
         graph.selectOnNode.call(graph, this);
       }
       else {
         graph.singleSelection.call(graph, this);
       }
-      d3.event.stopPropagation();
+      event.stopPropagation();
     })
   */
 
   this.setDrag(graph, gElement);
 
-  gElement.select("rect.open").on("click", () => {
+  gElement.select("rect.open").on("click", event => {
     this.open(graph);
-    d3.event.stopPropagation();
+    event.stopPropagation();
   });
 
-  gElement.select("text.open").on("click", () => {
+  gElement.select("text.open").on("click", event => {
     this.open(graph);
-    d3.event.stopPropagation();
+    event.stopPropagation();
   });
 
   D3Background.updateBackground(graph);
@@ -316,9 +316,9 @@ D3LayerComposite.prototype.setDrag = function (graph, gElement) {
         thisComposite.notifyAll();
         gElement.classed("active", true);
       })
-      .on("drag", () => {
+      .on("drag", event => {
         thisComposite.dragState = "drag";
-        thisComposite.dragged(d3.event.x, d3.event.y);
+        thisComposite.dragged(event.x, event.y);
         graph.dragged(thisComposite);
         thisComposite.notifyAll();
       })
@@ -430,30 +430,30 @@ D3LayerComposite.prototype.open = function (graph) {
 
   gElement
     .select("rect.open")
-    .on("click", () => {
+    .on("click", event => {
       thisComposite.close(graph);
-      d3.event.stopPropagation();
+      event.stopPropagation();
     });
 
   gElement
     .select("text.open")
-    .on("click", () => {
+    .on("click", event => {
       thisComposite.close(graph);
-      d3.event.stopPropagation();
+      event.stopPropagation();
     });
 
   gElement
     .select("rect.break")
-    .on("click", () => {
+    .on("click", event => {
       thisComposite.break(graph);
-      d3.event.stopPropagation();
+      event.stopPropagation();
     });
 
   gElement
     .select("text.break")
-    .on("click", () => {
+    .on("click", event => {
       thisComposite.break(graph);
-      d3.event.stopPropagation();
+      event.stopPropagation();
     });
 
   thisComposite.children.forEach(child =>
@@ -579,16 +579,16 @@ D3LayerComposite.prototype.close = function (graph) {
 
   gElement
     .select("rect.open")
-    .on("click", () => {
+    .on("click", event => {
       thisComposite.open(graph);
-      d3.event.stopPropagation();
+      event.stopPropagation();
     });
 
   gElement
     .select("text.open")
-    .on("click", () => {
+    .on("click", event => {
       thisComposite.open(graph);
-      d3.event.stopPropagation();
+      event.stopPropagation();
     });
 
   D3GraphValidation.isCycle(graph);

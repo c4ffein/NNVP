@@ -111,12 +111,14 @@ export default function D3GraphEditor(svg, model) {
   let transformOrigin = null
   thisGraph.svg.call(d3.zoom()
     .scaleExtent([0.5, 2.5])
-    .on("start", () => {
-      //transformOrigin = {x: d3.event.transform.x, y: d3.event.transform.y};
+    .on("start", event => {
+      //transformOrigin = {x: event.transform.x, y: event.transform.y};
       // If shiftKey is down, trigger multiple selection
-      if (d3.event.sourceEvent.shiftKey) {
+      if (event.sourceEvent.shiftKey) {
         thisGraph.svgG.append("g").attr("id", "selectionRect").selectAll("rect")
-          .data([origineSelection = {x:d3.mouse(thisGraph.svgG.node())[0], y:d3.mouse(thisGraph.svgG.node())[1]}])
+          .data([origineSelection = {
+            x:d3.pointer(event, thisGraph.svgG.node())[0], y:d3.pointer(event, thisGraph.svgG.node())[1]
+          }])
           .enter()
           .append('rect')
           .attr("x", d => d.x)
@@ -125,41 +127,41 @@ export default function D3GraphEditor(svg, model) {
           .attr("height", 0);
       }
     })
-    .on("zoom", () => {
+    .on("zoom", event => {
       // During the zoom (drag + wheel on mouse)
       // If shiftKey isn't down, apply the transformation on all the svgG using attribute transform
-      if (!(d3.event.sourceEvent.shiftKey)) {
-        thisGraph.zoomed.call(thisGraph);
+      if (!(event.sourceEvent.shiftKey)) {
+        thisGraph.zoomed.call(thisGraph, event);
       }
       // else, extend or reduce the selection's rectangle
       else {
         d3.select("#selectionRect").selectAll("rect")
           .attr("x", d =>
-              d3.mouse(thisGraph.svgG.node())[0] < d.x ?
-                d3.mouse(thisGraph.svgG.node())[0]: d.x
+              d3.pointer(event, thisGraph.svgG.node())[0] < d.x ?
+                d3.pointer(event, thisGraph.svgG.node())[0]: d.x
           )
           .attr("y", d =>
-              d3.mouse(thisGraph.svgG.node())[1] < d.y ?
-                d3.mouse(thisGraph.svgG.node())[1]: d.y
+              d3.pointer(event, thisGraph.svgG.node())[1] < d.y ?
+                d3.pointer(event, thisGraph.svgG.node())[1]: d.y
           )
-          .attr("width", d => Math.abs(d3.mouse(thisGraph.svgG.node())[0] - d.x))
-          .attr("height", d => Math.abs(d3.mouse(thisGraph.svgG.node())[1] - d.y));
+          .attr("width", d => Math.abs(d3.pointer(event, thisGraph.svgG.node())[0] - d.x))
+          .attr("height", d => Math.abs(d3.pointer(event, thisGraph.svgG.node())[1] - d.y));
       }
     })
-    .on("end", () => {
+    .on("end", event => {
       // If a selection's rectangle exist, select all nodes (layer) in
       if (d3.select("#selectionRect").node()) {
-        d3.event.transform.x = thisGraph.gTransform.x;
-        d3.event.transform.y = thisGraph.gTransform.y;
-        //d3.event.transform.x = transformOrigin.x;
-        //d3.event.transform.y = transformOrigin.y;
+        event.transform.x = thisGraph.gTransform.x;
+        event.transform.y = thisGraph.gTransform.y;
+        //event.transform.x = transformOrigin.x;
+        //event.transform.y = transformOrigin.y;
         d3.select("#selectionRect").remove();
         let d = origineSelection;
         // Define LeftTop position and RightBottom position of the selection's rectangle
-        let topX = d3.mouse(thisGraph.svgG.node())[0] < d.x ? d3.mouse(thisGraph.svgG.node())[0] : d.x;
-        let bottomX = d3.mouse(thisGraph.svgG.node())[0] < d.x ? d.x : d3.mouse(thisGraph.svgG.node())[0];
-        let topY = d3.mouse(thisGraph.svgG.node())[1] < d.y ? d3.mouse(thisGraph.svgG.node())[1] : d.y;
-        let bottomY = d3.mouse(thisGraph.svgG.node())[1] < d.y ? d.y : d3.mouse(thisGraph.svgG.node())[1];
+        let topX = d3.pointer(event, thisGraph.svgG.node())[0] < d.x ? d3.pointer(event, thisGraph.svgG.node())[0] : d.x;
+        let bottomX = d3.pointer(event, thisGraph.svgG.node())[0] < d.x ? d.x : d3.pointer(event, thisGraph.svgG.node())[0];
+        let topY = d3.pointer(event, thisGraph.svgG.node())[1] < d.y ? d3.pointer(event, thisGraph.svgG.node())[1] : d.y;
+        let bottomY = d3.pointer(event, thisGraph.svgG.node())[1] < d.y ? d.y : d3.pointer(event, thisGraph.svgG.node())[1];
         // Call the multipleSelection with the postion previously calculated
         thisGraph.multipleSelection(topX,topY,bottomX,bottomY);
       }
@@ -265,17 +267,17 @@ D3GraphEditor.prototype.selectEdge = function (edge) {
  * Call to move the drag line from source to the target point define by the mouse
  * @param source which Layer to drag from
  */
-D3GraphEditor.prototype.moveDragLine = function (source) {
-  let target = {x: d3.mouse(this.svgG.node())[0], y:d3.mouse(this.svgG.node())[1]};
+D3GraphEditor.prototype.moveDragLine = function (event, source) {
+  let target = {x: d3.pointer(event, this.svgG.node())[0], y:d3.pointer(event, this.svgG.node())[1]};
   D3Edge.moveDragLine(this.dragLine, source, target);
 }
 
 /**
  * Call on d3 zoom action, allow to move on the whiteboard and zoom with the wheel
  */
-D3GraphEditor.prototype.zoomed = function () {
-  this.gTransform = d3.event.transform;
-  this.svgG.attr("transform", d3.event.transform);
+D3GraphEditor.prototype.zoomed = function (event) {
+  this.gTransform = event.transform;
+  this.svgG.attr("transform", event.transform);
 };
 
 /**
@@ -631,32 +633,34 @@ D3GraphEditor.prototype.addEventHandlerDragOnHtmlClass = function (layer, htmlEl
   d3.select(htmlElement)
     .attr("draggable", "true")
     .call(d3.drag()
-      .subject( () => {
-        origine.x = d3.mouse(thisGraph.svgG.node())[0];
-        origine.y =  d3.mouse(thisGraph.svgG.node())[1];
+      .subject( event => {
+        origine.x = d3.pointer(event, thisGraph.svgG.node())[0];
+        origine.y =  d3.pointer(event, thisGraph.svgG.node())[1];
         return origine;
       })
-      .on("start", () => {
+      .on("start", event => {
         thisGraph.layerDrag = true;
         d3.select("#dragFromLeftbar").append("rect")
-          .attr("x", d3.mouse(thisGraph.svgG.node())[0])
-          .attr("y", d3.mouse(thisGraph.svgG.node())[1])
+          .attr("x", d3.pointer(event, thisGraph.svgG.node())[0])
+          .attr("y", d3.pointer(event, thisGraph.svgG.node())[1])
           .attr("height", 40)
           .attr("width", 90)
           .style("fill", "none")
           .style("stroke", "black");
       })
-      .on("drag", () =>
+      .on("drag", event =>
         d3.select("#dragFromLeftbar").selectAll("rect")
-          .attr("x", d3.mouse(thisGraph.svgG.node())[0])
-          .attr("y", d3.mouse(thisGraph.svgG.node())[1])
+          .attr("x", d3.pointer(event, thisGraph.svgG.node())[0])
+          .attr("y", d3.pointer(event, thisGraph.svgG.node())[1])
       )
-      .on("end", () => {
+      .on("end", event => {
         thisGraph.layerDrag = false;
-        const targetElement = d3.event.sourceEvent.target;
+        const targetElement = event.sourceEvent.target;
         for(let el = targetElement; el != null; el = el.parentElement){
           if(el.id == "svgWrapper")
-            thisGraph.addLayer(layer.clone(), d3.mouse(thisGraph.svgG.node())[0], d3.mouse(thisGraph.svgG.node())[1]);
+            thisGraph.addLayer(
+              layer.clone(), d3.pointer(event, thisGraph.svgG.node())[0], d3.pointer(event, thisGraph.svgG.node())[1]
+            );
         }
         d3.select("#dragFromLeftbar").selectAll("rect").remove();
       })

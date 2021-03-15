@@ -1,7 +1,7 @@
 /* eslint-disable */
 
 import * as d3 from 'd3';
-import d3tip from 'd3-tip';
+// import d3tip from 'd3-tip';
 import D3GraphEditor from './D3GraphEditor';
 import D3Background from './D3Background';
 import D3LayerComponent from './D3LayerComponent';
@@ -183,9 +183,9 @@ D3Layer.prototype.setOrigin = function () {
  * Removes the Layer
  */
 D3Layer.prototype.remove = function () {
-  if (D3Layer.tip) {
-    D3Layer.tip.hide();
-  }
+  // if (D3Layer.tip) {
+  //   D3Layer.tip.hide();
+  // }
   d3.select("#" + this.htmlID).remove();
 };
 
@@ -285,14 +285,14 @@ D3Layer.prototype.drawLayer = function (graph) {
   this.setLeftPoint(this.addCircle(gElement, "left-point"));
 
   gElement
-    .on("click", () => {
-      if (d3.event.shiftKey) {
+    .on("click", event => {
+      if (event.shiftKey) {
         graph.selectOnNode.call(graph, thisLayer);
       }
       else {
         graph.singleSelection.call(graph, thisLayer);
       }
-      d3.event.stopPropagation();
+      event.stopPropagation();
     })
     .call(d3.drag()
       .subject( () => {
@@ -308,10 +308,10 @@ D3Layer.prototype.drawLayer = function (graph) {
         thisLayer.notifyAll();
         gElement.classed("active", true);
       })
-      .on("drag", () => {
+      .on("drag", event => {
         thisLayer.dragState = "drag";
-        if(D3Layer.tip) D3Layer.tip.hide();
-        thisLayer.dragged(d3.event.x, d3.event.y);
+        // if(D3Layer.tip) D3Layer.tip.hide();
+        thisLayer.dragged(event.x, event.y);
         graph.dragged(thisLayer);
         thisLayer.notifyAll();
       })
@@ -336,7 +336,7 @@ D3Layer.prototype.drawLayer = function (graph) {
     .on("mouseleave", () => {
       gElement.select("rect").classed("over-layer", false);
       graph.mouseover_node = null;
-      if(D3Layer.tip) D3Layer.tip.hide();
+      // if(D3Layer.tip) D3Layer.tip.hide();
       gElement.selectAll("circle")
         .attr("r", 2);
     });
@@ -375,8 +375,8 @@ D3Layer.prototype.drawLayer = function (graph) {
       .on("start", function () {
         graph.layerMouseDown.call(graph, thisLayer);
       })
-      .on("drag", () => {
-        graph.moveDragLine.call(graph, this);
+      .on("drag", event => {
+        graph.moveDragLine.call(graph, event, this);
       })
       .on("end", function () {
         graph.layerMouseUp.call(graph, graph.mouseover_node);
@@ -408,7 +408,7 @@ D3Layer.prototype.appendText = function (gElement, graph) {
     .on("mouseleave", function () {
       d3.select(this).classed("over-layer", false);
       graph.mouseover_node = null;
-      if(D3Layer.tip) D3Layer.tip.hide();
+      // if(D3Layer.tip) D3Layer.tip.hide();
       gElement.selectAll("circle")
         .attr("r", 2);
     })
@@ -443,9 +443,9 @@ D3Layer.prototype.changeTextOfNode = function (gElement, graph) {
       .attr("id", "textEdited")
       .attr("contentEditable", "true")
       .text(thisLayer.name)
-      .on("keydown", function () {
-        d3.event.stopPropagation();
-        if (d3.event.keyCode == D3GraphEditor.ENTER_KEY) {
+      .on("keydown", function (event) {
+        event.stopPropagation();
+        if (event.keyCode == D3GraphEditor.ENTER_KEY) {
           this.blur();
         }
       })
@@ -537,24 +537,24 @@ D3Layer.prototype.mouseOver = function (graph) {
       edges = graph.model.d3Edges;
   let gElement = d3.select("#" + this.htmlID);
   //d3.tip = d3tip;
-  if(D3Layer.tip === undefined) {
-    D3Layer.tip = d3tip().attr('class', 'd3-tip').offset([-10, 0]);
-    gElement.call(D3Layer.tip);
-  }
+  // if(D3Layer.tip === undefined) {
+  //   D3Layer.tip = d3tip().attr('class', 'd3-tip').offset([-10, 0]);
+  //   gElement.call(D3Layer.tip);
+  // }
   if(edges.filter(edge => d3.select("g#"+edge.htmlID).select("path").attr("class").indexOf("linkCycle") >= 0).length > 0){
-    D3Layer.tip
-      .html(function() {
-      return "<strong>Incoherence:</strong> <span style='color:red'> Cycle </span>";
-    });
-    D3Layer.tip.show(gElement.select("rect").node());
+    // D3Layer.tip
+    //   .html(function() {
+    //   return "<strong>Incoherence:</strong> <span style='color:red'> Cycle </span>";
+    // });
+    // D3Layer.tip.show(gElement.select("rect").node());
   }
   else {
     if(D3GraphValidation.isIsolated(graph, thisLayer)) {
-      D3Layer.tip
-        .html(function() {
-        return "<strong>Incoherence:</strong> <span style='color:red'> is isolated </span>";
-      });
-      D3Layer.tip.show(gElement.select("rect").node());
+      // D3Layer.tip
+      //   .html(function() {
+      //   return "<strong>Incoherence:</strong> <span style='color:red'> is isolated </span>";
+      // });
+      // D3Layer.tip.show(gElement.select("rect").node());
     }
     else {
       if ( thisLayer.observers.length && thisLayer.observers[0].class === "D3Edge" &&
@@ -564,12 +564,12 @@ D3Layer.prototype.mouseOver = function (graph) {
           let className = d3.select("g#"+edge.id).select("path").attr("class");
           if(className.indexOf("linkError") >= 0){
             if (jsonKeras[thisLayer.kerasLayer.name].input.shape !== undefined && jsonKeras[thisLayer.kerasLayer.name].output.shape !== undefined) {
-              D3Layer.tip
-                .html(function () {
-                return "<strong> Bad Input, should be :</strong> <span style='color:red'>" + jsonKeras[thisLayer.kerasLayer.name].input.shape + "</span>"+"<br>"+
-                "<strong> but is :</strong> <span style='color:red'>" + badOutput + "</span>";
-              });
-              D3Layer.tip.show(gElement.select("rect").node());
+              // D3Layer.tip
+              //   .html(function () {
+              //   return "<strong> Bad Input, should be :</strong> <span style='color:red'>" + jsonKeras[thisLayer.kerasLayer.name].input.shape + "</span>"+"<br>"+
+              //   "<strong> but is :</strong> <span style='color:red'>" + badOutput + "</span>";
+              // });
+              // D3Layer.tip.show(gElement.select("rect").node());
             }
           }
         });
