@@ -84,22 +84,15 @@ export default {
       this.$nextTick(() => {this.batchChart.update();this.epochChart.update();});
     },
     async trainClicked() {
-      if (this.isTraining) {
-        this.cancelRequested = true;
-        return
-      }
+      if (this.isTraining) { this.cancelRequested = true; return; }
       this.chartsClicked();
       this.isTraining = true;
       await this.startTraining();
       this.cancelRequested = false;
       this.isTraining = false;
     },
-    changeSelectedOptimizer(value) {
-      this.selectedOptimizer = value;
-    },
-    changeEpochs(value) {
-      this.epochs = value;
-    },
+    changeSelectedOptimizer(value) { this.selectedOptimizer = value; },
+    changeEpochs(value) { this.epochs = value; },
     async startTraining() {
       window.tf = tf;
       const optimizer = this.selectedOptimizer;
@@ -156,12 +149,8 @@ export default {
       }
       try {
         await watchTraining(
-          this.batchChart,
-          this.epochChart,
-          this.chartData0,
-          this.chartData1,
-          (callbacks) => train(model, data, callbacks),
-          () => this.cancelRequested,
+          this.batchChart, this.epochChart, this.chartData0, this.chartData1,
+          (callbacks) => train(model, data, callbacks), () => this.cancelRequested,
           'cancelRequested',
         );
       }
@@ -180,7 +169,7 @@ export default {
           this.loadableDatasets[name][0].shape,
           this.loadableDatasets[name][0].labelsPath,
           this.loadableDatasets[name][0].labelsChecksum,
-          10,
+          10,  // number of classes
           this.loadableDatasets[name][0].numDatasetElements,
           this.loadableDatasets[name][0].numTrainElements,
         );
@@ -198,7 +187,7 @@ export default {
     bottomTrainerSize: Number,
     cdnDir: {
       type: String,
-      default: "https://nnvpdemo.tech/datasets/",
+      default: "https://datasets.nnvp.io/datasets/",
     },
   },
   watch: {

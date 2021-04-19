@@ -43,6 +43,7 @@ export default class Dataset {
     this.labelsPath = labelsPath;
     this.labelsSha256 = labelsSha256;
     this.numClasses = numClasses;
+    this.labelSize = 1;
     this.numDatasetElements = numDatasetElements;
     this.numTrainElements = numTrainElements;
     this.numTestElements = numTestElements || this.numDatasetElements - this.numTrainElements;
@@ -73,11 +74,7 @@ export default class Dataset {
         ([offset, nbElem, currentSpritePath], index) => {
           total = total + 1;
           const buildFunc = () => this.buildImgRequest(
-            currentSpritePath,
-            offset,
-            nbElem,
-            this.checksum ? this.checksum[index] : null,
-            datasetBytesBuffer,
+            currentSpritePath, offset, nbElem, this.checksum ? this.checksum[index] : null, datasetBytesBuffer
           )
           if (isSequential) chain = chain.then(buildFunc).then(incLoaded);
           else return buildFunc().then(incLoaded);
@@ -98,8 +95,8 @@ export default class Dataset {
     // Slice the the images and labels into train and test sets.
     this.trainImages = this.datasetImages.slice(0, this.imageByteSize * this.numTrainElements);
     this.testImages = this.datasetImages.slice(this.imageByteSize * this.numTrainElements);
-    this.trainLabels = this.datasetLabels.slice(0, this.numClasses * this.numTrainElements);
-    this.testLabels = this.datasetLabels.slice(this.numClasses * this.numTrainElements);
+    this.trainLabels = this.datasetLabels.slice(0, this.labelSize * this.numTrainElements);
+    this.testLabels = this.datasetLabels.slice(this.labelSize * this.numTrainElements);
   }
 
   buildImgRequest(imagesSpritePath, offset, nbElem, imagesSpriteChecksum, datasetBytesBuffer) {
@@ -133,17 +130,12 @@ export default class Dataset {
         ctx.drawImage(img, 0, i * chunkLength, img.width, viewLength, 0, 0, img.width, viewLength);
 
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        if (this.shape[2] == 1) { // All channels hold an equal value since the image is grayscale,
-          // so just read the red channel.
-          for (let j = 0; j < imageData.data.length / 4; j++) {
-            datasetBytesView[j] = imageData.data[j * 4] / 255;
-          }
+        if (this.shape[2] == 1) { // All channels hold an equal value since the image is grayscale, just read the red.
+          for (let j = 0; j < imageData.data.length / 4; j++) datasetBytesView[j] = imageData.data[j * 4] / 255;
         }
         else {
           for (let j = 0; j < imageData.data.length; j++) {
-            if ((j+1)%4 !== 0) {
-              datasetBytesView[Math.floor((j + 1) * 3 / 4)] = imageData.data[j] / 255;
-            }
+            if ((j+1)%4 !== 0) datasetBytesView[Math.floor((j + 1) * 3 / 4)] = imageData.data[j] / 255;
           }
         }
       }
@@ -168,6 +160,7 @@ export default class Dataset {
 
   nextBatch(batchSize, data, index) {
     const batchImagesArray = new Float32Array(batchSize * this.imageByteSize);
+    // const batchLabelsArray = new Uint8Array(batchSize * this.labelSize);  // TODO
     const batchLabelsArray = new Uint8Array(batchSize * this.numClasses);
 
     for (let i = 0; i < batchSize; i++) {
@@ -176,12 +169,14 @@ export default class Dataset {
       const image = data[0].slice(idx * this.imageByteSize, (idx + 1) * this.imageByteSize);
       batchImagesArray.set(image, i * this.imageByteSize);
 
-      const label = data[1].slice(idx * this.numClasses, idx * this.numClasses + this.numClasses);
-      batchLabelsArray.set(label, i * this.numClasses);
+      const label = data[1].slice(idx * this.labelSize, idx * this.labelSize + this.labelSize);
+      const label2 = Uint8Array.from([...Array(10)].map((_, p) => p + 1 === label[0] ? 1 : 0));  // TODO : Remove
+      batchLabelsArray.set(label2, i * this.numClasses);  // TODO
     }
 
     const xs = tf.tensor2d(batchImagesArray, [batchSize, this.imageByteSize]);
     const labels = tf.tensor2d(batchLabelsArray, [batchSize, this.numClasses]);
+    // const labels = tf.tensor2d(batchLabelsArray, [batchSize, this.labelSize]);  // TODO
 
     return { xs, labels };
   }
