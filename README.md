@@ -1,7 +1,7 @@
 # Description
-This project allows you to generate Python code describing a Keras model by creating a graph representing the different layers in your browser.
+This project allows you to generate Python/JS code describing a Keras model by creating a graph representing the different layers in your browser.
 Functionalities to launch the compilation and training on the server could be added if we keep developping it.
-A demo is available at [demo.nnvp.io](https://demo.nnvp.io).
+A demo is available at [nnvp.io](https://nnvp.io).
 
 # How to run
 ## Only the standalone client
