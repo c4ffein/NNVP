@@ -1,3 +1,5 @@
+# WARNING: This is a barely used side project and as I work alone, I'm breaking master for the Vue 3 migration. Check out f78d724032e97852b4f40197bedb9579e59cd1a4 if you want that project in a working state, which is the version in production at [nnvp.io](https://nnvp.io)
+
 # Description
 This project allows you to generate Python/JS code describing a Keras model by creating a graph representing the different layers in your browser.
 Functionalities to launch the compilation and training on the server could be added if we keep developping it.
