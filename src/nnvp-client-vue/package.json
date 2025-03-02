@@ -10,14 +10,15 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "vue": "^3.5.13",
     "@tensorflow/tfjs": "^3.3.0",
     "chartist": "^0.11.4",
     "d3": "^6.6.0",
-    "file-saver": "^2.0.5"
+    "file-saver": "^2.0.5",
+    "vue": "^3.5.13"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.2.1",
+    "@vitejs/plugin-vue-jsx": "^4.1.1",
     "vite": "^6.2.0"
   }
 }

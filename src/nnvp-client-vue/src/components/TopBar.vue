@@ -1,4 +1,4 @@
-<script>
+<script lang="jsx">
 export default {
   name: 'TopBar',
   render(h) { // eslint-disable-line

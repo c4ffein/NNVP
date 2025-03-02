@@ -1,4 +1,5 @@
 <template>
+  <div>
     <div id="topBar" class="topBar"><TopBar @open-trainer="openTrainer"/></div>
     <div id="leftBar" class="leftBar"><LeftBar/></div>
     <div id="whiteBoard" class="whiteBoard"><WhiteBoard/></div>
