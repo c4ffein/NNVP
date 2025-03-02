@@ -21,13 +21,15 @@
           v-bind:is="selectedPanel"
           v-bind:ref="'child'+selectedPanel"
           class="tab"
-          v-model="selectedDataset"
+          v-bind:value="selectedDataset"
           v-bind:loadableDatasets="loadableDatasets"
           v-bind:selectedOptimizer="selectedOptimizer"
           @changeSelectedOptimizer="changeSelectedOptimizer"
           v-bind:selectableOptimizers="selectableOptimizers"
           v-bind:epochs="epochs"
           @changeEpochs="changeEpochs"
+          v-bind:loadDataset="loadDataset"
+          v-bind:getWarningMessage="getWarningMessage"
         ></component>
       </keep-alive>
     </div>

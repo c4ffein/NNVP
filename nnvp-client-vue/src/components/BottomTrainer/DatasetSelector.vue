@@ -32,7 +32,13 @@ import * as tf from '@tensorflow/tfjs';
 
 export default {
   name: 'DatasetSelector',
-  props: {value: {type: String, default: null}, loadableDatasets: {type: Array, default: []}},
+  props: {
+    value: {type: String, default: null},
+    loadableDatasets: {type: Object, default: {}},
+    getDatasets: {type: Function, default: () => ({})},
+    loadDataset: {type: Function, default: () => null},
+    getWarningMessage: {type: Function, default: () => null},
+  },
   computed: {
     datasetDescription() { return this.loadableDatasets?.[this.value]?.[1] ?? ''; },
   },
@@ -47,7 +53,7 @@ export default {
   },
   methods: {
     async datasetSet(name) {
-      const warningMessage = this.$parent.getWarningMessage(name);
+      const warningMessage = this.getWarningMessage(name);
       if (warningMessage) {
         // TODO : better than confirm
         if (!confirm(warningMessage)) { // eslint-disable-line
@@ -66,7 +72,7 @@ export default {
         this.loadingShown = true;
         this.loadingPercentage = progress;
       };
-      this.$parent.loadDataset(name, x => updateProgressCheckRandom(x, randomChecker))
+      this.loadDataset(name, x => updateProgressCheckRandom(x, randomChecker))
         .then(async () => {
           if (this.loadingToken !== randomChecker) return;
           await this.fillSamples(name);
@@ -82,16 +88,20 @@ export default {
         return;
       }
       drawArea.innerHTML = '';
-      const datasets = this.$parent.datasets[name];
-      const examples = datasets.nextTestBatch(40);
+      const dataset = this.getDatasets()[name];
+      if(!dataset) {
+        console.log(`No dataset named ${name}`);  // TODO Handle better
+        return;
+      }
+      const examples = dataset.nextTestBatch(40);
       const numExamples = examples.xs.shape[0];
       for (let i = 0; i < numExamples; i += 1) {
         const imageTensor = tf.tidy(
-          () => examples.xs.slice([i, 0], [1, examples.xs.shape[1]]).reshape(datasets.shape),
+          () => examples.xs.slice([i, 0], [1, examples.xs.shape[1]]).reshape(dataset.shape),
         );
         const canvas = document.createElement('canvas');
-        canvas.width = datasets.shape[0]; // eslint-disable-line prefer-destructuring
-        canvas.height = datasets.shape[1]; // eslint-disable-line prefer-destructuring
+        canvas.width = dataset.shape[0]; // eslint-disable-line prefer-destructuring
+        canvas.height = dataset.shape[1]; // eslint-disable-line prefer-destructuring
         canvas.style = 'margin: 4px;';
         await tf.browser.toPixels(imageTensor, canvas); // eslint-disable-line
         drawArea.appendChild(canvas);

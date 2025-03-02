@@ -1,12 +1,10 @@
 <template>
-  <div>
-    <div id="topBar" class="topBar"><TopBar @open-trainer="openTrainer"/></div>
-    <div id="leftBar" class="leftBar"><LeftBar/></div>
-    <div id="whiteBoard" class="whiteBoard"><WhiteBoard/></div>
-    <div id="rightBar" class="rightBar"><RightBar msg="NNVP"/></div>
-    <div id="bottomTrainer" class="bottomTrainer" v-bind:style="{height: trainerHeight+'vh'}">
-      <BottomTrainer @close-trainer="closeTrainer" :bottomTrainerSize="trainerHeight"/>
-    </div>
+  <div id="topBar" class="topBar"><TopBar @open-trainer="openTrainer"/></div>
+  <div id="leftBar" class="leftBar"><LeftBar/></div>
+  <div id="whiteBoard" class="whiteBoard"><WhiteBoard/></div>
+  <div id="rightBar" class="rightBar"><RightBar msg="NNVP"/></div>
+  <div id="bottomTrainer" class="bottomTrainer" v-bind:style="{height: trainerHeight+'vh'}">
+    <BottomTrainer @close-trainer="closeTrainer" :bottomTrainerSize="trainerHeight"/>
   </div>
 </template>
 
@@ -80,14 +78,6 @@ body,html {
   user-select: none;
   /* still needed for some details with safari */
   -webkit-user-select: none;
-}
-.topBar { grid-area: topBar; }
-.leftBar { grid-area: leftBar; }
-.rightBar { grid-area: rightBar; }
-.whiteBoard { grid-area: whiteBoard; }
-.bottomTrainer { grid-area: bottomTrainer; }
-
-#app > div {
   background-color: rgba(255, 255, 255, 1);
   max-width: 100%;
   max-height: 100%;
@@ -98,6 +88,11 @@ body,html {
   text-align: center;
   font-family: 'Avenir', Helvetica, Arial, sans-serif;
 }
+.topBar { grid-area: topBar; }
+.leftBar { grid-area: leftBar; }
+.rightBar { grid-area: rightBar; }
+.whiteBoard { grid-area: whiteBoard; }
+.bottomTrainer { grid-area: bottomTrainer; }
 
 #app > .topBar {
   height: 26px;
