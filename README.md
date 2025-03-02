@@ -7,23 +7,19 @@ A demo is available at [nnvp.io](https://nnvp.io).
 
 # How to run
 ## Only the standalone client
-As we aren't working on an updated backend right now, you can just go to the `src/nnvp-client-vue` folder:
+As we aren't working on an updated backend right now, you can just go to the `nnvp-client-vue` folder:
  - `npm install`
- - either `npm run serve` to run a development version, or `npm run build` then serve the content of the `src/nnvp-client-vue/dist` folder.
-
-## With Docker : includes experimental backend
-### Prerequisites
-- Install docker
-- Install docker-compose
-
-### Instructions
-From the project directory, execute `launch_docker.sh`. The server is accessible at port 80 by default.
+ - `npm run dev` / `npm run dev-host` to run a development version
+ - `npm run build` then serve the content of the `nnvp-client-vue/dist` folder.
 
 # Launch the tests - not up to date
 - From the src/nnvp-client-vue directory :
   - Execute `npm install` then `npm run serve`
   - In another terminal, still in the same directory, launch `npm run test:e2e`
   - Warning : to use another browser, change test:e2e target of the package.json file, replacing Firefox by another browser installed locally
+
+# Future improvements
+- Check [tasks.md](/tasks.md)
 
 # Credits
 ## History
