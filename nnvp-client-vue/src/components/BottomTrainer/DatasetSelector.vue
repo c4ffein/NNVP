@@ -11,8 +11,7 @@
           {{key}}
         </option>
       </select>
-      <div id="dataset-description">
-        {{loadableDatasets[value][1]}}
+      <div id="dataset-description">{{datasetDescription}}
       </div>
     </div>
     <div id="samples-container">
@@ -33,7 +32,10 @@ import * as tf from '@tensorflow/tfjs';
 
 export default {
   name: 'DatasetSelector',
-  props: ['value', 'loadableDatasets'],
+  props: {value: {type: String, default: null}, loadableDatasets: {type: Array, default: []}},
+  computed: {
+    datasetDescription() { return this.loadableDatasets?.[this.value]?.[1] ?? ''; },
+  },
   data() {
     return {
       newestSelected: null, // Needed to simplify access before propagation

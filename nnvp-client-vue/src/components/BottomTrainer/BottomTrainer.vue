@@ -42,7 +42,7 @@ import loadableDatasets from '../../lib/JSDatasets/datasets-sources';
 import watchTraining from '../../lib/ModelTrainer/watchTraining';
 
 import * as Chartist from 'chartist';
-require('@/../node_modules/chartist/dist/chartist.min.css')
+// import '@/../node_modules/chartist/dist/chartist.min.css'  TODO CHECK IF STILL NEEDED
 import ChartistPluginTip from '@/lib/chartist-plugin-tip/chartist-plugin-tip';
 
 import Charts from './Charts.vue';

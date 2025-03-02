@@ -2,7 +2,7 @@
 
 import * as d3 from 'd3';
 import D3GraphValidation from './D3GraphValidation';
-const jsonKeras = require("../KerasInterface/generatedKerasLayers.json");
+import jsonKeras from '../KerasInterface/generatedKerasLayers.json'
 
 /**
  * Constructor of an edge

@@ -8,7 +8,7 @@ import D3LayerComponent from './D3LayerComponent';
 import D3LayerComposite from './D3LayerComposite';
 import D3GraphValidation from './D3GraphValidation';
 import KerasLayer from '../KerasInterface/KerasLayer';
-const jsonKeras = require("../KerasInterface/generatedKerasLayers.json");
+import jsonKeras from '../KerasInterface/generatedKerasLayers.json'
 
 
 /**

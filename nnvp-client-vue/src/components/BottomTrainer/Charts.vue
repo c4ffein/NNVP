@@ -16,7 +16,7 @@ import * as Chartist from 'chartist';
 
 import ChartistPluginTip from '@/lib/chartist-plugin-tip/chartist-plugin-tip';
 
-require('@/../node_modules/chartist/dist/chartist.min.css');
+// import '@/../node_modules/chartist/dist/chartist.min.css'  TODO CHECK IF STILL NEEDED
 
 export default {
   name: 'Charts',

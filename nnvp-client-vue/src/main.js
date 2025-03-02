@@ -15,12 +15,10 @@ app.config.productionTip = false;  // TODO Check
 // development versions, should later be automatically generated at build time.
 const kerasInterface = new KerasInterface(jsonLayersFile);
 
-Object.defineProperty(config.globalProperties.prototype, '$kerasInterface', { value: kerasInterface });
+app.config.globalProperties.$kerasInterface = kerasInterface;
 const d3Interface = new D3Interface();
-Object.defineProperty(config.globalProperties.prototype, '$d3Interface', { value: d3Interface });
-Object.defineProperty(
-  config.globalProperties.prototype, '$keyboardListener', { value: new KeyboardListener(d3Interface, kerasInterface) }
-);
+app.config.globalProperties.$d3Interface = d3Interface;
+app.config.globalProperties.$keyboardListener = new KeyboardListener(d3Interface, kerasInterface);
 
 
 app.mount('#app')

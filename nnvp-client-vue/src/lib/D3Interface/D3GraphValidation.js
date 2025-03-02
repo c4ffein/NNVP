@@ -1,7 +1,7 @@
 /* eslint-disable */
 
-import * as d3 from 'd3';
-const jsonKeras = require("../KerasInterface/generatedKerasLayers.json");
+import * as d3 from 'd3'
+import jsonKeras from '../KerasInterface/generatedKerasLayers.json'
 
 export default function D3GraphValidation () {};
 
