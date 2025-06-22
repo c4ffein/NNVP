@@ -6,6 +6,7 @@ But if you read this and you want to get involved, you can actually create one f
 - Finish Vue 3 migration, check everything works
 - Remove about.nnvp.io, make it a pop-up
 - Migrate from Netlify to GH pages for the SPA
+- use oxlint instead of eslint
 - http://yann.lecun.com/exdb/mnist/ : document mnist in NNVP
 - https://www.kaggle.com/zalando-research/fashionmnist : document in NNVP
 - https://github.com/DeepLenin/fashion-mnist_png
