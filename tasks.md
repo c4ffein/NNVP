@@ -3,21 +3,67 @@
 Not creating issues for those.
 But if you read this and you want to get involved, you can actually create one from any item of this list.
 
-- Finish Vue 3 migration, check everything works
-- Remove about.nnvp.io, make it a pop-up
-- Migrate from Netlify to GH pages for the SPA
-- use oxlint instead of eslint
-- http://yann.lecun.com/exdb/mnist/ : document mnist in NNVP
-- https://www.kaggle.com/zalando-research/fashionmnist : document in NNVP
-- https://github.com/DeepLenin/fashion-mnist_png
-  - fashion mnist converted to png, also include script to convert any mnist-like to png, mit license
-- document CIFAR10
-  - https://stackoverflow.com/questions/57291964/how-to-convert-cifar-dataset-into-the-same-format-as-mnist
-  - https://stackoverflow.com/questions/902761/saving-a-numpy-array-as-an-image
-- https://github.com/tensorflow/tfjs-data : link
-- https://www.tensorflow.org/api_docs/python/tf/keras/datasets/reuters : use this also
-- https://www.tensorflow.org/datasets/catalog/kmnist : use this also
-- https://www.tensorflow.org/datasets/catalog/mnist : document
-- https://www.tensorflow.org/datasets/api_docs/python/tfds/as_dataframe
-- Create a module that will make you create a model in a tutorial way
-  - https://keras.io/guides/sequential_model/ : integrate this
+## High Priority
+
+### 1. Finish Vue 3 migration, check everything works
+- [x] Set up Playwright e2e tests
+- [ ] Write tests and eventually fix issues for core functionality:
+  - [ ] **Layer selection & placement:**
+    - [ ] Click a layer template and verify it appears on the canvas
+    - [ ] Select another template after selecting a previous one
+  - [ ] **Code generation:**
+    - [ ] Load a template and generate JavaScript code
+    - [ ] Load a template and generate Python code
+  - [ ] **Parameter modification:**
+    - [ ] Modify layer parameters from RightBar and verify in generated code
+    - [ ] Test each parameter type (int, float, boolean, string, tuple, list, order)
+  - [ ] **Dataset loading:**
+    - [ ] Load a dataset from the BottomTrainer panel
+  - [ ] **Link/edge manipulation:**
+    - [ ] Load template, delete a link between layers, verify network is broken (error state)
+    - [ ] Redraw the deleted link, verify network is valid again
+  - [ ] **Node manipulation:**
+    - [ ] Load template, delete a node
+    - [ ] Re-add the node, set parameters from RightBar
+    - [ ] Reconnect missing links, verify network is valid
+  - [ ] **Undo/Redo:**
+    - [ ] Load template, delete 2 nodes
+    - [ ] Undo twice, verify nodes are restored
+    - [ ] Verify network can generate code again
+- [ ] Update README to reflect Vue 3 status
+
+### 2. Client improvements
+- [ ] Destroy the about.nnvp.io, make it part of this app
+- [ ] Fix corrupted Roboto-Thin-webfont.woff font file
+- [ ] Use oxlint instead of eslint
+
+### 3. Deployment
+- [ ] Migrate from Netlify to GH pages for the SPA
+
+## Documentation & Datasets
+
+### Dataset documentation
+- [ ] Document MNIST dataset
+  - Links: [LeCun MNIST](http://yann.lecun.com/exdb/mnist/), [TF Catalog](https://www.tensorflow.org/datasets/catalog/mnist)
+- [ ] Document Fashion-MNIST dataset
+  - Links: [Kaggle](https://www.kaggle.com/zalando-research/fashionmnist), [PNG conversion](https://github.com/DeepLenin/fashion-mnist_png)
+- [ ] Document CIFAR-10 dataset
+  - [Format conversion guide](https://stackoverflow.com/questions/57291964/how-to-convert-cifar-dataset-into-the-same-format-as-mnist)
+  - [Array to image](https://stackoverflow.com/questions/902761/saving-a-numpy-array-as-an-image)
+- [ ] Document K-MNIST dataset
+  - Link: [TF Catalog](https://www.tensorflow.org/datasets/catalog/kmnist)
+- [ ] Document Reuters dataset
+  - Link: [TF API docs](https://www.tensorflow.org/api_docs/python/tf/keras/datasets/reuters)
+- [ ] Link to TensorFlow.js data utilities
+  - Link: [tfjs-data](https://github.com/tensorflow/tfjs-data)
+  - Link: [tfds.as_dataframe](https://www.tensorflow.org/datasets/api_docs/python/tfds/as_dataframe)
+
+## Future Features
+
+### Tutorial mode
+- [ ] Create a guided tutorial module for building models step-by-step
+  - Reference: [Keras Sequential Model Guide](https://keras.io/guides/sequential_model/)
+
+### Alternate backend support
+- [ ] Add alternate PyTorch layers + code generation
+- [ ] Add alternate Tinygrad layers + code generation
