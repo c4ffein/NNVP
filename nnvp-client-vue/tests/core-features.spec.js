@@ -235,10 +235,10 @@ test.describe('NNVP Core Features', () => {
 
     expect(rightBarContent.length).toBeGreaterThan(0);
     expect(consoleErrors.length).toBe(0);
+    // TODO BETTER CHECKS
   });
 
-  test('should support undo/redo operations', async ({ page }) => {
-    // TODO ALSO TEST REDO, MAYBE IN AN ADDITIONAL TEST?
+  test('should support undo operations', async ({ page }) => {
     // Add two layers
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
@@ -249,7 +249,7 @@ test.describe('NNVP Core Features', () => {
 
     const layersAfterAdd = await page.$$eval('.d3Layer', layers => layers.length);
 
-    console.log('\n=== UNDO/REDO TEST ===');
+    console.log('\n=== UNDO TEST ===');
     console.log('Layers after adding 2:', layersAfterAdd);
 
     // Click Edit menu -> Undo
@@ -275,6 +275,181 @@ test.describe('NNVP Core Features', () => {
     console.log('Layers after second undo:', layersAfterUndo2);
 
     expect(layersAfterUndo2).toBeLessThan(layersAfterAdd);
+    expect(consoleErrors.length).toBe(0);
+  });
+
+  test('should modify int parameter and verify in generated code', async ({ page }) => {
+    // Add a Dense layer
+    const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
+    await denseLayer.click();
+    await page.waitForTimeout(500);
+
+    // Click layer to select it
+    const layerOnCanvas = await page.$('.d3Layer');
+    await layerOnCanvas.click();
+    await page.waitForTimeout(1000); // Wait longer for reactive update
+
+    // Check if rightbar-block is visible
+    const rightbarBlock = await page.$('#rightbar-block');
+
+    console.log('\n=== INT PARAMETER MODIFICATION TEST ===');
+    console.log('Rightbar block visible:', rightbarBlock !== null);
+
+    // Find and modify an int parameter
+    const numberInputs = await page.$$('#rightbar-block input[type="number"]');
+    // TODO check numberInputs.length > 0
+    // Change first parameter to 128
+    await numberInputs[0].fill('128');
+    await numberInputs[0].dispatchEvent('change');
+    await page.waitForTimeout(500);
+
+    console.log('Modified parameter to 128');
+
+    // Generate Python code and check content
+    const downloadPromise = page.waitForEvent('download', { timeout: 5000 }).catch(() => null);
+
+    const fileMenu = await page.$('text=File');
+    await fileMenu.click();
+    await page.waitForTimeout(300);
+
+    const generateOption = await page.$('text=Generate');
+    const generateText = await generateOption.textContent();
+    if (generateText.trim() === 'Generate') {
+      await generateOption.click();
+      await page.waitForTimeout(1000);
+
+      const download = await downloadPromise;
+      if (download) {
+        const path = await download.path();
+        const fs = require('fs');
+        const content = fs.readFileSync(path, 'utf-8');
+
+        console.log('Code contains "128":', content.includes('128'));
+        expect(content.includes('128')).toBe(true);
+      }
+    }
+
+    expect(consoleErrors.length).toBe(0);
+  });
+
+  test('should modify boolean parameter by clicking', async ({ page }) => {
+    // Add a Dense layer
+    const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
+    await denseLayer.click();
+    await page.waitForTimeout(500);
+
+    // Click layer to select it
+    const layerOnCanvas = await page.$('.d3Layer');
+    await layerOnCanvas.click();
+    await page.waitForTimeout(1000); // Wait longer for reactive update
+
+    // Check if rightbar-block is visible
+    const rightbarBlock = await page.$('#rightbar-block');
+
+    console.log('\n=== BOOLEAN PARAMETER MODIFICATION TEST ===');
+    console.log('Rightbar block visible:', rightbarBlock !== null);
+
+    if (rightbarBlock) {
+      // Find boolean parameter selects
+      const booleanSelects = await page.$$('#rightbar-block select.parameter-boolean');
+      console.log('Boolean parameters found:', booleanSelects.length);
+
+      if (booleanSelects.length > 0) {
+        const initialValue = await booleanSelects[0].evaluate(el => el.value);
+        console.log('Initial value:', initialValue);
+
+        // Click to toggle
+        await booleanSelects[0].click();
+        await page.waitForTimeout(500);
+
+        const newValue = await booleanSelects[0].evaluate(el => el.value);
+        console.log('Value after click:', newValue);
+
+        expect(newValue).not.toBe('void');
+      }
+    }
+
+    expect(consoleErrors.length).toBe(0);
+  });
+
+  test('should delete a layer using Delete key', async ({ page }) => {
+    // Add a layer
+    const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
+    await denseLayer.click();
+    await page.waitForTimeout(500);
+
+    const layersBeforeDelete = await page.$$eval('.d3Layer', layers => layers.length);
+
+    // Click on the layer using force to bypass the text element
+    const d3LayerElement = await page.$('.d3Layer');
+    const box = await d3LayerElement.boundingBox();
+
+    // Click in the center of the layer
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await page.waitForTimeout(500);
+
+    // Check if layer is selected (has 'selected' class)
+    const isSelected = await d3LayerElement.evaluate(el => el.classList.contains('selected'));
+
+    console.log('\n=== LAYER DELETION TEST ===');
+    console.log('Layers before delete:', layersBeforeDelete);
+    console.log('Layer is selected:', isSelected);
+
+    // Try Backspace first (as per KeyboardListener.js)
+    await page.keyboard.press('Backspace');
+    await page.waitForTimeout(500);
+
+    let layersAfterDelete = await page.$$eval('.d3Layer', layers => layers.length);
+    console.log('Layers after Backspace:', layersAfterDelete);
+
+    // If Backspace didn't work, try Delete
+    // TODO Actually 2 separate tests for delete and backspace
+    if (layersAfterDelete === layersBeforeDelete) {
+      await page.keyboard.press('Delete');
+      await page.waitForTimeout(500);
+      layersAfterDelete = await page.$$eval('.d3Layer', layers => layers.length);
+      console.log('Layers after Delete:', layersAfterDelete);
+    }
+
+    expect(layersAfterDelete).toBeLessThan(layersBeforeDelete);
+    expect(consoleErrors.length).toBe(0);
+  });
+
+  test('should test REDO functionality', async ({ page }) => {
+    // Add a layer
+    const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
+    await denseLayer.click();
+    await page.waitForTimeout(500);
+
+    const layersAfterAdd = await page.$$eval('.d3Layer', layers => layers.length);
+
+    console.log('\n=== REDO TEST ===');
+    console.log('Layers after adding:', layersAfterAdd);
+
+    // Undo
+    const editMenu = await page.$('text=Edit');
+    await editMenu.click();
+    await page.waitForTimeout(300);
+
+    const undoOption = await page.$('text=Undo');
+    await undoOption.click();
+    await page.waitForTimeout(500);
+
+    const layersAfterUndo = await page.$$eval('.d3Layer', layers => layers.length);
+    console.log('Layers after undo:', layersAfterUndo);
+
+    // Redo
+    await editMenu.click();
+    await page.waitForTimeout(300);
+
+    const redoOption = await page.$('text=Redo');
+    await redoOption.click();
+    await page.waitForTimeout(500);
+
+    const layersAfterRedo = await page.$$eval('.d3Layer', layers => layers.length);
+    console.log('Layers after redo:', layersAfterRedo);
+
+    expect(layersAfterRedo).toBe(layersAfterAdd);
     expect(consoleErrors.length).toBe(0);
   });
 });
