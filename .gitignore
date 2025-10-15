@@ -24,3 +24,7 @@ yarn-error.log*
 *.njsproj
 *.sln
 *.sw*
+
+# Playwright test results
+nnvp-client-vue/test-results
+nnvp-client-vue/playwright-report
