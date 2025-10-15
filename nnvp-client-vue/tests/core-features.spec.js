@@ -143,7 +143,6 @@ test.describe('NNVP Core Features', () => {
   });
 
   test('should generate JavaScript code', async ({ page }) => {
-    // TODO CHECK CONTENT
     // Add a simple layer first
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
@@ -165,20 +164,28 @@ test.describe('NNVP Core Features', () => {
 
     // Check if download happened
     const download = await downloadPromise;
-    if (download) {
-      console.log('JavaScript code download triggered');
-      console.log('Download filename:', download.suggestedFilename());
-      expect(download.suggestedFilename()).toContain('.js');
-    } else {
-      console.log('No download, checking for other output methods');
-      // Code might be shown in a different way (popup, textarea, etc.)
-    }
+    expect(download).not.toBeNull();
+
+    console.log('JavaScript code download triggered');
+    console.log('Download filename:', download.suggestedFilename());
+    expect(download.suggestedFilename()).toContain('.js');
+
+    // Check content
+    const path = await download.path();
+    const fs = require('fs');
+    const content = fs.readFileSync(path, 'utf-8');
+
+    console.log('Code length:', content.length);
+    console.log('Code contains "Dense":', content.includes('Dense') || content.includes('dense'));
+    console.log('Code contains "tf.":', content.includes('tf.'));
+
+    expect(content.length).toBeGreaterThan(0);
+    expect(content.includes('Dense') || content.includes('dense')).toBe(true);
 
     expect(consoleErrors.length).toBe(0);
   });
 
   test('should generate Python code', async ({ page }) => {
-    // TODO CHECK CONTENT
     // Add a simple layer first
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
@@ -195,24 +202,34 @@ test.describe('NNVP Core Features', () => {
     const generateOption = await page.$('text=Generate');
     // Make sure we're not clicking "Generate Javascript"
     const generateText = await generateOption.textContent();
-    if (generateText.trim() === 'Generate') {
-      await generateOption.click();
-      await page.waitForTimeout(1000);
+    expect(generateText.trim()).toBe('Generate');
 
-      console.log('\n=== PYTHON GENERATION TEST ===');
+    await generateOption.click();
+    await page.waitForTimeout(1000);
 
-      // Check if download happened
-      const download = await downloadPromise;
-      if (download) {
-        console.log('Python code download triggered');
-        console.log('Download filename:', download.suggestedFilename());
-        expect(download.suggestedFilename()).toContain('.py');
-      } else {
-        console.log('No download, checking for other output methods');
-      }
+    console.log('\n=== PYTHON GENERATION TEST ===');
 
-      expect(consoleErrors.length).toBe(0);
-    }
+    // Check if download happened
+    const download = await downloadPromise;
+    expect(download).not.toBeNull();
+
+    console.log('Python code download triggered');
+    console.log('Download filename:', download.suggestedFilename());
+    expect(download.suggestedFilename()).toContain('.py');
+
+    // Check content
+    const path = await download.path();
+    const fs = require('fs');
+    const content = fs.readFileSync(path, 'utf-8');
+
+    console.log('Code length:', content.length);
+    console.log('Code contains "Dense":', content.includes('Dense'));
+    console.log('Code contains "keras" or "tensorflow":', content.includes('keras') || content.includes('tensorflow'));
+
+    expect(content.length).toBeGreaterThan(0);
+    expect(content.includes('Dense')).toBe(true);
+
+    expect(consoleErrors.length).toBe(0);
   });
 
   test('should select a layer and show parameters in RightBar', async ({ page }) => {
@@ -228,14 +245,19 @@ test.describe('NNVP Core Features', () => {
 
     // Check if RightBar shows parameters
     const rightBarContent = await page.textContent('#rightBar');
+    const rightbarBlock = await page.$('#rightbar-block');
+    const isLayerSelected = await layerOnCanvas.evaluate(el => el.classList.contains('selected'));
 
     console.log('\n=== PARAMETER DISPLAY TEST ===');
+    console.log('Layer is selected:', isLayerSelected);
     console.log('RightBar has content:', rightBarContent.length > 0);
+    console.log('RightBar text (first 100 chars):', rightBarContent.substring(0, 100));
+    console.log('rightbar-block exists:', rightbarBlock !== null);
     console.log('RightBar contains "units":', rightBarContent.includes('units'));
+    console.log('RightBar contains "No layers selected":', rightBarContent.includes('No layers selected'));
 
     expect(rightBarContent.length).toBeGreaterThan(0);
     expect(consoleErrors.length).toBe(0);
-    // TODO BETTER CHECKS
   });
 
   test('should support undo operations', async ({ page }) => {
@@ -295,9 +317,16 @@ test.describe('NNVP Core Features', () => {
     console.log('\n=== INT PARAMETER MODIFICATION TEST ===');
     console.log('Rightbar block visible:', rightbarBlock !== null);
 
+    // rightbar-block MUST exist when a layer is selected
+    expect(rightbarBlock).not.toBeNull();
+
     // Find and modify an int parameter
     const numberInputs = await page.$$('#rightbar-block input[type="number"]');
-    // TODO check numberInputs.length > 0
+    console.log('Number inputs found:', numberInputs.length);
+
+    // There MUST be number inputs for a Dense layer
+    expect(numberInputs.length).toBeGreaterThan(0);
+
     // Change first parameter to 128
     await numberInputs[0].fill('128');
     await numberInputs[0].dispatchEvent('change');
@@ -349,25 +378,27 @@ test.describe('NNVP Core Features', () => {
     console.log('\n=== BOOLEAN PARAMETER MODIFICATION TEST ===');
     console.log('Rightbar block visible:', rightbarBlock !== null);
 
-    if (rightbarBlock) {
-      // Find boolean parameter selects
-      const booleanSelects = await page.$$('#rightbar-block select.parameter-boolean');
-      console.log('Boolean parameters found:', booleanSelects.length);
+    // rightbar-block MUST exist when a layer is selected
+    expect(rightbarBlock).not.toBeNull();
 
-      if (booleanSelects.length > 0) {
-        const initialValue = await booleanSelects[0].evaluate(el => el.value);
-        console.log('Initial value:', initialValue);
+    // Find boolean parameter selects
+    const booleanSelects = await page.$$('#rightbar-block select.parameter-boolean');
+    console.log('Boolean parameters found:', booleanSelects.length);
 
-        // Click to toggle
-        await booleanSelects[0].click();
-        await page.waitForTimeout(500);
+    // Dense layer MUST have boolean parameters
+    expect(booleanSelects.length).toBeGreaterThan(0);
 
-        const newValue = await booleanSelects[0].evaluate(el => el.value);
-        console.log('Value after click:', newValue);
+    const initialValue = await booleanSelects[0].evaluate(el => el.value);
+    console.log('Initial value:', initialValue);
 
-        expect(newValue).not.toBe('void');
-      }
-    }
+    // Click to toggle
+    await booleanSelects[0].click();
+    await page.waitForTimeout(500);
+
+    const newValue = await booleanSelects[0].evaluate(el => el.value);
+    console.log('Value after click:', newValue);
+
+    expect(newValue).not.toBe('void');
 
     expect(consoleErrors.length).toBe(0);
   });
