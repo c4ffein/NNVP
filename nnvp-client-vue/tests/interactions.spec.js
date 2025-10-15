@@ -36,16 +36,28 @@ test.describe('NNVP Interactions', () => {
     const searchBox = await page.$('#layerSearchBox');
     expect(searchBox).not.toBeNull();
 
+    // Get content before search
+    const leftBarTextBefore = await page.textContent('#leftBar');
+    const visibleLayersBefore = await page.$$('.LayerTemplate');
+
     // Type "dense" in the search box
     await searchBox.type('dense');
     await page.waitForTimeout(500);
 
-    // Check that search filtering works
-    const leftBarText = await page.textContent('#leftBar');
+    // Get content after search
+    const leftBarTextAfter = await page.textContent('#leftBar');
+    const visibleLayersAfter = await page.$$('.LayerTemplate');
+
     console.log('\n=== SEARCH TEST ===');
     console.log('Search box found and typed "dense"');
-    console.log('LeftBar still has content after search:', leftBarText.length > 0);
+    console.log('Visible layers before search:', visibleLayersBefore.length);
+    console.log('Visible layers after search:', visibleLayersAfter.length);
+    console.log('Content changed after search:', leftBarTextBefore !== leftBarTextAfter);
 
+    // Search should filter results (fewer visible items, since we're searching for "dense")
+    expect(visibleLayersAfter.length).toBeLessThan(visibleLayersBefore.length);
+    expect(visibleLayersAfter.length).toBeGreaterThan(0); // Should still show some results
+    expect(leftBarTextAfter.length).toBeGreaterThan(0);
     expect(consoleErrors.length).toBe(0);
   });
 
@@ -89,6 +101,10 @@ test.describe('NNVP Interactions', () => {
     console.log('Has Save option:', hasSave);
     console.log('Has Load option:', hasLoad);
 
+    expect(dropdownVisible).toBe(true);
+    expect(hasGenerate).toBe(true);
+    expect(hasSave).toBe(true);
+    expect(hasLoad).toBe(true);
     expect(consoleErrors.length).toBe(0);
   });
 
@@ -119,7 +135,8 @@ test.describe('NNVP Interactions', () => {
     console.log('Number of categories:', categoryNames.length);
     console.log('Category names:', categoryNames);
 
-    expect(categoryNames.length).toBeGreaterThan(0);
+    // Should have at least several major categories (Core, Convolutional, Pooling, etc)
+    expect(categoryNames.length).toBeGreaterThan(4);
     expect(consoleErrors.length).toBe(0);
   });
 
