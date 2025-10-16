@@ -62,17 +62,33 @@ export default {
       activatedChain: [],
       undoStackContainer: this.$d3Interface.getUndoStackContainer(),
       redoStackContainer: this.$d3Interface.getRedoStackContainer(),
-      templatesNamesContainer: this.$d3Interface.getTemplatesContainer(),
+      templatesRefreshKey: 0,
     };
+  },
+  mounted() {
+    // Subscribe to templates changes
+    this.templatesChangeHandler = () => {
+      this.templatesRefreshKey++;
+    };
+    this.$d3Interface.on('templates-changed', this.templatesChangeHandler);
+  },
+  beforeUnmount() {
+    // Unsubscribe from events
+    if (this.templatesChangeHandler) {
+      this.$d3Interface.off('templates-changed', this.templatesChangeHandler);
+    }
   },
   computed: {
     templatesMenu() {
-      if (this.templatesNamesContainer === undefined
-        || this.templatesNamesContainer.e === undefined
-        || this.templatesNamesContainer.e.length === 0) {
+      // Access refreshKey to trigger reactivity
+      this.templatesRefreshKey; // eslint-disable-line
+      const container = this.$d3Interface.getTemplatesContainer();
+      if (container === undefined
+        || container.e === undefined
+        || container.e.length === 0) {
         return {};
       }
-      return this.templatesNamesContainer.e
+      return container.e
         .map(name => [name, () => this.$d3Interface.loadTemplate(name)])
         .reduce((p, c) => { p[c[0]] = c[1]; return p; }, {}); // eslint-disable-line
     },

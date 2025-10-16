@@ -7,8 +7,28 @@ export default class {
     this.redoStackContainer = { e: [] };
     this.templateIdsContainer = { e: [] };
     this.leftBarRemountCallback = () => false;
+    // Event listeners for reactive updates
+    this.listeners = {};
     // TODO : next line, boolean to know if there is data?
     window.onbeforeunload = () => 'Warning : all unsaved data will be lost';
+  }
+
+  // Event system for framework-agnostic reactivity
+  on(event, callback) {
+    if (!this.listeners[event]) {
+      this.listeners[event] = [];
+    }
+    this.listeners[event].push(callback);
+  }
+
+  off(event, callback) {
+    if (!this.listeners[event]) return;
+    this.listeners[event] = this.listeners[event].filter(cb => cb !== callback);
+  }
+
+  emit(event, data) {
+    if (!this.listeners[event]) return;
+    this.listeners[event].forEach(callback => callback(data));
   }
 
   // Get the layer corresponding to the id on the active graph
@@ -23,6 +43,11 @@ export default class {
     this.redoStackContainer.e = this.activeGraph.redoStack;
     this.templateIdsContainer.e = this.activeGraph.templates.list();
     this.leftBarRemountCallback();
+    // Emit events for reactive updates
+    this.emit('templates-changed');
+    this.emit('selection-changed');
+    this.emit('undo-stack-changed');
+    this.emit('redo-stack-changed');
   }
 
   getActiveElementsContainer() {

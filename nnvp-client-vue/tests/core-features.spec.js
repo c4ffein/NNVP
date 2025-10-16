@@ -97,25 +97,30 @@ test.describe('NNVP Core Features', () => {
       await templatesOption.hover();
       await page.waitForTimeout(500);
 
-      // Try to find any template (templates are dynamically loaded)
-      const templates = await page.$$('.dropdown-content .menuItem');
+      // Get the templates from the nested dropdown under Templates menuItem
+      // The structure is: .menuItem (Templates) > .dropdown-content > .menuItem (actual templates)
+      const templates = await page.$$('.menuItem:has-text("Templates") > .dropdown-content > .menuItem');
       console.log('Number of templates found:', templates.length);
 
-      // If templates exist, find one that's not "New" (empty template)
+      // If templates exist, find one that's a real template (not a UI command)
       if (templates.length > 0) {
         let templateToLoad = null;
         let templateName = '';
 
+        // UI commands to skip
+        const uiCommands = ['New', 'Load', 'Save', 'Generate', 'Generate Javascript', 'Templates', 'Undo', 'Redo'];
+
         for (const template of templates) {
           const text = await template.textContent();
-          if (text.trim() !== 'New') {
+          const trimmed = text.trim();
+          if (!uiCommands.includes(trimmed)) {
             templateToLoad = template;
-            templateName = text.trim();
+            templateName = trimmed;
             break;
           }
         }
 
-        // Fallback to first template if all are "New" (unlikely)
+        // Fallback to first template if all are UI commands (unlikely)
         if (!templateToLoad) {
           templateToLoad = templates[0];
           templateName = await templateToLoad.textContent();
@@ -144,6 +149,7 @@ test.describe('NNVP Core Features', () => {
   });
 
   test('should generate JavaScript code', async ({ page }) => {
+    // TODO Double this test, one for a network from scratch, one for a generated network? And fix, create a valid net
     // Add a simple layer first
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
@@ -178,6 +184,7 @@ test.describe('NNVP Core Features', () => {
     console.log('Code length:', content.length);
     console.log('Code contains "Dense":', content.includes('Dense') || content.includes('dense'));
     console.log('Code contains "tf.":', content.includes('tf.'));
+    console.log('Full code:\n' + content);
 
     expect(content.length).toBeGreaterThan(0);
     expect(content.includes('Dense') || content.includes('dense')).toBe(true);
@@ -186,6 +193,7 @@ test.describe('NNVP Core Features', () => {
   });
 
   test('should generate Python code', async ({ page }) => {
+    // TODO Double this test, one for a network from scratch, one for a generated network? And fix, create a valid net
     // Add a simple layer first
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
@@ -224,6 +232,7 @@ test.describe('NNVP Core Features', () => {
     console.log('Code length:', content.length);
     console.log('Code contains "Dense":', content.includes('Dense'));
     console.log('Code contains "keras" or "tensorflow":', content.includes('keras') || content.includes('tensorflow'));
+    console.log('Full code:\n' + content);
 
     expect(content.length).toBeGreaterThan(0);
     expect(content.includes('Dense')).toBe(true);
