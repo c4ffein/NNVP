@@ -142,6 +142,25 @@ test.describe('NNVP Core Features', () => {
         console.log('Total layers on canvas after template load:', totalLayers);
 
         expect(totalLayers).toBeGreaterThan(0);
+
+        // Verify layer types in the loaded template
+        const layerTexts = await page.$$eval('.d3Layer text', texts => texts.map(t => t.textContent));
+        console.log('Layer types:', layerTexts);
+
+        // Template should have Input and Output layers
+        expect(layerTexts.some(text => text.includes('Input'))).toBe(true);
+        expect(layerTexts.some(text => text.includes('Output'))).toBe(true);
+
+        // Should have at least one processing layer (Dense, Conv, etc.)
+        const hasProcessingLayer = layerTexts.some(text =>
+          text.includes('Dense') || text.includes('Conv') || text.includes('Flatten')
+        );
+        expect(hasProcessingLayer).toBe(true);
+
+        // Verify edges/connections exist
+        const edges = await page.$$('.link');
+        console.log('Number of edges:', edges.length);
+        expect(edges.length).toBeGreaterThan(0);
       }
     }
 
@@ -236,6 +255,116 @@ test.describe('NNVP Core Features', () => {
 
     expect(content.length).toBeGreaterThan(0);
     expect(content.includes('Dense')).toBe(true);
+
+    expect(consoleErrors.length).toBe(0);
+  });
+
+  test('should generate JavaScript code from template', async ({ page }) => {
+    console.log('\n=== JAVASCRIPT GENERATION FROM TEMPLATE TEST ===');
+
+    // Load a template
+    const fileMenu = await page.$('text=File');
+    await fileMenu.click();
+    await page.waitForTimeout(300);
+
+    const templatesOption = await page.$('text=Templates');
+    await templatesOption.hover();
+    await page.waitForTimeout(500);
+
+    const templates = await page.$$('.menuItem:has-text("Templates") > .dropdown-content > .menuItem');
+    const uiCommands = ['New', 'Load', 'Save', 'Generate', 'Generate Javascript', 'Templates'];
+
+    let templateLoaded = false;
+    for (const template of templates) {
+      const text = await template.textContent();
+      if (!uiCommands.includes(text.trim())) {
+        console.log('Loading template:', text.trim());
+        await template.click();
+        templateLoaded = true;
+        break;
+      }
+    }
+
+    expect(templateLoaded).toBe(true);
+    await page.waitForTimeout(2000);
+
+    // Generate JavaScript code
+    const downloadPromise = page.waitForEvent('download', { timeout: 5000 });
+    await fileMenu.click();
+    await page.waitForTimeout(300);
+    const generateJsOption = await page.$('text=Generate Javascript');
+    await generateJsOption.click();
+    await page.waitForTimeout(1000);
+
+    const download = await downloadPromise;
+    expect(download).not.toBeNull();
+
+    const path = await download.path();
+    const content = fs.readFileSync(path, 'utf-8');
+
+    console.log('Code length:', content.length);
+    console.log('Has content:', content.length > 200);
+    console.log('Contains Dense or Conv:', content.includes('Dense') || content.includes('Conv'));
+
+    expect(content.length).toBeGreaterThan(200);
+    expect(content.includes('Dense') || content.includes('Conv')).toBe(true);
+    expect(content.includes('tf.')).toBe(true);
+
+    expect(consoleErrors.length).toBe(0);
+  });
+
+  test('should generate Python code from template', async ({ page }) => {
+    console.log('\n=== PYTHON GENERATION FROM TEMPLATE TEST ===');
+
+    // Load a template
+    const fileMenu = await page.$('text=File');
+    await fileMenu.click();
+    await page.waitForTimeout(300);
+
+    const templatesOption = await page.$('text=Templates');
+    await templatesOption.hover();
+    await page.waitForTimeout(500);
+
+    const templates = await page.$$('.menuItem:has-text("Templates") > .dropdown-content > .menuItem');
+    const uiCommands = ['New', 'Load', 'Save', 'Generate', 'Generate Javascript', 'Templates'];
+
+    let templateLoaded = false;
+    for (const template of templates) {
+      const text = await template.textContent();
+      if (!uiCommands.includes(text.trim())) {
+        console.log('Loading template:', text.trim());
+        await template.click();
+        templateLoaded = true;
+        break;
+      }
+    }
+
+    expect(templateLoaded).toBe(true);
+    await page.waitForTimeout(2000);
+
+    // Generate Python code
+    const downloadPromise = page.waitForEvent('download', { timeout: 5000 });
+    await fileMenu.click();
+    await page.waitForTimeout(300);
+    const generateOption = await page.$('text=Generate');
+    const generateText = await generateOption.textContent();
+    expect(generateText.trim()).toBe('Generate');
+    await generateOption.click();
+    await page.waitForTimeout(1000);
+
+    const download = await downloadPromise;
+    expect(download).not.toBeNull();
+
+    const path = await download.path();
+    const content = fs.readFileSync(path, 'utf-8');
+
+    console.log('Code length:', content.length);
+    console.log('Has content:', content.length > 200);
+    console.log('Contains Dense or Conv:', content.includes('Dense') || content.includes('Conv'));
+
+    expect(content.length).toBeGreaterThan(200);
+    expect(content.includes('Dense') || content.includes('Conv')).toBe(true);
+    expect(content.includes('keras') || content.includes('tensorflow')).toBe(true);
 
     expect(consoleErrors.length).toBe(0);
   });
