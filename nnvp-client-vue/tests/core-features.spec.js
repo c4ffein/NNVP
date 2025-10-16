@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import fs from 'node:fs';
 
 test.describe('NNVP Core Features', () => {
   let consoleMessages = [];
@@ -172,7 +173,6 @@ test.describe('NNVP Core Features', () => {
 
     // Check content
     const path = await download.path();
-    const fs = require('fs');
     const content = fs.readFileSync(path, 'utf-8');
 
     console.log('Code length:', content.length);
@@ -219,7 +219,6 @@ test.describe('NNVP Core Features', () => {
 
     // Check content
     const path = await download.path();
-    const fs = require('fs');
     const content = fs.readFileSync(path, 'utf-8');
 
     console.log('Code length:', content.length);
@@ -301,62 +300,112 @@ test.describe('NNVP Core Features', () => {
   });
 
   test('should modify int parameter and verify in generated code', async ({ page }) => {
-    // Add a Dense layer
+    console.log('\n=== INT PARAMETER MODIFICATION TEST ===');
+
+    // Build a simple complete model: Input -> Dense -> Output
+    // Add Input layer
+    const inputLayer = await page.$('.LayerTemplate:has-text("Input")');
+    await inputLayer.click();
+    await page.waitForTimeout(500);
+
+    // Add Dense layer
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
     await page.waitForTimeout(500);
 
-    // Click layer to select it
-    const layerOnCanvas = await page.$('.d3Layer');
-    await layerOnCanvas.click();
-    await page.waitForTimeout(1000); // Wait longer for reactive update
-
-    // Check if rightbar-block is visible
-    const rightbarBlock = await page.$('#rightbar-block');
-
-    console.log('\n=== INT PARAMETER MODIFICATION TEST ===');
-    console.log('Rightbar block visible:', rightbarBlock !== null);
-
-    // rightbar-block MUST exist when a layer is selected
-    expect(rightbarBlock).not.toBeNull();
-
-    // Find and modify an int parameter
-    const numberInputs = await page.$$('#rightbar-block input[type="number"]');
-    console.log('Number inputs found:', numberInputs.length);
-
-    // There MUST be number inputs for a Dense layer
-    expect(numberInputs.length).toBeGreaterThan(0);
-
-    // Change first parameter to 128
-    await numberInputs[0].fill('128');
-    await numberInputs[0].dispatchEvent('change');
+    // Add Output layer
+    const outputLayer = await page.$('.LayerTemplate:has-text("Output")');
+    await outputLayer.click();
     await page.waitForTimeout(500);
 
-    console.log('Modified parameter to 128');
+    console.log('Built model: Input -> Dense -> Output');
 
-    // Generate Python code and check content
-    const downloadPromise = page.waitForEvent('download', { timeout: 5000 }).catch(() => null);
+    // Verify we have at least one Dense layer on canvas
+    const allLayersText = await page.$$eval('.d3Layer text', texts => texts.map(t => t.textContent));
+    console.log('Layers on canvas:', allLayersText);
+    const hasDenseLayer = allLayersText.some(text => text.includes('Dense'));
+    expect(hasDenseLayer).toBe(true);
 
+    // Generate code BEFORE modification
+    const downloadPromise1 = page.waitForEvent('download', { timeout: 5000 });
     const fileMenu = await page.$('text=File');
     await fileMenu.click();
     await page.waitForTimeout(300);
+    const generateOption1 = await page.$('text=Generate');
+    await generateOption1.click();
+    await page.waitForTimeout(1000);
 
-    const generateOption = await page.$('text=Generate');
-    const generateText = await generateOption.textContent();
-    if (generateText.trim() === 'Generate') {
-      await generateOption.click();
+    const download1 = await downloadPromise1;
+    const path1 = await download1.path();
+    const contentBefore = fs.readFileSync(path1, 'utf-8');
+    console.log('Code before modification length:', contentBefore.length);
+    console.log('Code before contains "Dense":', contentBefore.includes('Dense'));
+
+    // Now select the Dense layer and modify its parameter
+    const layersOnCanvas = await page.$$('.d3Layer');
+    let denseLayerFound = false;
+
+    console.log('Attempting to find and select Dense layer...');
+
+    for (let i = 0; i < layersOnCanvas.length; i++) {
+      const layer = layersOnCanvas[i];
+      // Use mouse.click to bypass text element interception
+      const box = await layer.boundingBox();
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
       await page.waitForTimeout(1000);
 
-      const download = await downloadPromise;
-      if (download) {
-        const path = await download.path();
-        const fs = require('fs');
-        const content = fs.readFileSync(path, 'utf-8');
+      const rightBarText = await page.textContent('#rightBar');
+      console.log(`Layer ${i}: First 80 chars of rightbar: "${rightBarText.substring(0, 80)}"`);
 
-        console.log('Code contains "128":', content.includes('128'));
-        expect(content.includes('128')).toBe(true);
+      if (rightBarText.includes('Dense') && rightBarText.includes('units')) {
+        console.log('Found and selected Dense layer');
+        denseLayerFound = true;
+
+        // Check if rightbar-block is visible
+        const rightbarBlock = await page.$('#rightbar-block');
+        expect(rightbarBlock).not.toBeNull();
+
+        // Find and modify the "units" parameter
+        const numberInputs = await page.$$('#rightbar-block input[type="number"]');
+        console.log('Number inputs found:', numberInputs.length);
+        expect(numberInputs.length).toBeGreaterThan(0);
+
+        const initialValue = await numberInputs[0].inputValue();
+        console.log('Initial units value:', initialValue);
+
+        // Change to a distinctive value: 256
+        await numberInputs[0].fill('256');
+        await numberInputs[0].dispatchEvent('change');
+        await page.waitForTimeout(500);
+
+        const newValue = await numberInputs[0].inputValue();
+        console.log('Modified units value to:', newValue);
+        expect(newValue).toBe('256');
+
+        break;
       }
     }
+
+    expect(denseLayerFound).toBe(true);
+
+    // Generate code AFTER modification
+    const downloadPromise2 = page.waitForEvent('download', { timeout: 5000 });
+    await fileMenu.click();
+    await page.waitForTimeout(300);
+    const generateOption2 = await page.$('text=Generate');
+    await generateOption2.click();
+    await page.waitForTimeout(1000);
+
+    const download2 = await downloadPromise2;
+    const path2 = await download2.path();
+    const contentAfter = fs.readFileSync(path2, 'utf-8');
+    console.log('Code after modification length:', contentAfter.length);
+    console.log('Code after contains "256":', contentAfter.includes('256'));
+    console.log('Code changed:', contentBefore !== contentAfter);
+
+    // Verify the code changed and contains our value
+    expect(contentAfter.includes('256')).toBe(true);
+    expect(contentBefore !== contentAfter).toBe(true);
 
     expect(consoleErrors.length).toBe(0);
   });

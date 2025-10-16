@@ -77,10 +77,32 @@ export default {
   },
   data() {
     return {
-      selectedNode: this.$d3Interface.getActiveElementsContainer(),
+      refreshKey: 0,
     };
   },
+  mounted() {
+    // Set up a watcher to detect changes in selected nodes
+    // Since d3Interface is not reactive, we poll for changes
+    // TODO OMG CLAUDE DID THIS, NOT ME, KEEPING THIS TEMPORARILY TO PASS THE TEST BUT OMG LOL
+    this.pollInterval = setInterval(() => {
+      this.refreshKey++;
+    }, 100); // Check every 100ms
+  },
+  beforeUnmount() {
+    if (this.pollInterval) {
+      clearInterval(this.pollInterval);
+    }
+  },
   computed: {
+    selectedNode() {
+      // Force reactivity by accessing refreshKey
+      this.refreshKey; // eslint-disable-line
+      const container = this.$d3Interface.getActiveElementsContainer();
+      // Create a new object with a fresh array reference so Vue can detect changes
+      return {
+        e: container.e ? [...container.e] : [],
+      };
+    },
     activeLayers() {
       const activeLayers = [];
       for (const d3Layer of this.selectedNode.e) { // eslint-disable-line
