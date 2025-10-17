@@ -47,6 +47,9 @@ export default function D3GraphEditor(svg, model) {
   this.model = model || new D3Model(undefined, undefined, this);
   this.templates = new D3Templates();
 
+  // Debug flag for event logging (set to true to see click/drag events in console)
+  this.debugEvents = false;
+
   // ID's counter
   this.nodeId = 0;
 

@@ -17,6 +17,11 @@ export default {
     let svg = d3.select("#svgWrapper").append("svg");
     let whiteboard = this.$d3Interface;
     whiteboard.addGraphEditor(new D3GraphEditor(svg));
+
+    // Expose graph editor for debugging/testing
+    // TODO Claude did this, keeping as-is, but maybe this doesn't work on board switch
+    window.nnvpGraphEditor = whiteboard.activeGraph;
+
     // upload button
     d3.select("#hidden-file-upload").on("change", function (d) {
       let uploadFileEvent = this;

@@ -352,35 +352,22 @@ D3Layer.prototype.drawLayer = function (graph) {
       graph.mouseover_node = null;
       d3.select(this).attr("r", 2);
     })
-    .on("click", function(){
-      if(graph.model.d3Layers.length > 1){
-        let dist = null,
-            finalLayer,
-            sourceCenter = {x: thisLayer.x + (thisLayer.width/2), y: thisLayer.y + (thisLayer.height/2)};
-        graph.model.d3Layers.forEach(layer => {
-          let targetCenter = {x: layer.x + (layer.width/2), y: layer.y + (layer.height/2)};
-          let newDist = Math.sqrt(Math.abs(sourceCenter.x - targetCenter.x)*Math.abs(sourceCenter.x - targetCenter.x) + Math.abs(sourceCenter.y - targetCenter.y)*Math.abs(sourceCenter.y - targetCenter.y));
-          if((!dist || dist > newDist) && layer !== thisLayer){
-            dist = newDist;
-            finalLayer = layer;
-          }
-        });
-        graph.mouseDownNode = thisLayer;
-        graph.layerMouseUp.call(graph, finalLayer);
-        gElement.classed("isolated", D3GraphValidation.isIsolated(graph, thisLayer));
-      }
-    })
     .call(d3.drag()
       .subject( () => { return { x: thisLayer.x, y: thisLayer.y }; })
       .on("start", function () {
+        if (graph.debugEvents) console.log(`[DRAG START] Anchor on layer ${thisLayer.htmlID}, mouseDownNode before: ${graph.mouseDownNode ? graph.mouseDownNode.htmlID : 'null'}`);
         graph.layerMouseDown.call(graph, thisLayer);
+        if (graph.debugEvents) console.log(`[DRAG START] mouseDownNode after: ${graph.mouseDownNode ? graph.mouseDownNode.htmlID : 'null'}`);
       })
       .on("drag", event => {
-        graph.moveDragLine.call(graph, event, this);
+        if (graph.debugEvents) console.log(`[DRAG] Moving dragLine from ${graph.mouseDownNode ? graph.mouseDownNode.htmlID : 'null'}`);
+        graph.moveDragLine.call(graph, event, graph.mouseDownNode);
       })
       .on("end", function () {
+        if (graph.debugEvents) console.log(`[DRAG END] From ${graph.mouseDownNode ? graph.mouseDownNode.htmlID : 'null'} to ${graph.mouseover_node ? graph.mouseover_node.htmlID : 'null'}`);
         graph.layerMouseUp.call(graph, graph.mouseover_node);
         gElement.classed("isolated", D3GraphValidation.isIsolated(graph, thisLayer));
+        if (graph.debugEvents) console.log(`[DRAG END] mouseDownNode after: ${graph.mouseDownNode ? graph.mouseDownNode.htmlID : 'null'}`);
       })
     );
 
