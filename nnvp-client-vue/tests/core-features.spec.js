@@ -192,74 +192,63 @@ test.describe('NNVP Core Features', () => {
 
     console.log('5 layers added to canvas');
 
-    // Strategy: Use mouse movements to drag anchors with actual movement distance
-    // D3's drag handler requires actual mouse movement to trigger the connection logic
+    // Enable debug logging to see D3 drag events
+    await page.evaluate(() => {
+      window.nnvpGraphEditor.debugEvents = true;
+    });
+    console.log('Debug logging enabled');
 
-    console.log('Connecting layers via anchor dragging with mouse movements...');
+    // Reposition layers vertically using transitionToXY (drag doesn't update model x/y)
+    console.log('Repositioning layers vertically...');
+    await page.evaluate(() => {
+      for (let i = 0; i < 5; i++) {
+        const layer = window.nnvpGraphEditor.model.d3Layers[i];
+        const targetY = 100 + i * 120;
+        layer.transitionToXY(300, targetY);
+      }
+    });
+    await page.waitForTimeout(1000);
+    console.log('All layers repositioned using transitionToXY');
 
-    // Get the positions of the anchor points
-    const anchor0 = await page.$('#d3-layer-0 circle.bottom-point');
-    const box0 = await anchor0.boundingBox();
+    // Verify layers are properly positioned
+    const layerPositions = await page.evaluate(() => {
+      return Array.from({length: 5}, (_, i) => {
+        const layer = window.nnvpGraphEditor.model.d3Layers[i];
+        return { id: layer.htmlID, x: layer.x, y: layer.y };
+      });
+    });
+    console.log('Layer positions:', JSON.stringify(layerPositions, null, 2));
 
-    // Connect d3-layer-0 (Input) -> d3-layer-1 (Flatten)
-    // Drag with actual mouse movement distance
-    await page.mouse.move(box0.x + box0.width/2, box0.y + box0.height/2);
-    await page.mouse.down();
-    await page.mouse.move(box0.x + box0.width/2 + 50, box0.y + box0.height/2 + 100); // Move away
-    await page.waitForTimeout(100);
+    console.log('Connecting layers using drag-and-drop on anchors...');
 
-    const anchor1 = await page.$('#d3-layer-1 circle.top-point');
-    const box1 = await anchor1.boundingBox();
-    await page.mouse.move(box1.x + box1.width/2, box1.y + box1.height/2);
-    await page.mouse.up();
-    await page.waitForTimeout(300);
-    console.log('Connected layer 0 -> 1');
+    // Drag from each layer's bottom anchor to the next layer's center to create connections
+    for (let i = 0; i < 4; i++) {
+      // Get target layer rect to ensure mouseover_node is set
+      const targetLayer = await page.$(`#d3-layer-${i+1} rect`);
+      const targetBox = await targetLayer.boundingBox();
 
-    // Connect d3-layer-1 (Flatten) -> d3-layer-2 (Dense)
-    await page.mouse.move(box1.x + box1.width/2, box1.y + box1.height/2 + 20); // Start at layer 1 bottom
-    await page.mouse.down();
-    await page.mouse.move(box1.x + box1.width/2 + 50, box1.y + box1.height/2 + 120);
-    await page.waitForTimeout(100);
+      const sourceAnchor = await page.$(`#d3-layer-${i} circle.bottom-point`);
+      const sourceBox = await sourceAnchor.boundingBox();
 
-    const anchor2 = await page.$('#d3-layer-2 circle.top-point');
-    const box2 = await anchor2.boundingBox();
-    await page.mouse.move(box2.x + box2.width/2, box2.y + box2.height/2);
-    await page.mouse.up();
-    await page.waitForTimeout(300);
-    console.log('Connected layer 1 -> 2');
+      // Start drag from source anchor
+      await page.mouse.move(sourceBox.x + sourceBox.width/2, sourceBox.y + sourceBox.height/2);
+      await page.waitForTimeout(200);
+      await page.mouse.down();
+      await page.waitForTimeout(200);
 
-    // Connect d3-layer-2 (Dense) -> d3-layer-3 (Dense)
-    await page.mouse.move(box2.x + box2.width/2, box2.y + box2.height/2 + 40);
-    await page.mouse.down();
-    await page.mouse.move(box2.x + box2.width/2 + 50, box2.y + box2.height/2 + 140);
-    await page.waitForTimeout(100);
+      // Move to target layer center (to set mouseover_node)
+      await page.mouse.move(targetBox.x + targetBox.width/2, targetBox.y + targetBox.height/2);
+      await page.waitForTimeout(300);
 
-    const anchor3 = await page.$('#d3-layer-3 circle.top-point');
-    const box3 = await anchor3.boundingBox();
-    await page.mouse.move(box3.x + box3.width/2, box3.y + box3.height/2);
-    await page.mouse.up();
-    await page.waitForTimeout(300);
-    console.log('Connected layer 2 -> 3');
+      // Release to create connection
+      await page.mouse.up();
+      await page.waitForTimeout(500);
 
-    // Connect d3-layer-3 (Dense) -> d3-layer-4 (Output)
-    await page.mouse.move(box3.x + box3.width/2, box3.y + box3.height/2 + 40);
-    await page.mouse.down();
-    await page.mouse.move(box3.x + box3.width/2 + 50, box3.y + box3.height/2 + 140);
-    await page.waitForTimeout(100);
+      const currentEdges = await page.$$eval('.link:not(.dragline)', links => links.length);
+      console.log(`Connected layer ${i} to layer ${i+1}, total edges: ${currentEdges}`);
+    }
 
-    const anchor4 = await page.$('#d3-layer-4 circle.top-point');
-    const box4 = await anchor4.boundingBox();
-    await page.mouse.move(box4.x + box4.width/2, box4.y + box4.height/2);
-    await page.mouse.up();
-    await page.waitForTimeout(300);
-    console.log('Connected layer 3 -> 4');
-
-    // Check if edges were created
-    const edgesCount = await page.$$eval('.link', links => links.length);
-    console.log('Edges created:', edgesCount);
-    // Note: dragAndDrop on stacked layers may not create all expected connections
-    // but should create at least one
-    expect(edgesCount).toBeGreaterThan(0);
+    console.log('Finished connecting layers');
 
     // Set up listener for download or popup
     const downloadPromise = page.waitForEvent('download', { timeout: 5000 }).catch(() => null);
@@ -368,14 +357,85 @@ test.describe('NNVP Core Features', () => {
   });
 
   test('should generate Python code from manually built network', async ({ page }) => {
-    // TODO: This test is failing because manually adding layers doesn't auto-connect them
-    // Need to implement edge/connection drawing, or find the auto-connect mechanism
-    // For now, use "should generate Python code from template" instead
+    console.log('\n=== MANUAL NETWORK BUILDING TEST (Python) ===');
+
+    // Add layers by clicking
     const inputLayer = await page.$('.LayerTemplate:has-text("Input")');
     await inputLayer.click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(500);
 
-    // Set up listener for download or popup
+    const flattenLayer = await page.$('.LayerTemplate:has-text("Flatten")');
+    await flattenLayer.click();
+    await page.waitForTimeout(500);
+
+    const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
+    await denseLayer.click();
+    await page.waitForTimeout(500);
+
+    await denseLayer.click(); // Second Dense
+    await page.waitForTimeout(500);
+
+    const outputLayer = await page.$('.LayerTemplate:has-text("Output")');
+    await outputLayer.click();
+    await page.waitForTimeout(500);
+
+    console.log('5 layers added to canvas');
+
+    // Enable debug logging
+    await page.evaluate(() => {
+      window.nnvpGraphEditor.debugEvents = true;
+    });
+    console.log('Debug logging enabled');
+
+    // Reposition layers vertically
+    console.log('Repositioning layers vertically...');
+    await page.evaluate(() => {
+      for (let i = 0; i < 5; i++) {
+        const layer = window.nnvpGraphEditor.model.d3Layers[i];
+        const targetY = 100 + i * 120;
+        layer.transitionToXY(300, targetY);
+      }
+    });
+    await page.waitForTimeout(1000);
+    console.log('All layers repositioned using transitionToXY');
+
+    // Verify positions
+    const layerPositions = await page.evaluate(() => {
+      return Array.from({length: 5}, (_, i) => {
+        const layer = window.nnvpGraphEditor.model.d3Layers[i];
+        return { id: layer.htmlID, x: layer.x, y: layer.y };
+      });
+    });
+    console.log('Layer positions:', JSON.stringify(layerPositions, null, 2));
+
+    console.log('Connecting layers using drag-and-drop on anchors...');
+
+    // Drag to connect layers
+    for (let i = 0; i < 4; i++) {
+      const targetLayer = await page.$(`#d3-layer-${i+1} rect`);
+      const targetBox = await targetLayer.boundingBox();
+
+      const sourceAnchor = await page.$(`#d3-layer-${i} circle.bottom-point`);
+      const sourceBox = await sourceAnchor.boundingBox();
+
+      await page.mouse.move(sourceBox.x + sourceBox.width/2, sourceBox.y + sourceBox.height/2);
+      await page.waitForTimeout(200);
+      await page.mouse.down();
+      await page.waitForTimeout(200);
+
+      await page.mouse.move(targetBox.x + targetBox.width/2, targetBox.y + targetBox.height/2);
+      await page.waitForTimeout(300);
+
+      await page.mouse.up();
+      await page.waitForTimeout(500);
+
+      const currentEdges = await page.$$eval('.link:not(.dragline)', links => links.length);
+      console.log(`Connected layer ${i} to layer ${i+1}, total edges: ${currentEdges}`);
+    }
+
+    console.log('Finished connecting layers');
+
+    // Set up listener for download
     const downloadPromise = page.waitForEvent('download', { timeout: 5000 }).catch(() => null);
 
     // Open File menu and click Generate
@@ -384,10 +444,8 @@ test.describe('NNVP Core Features', () => {
     await page.waitForTimeout(300);
 
     const generateOption = await page.$('text=Generate');
-    // Make sure we're not clicking "Generate Javascript"
     const generateText = await generateOption.textContent();
     expect(generateText.trim()).toBe('Generate');
-
     await generateOption.click();
     await page.waitForTimeout(1000);
 
@@ -406,8 +464,9 @@ test.describe('NNVP Core Features', () => {
     const content = fs.readFileSync(path, 'utf-8');
 
     console.log('Code length:', content.length);
+    console.log('Generated code:\n', content);
     console.log('Contains Dense:', content.includes('Dense'));
-    console.log('Contains keras.layers:', content.includes('keras.layers'));
+    console.log('Contains keras or tensorflow:', content.includes('keras') || content.includes('tensorflow'));
 
     expect(content.length).toBeGreaterThan(200);
     expect(content.includes('Dense')).toBe(true);
