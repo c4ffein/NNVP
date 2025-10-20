@@ -1,28 +1,29 @@
-# WARNING: This is a barely used side project and as I work alone, I'm breaking master for the Vue 3 migration. Check out f78d724032e97852b4f40197bedb9579e59cd1a4 if you want that project in a working state, which is the version in production at [nnvp.io](https://nnvp.io)
+# NNVP
+## REFACOR WARNING
+This is a barely used side project and as I work alone, I broke master for the Vue 3 migration.
+Check out `f78d724032e97852b4f40197bedb9579e59cd1a4` if you want that project in a working state, which is the version in production at [nnvp.io](https://nnvp.io). The current migration is tracked in [tasks.md](/tasks.md)
 
-# Description
+## Description
 This project allows you to generate Python/JS code describing a Keras model by creating a graph representing the different layers in your browser.
 Functionalities to launch the compilation and training on the server could be added if we keep developping it.
 A demo is available at [nnvp.io](https://nnvp.io).
 
-# How to run
-## Only the standalone client
+## How to run
+### Only the standalone client
 As we aren't working on an updated backend right now, you can just go to the `nnvp-client-vue` folder:
  - `npm install`
  - `npm run dev` / `npm run dev-host` to run a development version
  - `npm run build` then serve the content of the `nnvp-client-vue/dist` folder.
 
-# Launch the tests - not up to date
-- From the src/nnvp-client-vue directory :
-  - Execute `npm install` then `npm run serve`
-  - In another terminal, still in the same directory, launch `npm run test:e2e`
-  - Warning : to use another browser, change test:e2e target of the package.json file, replacing Firefox by another browser installed locally
+## Running the tests
+The e2e test suite uses Playwright and covers most of the original features.
+- `make test-e2e` - Tests run in Chromium by default
 
-# Future improvements
+## Future improvements
 - Check [tasks.md](/tasks.md)
 
-# Credits
-## History
+## Credits
+### History
 This project was initially carried out as part of my first year of master's degree. The client was forked from Draw.io, as it provided a really good user experience.
 Continuing to work on it was proposed as a subject for one of the the second year's projects, this time for a bigger team, although with a much shorter development time.
 Modifying the existing codebase to implement new features was still a really difficult task, as Draw.io was totally not designed to run graph algorithms.
@@ -32,7 +33,7 @@ We only adapted backend for our new client, which was now simpler as we didn't n
 We managed to produce a somehow usable tool, missing lots of features and without a satisactory user experience.
 Since then, a lot of the code has been modified. We still need to refactor big parts of it. You can now generate Keras code without backend, we will focus on client and continue to develop backend only to enable training on it.
 
-## People who worked on it at the university
+### People who worked on it at the university
 - [c4ffein](https://github.com/c4ffein) : Both university projects, most of back-end except the file describing all types of Keras layers. As for the client, interface between the Vue.js and D3.js code, code managing the Keras layers, top bar and left bar components, Docker.
 - [Firstein](https://github.com/Firstein) : Most of the D3 codebase.
 - [aliuc](https://github.com/aliuc) : Only participated in the first project, wrote the initial file describing Keras layers.
