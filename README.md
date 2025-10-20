@@ -1,5 +1,5 @@
 # NNVP
-## REFACOR WARNING
+## REFACTOR WARNING
 This is a barely used side project and as I work alone, I broke master for the Vue 3 migration.
 Check out `f78d724032e97852b4f40197bedb9579e59cd1a4` if you want that project in a working state, which is the version in production at [nnvp.io](https://nnvp.io). The current migration is tracked in [tasks.md](/tasks.md)
 
