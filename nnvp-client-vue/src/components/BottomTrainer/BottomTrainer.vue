@@ -22,6 +22,7 @@
           v-bind:ref="'child'+selectedPanel"
           class="tab"
           v-bind:value="selectedDataset"
+          @input="selectedDataset = $event"
           v-bind:loadableDatasets="loadableDatasets"
           v-bind:selectedOptimizer="selectedOptimizer"
           @changeSelectedOptimizer="changeSelectedOptimizer"

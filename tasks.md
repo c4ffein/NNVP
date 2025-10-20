@@ -25,8 +25,10 @@ But if you read this and you want to get involved, you can actually create one f
     - [ ] Test tuple parameter types
     - [ ] Test list parameter types
     - [ ] Test order parameter types
-  - [ ] **Dataset loading:**
-    - [ ] Load a dataset from the BottomTrainer panel
+  - [x] **Dataset loading:**
+    - [x] Load a dataset from the BottomTrainer panel
+    - [x] Load fashion mnist after mnist from the BottomTrainer panel
+    - [x] Reload mnist after the mnist -> fashion mnist interaction
   - [ ] **Link/edge manipulation:**
     - [ ] Load template, delete a link between layers, verify network is broken (error state)
     - [ ] Redraw the deleted link, verify network is valid again

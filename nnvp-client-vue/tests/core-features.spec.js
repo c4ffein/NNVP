@@ -668,25 +668,23 @@ def build_model():
   test('should modify int parameter and verify in generated code', async ({ page }) => {
     console.log('\n=== INT PARAMETER MODIFICATION TEST ===');
 
-    // Build a simple complete model: Input -> Dense -> Output
-    // Add Input layer
-    const inputLayer = await page.$('.LayerTemplate:has-text("Input")');
-    await inputLayer.click();
+    // Load a template to get a complete connected network
+    const fileMenu = await page.$('text=File');
+    await fileMenu.click();
     await page.waitForTimeout(500);
 
-    // Add Dense layer
-    const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
-    await denseLayer.click();
+    // Hover over Templates to open submenu
+    const templatesOption = await page.$('text=Templates');
+    await templatesOption.hover();
     await page.waitForTimeout(500);
 
-    // Add Output layer
-    const outputLayer = await page.$('.LayerTemplate:has-text("Output")');
-    await outputLayer.click();
-    await page.waitForTimeout(500);
+    // Select "2D Dense for MNIST" template from submenu
+    const template = await page.$('text=2D Dense for MNIST');
+    await template.click();
+    await page.waitForTimeout(1000);
+    console.log('Loaded template: 2D Dense for MNIST');
 
-    console.log('Built model: Input -> Dense -> Output');
-
-    // Verify we have at least one Dense layer on canvas
+    // Verify we have Dense layers
     const allLayersText = await page.$$eval('.d3Layer text', texts => texts.map(t => t.textContent));
     console.log('Layers on canvas:', allLayersText);
     const hasDenseLayer = allLayersText.some(text => text.includes('Dense'));
@@ -694,7 +692,6 @@ def build_model():
 
     // Generate code BEFORE modification
     const downloadPromise1 = page.waitForEvent('download', { timeout: 5000 });
-    const fileMenu = await page.$('text=File');
     await fileMenu.click();
     await page.waitForTimeout(300);
     const generateOption1 = await page.$('text=Generate');
@@ -1042,6 +1039,222 @@ def build_model():
 
     console.log('✅ MNIST dataset loading completed successfully with real samples!');
 
+    expect(consoleErrors.length).toBe(0);
+  });
+
+  test('should load FashionMNIST after MNIST', async ({ page }) => {
+    console.log('\n=== FASHION MNIST LOADING TEST ===');
+    // Enable debug logging
+    await page.evaluate(() => {
+      window.nnvpDebugDatasets = true;
+    });
+    // Go to Dataset tab
+    const datasetTab = await page.$('.BottomTrainer.bar-button:has-text("Dataset")');
+    await datasetTab.click();
+    await page.waitForTimeout(500);
+    const datasetSelector = await page.$('#dataset-selector-selector');
+    // Wait for MNIST auto-load to complete
+    console.log('Waiting for MNIST auto-load...');
+    await page.waitForTimeout(4000);
+    await page.waitForFunction(
+      () => {
+        const samplesDiv = document.querySelector('#samples');
+        return samplesDiv && samplesDiv.querySelectorAll('canvas').length > 0;
+      },
+      { timeout: 120000 }
+    );
+    console.log('MNIST loaded');
+    // Get average pixel data from ALL MNIST samples (should be consistent across runs)
+    const mnistPixelData = await page.evaluate(() => {
+      const canvases = document.querySelectorAll('#samples canvas');
+      let totalSum = 0;
+      let totalPixels = 0;
+
+      canvases.forEach(canvas => {
+        const ctx = canvas.getContext('2d');
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        // Sum all pixels
+        for (let i = 0; i < imageData.data.length; i += 4) {
+          totalSum += imageData.data[i]; // Red channel (grayscale, so R=G=B)
+          totalPixels++;
+        }
+      });
+      return Math.round(totalSum / totalPixels);
+    });
+    console.log('MNIST average pixel value across all samples:', mnistPixelData);
+    // Verify MNIST has expected brightness range (20-55)
+    expect(mnistPixelData).toBeGreaterThan(20);
+    expect(mnistPixelData).toBeLessThan(55);
+    // Now change to FashionMNIST using the dropdown selector (like a real user would)
+    console.log('Changing to FashionMNIST...');
+    await page.selectOption('#dataset-selector-selector', 'FashionMNIST');
+    // Wait for FashionMNIST to load
+    await page.waitForTimeout(3000);
+    // Verify selector changed
+    const newDataset = await datasetSelector.evaluate(el => el.value);
+    console.log('Selector value:', newDataset);
+    expect(newDataset).toBe('FashionMNIST');
+    // Wait for samples to render
+    await page.waitForFunction(
+      () => {
+        const samplesDiv = document.querySelector('#samples');
+        const loadingBar = document.querySelector('#data-selector-loading-bar-container');
+        const loadingHidden = !loadingBar || window.getComputedStyle(loadingBar).display === 'none';
+        return loadingHidden && samplesDiv && samplesDiv.querySelectorAll('canvas').length > 0;
+      },
+      { timeout: 120000 }
+    );
+    // Verify FashionMNIST samples rendered
+    const samplesDiv = await page.$('#samples');
+    const canvases = await samplesDiv.$$('canvas');
+    console.log('FashionMNIST canvases:', canvases.length);
+    expect(canvases.length).toBeGreaterThan(0);
+    expect(canvases.length).toBeLessThanOrEqual(40);
+    // Get average pixel data from ALL FashionMNIST samples
+    const fashionPixelData = await page.evaluate(() => {
+      const canvases = document.querySelectorAll('#samples canvas');
+      let totalSum = 0;
+      let totalPixels = 0;
+      canvases.forEach(canvas => {
+        const ctx = canvas.getContext('2d');
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        for (let i = 0; i < imageData.data.length; i += 4) {
+          totalSum += imageData.data[i];
+          totalPixels++;
+        }
+      });
+      return Math.round(totalSum / totalPixels);
+    });
+    console.log('FashionMNIST average pixel value across all samples:', fashionPixelData);
+    // Verify FashionMNIST has expected brightness range (55-90)
+    expect(fashionPixelData).toBeGreaterThan(55);
+    expect(fashionPixelData).toBeLessThan(90);
+    // Verify images are actually different
+    expect(fashionPixelData).not.toBe(mnistPixelData);
+    console.log(
+      '✅ Verified datasets are different and in expected ranges (MNIST:',
+      mnistPixelData,
+      ', FashionMNIST:',
+      fashionPixelData,
+      ')',
+    );
+    // Verify description updated
+    const description = await page.textContent('#dataset-description');
+    console.log('Description:', description.substring(0, 100));
+    expect(description).toContain('clothes'); // FashionMNIST description says "Dataset of clothes images"
+    expect(description).not.toContain('handwritten'); // Should not have MNIST description
+    console.log('✅ FashionMNIST loaded successfully after MNIST!');
+    expect(consoleErrors.length).toBe(0);
+  });
+
+  test('should reload MNIST after FashionMNIST', async ({ page }) => {
+    console.log('\n=== RELOAD MNIST TEST ===');
+    // Enable debug logging
+    await page.evaluate(() => {
+      window.nnvpDebugDatasets = true;
+    });
+    // Go to Dataset tab
+    const datasetTab = await page.$('.BottomTrainer.bar-button:has-text("Dataset")');
+    await datasetTab.click();
+    await page.waitForTimeout(500);
+    const datasetSelector = await page.$('#dataset-selector-selector');
+    // Wait for MNIST auto-load
+    console.log('Waiting for initial MNIST...');
+    await page.waitForTimeout(4000);
+    await page.waitForFunction(
+      () => {
+        const samplesDiv = document.querySelector('#samples');
+        return samplesDiv && samplesDiv.querySelectorAll('canvas').length > 0;
+      },
+      { timeout: 120000 }
+    );
+    console.log('MNIST loaded');
+    // Change to FashionMNIST using the dropdown selector
+    console.log('Loading FashionMNIST...');
+    await page.selectOption('#dataset-selector-selector', 'FashionMNIST');
+    await page.waitForTimeout(2000);
+    // Wait for FashionMNIST to load
+    await page.waitForFunction(
+      () => {
+        const samplesDiv = document.querySelector('#samples');
+        const loadingBar = document.querySelector('#data-selector-loading-bar-container');
+        const loadingHidden = !loadingBar || window.getComputedStyle(loadingBar).display === 'none';
+        return loadingHidden && samplesDiv && samplesDiv.querySelectorAll('canvas').length > 0;
+      },
+      { timeout: 120000 }
+    );
+    console.log('FashionMNIST loaded');
+    // Get average pixel data from ALL FashionMNIST samples
+    const fashionPixelData = await page.evaluate(() => {
+      const canvases = document.querySelectorAll('#samples canvas');
+      let totalSum = 0;
+      let totalPixels = 0;
+      canvases.forEach(canvas => {
+        const ctx = canvas.getContext('2d');
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        for (let i = 0; i < imageData.data.length; i += 4) { totalSum += imageData.data[i]; totalPixels++; }
+      });
+      return Math.round(totalSum / totalPixels);
+    });
+    console.log('FashionMNIST average pixel value:', fashionPixelData);
+    // Verify FashionMNIST has expected brightness range (55-90)
+    expect(fashionPixelData).toBeGreaterThan(55);
+    expect(fashionPixelData).toBeLessThan(90);
+    // Now reload MNIST using the dropdown selector
+    console.log('Reloading MNIST...');
+    await page.selectOption('#dataset-selector-selector', 'MNIST');
+    await page.waitForTimeout(2000);
+    // Verify selector changed back
+    const finalDataset = await datasetSelector.evaluate(el => el.value);
+    console.log('Final selector value:', finalDataset);
+    expect(finalDataset).toBe('MNIST');
+    // MNIST should load from cache (faster)
+    const loadStartTime = Date.now();
+    await page.waitForFunction(
+      () => {
+        const samplesDiv = document.querySelector('#samples');
+        const loadingBar = document.querySelector('#data-selector-loading-bar-container');
+        const loadingHidden = !loadingBar || window.getComputedStyle(loadingBar).display === 'none';
+        return loadingHidden && samplesDiv && samplesDiv.querySelectorAll('canvas').length > 0;
+      },
+      { timeout: 10000 } // Should be fast from cache
+    );
+    const loadTime = Date.now() - loadStartTime;
+    console.log(`MNIST reloaded from cache in ${loadTime}ms`);
+    // Verify MNIST samples rendered
+    const samplesDiv = await page.$('#samples');
+    const canvases = await samplesDiv.$$('canvas');
+    console.log('MNIST canvases:', canvases.length);
+    expect(canvases.length).toBeGreaterThan(0);
+    // Get average pixel data from reloaded MNIST
+    const mnistPixelData = await page.evaluate(() => {
+      const canvases = document.querySelectorAll('#samples canvas');
+      let totalSum = 0;
+      let totalPixels = 0;
+      canvases.forEach(canvas => {
+        const ctx = canvas.getContext('2d');
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        for (let i = 0; i < imageData.data.length; i += 4) { totalSum += imageData.data[i]; totalPixels++; }
+      });
+      return Math.round(totalSum / totalPixels);
+    });
+    console.log('MNIST average pixel value after reload:', mnistPixelData);
+    // Verify MNIST has expected brightness range (20-55)
+    expect(mnistPixelData).toBeGreaterThan(20);
+    expect(mnistPixelData).toBeLessThan(55);
+    // Verify images switched back (MNIST != FashionMNIST)
+    expect(mnistPixelData).not.toBe(fashionPixelData);
+    console.log(
+      '✅ Verified datasets switched back and in expected ranges (MNIST:',
+      mnistPixelData,
+      ', FashionMNIST:',
+      fashionPixelData,
+      ')',
+    );
+    const description = await page.textContent('#dataset-description');
+    expect(description).toContain('MNIST');
+    expect(description).not.toContain('Fashion');
+    console.log('✅ MNIST reloaded successfully from cache!');
     expect(consoleErrors.length).toBe(0);
   });
 });
