@@ -29,6 +29,7 @@
           v-bind:epochs="epochs"
           @changeEpochs="changeEpochs"
           v-bind:loadDataset="loadDataset"
+          v-bind:getDatasets="getDatasets"
           v-bind:getWarningMessage="getWarningMessage"
         ></component>
       </keep-alive>
@@ -202,6 +203,10 @@ export default {
       if (this.loadableDatasets[name].length >= 3 && !this.datasets[name]) {
         return this.loadableDatasets[name][2];
       }
+    },
+    getDatasets() {
+      if (window.nnvpDebugDatasets) console.log('[BottomTrainer] getDatasets called, returning:', Object.keys(this.datasets || {}));
+      return this.datasets || {};
     },
   },
   props: {

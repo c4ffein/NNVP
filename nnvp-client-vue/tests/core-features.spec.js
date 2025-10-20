@@ -898,4 +898,150 @@ def build_model():
     expect(layersAfterRedo).toBe(layersAfterAdd);
     expect(consoleErrors.length).toBe(0);
   });
+
+  test('should interact with dataset selector in BottomTrainer', async ({ page }) => {
+    console.log('\n=== DATASET SELECTOR TEST ===');
+
+    // Enable dataset debug logging
+    await page.evaluate(() => {
+      window.nnvpDebugDatasets = true;
+    });
+    console.log('Dataset debug logging enabled');
+
+    // Verify BottomTrainer is visible
+    const bottomTrainer = await page.$('#BottomTrainer');
+    expect(bottomTrainer).not.toBeNull();
+    console.log('BottomTrainer panel found');
+
+    // Click Dataset tab
+    const datasetTab = await page.$('.BottomTrainer.bar-button:has-text("Dataset")');
+    await datasetTab.click();
+    await page.waitForTimeout(500);
+    console.log('Dataset tab clicked');
+
+    // Verify dataset selector exists
+    const datasetSelector = await page.$('#dataset-selector-selector');
+    expect(datasetSelector).not.toBeNull();
+    console.log('Dataset selector found');
+
+    // Check default dataset
+    const initialDataset = await datasetSelector.evaluate(el => el.value);
+    console.log('Initial dataset:', initialDataset);
+    expect(initialDataset).toBe('MNIST');
+
+    // Verify dataset options are available
+    const datasetOptions = await datasetSelector.$$eval('option', options =>
+      options.map(opt => opt.value)
+    );
+    console.log('Available datasets:', datasetOptions);
+    expect(datasetOptions).toContain('MNIST');
+    expect(datasetOptions).toContain('FashionMNIST');
+    expect(datasetOptions).toContain('CIFAR10');
+
+    // Check initial description
+    const initialDescription = await page.textContent('#dataset-description');
+    console.log('MNIST description:', initialDescription.substring(0, 100));
+    expect(initialDescription).toContain('MNIST');
+    expect(initialDescription.length).toBeGreaterThan(20);
+
+    // Wait for MNIST auto-load to start (3 second setTimeout in mounted())
+    console.log('Waiting for MNIST auto-load to start (3s timeout in mounted())...');
+    await page.waitForTimeout(4000);
+
+    // Check debug logs immediately to see if loading started
+    let datasetLogs = consoleMessages.filter(msg =>
+      msg.text.includes('[DatasetSelector]') || msg.text.includes('[BottomTrainer]')
+    );
+    console.log(`\n📊 Dataset logs after 4s: ${datasetLogs.length} messages`);
+    if (datasetLogs.length > 0) {
+      console.log('Last 15 messages (to see completion):');
+      datasetLogs.slice(-15).forEach(log => console.log(`  - ${log.text.substring(0, 150)}`));
+    } else {
+      console.log('⚠️  NO DATASET LOGS YET! Dataset loading might not have started.');
+    }
+
+    // Wait for loading to complete (loading bar should disappear)
+    console.log('\nWaiting for dataset loading to complete (checking loading bar visibility)...');
+    await page.waitForFunction(
+      () => {
+        const loadingBar = document.querySelector('#data-selector-loading-bar-container');
+        const samplesDiv = document.querySelector('#samples');
+        // Loading complete when: loading bar hidden AND samples div is visible (not display:none)
+        const loadingBarHidden = !loadingBar || window.getComputedStyle(loadingBar).display === 'none';
+        const samplesVisible = samplesDiv && window.getComputedStyle(samplesDiv).display !== 'none';
+        return loadingBarHidden && samplesVisible;
+      },
+      { timeout: 120000 } // 2 minutes for CDN download
+    );
+
+    console.log('Loading bar hidden! Checking samples div...');
+
+    // Debug: Check what's in the samples div
+    const samplesDebug = await page.evaluate(() => {
+      const samplesDiv = document.querySelector('#samples');
+      return {
+        exists: !!samplesDiv,
+        display: samplesDiv ? window.getComputedStyle(samplesDiv).display : null,
+        innerHTML: samplesDiv ? samplesDiv.innerHTML.substring(0, 200) : null,
+        childCount: samplesDiv ? samplesDiv.children.length : 0,
+        canvasCount: samplesDiv ? samplesDiv.querySelectorAll('canvas').length : 0,
+      };
+    });
+    console.log('Samples div debug:', JSON.stringify(samplesDebug, null, 2));
+
+    // If no canvases, wait a bit more
+    if (samplesDebug.canvasCount === 0) {
+      console.log('No canvases yet, waiting 5 more seconds...');
+      await page.waitForTimeout(5000);
+
+      const samplesDebug2 = await page.evaluate(() => {
+        const samplesDiv = document.querySelector('#samples');
+        return {
+          canvasCount: samplesDiv ? samplesDiv.querySelectorAll('canvas').length : 0,
+          innerHTML: samplesDiv ? samplesDiv.innerHTML.substring(0, 300) : null,
+        };
+      });
+      console.log('After 5s wait:', JSON.stringify(samplesDebug2, null, 2));
+    }
+
+    console.log('Checking for canvases...');
+
+    // Verify actual canvas samples are rendered
+    const samplesDiv = await page.$('#samples');
+    const canvases = await samplesDiv.$$('canvas');
+    console.log('Number of MNIST sample canvases rendered:', canvases.length);
+    expect(canvases.length).toBeGreaterThan(0);
+    expect(canvases.length).toBeLessThanOrEqual(40); // Should render 40 samples
+
+    // Verify canvas has actual content (not empty)
+    const firstCanvas = canvases[0];
+    const canvasSize = await firstCanvas.evaluate(canvas => ({
+      width: canvas.width,
+      height: canvas.height
+    }));
+    console.log('Sample canvas size:', canvasSize);
+    expect(canvasSize.width).toBe(28); // MNIST is 28x28
+    expect(canvasSize.height).toBe(28);
+
+    // Verify loading debug logs
+    const allDatasetLogs = consoleMessages.filter(msg =>
+      msg.text.includes('[DatasetSelector]') || msg.text.includes('[BottomTrainer]')
+    );
+    console.log('\nDataset loading logs (' + allDatasetLogs.length + ' messages):');
+    allDatasetLogs.slice(0, 10).forEach(log => console.log(`  ${log.type}: ${log.text.substring(0, 100)}`));
+
+    // Should have logs showing complete loading process
+    const hasLoadStartLog = allDatasetLogs.some(log =>
+      log.text.includes('datasetSet called') || log.text.includes('Starting load')
+    );
+    const hasLoadCompleteLog = allDatasetLogs.some(log =>
+      log.text.includes('Samples filled')
+    );
+    expect(hasLoadStartLog).toBe(true);
+    expect(hasLoadCompleteLog).toBe(true);
+
+    console.log('✅ MNIST dataset loading completed successfully with real samples!');
+
+    expect(consoleErrors.length).toBe(0);
+  });
 });
