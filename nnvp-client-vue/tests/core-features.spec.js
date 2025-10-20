@@ -272,17 +272,22 @@ test.describe('NNVP Core Features', () => {
     console.log('Download filename:', download.suggestedFilename());
     expect(download.suggestedFilename()).toContain('.js');
 
-    // Check content
+    // Check content against golden master
     const path = await download.path();
     const content = fs.readFileSync(path, 'utf-8');
 
-    console.log('Code length:', content.length);
-    console.log('Contains layers.dense:', content.includes('layers.dense'));
-    console.log('Contains tf.sequential:', content.includes('tf.sequential'));
+    const expectedJS = `function createModel() {
+    const model = tf.sequential();
+    model.add(tf.layers.flatten({inputShape:[100,100,],}));
+    model.add(tf.layers.dense({}));
+    model.add(tf.layers.dense({}));
+    return model;
+}
+`;
 
-    expect(content.length).toBeGreaterThan(200);
-    expect(content.includes('layers.dense')).toBe(true);
-    expect(content.includes('tf.sequential') || content.includes('tf.model')).toBe(true);
+    console.log('Generated code:\n', content);
+
+    expect(content.trim()).toBe(expectedJS.trim());
 
     expect(consoleErrors.length).toBe(0);
   });
@@ -459,18 +464,23 @@ test.describe('NNVP Core Features', () => {
     console.log('Download filename:', download.suggestedFilename());
     expect(download.suggestedFilename()).toContain('.py');
 
-    // Check content
+    // Check content against golden master
     const path = await download.path();
     const content = fs.readFileSync(path, 'utf-8');
 
-    console.log('Code length:', content.length);
-    console.log('Generated code:\n', content);
-    console.log('Contains Dense:', content.includes('Dense'));
-    console.log('Contains keras or tensorflow:', content.includes('keras') || content.includes('tensorflow'));
+    const expectedPython = `from tensorflow import keras
 
-    expect(content.length).toBeGreaterThan(200);
-    expect(content.includes('Dense')).toBe(true);
-    expect(content.includes('keras') || content.includes('tensorflow')).toBe(true);
+def build_model():
+    model = keras.models.Sequential()
+    model.add(keras.layers.Flatten(input_shape = (100,100,)))
+    model.add(keras.layers.Dense())
+    model.add(keras.layers.Dense())
+    return model
+`;
+
+    console.log('Generated code:\n', content);
+
+    expect(content.trim()).toBe(expectedPython.trim());
 
     expect(consoleErrors.length).toBe(0);
   });
