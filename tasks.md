@@ -16,11 +16,15 @@ But if you read this and you want to get involved, you can actually create one f
     - [x] Load a template and generate Python code
     - [x] Manually build network and generate JavaScript code (with drag-and-drop)
     - [x] Manually build network and generate Python code (with drag-and-drop)
-  - [x] **Parameter modification:**
+  - [ ] **Parameter modification:**
     - [x] Modify layer parameters from RightBar and verify in generated code
     - [x] Test integer parameter modification
     - [x] Test boolean parameter modification
-    - [ ] Test float, string, tuple, list, order parameter types
+    - [ ] Test float parameter types
+    - [ ] Test string parameter types
+    - [ ] Test tuple parameter types
+    - [ ] Test list parameter types
+    - [ ] Test order parameter types
   - [ ] **Dataset loading:**
     - [ ] Load a dataset from the BottomTrainer panel
   - [ ] **Link/edge manipulation:**
