@@ -53,12 +53,15 @@ export default {
   },
   methods: {
     async datasetSet(name) {
+      if (window.nnvpDebugDatasets) console.log(`[DatasetSelector] datasetSet called with: ${name}`);
+
       const warningMessage = this.getWarningMessage(name);
       if (warningMessage) {
         // TODO : better than confirm
         if (!confirm(warningMessage)) { // eslint-disable-line
           document.getElementById('dataset-selector-selector').value = this.value;
           this.value = this.newestSelected;
+          if (window.nnvpDebugDatasets) console.log(`[DatasetSelector] User cancelled warning for: ${name}`);
           return;
         }
       }
@@ -67,16 +70,28 @@ export default {
       const randomChecker = Math.random(); // TODO : better solution than using a token
       this.loadingToken = randomChecker;
       this.loadingShown = true;
+
+      if (window.nnvpDebugDatasets) console.log(`[DatasetSelector] Starting load for: ${name}, token: ${randomChecker}`);
+
       const updateProgressCheckRandom = (progress, random) => {
         if (random !== this.loadingToken) return;
         this.loadingShown = true;
         this.loadingPercentage = progress;
+        if (window.nnvpDebugDatasets) console.log(`[DatasetSelector] Loading progress for ${name}: ${(progress * 100).toFixed(1)}%`);
       };
       this.loadDataset(name, x => updateProgressCheckRandom(x, randomChecker))
         .then(async () => {
-          if (this.loadingToken !== randomChecker) return;
+          if (this.loadingToken !== randomChecker) {
+            if (window.nnvpDebugDatasets) console.log(`[DatasetSelector] Load cancelled for: ${name} (token mismatch)`);
+            return;
+          }
+          if (window.nnvpDebugDatasets) console.log(`[DatasetSelector] Load complete for: ${name}, filling samples...`);
           await this.fillSamples(name);
           this.loadingShown = false;
+          if (window.nnvpDebugDatasets) console.log(`[DatasetSelector] Samples filled for: ${name}`);
+        })
+        .catch(error => {
+          if (window.nnvpDebugDatasets) console.error(`[DatasetSelector] Error loading ${name}:`, error);
         });
     },
     // Mostly from https://storage.googleapis.com/tfjs-vis/mnist/dist/index.html

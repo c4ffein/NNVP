@@ -162,9 +162,17 @@ export default {
       }
     },
     async loadDataset(name, progressionCallback) {
+      if (window.nnvpDebugDatasets) console.log(`[BottomTrainer] loadDataset called for: ${name}`);
+
       // TODO : change behaviour when already loading
       this.datasets = this.datasets || {};
       if (!(name in this.datasets)){
+        if (window.nnvpDebugDatasets) {
+          console.log(`[BottomTrainer] Dataset ${name} not cached, loading from:`);
+          console.log(`  - Images: ${this.loadableDatasets[name][0].imagesSpritePath}`);
+          console.log(`  - Labels: ${this.loadableDatasets[name][0].labelsPath}`);
+        }
+
         const newDataset = new Dataset(
           this.loadableDatasets[name][0].imagesSpritePath,
           this.loadableDatasets[name][0].imagesSpriteChecksum,
@@ -175,8 +183,19 @@ export default {
           this.loadableDatasets[name][0].numDatasetElements,
           this.loadableDatasets[name][0].numTrainElements,
         );
-        await newDataset.load(progressionCallback);
-        this.datasets[name] = newDataset;
+
+        if (window.nnvpDebugDatasets) console.log(`[BottomTrainer] Starting newDataset.load() for: ${name}`);
+
+        try {
+          await newDataset.load(progressionCallback);
+          this.datasets[name] = newDataset;
+          if (window.nnvpDebugDatasets) console.log(`[BottomTrainer] Dataset ${name} loaded and cached successfully`);
+        } catch (error) {
+          if (window.nnvpDebugDatasets) console.error(`[BottomTrainer] Error loading dataset ${name}:`, error);
+          throw error;
+        }
+      } else {
+        if (window.nnvpDebugDatasets) console.log(`[BottomTrainer] Dataset ${name} already cached`);
       }
     },
     getWarningMessage(name, progressionCallback) {

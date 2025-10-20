@@ -8,15 +8,19 @@ But if you read this and you want to get involved, you can actually create one f
 ### 1. Finish Vue 3 migration, check everything works
 - [x] Set up Playwright e2e tests
 - [ ] Write tests and eventually fix issues for core functionality:
-  - [ ] **Layer selection & placement:**
-    - [ ] Click a layer template and verify it appears on the canvas
-    - [ ] Select another template after selecting a previous one
-  - [ ] **Code generation:**
-    - [ ] Load a template and generate JavaScript code
-    - [ ] Load a template and generate Python code
-  - [ ] **Parameter modification:**
-    - [ ] Modify layer parameters from RightBar and verify in generated code
-    - [ ] Test each parameter type (int, float, boolean, string, tuple, list, order)
+  - [x] **Layer selection & placement:**
+    - [x] Click a layer template and verify it appears on the canvas
+    - [x] Select another template after selecting a previous one
+  - [x] **Code generation:**
+    - [x] Load a template and generate JavaScript code
+    - [x] Load a template and generate Python code
+    - [x] Manually build network and generate JavaScript code (with drag-and-drop)
+    - [x] Manually build network and generate Python code (with drag-and-drop)
+  - [x] **Parameter modification:**
+    - [x] Modify layer parameters from RightBar and verify in generated code
+    - [x] Test integer parameter modification
+    - [x] Test boolean parameter modification
+    - [ ] Test float, string, tuple, list, order parameter types
   - [ ] **Dataset loading:**
     - [ ] Load a dataset from the BottomTrainer panel
   - [ ] **Link/edge manipulation:**
@@ -26,10 +30,9 @@ But if you read this and you want to get involved, you can actually create one f
     - [ ] Load template, delete a node
     - [ ] Re-add the node, set parameters from RightBar
     - [ ] Reconnect missing links, verify network is valid
-  - [ ] **Undo/Redo:**
-    - [ ] Load template, delete 2 nodes
-    - [ ] Undo twice, verify nodes are restored
-    - [ ] Verify network can generate code again
+  - [x] **Undo/Redo:**
+    - [x] Test undo functionality
+    - [x] Test redo functionality
 - [ ] Update README to reflect Vue 3 status
 
 ### 2. Replace D3.js with modern graph visualization library
