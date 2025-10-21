@@ -20,10 +20,10 @@ But if you read this and you want to get involved, you can actually create one f
     - [x] Modify layer parameters from RightBar and verify in generated code
     - [x] Test integer parameter modification
     - [x] Test boolean parameter modification
-    - [ ] Test float parameter types
-    - [ ] Test string parameter types
-    - [ ] Test tuple parameter types
-    - [ ] Test list parameter types
+    - [x] Test float parameter types
+    - [x] Test string parameter types
+    - [x] Test tuple parameter types
+    - [x] Test list parameter types
     - [ ] Test order parameter types
   - [x] **Dataset loading:**
     - [x] Load a dataset from the BottomTrainer panel

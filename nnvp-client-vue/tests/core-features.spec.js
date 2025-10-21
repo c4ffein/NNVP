@@ -667,29 +667,24 @@ def build_model():
 
   test('should modify int parameter and verify in generated code', async ({ page }) => {
     console.log('\n=== INT PARAMETER MODIFICATION TEST ===');
-
     // Load a template to get a complete connected network
     const fileMenu = await page.$('text=File');
     await fileMenu.click();
     await page.waitForTimeout(500);
-
     // Hover over Templates to open submenu
     const templatesOption = await page.$('text=Templates');
     await templatesOption.hover();
     await page.waitForTimeout(500);
-
     // Select "2D Dense for MNIST" template from submenu
     const template = await page.$('text=2D Dense for MNIST');
     await template.click();
     await page.waitForTimeout(1000);
     console.log('Loaded template: 2D Dense for MNIST');
-
     // Verify we have Dense layers
     const allLayersText = await page.$$eval('.d3Layer text', texts => texts.map(t => t.textContent));
     console.log('Layers on canvas:', allLayersText);
     const hasDenseLayer = allLayersText.some(text => text.includes('Dense'));
     expect(hasDenseLayer).toBe(true);
-
     // Generate code BEFORE modification
     const downloadPromise1 = page.waitForEvent('download', { timeout: 5000 });
     await fileMenu.click();
@@ -697,60 +692,46 @@ def build_model():
     const generateOption1 = await page.$('text=Generate');
     await generateOption1.click();
     await page.waitForTimeout(1000);
-
     const download1 = await downloadPromise1;
     const path1 = await download1.path();
     const contentBefore = fs.readFileSync(path1, 'utf-8');
     console.log('Code before modification length:', contentBefore.length);
     console.log('Code before contains "Dense":', contentBefore.includes('Dense'));
-
     // Now select the Dense layer and modify its parameter
     const layersOnCanvas = await page.$$('.d3Layer');
     let denseLayerFound = false;
-
     console.log('Attempting to find and select Dense layer...');
-
     for (let i = 0; i < layersOnCanvas.length; i++) {
       const layer = layersOnCanvas[i];
       // Use mouse.click to bypass text element interception
       const box = await layer.boundingBox();
       await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
       await page.waitForTimeout(1000);
-
       const rightBarText = await page.textContent('#rightBar');
       console.log(`Layer ${i}: First 80 chars of rightbar: "${rightBarText.substring(0, 80)}"`);
-
       if (rightBarText.includes('Dense') && rightBarText.includes('units')) {
         console.log('Found and selected Dense layer');
         denseLayerFound = true;
-
         // Check if rightbar-block is visible
         const rightbarBlock = await page.$('#rightbar-block');
         expect(rightbarBlock).not.toBeNull();
-
         // Find and modify the "units" parameter
         const numberInputs = await page.$$('#rightbar-block input[type="number"]');
         console.log('Number inputs found:', numberInputs.length);
         expect(numberInputs.length).toBeGreaterThan(0);
-
         const initialValue = await numberInputs[0].inputValue();
         console.log('Initial units value:', initialValue);
-
         // Change to a distinctive value: 256
         await numberInputs[0].fill('256');
         await numberInputs[0].dispatchEvent('change');
         await page.waitForTimeout(500);
-
         const newValue = await numberInputs[0].inputValue();
         console.log('Modified units value to:', newValue);
         expect(newValue).toBe('256');
-
         break;
       }
     }
-
     expect(denseLayerFound).toBe(true);
-
     // Generate code AFTER modification
     const downloadPromise2 = page.waitForEvent('download', { timeout: 5000 });
     await fileMenu.click();
@@ -758,18 +739,15 @@ def build_model():
     const generateOption2 = await page.$('text=Generate');
     await generateOption2.click();
     await page.waitForTimeout(1000);
-
     const download2 = await downloadPromise2;
     const path2 = await download2.path();
     const contentAfter = fs.readFileSync(path2, 'utf-8');
     console.log('Code after modification length:', contentAfter.length);
     console.log('Code after contains "256":', contentAfter.includes('256'));
     console.log('Code changed:', contentBefore !== contentAfter);
-
     // Verify the code changed and contains our value
     expect(contentAfter.includes('256')).toBe(true);
     expect(contentBefore !== contentAfter).toBe(true);
-
     expect(consoleErrors.length).toBe(0);
   });
 
@@ -778,40 +756,273 @@ def build_model():
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
     await page.waitForTimeout(500);
-
     // Click layer to select it
     const layerOnCanvas = await page.$('.d3Layer');
     await layerOnCanvas.click();
     await page.waitForTimeout(1000); // Wait longer for reactive update
-
     // Check if rightbar-block is visible
     const rightbarBlock = await page.$('#rightbar-block');
-
     console.log('\n=== BOOLEAN PARAMETER MODIFICATION TEST ===');
     console.log('Rightbar block visible:', rightbarBlock !== null);
-
     // rightbar-block MUST exist when a layer is selected
     expect(rightbarBlock).not.toBeNull();
-
     // Find boolean parameter selects
     const booleanSelects = await page.$$('#rightbar-block select.parameter-boolean');
     console.log('Boolean parameters found:', booleanSelects.length);
-
     // Dense layer MUST have boolean parameters
     expect(booleanSelects.length).toBeGreaterThan(0);
-
     const initialValue = await booleanSelects[0].evaluate(el => el.value);
     console.log('Initial value:', initialValue);
-
     // Click to toggle
     await booleanSelects[0].click();
     await page.waitForTimeout(500);
-
     const newValue = await booleanSelects[0].evaluate(el => el.value);
     console.log('Value after click:', newValue);
-
     expect(newValue).not.toBe('void');
+    expect(consoleErrors.length).toBe(0);
+  });
 
+  test('should modify float parameter and verify in generated code', async ({ page }) => {
+    console.log('\n=== FLOAT PARAMETER MODIFICATION TEST ===');
+    // Load a template with Dropout layer (has float "rate" parameter)
+    const fileMenu = await page.$('text=File');
+    await fileMenu.click();
+    await page.waitForTimeout(500);
+    const templatesOption = await page.$('text=Templates');
+    await templatesOption.hover();
+    await page.waitForTimeout(500);
+    const template = await page.$('text=2D Conv for MNIST');
+    await template.click();
+    await page.waitForTimeout(1000);
+    console.log('Loaded template: 2D Conv for MNIST');
+    // Generate code BEFORE modification
+    const downloadPromiseBefore = page.waitForEvent('download', { timeout: 5000 });
+    await fileMenu.click();
+    await page.waitForTimeout(300);
+    let generateOption = await page.$('text=Generate');
+    await generateOption.click();
+    await page.waitForTimeout(1000);
+    const downloadBefore = await downloadPromiseBefore;
+    const pathBefore = await downloadBefore.path();
+    const contentBefore = fs.readFileSync(pathBefore, 'utf-8');
+    console.log('Code before modification length:', contentBefore.length);
+    // Find and select Dropout layer
+    const layersOnCanvas = await page.$$('.d3Layer');
+    let dropoutLayerFound = false;
+    for (let i = 0; i < layersOnCanvas.length; i++) {
+      const layer = layersOnCanvas[i];
+      const box = await layer.boundingBox();
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+      await page.waitForTimeout(1000);
+      const rightBarText = await page.textContent('#rightBar');
+      if (rightBarText.includes('Dropout') && rightBarText.includes('rate')) {
+        console.log('Found and selected Dropout layer');
+        dropoutLayerFound = true;
+        // Find the range slider for "rate" parameter (Dropout uses range 0-1)
+        const rangeInputs = await page.$$('#rightbar-block input[type="range"]');
+        console.log('Range inputs found:', rangeInputs.length);
+        expect(rangeInputs.length).toBeGreaterThan(0);
+        const initialValue = await rangeInputs[0].inputValue();
+        console.log('Initial rate value:', initialValue);
+        // Change to 0.75 (this is a slider, so fill works)
+        await rangeInputs[0].fill('0.75');
+        await rangeInputs[0].dispatchEvent('change');
+        await page.waitForTimeout(1000); // Wait for Vue reactivity
+        const newValue = await rangeInputs[0].inputValue();
+        console.log('Modified rate value to:', newValue);
+        expect(newValue).toBe('0.75');
+        break;
+      }
+    }
+    expect(dropoutLayerFound).toBe(true);
+    // Generate code AFTER modification
+    const downloadPromiseAfter = page.waitForEvent('download', { timeout: 5000 });
+    await fileMenu.click();
+    await page.waitForTimeout(300);
+    generateOption = await page.$('text=Generate');
+    await generateOption.click();
+    await page.waitForTimeout(1000);
+    const downloadAfter = await downloadPromiseAfter;
+    const pathAfter = await downloadAfter.path();
+    const contentAfter = fs.readFileSync(pathAfter, 'utf-8');
+    console.log('Code before contains 0.75:', contentBefore.includes('0.75'));
+    console.log('Code after contains 0.75:', contentAfter.includes('0.75'));
+    // Verify the parameter change is reflected in the code
+    expect(contentBefore.includes('0.75')).toBe(false);
+    expect(contentAfter.includes('0.75')).toBe(true);
+    console.log('✅ Float parameter test passed!');
+    expect(consoleErrors.length).toBe(0);
+  });
+
+  test('should modify string parameter and verify in generated code', async ({ page }) => {
+    console.log('\n=== STRING PARAMETER MODIFICATION TEST ===');
+    // Add an Input layer (has string "name" parameter)
+    const inputLayer = await page.$('.LayerTemplate:has-text("Input")');
+    await inputLayer.click();
+    await page.waitForTimeout(1000);
+    // Click to select the Input layer
+    const layerOnCanvas = await page.$('.d3Layer');
+    const box = await layerOnCanvas.boundingBox();
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await page.waitForTimeout(1000);
+    const rightBarText = await page.textContent('#rightBar');
+    console.log('RightBar contains Input:', rightBarText.includes('Input'));
+    // Find text input for "name" parameter
+    const textInputs = await page.$$('#rightbar-block input[type="text"]');
+    console.log('Text inputs found:', textInputs.length);
+    expect(textInputs.length).toBeGreaterThan(0);
+    // Find the "name" input (check labels or use the first one)
+    const nameInput = textInputs[0];
+    const initialValue = await nameInput.inputValue();
+    console.log('Initial name value:', initialValue);
+    // Set a distinctive name
+    await nameInput.fill('test_input_layer');
+    await nameInput.dispatchEvent('change');
+    await page.waitForTimeout(1000);
+    const newValue = await nameInput.inputValue();
+    console.log('Modified name value to:', newValue);
+    expect(newValue).toBe('test_input_layer');
+    // Generate code and verify
+    const downloadPromise = page.waitForEvent('download', { timeout: 5000 });
+    const fileMenu = await page.$('text=File');
+    await fileMenu.click();
+    await page.waitForTimeout(300);
+    const generateOption = await page.$('text=Generate');
+    await generateOption.click();
+    await page.waitForTimeout(1000);
+    const download = await downloadPromise;
+    const path = await download.path();
+    const content = fs.readFileSync(path, 'utf-8');
+    console.log('Code contains test_input_layer:', content.includes('test_input_layer'));
+    expect(content.includes('test_input_layer')).toBe(true);
+    console.log('✅ String parameter test passed!');
+    expect(consoleErrors.length).toBe(0);
+  });
+
+  test('should modify tuple parameter and verify in generated code', async ({ page }) => {
+    console.log('\n=== TUPLE PARAMETER MODIFICATION TEST ===');
+    // Load template with Conv2D (has tuple "kernel_size" parameter)
+    const fileMenu = await page.$('text=File');
+    await fileMenu.click();
+    await page.waitForTimeout(500);
+    const templatesOption = await page.$('text=Templates');
+    await templatesOption.hover();
+    await page.waitForTimeout(500);
+    const template = await page.$('text=2D Conv for MNIST');
+    await template.click();
+    await page.waitForTimeout(1000);
+    // Find and select Conv2D layer
+    const layersOnCanvas = await page.$$('.d3Layer');
+    let conv2dLayerFound = false;
+    for (let i = 0; i < layersOnCanvas.length; i++) {
+      const layer = layersOnCanvas[i];
+      const box = await layer.boundingBox();
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+      await page.waitForTimeout(1000);
+      const rightBarText = await page.textContent('#rightBar');
+      if (rightBarText.includes('Conv2D') && rightBarText.includes('kernel_size')) {
+        console.log('Found and selected Conv2D layer');
+        conv2dLayerFound = true;
+        // Find tuple inputs for kernel_size
+        // Conv2D has: filters (int), kernel_size (tuple), strides (tuple), etc.
+        // So we need to find the right tuple inputs
+        const tupleInputs = await page.$$('#rightbar-block input[type="number"]');
+        console.log('Number inputs found:', tupleInputs.length);
+        // Log all values to see which ones are kernel_size
+        for (let i = 0; i < Math.min(tupleInputs.length, 10); i++) {
+          const val = await tupleInputs[i].inputValue();
+          console.log(`  Input ${i}: ${val}`);
+        }
+        // kernel_size is typically the second parameter (after filters)
+        // The template has filters=32, kernel_size=(3,3)
+        // So indices 1 and 2 should be kernel_size
+        expect(tupleInputs.length).toBeGreaterThanOrEqual(3);
+        // Change kernel_size (indices 1,2) to (5, 5)
+        await tupleInputs[1].fill('5');
+        await tupleInputs[1].dispatchEvent('change');
+        await page.waitForTimeout(200);
+        await tupleInputs[2].fill('5');
+        await tupleInputs[2].dispatchEvent('change');
+        await page.waitForTimeout(1000);
+        const newValue1 = await tupleInputs[1].inputValue();
+        const newValue2 = await tupleInputs[2].inputValue();
+        console.log(`Modified kernel_size to: (${newValue1}, ${newValue2})`);
+        expect(newValue1).toBe('5');
+        expect(newValue2).toBe('5');
+        break;
+      }
+    }
+    expect(conv2dLayerFound).toBe(true);
+    // Generate code and verify
+    const downloadPromise = page.waitForEvent('download', { timeout: 5000 });
+    await fileMenu.click();
+    await page.waitForTimeout(300);
+    const generateOption = await page.$('text=Generate');
+    await generateOption.click();
+    await page.waitForTimeout(1000);
+    const download = await downloadPromise;
+    const path = await download.path();
+    const content = fs.readFileSync(path, 'utf-8');
+    console.log('Code contains kernel_size=(5,5):', content.includes('5,5'));
+    expect(content.includes('5,5')).toBe(true);
+    console.log('✅ Tuple parameter test passed!');
+    expect(consoleErrors.length).toBe(0);
+  });
+
+  test('should modify list parameter and verify in generated code', async ({ page }) => {
+    console.log('\n=== LIST PARAMETER MODIFICATION TEST ===');
+    // Load template with Flatten (has list "data_format" parameter)
+    const fileMenu = await page.$('text=File');
+    await fileMenu.click();
+    await page.waitForTimeout(500);
+    const templatesOption = await page.$('text=Templates');
+    await templatesOption.hover();
+    await page.waitForTimeout(500);
+    const template = await page.$('text=2D Dense for MNIST');
+    await template.click();
+    await page.waitForTimeout(1000);
+    // Find and select Flatten layer
+    const layersOnCanvas = await page.$$('.d3Layer');
+    let flattenLayerFound = false;
+    for (let i = 0; i < layersOnCanvas.length; i++) {
+      const layer = layersOnCanvas[i];
+      const box = await layer.boundingBox();
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+      await page.waitForTimeout(1000);
+      const rightBarText = await page.textContent('#rightBar');
+      if (rightBarText.includes('Flatten') && rightBarText.includes('data_format')) {
+        console.log('Found and selected Flatten layer');
+        flattenLayerFound = true;
+        // Find select dropdown for data_format
+        const selectInputs = await page.$$('#rightbar-block select');
+        console.log('Select inputs found:', selectInputs.length);
+        expect(selectInputs.length).toBeGreaterThan(0);
+        const initialValue = await selectInputs[0].evaluate(el => el.value);
+        console.log('Initial data_format value:', initialValue);
+        // Change to channels_first
+        await selectInputs[0].selectOption('channels_first');
+        await selectInputs[0].dispatchEvent('change');
+        await page.waitForTimeout(1000);
+        const newValue = await selectInputs[0].evaluate(el => el.value);
+        console.log('Modified data_format to:', newValue);
+        expect(newValue).toBe('channels_first');
+        break;
+      }
+    }
+    expect(flattenLayerFound).toBe(true);
+    // Generate code and verify
+    const downloadPromise = page.waitForEvent('download', { timeout: 5000 });
+    await fileMenu.click();
+    await page.waitForTimeout(300);
+    const generateOption = await page.$('text=Generate');
+    await generateOption.click();
+    await page.waitForTimeout(1000);
+    const download = await downloadPromise;
+    const path = await download.path();
+    const content = fs.readFileSync(path, 'utf-8');
+    console.log('Code contains channels_first:', content.includes('channels_first'));
+    expect(content.includes('channels_first')).toBe(true);
+    console.log('✅ List parameter test passed!');
     expect(consoleErrors.length).toBe(0);
   });
 
@@ -820,31 +1031,23 @@ def build_model():
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
     await page.waitForTimeout(500);
-
     const layersBeforeDelete = await page.$$eval('.d3Layer', layers => layers.length);
-
     // Click on the layer using force to bypass the text element
     const d3LayerElement = await page.$('.d3Layer');
     const box = await d3LayerElement.boundingBox();
-
     // Click in the center of the layer
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
     await page.waitForTimeout(500);
-
     // Check if layer is selected (has 'selected' class)
     const isSelected = await d3LayerElement.evaluate(el => el.classList.contains('selected'));
-
     console.log('\n=== LAYER DELETION TEST ===');
     console.log('Layers before delete:', layersBeforeDelete);
     console.log('Layer is selected:', isSelected);
-
     // Try Backspace first (as per KeyboardListener.js)
     await page.keyboard.press('Backspace');
     await page.waitForTimeout(500);
-
     let layersAfterDelete = await page.$$eval('.d3Layer', layers => layers.length);
     console.log('Layers after Backspace:', layersAfterDelete);
-
     // If Backspace didn't work, try Delete
     // TODO Actually 2 separate tests for delete and backspace
     if (layersAfterDelete === layersBeforeDelete) {
@@ -853,7 +1056,6 @@ def build_model():
       layersAfterDelete = await page.$$eval('.d3Layer', layers => layers.length);
       console.log('Layers after Delete:', layersAfterDelete);
     }
-
     expect(layersAfterDelete).toBeLessThan(layersBeforeDelete);
     expect(consoleErrors.length).toBe(0);
   });
@@ -863,35 +1065,26 @@ def build_model():
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
     await page.waitForTimeout(500);
-
     const layersAfterAdd = await page.$$eval('.d3Layer', layers => layers.length);
-
     console.log('\n=== REDO TEST ===');
     console.log('Layers after adding:', layersAfterAdd);
-
     // Undo
     const editMenu = await page.$('text=Edit');
     await editMenu.click();
     await page.waitForTimeout(300);
-
     const undoOption = await page.$('text=Undo');
     await undoOption.click();
     await page.waitForTimeout(500);
-
     const layersAfterUndo = await page.$$eval('.d3Layer', layers => layers.length);
     console.log('Layers after undo:', layersAfterUndo);
-
     // Redo
     await editMenu.click();
     await page.waitForTimeout(300);
-
     const redoOption = await page.$('text=Redo');
     await redoOption.click();
     await page.waitForTimeout(500);
-
     const layersAfterRedo = await page.$$eval('.d3Layer', layers => layers.length);
     console.log('Layers after redo:', layersAfterRedo);
-
     expect(layersAfterRedo).toBe(layersAfterAdd);
     expect(consoleErrors.length).toBe(0);
   });
