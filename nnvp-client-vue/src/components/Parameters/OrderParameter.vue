@@ -33,6 +33,32 @@
 </template>
 
 <script>
+/**
+ * OrderParameter Component
+ *
+ * A drag-and-drop reordering interface for list-based parameters where the order of items matters.
+ *
+ * Features:
+ * - Visual list display showing items with their name and ID
+ * - Drag-and-drop reordering using HTML5 native events
+ * - Duplicate detection with warning messages
+ * - Disables reordering when duplicates are found
+ *
+ * Potential Use Cases:
+ * - Permute/Transpose layers: Reordering axes like [0,1,2,3] → [0,3,1,2]
+ * - Concatenate layers: Specifying the order of input tensors
+ * - Reshape operations: Defining dimension ordering
+ *
+ * Current Status:
+ * As of 2025-10-21, no layers in the codebase currently use the "order" parameter type.
+ * The component exists and is functional but isn't actively used in any layer definitions - neither is tested.
+ *
+ * Props:
+ * @prop {String} title - Optional title for the parameter
+ * @prop {Array} itemList - The list of items to be ordered
+ * @prop {Function} idFunc - Function to extract ID from each item
+ * @prop {Function} nameFunc - Function to extract display name from each item
+ */
 export default {
   name: 'OrderParameter',
   props: {

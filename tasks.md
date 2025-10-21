@@ -16,7 +16,7 @@ But if you read this and you want to get involved, you can actually create one f
     - [x] Load a template and generate Python code
     - [x] Manually build network and generate JavaScript code (with drag-and-drop)
     - [x] Manually build network and generate Python code (with drag-and-drop)
-  - [ ] **Parameter modification:**
+  - [x] **Parameter modification:**
     - [x] Modify layer parameters from RightBar and verify in generated code
     - [x] Test integer parameter modification
     - [x] Test boolean parameter modification
@@ -24,7 +24,7 @@ But if you read this and you want to get involved, you can actually create one f
     - [x] Test string parameter types
     - [x] Test tuple parameter types
     - [x] Test list parameter types
-    - [ ] Test order parameter types
+    - ~~[ ] Test order parameter types~~ (no layers currently use this parameter type)
   - [x] **Dataset loading:**
     - [x] Load a dataset from the BottomTrainer panel
     - [x] Load fashion mnist after mnist from the BottomTrainer panel
