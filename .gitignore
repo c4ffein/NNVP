@@ -28,3 +28,4 @@ yarn-error.log*
 # Playwright test results
 nnvp-client-vue/test-results
 nnvp-client-vue/playwright-report
+test-results
