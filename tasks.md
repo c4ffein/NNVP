@@ -29,9 +29,9 @@ But if you read this and you want to get involved, you can actually create one f
     - [x] Load a dataset from the BottomTrainer panel
     - [x] Load fashion mnist after mnist from the BottomTrainer panel
     - [x] Reload mnist after the mnist -> fashion mnist interaction
-  - [ ] **Link/edge manipulation:**
-    - [ ] Load template, delete a link between layers, verify network is broken (error state)
-    - [ ] Redraw the deleted link, verify network is valid again
+  - [x] **Link/edge manipulation:**
+    - [x] Load template, delete a link between layers, verify network is broken (error state)
+    - [x] Redraw the deleted link, verify network is valid again
   - [ ] **Node manipulation:**
     - [ ] Load template, delete a node
     - [ ] Re-add the node, set parameters from RightBar

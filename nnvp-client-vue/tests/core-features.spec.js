@@ -1091,34 +1091,28 @@ def build_model():
 
   test('should interact with dataset selector in BottomTrainer', async ({ page }) => {
     console.log('\n=== DATASET SELECTOR TEST ===');
-
     // Enable dataset debug logging
     await page.evaluate(() => {
       window.nnvpDebugDatasets = true;
     });
     console.log('Dataset debug logging enabled');
-
     // Verify BottomTrainer is visible
     const bottomTrainer = await page.$('#BottomTrainer');
     expect(bottomTrainer).not.toBeNull();
     console.log('BottomTrainer panel found');
-
     // Click Dataset tab
     const datasetTab = await page.$('.BottomTrainer.bar-button:has-text("Dataset")');
     await datasetTab.click();
     await page.waitForTimeout(500);
     console.log('Dataset tab clicked');
-
     // Verify dataset selector exists
     const datasetSelector = await page.$('#dataset-selector-selector');
     expect(datasetSelector).not.toBeNull();
     console.log('Dataset selector found');
-
     // Check default dataset
     const initialDataset = await datasetSelector.evaluate(el => el.value);
     console.log('Initial dataset:', initialDataset);
     expect(initialDataset).toBe('MNIST');
-
     // Verify dataset options are available
     const datasetOptions = await datasetSelector.$$eval('option', options =>
       options.map(opt => opt.value)
@@ -1127,17 +1121,14 @@ def build_model():
     expect(datasetOptions).toContain('MNIST');
     expect(datasetOptions).toContain('FashionMNIST');
     expect(datasetOptions).toContain('CIFAR10');
-
     // Check initial description
     const initialDescription = await page.textContent('#dataset-description');
     console.log('MNIST description:', initialDescription.substring(0, 100));
     expect(initialDescription).toContain('MNIST');
     expect(initialDescription.length).toBeGreaterThan(20);
-
     // Wait for MNIST auto-load to start (3 second setTimeout in mounted())
     console.log('Waiting for MNIST auto-load to start (3s timeout in mounted())...');
     await page.waitForTimeout(4000);
-
     // Check debug logs immediately to see if loading started
     let datasetLogs = consoleMessages.filter(msg =>
       msg.text.includes('[DatasetSelector]') || msg.text.includes('[BottomTrainer]')
@@ -1149,7 +1140,6 @@ def build_model():
     } else {
       console.log('⚠️  NO DATASET LOGS YET! Dataset loading might not have started.');
     }
-
     // Wait for loading to complete (loading bar should disappear)
     console.log('\nWaiting for dataset loading to complete (checking loading bar visibility)...');
     await page.waitForFunction(
@@ -1163,9 +1153,7 @@ def build_model():
       },
       { timeout: 120000 } // 2 minutes for CDN download
     );
-
     console.log('Loading bar hidden! Checking samples div...');
-
     // Debug: Check what's in the samples div
     const samplesDebug = await page.evaluate(() => {
       const samplesDiv = document.querySelector('#samples');
@@ -1178,7 +1166,6 @@ def build_model():
       };
     });
     console.log('Samples div debug:', JSON.stringify(samplesDebug, null, 2));
-
     // If no canvases, wait a bit more
     if (samplesDebug.canvasCount === 0) {
       console.log('No canvases yet, waiting 5 more seconds...');
@@ -1193,16 +1180,13 @@ def build_model():
       });
       console.log('After 5s wait:', JSON.stringify(samplesDebug2, null, 2));
     }
-
     console.log('Checking for canvases...');
-
     // Verify actual canvas samples are rendered
     const samplesDiv = await page.$('#samples');
     const canvases = await samplesDiv.$$('canvas');
     console.log('Number of MNIST sample canvases rendered:', canvases.length);
     expect(canvases.length).toBeGreaterThan(0);
     expect(canvases.length).toBeLessThanOrEqual(40); // Should render 40 samples
-
     // Verify canvas has actual content (not empty)
     const firstCanvas = canvases[0];
     const canvasSize = await firstCanvas.evaluate(canvas => ({
@@ -1212,14 +1196,12 @@ def build_model():
     console.log('Sample canvas size:', canvasSize);
     expect(canvasSize.width).toBe(28); // MNIST is 28x28
     expect(canvasSize.height).toBe(28);
-
     // Verify loading debug logs
     const allDatasetLogs = consoleMessages.filter(msg =>
       msg.text.includes('[DatasetSelector]') || msg.text.includes('[BottomTrainer]')
     );
     console.log('\nDataset loading logs (' + allDatasetLogs.length + ' messages):');
     allDatasetLogs.slice(0, 10).forEach(log => console.log(`  ${log.type}: ${log.text.substring(0, 100)}`));
-
     // Should have logs showing complete loading process
     const hasLoadStartLog = allDatasetLogs.some(log =>
       log.text.includes('datasetSet called') || log.text.includes('Starting load')
@@ -1229,9 +1211,7 @@ def build_model():
     );
     expect(hasLoadStartLog).toBe(true);
     expect(hasLoadCompleteLog).toBe(true);
-
     console.log('✅ MNIST dataset loading completed successfully with real samples!');
-
     expect(consoleErrors.length).toBe(0);
   });
 
@@ -1449,5 +1429,111 @@ def build_model():
     expect(description).not.toContain('Fashion');
     console.log('✅ MNIST reloaded successfully from cache!');
     expect(consoleErrors.length).toBe(0);
+  });
+
+  test('should delete edge and verify layers become isolated', async ({ page }) => {
+    console.log('\n=== EDGE DELETION TEST ===');
+    // Load a template with connected layers
+    await page.click('text=File');
+    await page.waitForTimeout(500);
+    const templatesOption = await page.$('text=Templates');
+    await templatesOption.hover();
+    await page.waitForTimeout(500);
+    const template = await page.$('text=2D Dense for MNIST');
+    await template.click();
+    await page.waitForTimeout(2000);
+    // Count initial edges
+    const initialEdges = await page.$$('.edge');
+    console.log('Initial edges:', initialEdges.length);
+    expect(initialEdges.length).toBeGreaterThan(0);
+    // Count isolated layers before deletion
+    const isolatedBefore = await page.$$('.d3Layer rect.isolated');
+    console.log('Isolated layers before deletion:', isolatedBefore.length);
+    // Click on an edge to select it (try the first edge)
+    // Edges are SVG elements, need to click on their path
+    const firstEdge = await page.$('.edge path');
+    expect(firstEdge).not.toBeNull();
+    const edgeBox = await firstEdge.boundingBox();
+    await page.mouse.click(edgeBox.x + edgeBox.width / 2, edgeBox.y + edgeBox.height / 2);
+    await page.waitForTimeout(500);
+    // Verify edge is selected
+    const selectedEdge = await page.$('.edge.selected');
+    expect(selectedEdge).not.toBeNull();
+    console.log('Edge selected:', await selectedEdge.evaluate(el => el.id));
+    // Press Backspace key to delete the edge (alternative to Delete)
+    await page.keyboard.press('Backspace');
+    await page.waitForTimeout(1000);
+    // Count edges after deletion
+    const edgesAfter = await page.$$('.edge');
+    console.log('Edges after deletion:', edgesAfter.length);
+    expect(edgesAfter.length).toBe(initialEdges.length - 1);
+    // Check if any layers became isolated
+    const isolatedAfter = await page.$$('.d3Layer rect.isolated');
+    console.log('Isolated layers after deletion:', isolatedAfter.length);
+    expect(isolatedAfter.length).toBeGreaterThan(isolatedBefore.length);
+    console.log('✅ Edge deleted and layers became isolated!');
+  });
+
+  test('should redraw deleted edge and verify network is valid again', async ({ page }) => {
+    console.log('\n=== EDGE RECREATION TEST ===');
+
+    // Load a template with connected layers
+    await page.click('text=File');
+    await page.waitForTimeout(500);
+    const templatesOption = await page.$('text=Templates');
+    await templatesOption.hover();
+    await page.waitForTimeout(500);
+    const template = await page.$('text=2D Dense for MNIST');
+    await template.click();
+    await page.waitForTimeout(2000);
+    // Get all layers to identify source and target for reconnection
+    const layers = await page.$$('.d3Layer');
+    console.log('Total layers:', layers.length);
+    // Count initial edges
+    const initialEdges = await page.$$('.edge');
+    console.log('Initial edges:', initialEdges.length);
+    // Select and delete first edge
+    // Get edge group to get its ID, but click on the path element
+    const firstEdgeGroup = await page.$('.edge');
+    const edgeId = await firstEdgeGroup.evaluate(el => el.id);
+    console.log('Deleting edge:', edgeId);
+    const firstEdgePath = await page.$('.edge path');
+    const edgeBox = await firstEdgePath.boundingBox();
+    await page.mouse.click(edgeBox.x + edgeBox.width / 2, edgeBox.y + edgeBox.height / 2);
+    await page.waitForTimeout(500);
+    await page.keyboard.press('Backspace');
+    await page.waitForTimeout(1000);
+    // Verify edge was deleted
+    const edgesAfterDelete = await page.$$('.edge');
+    expect(edgesAfterDelete.length).toBe(initialEdges.length - 1);
+    // Check isolated layers
+    const isolated = await page.$$('.d3Layer rect.isolated');
+    console.log('Isolated layers after deletion:', isolated.length);
+    const isolatedCount = isolated.length;
+    // Redraw the edge by dragging from anchor to anchor
+    console.log('Reconnecting layers by drag-and-drop...');
+    // The deleted edge was s0_t1 (layer-0 to layer-1), so reconnect those same layers
+    const sourceAnchor = await page.$('#d3-layer-0 circle.bottom-point');
+    const sourceBox = await sourceAnchor.boundingBox();
+    const targetLayer = await page.$('#d3-layer-1 rect');
+    const targetBox = await targetLayer.boundingBox();
+    // Drag from source anchor to target layer center
+    await page.mouse.move(sourceBox.x + sourceBox.width/2, sourceBox.y + sourceBox.height/2);
+    await page.waitForTimeout(200);
+    await page.mouse.down();
+    await page.waitForTimeout(200);
+    await page.mouse.move(targetBox.x + targetBox.width/2, targetBox.y + targetBox.height/2);
+    await page.waitForTimeout(300);
+    await page.mouse.up();
+    await page.waitForTimeout(500);
+    // Count edges after reconnection
+    const edgesAfterReconnect = await page.$$('.edge');
+    console.log('Edges after reconnection:', edgesAfterReconnect.length);
+    expect(edgesAfterReconnect.length).toBe(initialEdges.length);
+    // Check isolated layers - should be less than before
+    const isolatedAfterReconnect = await page.$$('.d3Layer rect.isolated');
+    console.log('Isolated layers after reconnection:', isolatedAfterReconnect.length);
+    expect(isolatedAfterReconnect.length).toBeLessThan(isolatedCount);
+    console.log('✅ Edge recreated and network is valid again!');
   });
 });
