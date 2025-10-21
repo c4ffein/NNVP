@@ -1536,4 +1536,141 @@ def build_model():
     expect(isolatedAfterReconnect.length).toBeLessThan(isolatedCount);
     console.log('✅ Edge recreated and network is valid again!');
   });
+
+  test('should delete node, re-add it, set parameters, and reconnect', async ({ page }) => {
+    console.log('\n=== NODE MANIPULATION TEST ===');
+    // Load a template with multiple connected layers
+    await page.click('text=File');
+    await page.waitForTimeout(500);
+    const templatesOption = await page.$('text=Templates');
+    await templatesOption.hover();
+    await page.waitForTimeout(500);
+    const template = await page.$('text=2D Dense for MNIST');
+    await template.click();
+    await page.waitForTimeout(2000);
+    // Get initial state
+    const initialLayers = await page.$$('.d3Layer');
+    const initialEdges = await page.$$('.edge');
+    console.log('Initial layers:', initialLayers.length);
+    console.log('Initial edges:', initialEdges.length);
+    // Select and delete the first Dense layer (layer 2) - this will isolate the second Dense
+    const denseLayer = initialLayers[2];
+    const denseBox = await denseLayer.boundingBox();
+    await page.mouse.click(denseBox.x + denseBox.width / 2, denseBox.y + denseBox.height / 2);
+    await page.waitForTimeout(500);
+    // Verify layer is selected
+    const isSelected = await denseLayer.evaluate(el => el.classList.contains('selected'));
+    console.log('Dense layer selected:', isSelected);
+    expect(isSelected).toBe(true);
+    // Delete the layer
+    await page.keyboard.press('Backspace');
+    await page.waitForTimeout(1000);
+    // Verify layer was deleted
+    const layersAfterDelete = await page.$$('.d3Layer');
+    const edgesAfterDelete = await page.$$('.edge');
+    console.log('Layers after deletion:', layersAfterDelete.length);
+    console.log('Edges after deletion:', edgesAfterDelete.length);
+    expect(layersAfterDelete.length).toBe(initialLayers.length - 1);
+    expect(edgesAfterDelete.length).toBeLessThan(initialEdges.length);
+    // Check for isolated layers (optional - depends on which layer was deleted)
+    const isolatedAfterDelete = await page.$$('.d3Layer rect.isolated');
+    console.log('Isolated layers after deletion:', isolatedAfterDelete.length);
+    // Re-add a Dense layer
+    const denseTemplate = await page.$('.LayerTemplate:has-text("Dense")');
+    await denseTemplate.click();
+    await page.waitForTimeout(1000);
+    // Verify layer was added
+    const layersAfterAdd = await page.$$('.d3Layer');
+    console.log('Layers after re-adding Dense:', layersAfterAdd.length);
+    expect(layersAfterAdd.length).toBe(initialLayers.length);
+    // Select the newly added layer (last one) and set parameters
+    const newDenseLayer = layersAfterAdd[layersAfterAdd.length - 1];
+    const newDenseBox = await newDenseLayer.boundingBox();
+    await page.mouse.click(newDenseBox.x + newDenseBox.width / 2, newDenseBox.y + newDenseBox.height / 2);
+    await page.waitForTimeout(500);
+    // Verify RightBar shows parameters
+    const rightBarText = await page.textContent('#rightbar-block');
+    console.log('RightBar shows Dense parameters:', rightBarText.includes('units'));
+    expect(rightBarText).toContain('units');
+    // Set units parameter to 128
+    const unitsInput = await page.$('#rightbar-block input[type="number"]');
+    await unitsInput.fill('128');
+    await unitsInput.dispatchEvent('change');
+    await page.waitForTimeout(500);
+    const unitsValue = await unitsInput.inputValue();
+    console.log('Set units to:', unitsValue);
+    expect(unitsValue).toBe('128');
+    // Reconnect the layers
+    // After deleting first Dense (layer 2): Input → Flatten → (gap) → Dense → Output
+    // Layers after deletion: Input(0), Flatten(1), Dense(2), Output(3)
+    // New Dense will be added as layer 4
+    // We need to connect: Flatten(1) → new Dense(4) → old Dense(2)
+    console.log('Reconnecting layers...');
+    // Get the new layer's ID
+    const newLayerId = await newDenseLayer.evaluate(el => el.id);
+    console.log('New layer ID:', newLayerId);
+    // First, get fresh references to all layers after adding the new one
+    const allLayersAfterAdd = await page.$$('.d3Layer');
+    console.log('Total layers after adding:', allLayersAfterAdd.length);
+    // Debug: print all layer types to understand the order
+    const layerTypes = await page.$$eval('.d3Layer text', texts => texts.map(t => t.textContent));
+    console.log('Layer order after adding:', layerTypes);
+    // Connect Flatten (index 1) to new Dense (index 4)
+    const flattenLayer = allLayersAfterAdd[1];
+    const flattenAnchor = await flattenLayer.$('circle.bottom-point');
+    const flattenAnchorBox = await flattenAnchor.boundingBox();
+    const newDenseLayerFinal = allLayersAfterAdd[4];
+    const newDenseBoxFinal = await newDenseLayerFinal.boundingBox();
+    await page.mouse.move(flattenAnchorBox.x + flattenAnchorBox.width/2, flattenAnchorBox.y + flattenAnchorBox.height/2);
+    await page.waitForTimeout(200);
+    await page.mouse.down();
+    await page.waitForTimeout(200);
+    await page.mouse.move(newDenseBoxFinal.x + newDenseBoxFinal.width/2, newDenseBoxFinal.y + newDenseBoxFinal.height/2);
+    await page.waitForTimeout(300);
+    await page.mouse.up();
+    await page.waitForTimeout(500);
+    console.log('Connected Flatten to new Dense');
+    let currentEdges = await page.$$('.edge');
+    console.log('Edges after first connection:', currentEdges.length);
+    // Connect new Dense (index 4) to old Dense (index 2)
+    const newDenseAnchor = await newDenseLayerFinal.$('circle.bottom-point');
+    const newDenseAnchorBox = await newDenseAnchor.boundingBox();
+    const oldDenseLayer = allLayersAfterAdd[2];
+    const oldDenseBox = await oldDenseLayer.boundingBox();
+    await page.mouse.move(
+      newDenseAnchorBox.x + newDenseAnchorBox.width/2, newDenseAnchorBox.y + newDenseAnchorBox.height/2
+    );
+    await page.waitForTimeout(200);
+    await page.mouse.down();
+    await page.waitForTimeout(200);
+    await page.mouse.move(oldDenseBox.x + oldDenseBox.width/2, oldDenseBox.y + oldDenseBox.height/2);
+    await page.waitForTimeout(300);
+    await page.mouse.up();
+    await page.waitForTimeout(500);
+    console.log('Connected new Dense to old Dense');
+    currentEdges = await page.$$('.edge');
+    console.log('Edges after second connection:', currentEdges.length);
+    // Verify edges were recreated
+    const edgesAfterReconnect = await page.$$('.edge');
+    console.log('Edges after reconnection:', edgesAfterReconnect.length);
+    expect(edgesAfterReconnect.length).toBeGreaterThan(edgesAfterDelete.length);
+    // Verify isolated layers decreased or stayed same
+    const isolatedAfterReconnect = await page.$$('.d3Layer rect.isolated');
+    console.log('Isolated layers after reconnection:', isolatedAfterReconnect.length);
+    expect(isolatedAfterReconnect.length).toBeLessThanOrEqual(isolatedAfterDelete.length);
+    // Verify the parameter was saved by generating code
+    const fileMenu = await page.$('text=File');
+    const downloadPromise = page.waitForEvent('download', { timeout: 10000 });
+    await fileMenu.click();
+    await page.waitForTimeout(300);
+    const generateOption = await page.$('text=Generate');
+    await generateOption.click();
+    await page.waitForTimeout(1000);
+    const download = await downloadPromise;
+    const path = await download.path();
+    const content = fs.readFileSync(path, 'utf8');
+    console.log('Generated code contains units=128:', content.includes('128'));
+    expect(content).toContain('128');
+    console.log('✅ Node deleted, re-added, configured, and reconnected successfully!');
+  });
 });

@@ -32,13 +32,13 @@ But if you read this and you want to get involved, you can actually create one f
   - [x] **Link/edge manipulation:**
     - [x] Load template, delete a link between layers, verify network is broken (error state)
     - [x] Redraw the deleted link, verify network is valid again
-  - [ ] **Node manipulation:**
-    - [ ] Load template, delete a node
-    - [ ] Re-add the node, set parameters from RightBar
-    - [ ] Reconnect missing links, verify network is valid
+  - [x] **Node manipulation:**
+    - [x] Load template, delete a node, Re-add the node, set parameters from RightBar, Reconnect missing links, verify network is valid
   - [x] **Undo/Redo:**
     - [x] Test undo functionality
     - [x] Test redo functionality
+  - [ ] Whole MNIST training workflow, mark as slow, ideate with Claude
+    - see if can get significant results (for testing lol) with low epochs
 - [ ] Update README to reflect Vue 3 status
 
 ### 2. Replace D3.js with modern graph visualization library
