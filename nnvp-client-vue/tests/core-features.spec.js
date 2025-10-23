@@ -1675,7 +1675,8 @@ def build_model():
   });
 
   test('should complete full MNIST training workflow', async ({ browser }) => {
-    test.slow(); // Mark as slow test - training takes time with 4 epochs
+    test.slow(); // Mark as slow test - training takes time with 10 epochs
+    test.setTimeout(120000); // Set explicit timeout of 2 minutes for training
     console.log('\n=== MNIST TRAINING WORKFLOW TEST ===');
     // Create a new context
     const context = await browser.newContext();
@@ -1751,14 +1752,14 @@ def build_model():
     // Now click Options tab to set epochs
     await page.click('text=Options');
     await page.waitForTimeout(500);
-    // Set epochs to 4 for meaningful training progress verification
+    // Set epochs to 10 for meaningful training progress verification
     const epochsInput = await page.$('#CompileOptions input[type="number"]');
-    await epochsInput.fill('4');
+    await epochsInput.fill('10');
     await epochsInput.dispatchEvent('input');
     await page.waitForTimeout(300);
     const epochsValue = await epochsInput.inputValue();
     console.log('Set epochs to:', epochsValue);
-    expect(epochsValue).toBe('4');
+    expect(epochsValue).toBe('10');
     // Click Train button
     console.log('Attempting to click Train button...');
     // Method 1: Get all trainer bar buttons and click the 4th one (index 3)
@@ -1831,9 +1832,9 @@ def build_model():
     const batchUpdates = consoleMessages.filter(msg => msg.includes('[Charts] Batch chart update'));
     const epochUpdates = consoleMessages.filter(msg => msg.includes('[Charts] Epoch chart update'));
     console.log(`Found ${batchUpdates.length} batch updates and ${epochUpdates.length} epoch updates`);
-    // We should have batch updates (one per batch) and epoch updates (4 epochs + initial)
+    // We should have batch updates (one per batch) and epoch updates (20 epochs + initial)
     expect(batchUpdates.length).toBeGreaterThan(0);
-    expect(epochUpdates.length).toBeGreaterThanOrEqual(5); // Initial empty + 4 epochs
+    expect(epochUpdates.length).toBeGreaterThanOrEqual(11); // Initial empty + 10 epochs
     // Parse the first real epoch (index 1) and last epoch metrics
     const firstEpochMsg = epochUpdates[1]; // Skip index 0 which is the initial empty update
     const lastEpochMsg = epochUpdates[epochUpdates.length - 1];

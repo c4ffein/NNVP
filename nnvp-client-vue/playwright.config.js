@@ -15,7 +15,20 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        // Run in headed mode when DISPLAY is set (e.g., when using xvfb-run)
+        // This enables WebGL support for training tests
+        headless: !process.env.DISPLAY,
+        launchOptions: {
+          args: [
+            '--disable-gpu',
+            '--enable-webgl',
+            '--ignore-gpu-blocklist',
+            '--use-gl=swiftshader',
+          ],
+        },
+      },
     },
   ],
   webServer: {

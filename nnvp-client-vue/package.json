@@ -9,6 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test:e2e": "playwright test",
+    "test:e2e:xvfb": "xvfb-run --auto-servernum --server-args='-screen 0 1280x720x24' playwright test",
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {

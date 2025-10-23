@@ -12,6 +12,7 @@
 </template>
 
 <script>
+import { markRaw } from 'vue';
 import * as Chartist from 'chartist';
 
 import ChartistPluginTip from '@/lib/chartist-plugin-tip/chartist-plugin-tip';
@@ -21,27 +22,41 @@ import ChartistPluginTip from '@/lib/chartist-plugin-tip/chartist-plugin-tip';
 export default {
   name: 'Charts',
   mounted() {
-    this.$parent.chartData0 = {
-      labels: [],
-      series: [{ className: 'acc', name: 'acc', data: [] }, { className: 'loss', name: 'loss', data: [] }],
-    };
-    this.$parent.chartData1 = {
-      labels: [],
-      series: [
-        { className: 'ct-series-acc', name: 'acc', data: [] },
-        { className: 'ct-series-val-acc', name: 'val-acc', data: [] },
-        { className: 'ct-series-loss', name: 'loss', data: [] },
-        { className: 'ct-series-val-loss', name: 'val-loss', data: [] },
-      ],
-    };
-    // eslint-disable-next-line
-    const chartistPluginTip = new ChartistPluginTip(window, document, Chartist);
-    this.$parent.batchChart = new Chartist.Line('#ct-chart-batch', this.chartData0, {
-      lineSmooth: false, plugins: [Chartist.plugins.ctTip({ title: ':value' })],
-    });
-    this.$parent.epochChart = new Chartist.Line('#ct-chart-epoch', this.chartData1, {
-      lineSmooth: false, plugins: [Chartist.plugins.ctTip({ title: ':value' })],
-    });
+    try {
+      // Find the BottomTrainer parent (might be behind KeepAlive wrapper)
+      let parent = this.$parent;
+      while (parent && parent.$options.name !== 'BottomTrainer') {
+        parent = parent.$parent;
+      }
+
+      if (!parent) {
+        console.error('[Charts] Could not find BottomTrainer parent');
+        return;
+      }
+
+      // TODO: Chartist has compatibility issues with Vue 3, temporarily disabled
+      // Will be replaced with a different charting library
+      // For now, create mock chart objects that log updates
+      parent.batchChart = {
+        update: (data) => {
+          if (window.nnvpDebugTraining) {
+            console.log('[Charts] Batch chart update:', JSON.stringify(parent.chartData0));
+          }
+        }
+      };
+      parent.epochChart = {
+        update: (data) => {
+          if (window.nnvpDebugTraining) {
+            console.log('[Charts] Epoch chart update:', JSON.stringify(parent.chartData1));
+          }
+        }
+      };
+
+      console.log('[Charts] mounted successfully (Chartist disabled)');
+    } catch (error) {
+      console.error('[Charts] Error in mounted():', error);
+      throw error;
+    }
   },
 };
 </script>

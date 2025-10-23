@@ -22,7 +22,7 @@
           v-bind:ref="'child'+selectedPanel"
           class="tab"
           v-bind:value="selectedDataset"
-          @input="selectedDataset = $event"
+          @input="value => { if (typeof value === 'string') selectedDataset = value; }"
           v-bind:loadableDatasets="loadableDatasets"
           v-bind:selectedOptimizer="selectedOptimizer"
           @changeSelectedOptimizer="changeSelectedOptimizer"
@@ -72,7 +72,27 @@ export default {
         'sgd', 'adagrad', 'adadelta', 'adam', 'adamax', 'rmsprop'
       ],
       selectedPanel: "DatasetSelector",
+      // Initialize chart data here so it's always available
+      chartData0: null,
+      chartData1: null,
     };
+  },
+  mounted() {
+    // Initialize chart data (Charts component will use these)
+    this.chartData0 = {
+      labels: [],
+      series: [{ className: 'acc', name: 'acc', data: [] }, { className: 'loss', name: 'loss', data: [] }],
+    };
+    this.chartData1 = {
+      labels: [],
+      series: [
+        { className: 'ct-series-acc', name: 'acc', data: [] },
+        { className: 'ct-series-val-acc', name: 'val-acc', data: [] },
+        { className: 'ct-series-loss', name: 'loss', data: [] },
+        { className: 'ct-series-val-loss', name: 'val-loss', data: [] },
+      ],
+    };
+    console.log('[BottomTrainer] Chart data initialized');
   },
   methods: {
     datasetClicked() {
@@ -90,6 +110,8 @@ export default {
     async trainClicked() {
       if (this.isTraining) { this.cancelRequested = true; return; }
       this.chartsClicked();
+      // Wait for Charts component to mount
+      await this.$nextTick();
       this.isTraining = true;
       await this.startTraining();
       this.cancelRequested = false;
@@ -103,13 +125,14 @@ export default {
       const epochs = this.epochs;
       let createModel;
       try {
+        // Create a function scope to avoid const reassignment error
         createModel = eval(
-          `tf=window.tf;\n${this.$d3Interface.generateJavascriptNoSave(this.$kerasInterface)}createModel`
+          `(function() { const tf = window.tf; ${this.$d3Interface.generateJavascriptNoSave(this.$kerasInterface)} return createModel; })()`
         );
       }
       catch (error) {
         alert("Incorrect network : couldn't find Inputs/Outputs, or they weren't connected.");
-        console.log(error);
+        console.error('[BottomTrainer] Error generating model:', error);
         return;
       }
       let model;
@@ -119,7 +142,7 @@ export default {
       catch (error) {
         // Param errors
         alert(error);
-        console.log(error);
+        console.error('[BottomTrainer] Error creating model:', error);
         return;
       }
       model.compile({
@@ -160,6 +183,7 @@ export default {
       }
       catch (error) {
         if (error == "cancelRequested") return;
+        console.error('[BottomTrainer] Training error:', error);
         alert(error);
       }
     },
