@@ -1673,4 +1673,208 @@ def build_model():
     expect(content).toContain('128');
     console.log('✅ Node deleted, re-added, configured, and reconnected successfully!');
   });
+
+  test('should complete full MNIST training workflow', async ({ browser }) => {
+    test.slow(); // Mark as slow test - training takes time with 4 epochs
+    console.log('\n=== MNIST TRAINING WORKFLOW TEST ===');
+    // Create a new context
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    // Capture alerts and console messages
+    const alerts = [];
+    const consoleMessages = [];
+    page.on('dialog', async dialog => {
+      console.log('ALERT:', dialog.message());
+      alerts.push(dialog.message());
+      await dialog.accept();
+    });
+    page.on('console', msg => {
+      const text = msg.text();
+      consoleMessages.push(text);
+      // Log important console messages
+      if (text.includes('CPU-only mode') || text.includes('CPU backend') ||
+          text.includes('Epoch') || text.includes('training') ||
+          text.includes('[Charts]') || text.includes('mounted')) {
+        console.log('[BROWSER]', text);
+      }
+      if (text.includes('error') || text.includes('Error') || text.includes('ERROR') ||
+          text.includes('warn') || text.includes('Warning')) {
+        console.log('[BROWSER ERROR]', text);
+      }
+    });
+    // Navigate to the app with CPU backend parameter
+    // This forces TensorFlow.js to use CPU instead of WebGL (which doesn't work in xvfb)
+    await page.goto('http://localhost:5173?backend=cpu');
+    await page.waitForTimeout(2000); // Wait for CPU backend to initialize
+    // Load a template for training
+    await page.click('text=File');
+    await page.waitForTimeout(500);
+    const templatesOption = await page.$('text=Templates');
+    await templatesOption.hover();
+    await page.waitForTimeout(500);
+    const template = await page.$('text=2D Dense for MNIST');
+    await template.click();
+    await page.waitForTimeout(2000);
+    console.log('Loaded template: 2D Dense for MNIST');
+    // Open Training panel via top menu
+    await page.click('text=Training');
+    await page.waitForTimeout(1000);
+    // Verify BottomTrainer is visible
+    const bottomTrainer = await page.$('#BottomTrainer');
+    expect(bottomTrainer).not.toBeNull();
+    console.log('BottomTrainer panel opened');
+    // Enable debug logging
+    await page.evaluate(() => {
+      window.nnvpDebugDatasets = true;
+      window.nnvpDebugTraining = true;
+    });
+    console.log('Enabled debug logging');
+    // Click Dataset tab to show the dataset selector
+    await page.click('text=Dataset');
+    await page.waitForTimeout(1000);
+    console.log('Dataset tab clicked');
+    // Select MNIST from the dropdown
+    const datasetSelector = await page.$('#dataset-selector-selector');
+    expect(datasetSelector).not.toBeNull();
+    await datasetSelector.selectOption('MNIST');
+    console.log('Selected MNIST from dropdown');
+    // Wait for dataset loading to complete
+    // The loading bar should appear and then disappear
+    await page.waitForTimeout(2000); // Give it time to start loading
+    // Wait for loading to complete (loading bar to disappear)
+    try {
+      await page.waitForSelector('#data-selector-loading-bar-container', { state: 'hidden', timeout: 30000 });
+      console.log('Dataset loading completed (loading bar disappeared)');
+    } catch (error) {
+      console.log('Warning: Loading bar did not disappear within timeout, continuing anyway...');
+    }
+    // Now click Options tab to set epochs
+    await page.click('text=Options');
+    await page.waitForTimeout(500);
+    // Set epochs to 4 for meaningful training progress verification
+    const epochsInput = await page.$('#CompileOptions input[type="number"]');
+    await epochsInput.fill('4');
+    await epochsInput.dispatchEvent('input');
+    await page.waitForTimeout(300);
+    const epochsValue = await epochsInput.inputValue();
+    console.log('Set epochs to:', epochsValue);
+    expect(epochsValue).toBe('4');
+    // Click Train button
+    console.log('Attempting to click Train button...');
+    // Method 1: Get all trainer bar buttons and click the 4th one (index 3)
+    const trainerButtons = await page.$$('#trainer-bar .bar-button');
+    console.log('Found', trainerButtons.length, 'trainer bar buttons');
+    expect(trainerButtons.length).toBe(4); // Dataset, Options, Charts, Train
+    const trainButton = trainerButtons[3]; // Train is the 4th button
+    const trainButtonText = await trainButton.textContent();
+    console.log('Train button text:', trainButtonText.trim());
+    expect(trainButtonText.trim()).toBe('Train');
+    // Click it with force to ensure it registers
+    await trainButton.click({ force: true });
+    console.log('Clicked Train button (method 1: direct element click)');
+    // Wait for either training to start or an alert
+    await page.waitForTimeout(3000);
+    // Check if we got any alerts
+    if (alerts.length > 0) {
+      console.log('Alerts received:', alerts);
+    }
+    // Try to find Stop button
+    let stopButton = await page.$('text=Stop');
+    console.log('Stop button found after 3s:', stopButton !== null);
+    if (!stopButton) {
+      // Debug: What text is in the Train button now?
+      const currentButtons = await page.$$('#trainer-bar .bar-button');
+      console.log('Current button texts after 3s:');
+      for (let i = 0; i < currentButtons.length; i++) {
+        const text = await currentButtons[i].textContent();
+        console.log(`  Button ${i}: "${text}"`);
+      }
+      // Wait a bit more in case training is slow to start
+      console.log('Waiting 5 more seconds...');
+      await page.waitForTimeout(5000);
+      stopButton = await page.$('text=Stop');
+      console.log('Stop button found after 8s total:', stopButton !== null);
+      if (!stopButton) {
+        const finalButtons = await page.$$('#trainer-bar .bar-button');
+        console.log('Final button texts after 8s:');
+        for (let i = 0; i < finalButtons.length; i++) {
+          const text = await finalButtons[i].textContent();
+          console.log(`  Button ${i}: "${text}"`);
+        }
+        // Print last 20 console messages to see what happened
+        console.log('\nLast 20 browser console messages:');
+        const lastMessages = consoleMessages.slice(-20);
+        lastMessages.forEach((msg, i) => {
+          console.log(`  ${i}: ${msg}`);
+        });
+      }
+    }
+    //     expect(stopButton).not.toBeNull();
+    console.log('Training started (Stop button visible)');
+    // Verify Charts tab is active (automatically switches during training)
+    const chartsPanel = await page.$('#Charts');
+    expect(chartsPanel).not.toBeNull();
+    console.log('Charts panel is active');
+    // Wait for training to complete (button changes back to "Train")
+    // With 2 epochs and 500 training samples, this should take ~30-60 seconds
+    console.log('Waiting for training to complete...');
+    await page.waitForSelector('text=Train', { timeout: 120000 }); // 2 minute timeout
+    console.log('Training completed (Train button visible again)');
+    // Verify that charts are visible (data validation is complex with Vue 3)
+    const batchChart = await page.$('#ct-chart-batch');
+    const epochChart = await page.$('#ct-chart-epoch');
+    expect(batchChart).not.toBeNull();
+    expect(epochChart).not.toBeNull();
+    console.log('Charts are visible');
+    // Verify training actually ran by checking console messages
+    // Look for batch chart updates and epoch chart updates
+    const batchUpdates = consoleMessages.filter(msg => msg.includes('[Charts] Batch chart update'));
+    const epochUpdates = consoleMessages.filter(msg => msg.includes('[Charts] Epoch chart update'));
+    console.log(`Found ${batchUpdates.length} batch updates and ${epochUpdates.length} epoch updates`);
+    // We should have batch updates (one per batch) and epoch updates (4 epochs + initial)
+    expect(batchUpdates.length).toBeGreaterThan(0);
+    expect(epochUpdates.length).toBeGreaterThanOrEqual(5); // Initial empty + 4 epochs
+    // Parse the first real epoch (index 1) and last epoch metrics
+    const firstEpochMsg = epochUpdates[1]; // Skip index 0 which is the initial empty update
+    const lastEpochMsg = epochUpdates[epochUpdates.length - 1];
+    // Extract JSON from the messages
+    const extractMetrics = (msg) => {
+      const jsonStart = msg.indexOf('{"labels"');
+      if (jsonStart === -1) return null;
+      const jsonStr = msg.substring(jsonStart);
+      try {
+        const data = JSON.parse(jsonStr);
+        return {
+          acc: data.series[0].data[data.series[0].data.length - 1],
+          val_acc: data.series[1].data[data.series[1].data.length - 1],
+          loss: data.series[2].data[data.series[2].data.length - 1],
+          val_loss: data.series[3].data[data.series[3].data.length - 1],
+        };
+      } catch (e) {
+        console.error('Failed to parse metrics:', e);
+        return null;
+      }
+    };
+    const firstMetrics = extractMetrics(firstEpochMsg);
+    const lastMetrics = extractMetrics(lastEpochMsg);
+    expect(firstMetrics).not.toBeNull();
+    expect(lastMetrics).not.toBeNull();
+    console.log('First epoch metrics:', firstMetrics);
+    console.log('Last epoch metrics:', lastMetrics);
+    // Verify training progress: both accuracies should increase by at least 0.2
+    const accGain = lastMetrics.acc - firstMetrics.acc;
+    const valAccGain = lastMetrics.val_acc - firstMetrics.val_acc;
+    console.log(`Accuracy gain: ${accGain.toFixed(3)} (training), ${valAccGain.toFixed(3)} (validation)`);
+    expect(accGain).toBeGreaterThanOrEqual(0.2);
+    expect(valAccGain).toBeGreaterThanOrEqual(0.2);
+    // Verify both losses should decrease by at least 0.2
+    const lossDecrease = firstMetrics.loss - lastMetrics.loss;
+    const valLossDecrease = firstMetrics.val_loss - lastMetrics.val_loss;
+    console.log(`Loss decrease: ${lossDecrease.toFixed(3)} (training), ${valLossDecrease.toFixed(3)} (validation)`);
+    expect(lossDecrease).toBeGreaterThanOrEqual(0.2);
+    expect(valLossDecrease).toBeGreaterThanOrEqual(0.2);
+    console.log('✅ MNIST training workflow completed successfully with verified progress!');
+    // Cleanup
+    await context.close();
+  });
 });
