@@ -145,11 +145,13 @@ export default {
         console.error('[BottomTrainer] Error creating model:', error);
         return;
       }
+      console.log('[BottomTrainer] Compiling model with optimizer:', optimizer);
       model.compile({
         optimizer,
         loss: 'categoricalCrossentropy',
         metrics: ['accuracy'],
       });
+      console.log('[BottomTrainer] Model compiled successfully');
       const datasetName = this.selectedDataset;
       await this.loadDataset(datasetName);
       const data = this.datasets[datasetName];

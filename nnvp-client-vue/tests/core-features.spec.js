@@ -1695,7 +1695,8 @@ def build_model():
       // Log important console messages
       if (text.includes('CPU-only mode') || text.includes('CPU backend') ||
           text.includes('Epoch') || text.includes('training') ||
-          text.includes('[Charts]') || text.includes('mounted')) {
+          text.includes('[Charts]') || text.includes('mounted') ||
+          text.includes('[BottomTrainer]') || text.includes('optimizer')) {
         console.log('[BROWSER]', text);
       }
       if (text.includes('error') || text.includes('Error') || text.includes('ERROR') ||
@@ -1760,6 +1761,14 @@ def build_model():
     const epochsValue = await epochsInput.inputValue();
     console.log('Set epochs to:', epochsValue);
     expect(epochsValue).toBe('10');
+    // Set optimizer to 'adam' for consistent results
+    const optimizerSelector = await page.$('#optimizer-selector select');
+    expect(optimizerSelector).not.toBeNull();
+    await optimizerSelector.selectOption('adam');
+    await page.waitForTimeout(300);
+    const optimizerValue = await optimizerSelector.inputValue();
+    console.log('Set optimizer to:', optimizerValue);
+    expect(optimizerValue).toBe('adam');
     // Click Train button
     console.log('Attempting to click Train button...');
     // Method 1: Get all trainer bar buttons and click the 4th one (index 3)
