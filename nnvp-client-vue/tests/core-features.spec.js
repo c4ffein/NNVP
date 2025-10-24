@@ -1830,23 +1830,28 @@ def build_model():
     console.log('Waiting for training to complete...');
     await page.waitForSelector('text=Train', { timeout: 120000 }); // 2 minute timeout
     console.log('Training completed (Train button visible again)');
-    // Verify that charts are visible (data validation is complex with Vue 3)
-    const batchChart = await page.$('#ct-chart-batch');
-    const epochChart = await page.$('#ct-chart-epoch');
-    expect(batchChart).not.toBeNull();
-    expect(epochChart).not.toBeNull();
-    console.log('Charts are visible');
+    // Verify that charts are visible (using SVG-based LineChart components)
+    const svgElements = await page.$$('svg.line-chart-svg');
+    expect(svgElements.length).toBe(2); // Batch and Epoch charts
+    console.log('Charts are visible (SVG elements found)');
     // Verify training actually ran by checking console messages
     // Look for batch chart updates and epoch chart updates
     const batchUpdates = consoleMessages.filter(msg => msg.includes('[Charts] Batch chart update'));
     const epochUpdates = consoleMessages.filter(msg => msg.includes('[Charts] Epoch chart update'));
     console.log(`Found ${batchUpdates.length} batch updates and ${epochUpdates.length} epoch updates`);
-    // We should have batch updates (one per batch) and epoch updates (20 epochs + initial)
+    // We should have batch updates (one per batch) and epoch updates (>=10 epochs)
     expect(batchUpdates.length).toBeGreaterThan(0);
-    expect(epochUpdates.length).toBeGreaterThanOrEqual(11); // Initial empty + 10 epochs
-    // Parse the first real epoch (index 1) and last epoch metrics
-    const firstEpochMsg = epochUpdates[1]; // Skip index 0 which is the initial empty update
+    expect(epochUpdates.length).toBeGreaterThanOrEqual(10); // At least 10 epochs
+    // Skip initial empty update if present, use first real epoch
+    let firstEpochIndex = 0;
+    // Check if first update has empty data
+    if (epochUpdates[0].includes('"data":[]')) {
+      firstEpochIndex = 1; // Skip empty initial update
+    }
+    const firstEpochMsg = epochUpdates[firstEpochIndex];
     const lastEpochMsg = epochUpdates[epochUpdates.length - 1];
+    console.log('First epoch message:', firstEpochMsg);
+    console.log('Last epoch message:', lastEpochMsg);
     // Extract JSON from the messages
     const extractMetrics = (msg) => {
       const jsonStart = msg.indexOf('{"labels"');

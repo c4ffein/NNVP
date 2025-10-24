@@ -45,10 +45,6 @@ import Dataset from '../../lib/JSDatasets/google-data-loader';
 import loadableDatasets from '../../lib/JSDatasets/datasets-sources';
 import watchTraining from '../../lib/ModelTrainer/watchTraining';
 
-import * as Chartist from 'chartist';
-// import '@/../node_modules/chartist/dist/chartist.min.css'  TODO CHECK IF STILL NEEDED
-import ChartistPluginTip from '@/lib/chartist-plugin-tip/chartist-plugin-tip';
-
 import Charts from './Charts.vue';
 import CompileOptions from './CompileOptions.vue';
 import DatasetSelector from './DatasetSelector.vue';
