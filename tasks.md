@@ -6,9 +6,10 @@ But if you read this and you want to get involved, you can actually create one f
 ## High Priority
 
 ### 1. Client improvements
-- [ ] Fix corrupted Roboto-Thin-webfont.woff font file
+- [x] Fix corrupted Roboto-Thin-webfont.woff font file => Actually switched for Inter
 - [ ] Destroy the about.nnvp.io, make it part of this app
 - [ ] Use oxlint instead of eslint
+- [ ] More modern / bold but still minimalistic theme
 
 ### 2. Deployment
 - [ ] Migrate from Netlify to GH pages for the SPA
