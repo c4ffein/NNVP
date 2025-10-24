@@ -1960,4 +1960,175 @@ def build_model():
     // Cleanup
     await context.close();
   });
+
+  test('should create edge by dragging from handle to handle (verify drag still works)', async ({ page }) => {
+    console.log('\n=== DRAG-TO-CONNECT TEST (VERIFY NOT BROKEN) ===');
+    // Add two layers
+    const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
+    await denseLayer.click();
+    await page.waitForTimeout(500);
+    await denseLayer.click();
+    await page.waitForTimeout(500);
+    const layers = await page.$$('.d3Layer');
+    console.log('Added layers:', layers.length);
+    expect(layers.length).toBe(2);
+    // Move second layer to avoid overlap (drag it down)
+    const layer1 = await page.$('#d3-layer-1 rect');
+    const layer1Box = await layer1.boundingBox();
+    await page.mouse.move(layer1Box.x + layer1Box.width/2, layer1Box.y + layer1Box.height/2);
+    await page.mouse.down();
+    await page.mouse.move(layer1Box.x + layer1Box.width/2, layer1Box.y + layer1Box.height/2 + 150);
+    await page.mouse.up();
+    await page.waitForTimeout(500);
+    // Get initial edge count
+    const edgesBefore = await page.$$('.edge');
+    console.log('Edges before drag:', edgesBefore.length);
+    // Drag from first layer's bottom handle to second layer
+    const sourceHandle = await page.$('#d3-layer-0 circle.bottom-point');
+    const sourceBox = await sourceHandle.boundingBox();
+    const targetLayer = await page.$('#d3-layer-1 rect');
+    const targetBox = await targetLayer.boundingBox();
+    console.log('Dragging from layer 0 bottom handle to layer 1...');
+    await page.mouse.move(sourceBox.x + sourceBox.width/2, sourceBox.y + sourceBox.height/2);
+    await page.waitForTimeout(200);
+    await page.mouse.down();
+    await page.waitForTimeout(200);
+    await page.mouse.move(targetBox.x + targetBox.width/2, targetBox.y + targetBox.height/2);
+    await page.waitForTimeout(300);
+    await page.mouse.up();
+    await page.waitForTimeout(500);
+    // Verify edge was created
+    const edgesAfter = await page.$$('.edge');
+    console.log('Edges after drag:', edgesAfter.length);
+    expect(edgesAfter.length).toBe(edgesBefore.length + 1);
+    console.log('✅ Drag-to-connect still works correctly!');
+  });
+
+  test('should create edge by click-to-link mode (click handle, then click another handle)', async ({ page }) => {
+    console.log('\n=== CLICK-TO-LINK TEST ===');
+    // Add two layers
+    const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
+    await denseLayer.click();
+    await page.waitForTimeout(500);
+    await denseLayer.click();
+    await page.waitForTimeout(500);
+    const layers = await page.$$('.d3Layer');
+    console.log('Added layers:', layers.length);
+    expect(layers.length).toBe(2);
+    // Move second layer to avoid overlap (drag it down)
+    const layer1 = await page.$('#d3-layer-1 rect');
+    const layer1Box = await layer1.boundingBox();
+    await page.mouse.move(layer1Box.x + layer1Box.width/2, layer1Box.y + layer1Box.height/2);
+    await page.mouse.down();
+    await page.mouse.move(layer1Box.x + layer1Box.width/2, layer1Box.y + layer1Box.height/2 + 150);
+    await page.mouse.up();
+    await page.waitForTimeout(500);
+    // Get initial edge count
+    const edgesBefore = await page.$$('.edge');
+    console.log('Edges before click-to-link:', edgesBefore.length);
+    // Click first layer's bottom handle to enter link mode
+    const sourceHandle = await page.$('#d3-layer-0 circle.bottom-point');
+    console.log('Clicking source handle to enter link mode...');
+    await sourceHandle.click();
+    await page.waitForTimeout(300);
+    // Verify link mode active by checking if handle has link-source-active class
+    const hasActiveClass = await sourceHandle.evaluate(el => el.classList.contains('link-source-active'));
+    console.log('Source handle has link-source-active class:', hasActiveClass);
+    expect(hasActiveClass).toBe(true);
+    // Click second layer's top handle to complete the link
+    const targetHandle = await page.$('#d3-layer-1 circle.top-point');
+    console.log('Clicking target handle to create edge...');
+    await targetHandle.click();
+    await page.waitForTimeout(500);
+    // Verify edge was created
+    const edgesAfter = await page.$$('.edge');
+    console.log('Edges after click-to-link:', edgesAfter.length);
+    expect(edgesAfter.length).toBe(edgesBefore.length + 1);
+    // Verify link mode exited (class removed)
+    const stillActive = await sourceHandle.evaluate(el => el.classList.contains('link-source-active'));
+    console.log('Link mode exited (class removed):', !stillActive);
+    expect(stillActive).toBe(false);
+    console.log('✅ Click-to-link works correctly!');
+  });
+
+  test('should cancel click-to-link mode by pressing ESC key', async ({ page }) => {
+    console.log('\n=== CLICK-TO-LINK CANCEL (ESC KEY) TEST ===');
+    // Add one layer
+    const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
+    await denseLayer.click();
+    await page.waitForTimeout(500);
+    // Click handle to enter link mode
+    const sourceHandle = await page.$('#d3-layer-0 circle.bottom-point');
+    console.log('Entering link mode...');
+    await sourceHandle.click();
+    await page.waitForTimeout(300);
+    // Verify link mode active
+    const hasActiveClass = await sourceHandle.evaluate(el => el.classList.contains('link-source-active'));
+    console.log('Link mode active:', hasActiveClass);
+    expect(hasActiveClass).toBe(true);
+    // Press ESC to cancel
+    console.log('Pressing ESC to cancel...');
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+    // Verify link mode exited
+    const stillActive = await sourceHandle.evaluate(el => el.classList.contains('link-source-active'));
+    console.log('Link mode cancelled (class removed):', !stillActive);
+    expect(stillActive).toBe(false);
+    console.log('✅ ESC key cancels link mode correctly!');
+  });
+
+  test('should cancel click-to-link mode by clicking background', async ({ page }) => {
+    console.log('\n=== CLICK-TO-LINK CANCEL (BACKGROUND CLICK) TEST ===');
+    // Add one layer
+    const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
+    await denseLayer.click();
+    await page.waitForTimeout(500);
+    // Click handle to enter link mode
+    const sourceHandle = await page.$('#d3-layer-0 circle.bottom-point');
+    console.log('Entering link mode...');
+    await sourceHandle.click();
+    await page.waitForTimeout(300);
+    // Verify link mode active
+    const hasActiveClass = await sourceHandle.evaluate(el => el.classList.contains('link-source-active'));
+    console.log('Link mode active:', hasActiveClass);
+    expect(hasActiveClass).toBe(true);
+    // Click on empty background area to cancel
+    console.log('Clicking background to cancel...');
+    const svg = await page.$('#svgWrapper svg');
+    const svgBox = await svg.boundingBox();
+    // Click on an empty area far from the layer
+    await page.mouse.click(svgBox.x + svgBox.width - 100, svgBox.y + 100);
+    await page.waitForTimeout(300);
+    // Verify link mode exited
+    const stillActive = await sourceHandle.evaluate(el => el.classList.contains('link-source-active'));
+    console.log('Link mode cancelled (class removed):', !stillActive);
+    expect(stillActive).toBe(false);
+    console.log('✅ Background click cancels link mode correctly!');
+  });
+
+  test('should cancel click-to-link mode by clicking same handle again', async ({ page }) => {
+    console.log('\n=== CLICK-TO-LINK CANCEL (SAME HANDLE) TEST ===');
+    // Add one layer
+    const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
+    await denseLayer.click();
+    await page.waitForTimeout(500);
+    // Click handle to enter link mode
+    const sourceHandle = await page.$('#d3-layer-0 circle.bottom-point');
+    console.log('Entering link mode...');
+    await sourceHandle.click();
+    await page.waitForTimeout(300);
+    // Verify link mode active
+    const hasActiveClass = await sourceHandle.evaluate(el => el.classList.contains('link-source-active'));
+    console.log('Link mode active:', hasActiveClass);
+    expect(hasActiveClass).toBe(true);
+    // Click same handle again to cancel
+    console.log('Clicking same handle to cancel...');
+    await sourceHandle.click();
+    await page.waitForTimeout(300);
+    // Verify link mode exited
+    const stillActive = await sourceHandle.evaluate(el => el.classList.contains('link-source-active'));
+    console.log('Link mode cancelled (class removed):', !stillActive);
+    expect(stillActive).toBe(false);
+    console.log('✅ Clicking same handle cancels link mode correctly!');
+  });
 });

@@ -341,6 +341,9 @@ D3Layer.prototype.drawLayer = function (graph) {
         .attr("r", 2);
     });
 
+  // Track whether a drag actually occurred (not just click)
+  let isDragging = false;
+
   gElement.selectAll("circle")
     .on("mouseover", function () {
       d3.select(this).classed("active-point", true);
@@ -355,21 +358,71 @@ D3Layer.prototype.drawLayer = function (graph) {
     .call(d3.drag()
       .subject( () => { return { x: thisLayer.x, y: thisLayer.y }; })
       .on("start", function () {
+        isDragging = false; // Reset flag
         if (graph.debugEvents) console.log(`[DRAG START] Anchor on layer ${thisLayer.htmlID}, mouseDownNode before: ${graph.mouseDownNode ? graph.mouseDownNode.htmlID : 'null'}`);
         graph.layerMouseDown.call(graph, thisLayer);
         if (graph.debugEvents) console.log(`[DRAG START] mouseDownNode after: ${graph.mouseDownNode ? graph.mouseDownNode.htmlID : 'null'}`);
       })
       .on("drag", event => {
+        isDragging = true; // Mark that actual dragging occurred
         if (graph.debugEvents) console.log(`[DRAG] Moving dragLine from ${graph.mouseDownNode ? graph.mouseDownNode.htmlID : 'null'}`);
         graph.moveDragLine.call(graph, event, graph.mouseDownNode);
       })
       .on("end", function () {
-        if (graph.debugEvents) console.log(`[DRAG END] From ${graph.mouseDownNode ? graph.mouseDownNode.htmlID : 'null'} to ${graph.mouseover_node ? graph.mouseover_node.htmlID : 'null'}`);
-        graph.layerMouseUp.call(graph, graph.mouseover_node);
-        gElement.classed("isolated", D3GraphValidation.isIsolated(graph, thisLayer));
+        if (graph.debugEvents) console.log(`[DRAG END] From ${graph.mouseDownNode ? graph.mouseDownNode.htmlID : 'null'} to ${graph.mouseover_node ? graph.mouseover_node.htmlID : 'null'}, isDragging: ${isDragging}`);
+        if (isDragging) {
+          // Only create edge if actual dragging occurred
+          graph.layerMouseUp.call(graph, graph.mouseover_node);
+          gElement.classed("isolated", D3GraphValidation.isIsolated(graph, thisLayer));
+        }
         if (graph.debugEvents) console.log(`[DRAG END] mouseDownNode after: ${graph.mouseDownNode ? graph.mouseDownNode.htmlID : 'null'}`);
       })
-    );
+    )
+    .on("click", function (event) {
+      // Click-to-link mode: click handle, then click another handle to create edge
+      event.stopPropagation(); // Don't trigger background click
+
+      if (isDragging) {
+        // Drag happened, don't process as click
+        if (graph.debugEvents) console.log(`[CLICK] Ignored - was actually a drag`);
+        return;
+      }
+
+      const clickedHandle = d3.select(this);
+
+      if (!graph.linkMode) {
+        // First click: enter link mode
+        graph.linkMode = true;
+        graph.linkSourceLayer = thisLayer;
+        graph.linkSourceHandle = clickedHandle;
+
+        // Visual feedback
+        clickedHandle.classed("link-source-active", true);
+        d3.select("body").style("cursor", "crosshair");
+
+        if (graph.debugEvents) console.log(`[CLICK-TO-LINK] Started from layer ${thisLayer.htmlID}`);
+      } else {
+        // Second click: create edge or cancel
+        if (graph.linkSourceHandle.node() === this) {
+          // Clicked same handle twice - cancel
+          if (graph.debugEvents) console.log(`[CLICK-TO-LINK] Cancelled (same handle clicked twice)`);
+          graph.exitLinkMode();
+        } else if (graph.linkSourceLayer === thisLayer) {
+          // Clicked same layer - cancel (can't connect to self)
+          if (graph.debugEvents) console.log(`[CLICK-TO-LINK] Cancelled (can't connect layer to itself)`);
+          graph.exitLinkMode();
+        } else {
+          // Create edge between source and target
+          if (graph.debugEvents) console.log(`[CLICK-TO-LINK] Creating edge from ${graph.linkSourceLayer.htmlID} to ${thisLayer.htmlID}`);
+
+          // Reuse existing edge creation logic
+          graph.layerMouseDown.call(graph, graph.linkSourceLayer);
+          graph.layerMouseUp.call(graph, thisLayer);
+
+          graph.exitLinkMode();
+        }
+      }
+    });
 
   thisLayer.appendText(gElement, graph);
 };

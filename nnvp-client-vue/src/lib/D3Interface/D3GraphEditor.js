@@ -60,6 +60,11 @@ export default function D3GraphEditor(svg, model) {
   this.selectedText = null;
   this.layerDrag = false;
 
+  // Click-to-link mode state
+  this.linkMode = false;
+  this.linkSourceLayer = null;
+  this.linkSourceHandle = null;
+
   this.undoStack = [];
   this.redoStack = [];
 
@@ -180,6 +185,17 @@ export default function D3GraphEditor(svg, model) {
   // If a click occur directely on the svg and not node call undoSelection
   thisGraph.svg.on('click', (d, event) => {
     thisGraph.undoSelection();
+    // Exit link mode if active
+    if (thisGraph.linkMode) {
+      thisGraph.exitLinkMode();
+    }
+  });
+
+  // Add ESC key handler to cancel link mode
+  d3.select(document).on('keydown', (event) => {
+    if (event.key === 'Escape' && thisGraph.linkMode) {
+      thisGraph.exitLinkMode();
+    }
   });
 };
 
@@ -274,6 +290,19 @@ D3GraphEditor.prototype.moveDragLine = function (event, source) {
   let target = {x: d3.pointer(event, this.svgG.node())[0], y:d3.pointer(event, this.svgG.node())[1]};
   D3Edge.moveDragLine(this.dragLine, source, target);
 }
+
+/**
+ * Exit click-to-link mode and clean up visual feedback
+ */
+D3GraphEditor.prototype.exitLinkMode = function () {
+  if (this.linkSourceHandle) {
+    this.linkSourceHandle.classed("link-source-active", false);
+  }
+  d3.select("body").style("cursor", null);
+  this.linkMode = false;
+  this.linkSourceLayer = null;
+  this.linkSourceHandle = null;
+};
 
 /**
  * Call on d3 zoom action, allow to move on the whiteboard and zoom with the wheel

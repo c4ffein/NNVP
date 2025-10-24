@@ -120,6 +120,22 @@ path.link.hidden {
 .active-point {
   cursor: pointer;
 }
+.link-source-active {
+  fill: #646cff !important;
+  stroke: #535bf2 !important;
+  stroke-width: 3px !important;
+  r: 8 !important;
+  cursor: crosshair;
+  animation: pulse 1s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
 .d3-tip {
   line-height: 1;
   font-weight: bold;
