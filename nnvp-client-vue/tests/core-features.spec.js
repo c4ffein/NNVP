@@ -1674,6 +1674,9 @@ def build_model():
     console.log('✅ Node deleted, re-added, configured, and reconnected successfully!');
   });
 
+  // big e2e test to ensure the whole typical workflow works
+  // this may be against the "easy to debug" practices
+  // but there are other tests to help you debug specific features anyway
   test('should complete full MNIST training workflow', async ({ browser }) => {
     test.slow(); // Mark as slow test - training takes time with 10 epochs
     test.setTimeout(120000); // Set explicit timeout of 2 minutes for training
@@ -1834,6 +1837,37 @@ def build_model():
     const svgElements = await page.$$('svg.line-chart-svg');
     expect(svgElements.length).toBe(2); // Batch and Epoch charts
     console.log('Charts are visible (SVG elements found)');
+    // WARNING: BEGIN TOOLTIP TEST ZONE, SHOULD PUT IN ANOTHER SPECIFIC TEST - BUT ACTUALLY ENABLES TO VERIFY COHERENCE
+    // Test tooltip functionality by hovering over a chart point
+    console.log('Testing tooltip functionality...');
+    // Find all hover points in the epoch chart (second chart)
+    const hoverPoints = await page.$$('svg.line-chart-svg circle.hover-point');
+    expect(hoverPoints.length).toBeGreaterThan(0);
+    console.log(`Found ${hoverPoints.length} hover points in charts`);
+    // Hover over a point in the middle of the data
+    const midPoint = hoverPoints[Math.floor(hoverPoints.length / 2)];
+    await midPoint.hover();
+    // Wait a bit for the tooltip to appear
+    await page.waitForTimeout(100);
+    // Verify tooltip is visible
+    const tooltip = await page.$('.tooltip');
+    expect(tooltip).not.toBeNull();
+    const isTooltipVisible = await tooltip.isVisible();
+    expect(isTooltipVisible).toBe(true);
+    console.log('Tooltip appeared on hover');
+    // Verify tooltip contains expected content
+    const tooltipText = await tooltip.textContent();
+    expect(tooltipText).toContain('Epoch/Batch:'); // Label
+    expect(tooltipText.length).toBeGreaterThan(10); // Has some content
+    console.log('Tooltip content verified:', tooltipText.substring(0, 50) + '...');
+    // Move mouse away and verify tooltip disappears
+    await page.mouse.move(0, 0);
+    await page.waitForTimeout(100);
+    const tooltipAfter = await page.$('.tooltip');
+    const isTooltipVisibleAfter = tooltipAfter ? await tooltipAfter.isVisible() : false;
+    expect(isTooltipVisibleAfter).toBe(false);
+    console.log('Tooltip correctly disappears when mouse leaves');
+    // WARNING: END TOOLTIP TEST ZONE, SHOULD PUT IN ANOTHER SPECIFIC TEST
     // Verify training actually ran by checking console messages
     // Look for batch chart updates and epoch chart updates
     const batchUpdates = consoleMessages.filter(msg => msg.includes('[Charts] Batch chart update'));
@@ -1852,6 +1886,40 @@ def build_model():
     const lastEpochMsg = epochUpdates[epochUpdates.length - 1];
     console.log('First epoch message:', firstEpochMsg);
     console.log('Last epoch message:', lastEpochMsg);
+    // Verify chart data coherence: tooltip values should match console message data
+    console.log('Verifying chart data matches console logs...');
+    // Parse the last epoch data from console
+    const jsonStart = lastEpochMsg.indexOf('{"labels"');
+    const jsonStr = lastEpochMsg.substring(jsonStart);
+    const lastEpochData = JSON.parse(jsonStr);
+    // Get the last accuracy and loss values from console data
+    const lastAccFromConsole = lastEpochData.series[0].data[lastEpochData.series[0].data.length - 1];
+    const lastLossFromConsole = lastEpochData.series[2].data[lastEpochData.series[2].data.length - 1];
+    console.log('Console data - last acc:', lastAccFromConsole, 'last loss:', lastLossFromConsole);
+    // Now hover over one of the last few points and verify the tooltip shows a value close to console
+    const lastFewPoints = hoverPoints.slice(-10);
+    await lastFewPoints[5].hover(); // Hover over a point near the end
+    await page.waitForTimeout(100);
+    const dataTooltip = await page.$('.tooltip');
+    const dataTooltipText = await dataTooltip.textContent();
+    console.log('Chart tooltip text:', dataTooltipText);
+    // Extract the numeric value from tooltip
+    const valueMatch = dataTooltipText.match(/(\d+\.\d+)/);
+    expect(valueMatch).not.toBeNull();
+    const chartValue = parseFloat(valueMatch[1]);
+    console.log('Chart displayed value:', chartValue);
+    // Verify it's in a reasonable range (between 0 and 2.5 for loss/accuracy)
+    expect(chartValue).toBeGreaterThanOrEqual(0);
+    expect(chartValue).toBeLessThanOrEqual(2.5);
+    // Verify it's close to one of the console values (within reasonable range)
+    // The value should be close to either last acc or last loss from console
+    const diffFromAcc = Math.abs(chartValue - lastAccFromConsole);
+    const diffFromLoss = Math.abs(chartValue - lastLossFromConsole);
+    const isCloseToConsole = diffFromAcc < 0.5 || diffFromLoss < 0.5; // Within 0.5
+    expect(isCloseToConsole).toBe(true);
+    console.log('Chart data coherence verified - tooltip value matches console data (diff from acc:', diffFromAcc.toFixed(3), 'diff from loss:', diffFromLoss.toFixed(3), ')');
+    await page.mouse.move(0, 0);
+    await page.waitForTimeout(100);
     // Extract JSON from the messages
     const extractMetrics = (msg) => {
       const jsonStart = msg.indexOf('{"labels"');
