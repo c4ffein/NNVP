@@ -337,7 +337,7 @@ export default {
 
 .chart-title {
   grid-row: 1/2;
-  font-family: "Roboto Thin", sans-serif;
+  font-family: var(--font-regular); font-weight: var(--font-weight-regular);
   font-size: 15px;
 }
 
@@ -368,7 +368,7 @@ export default {
 .axis-label {
   fill: #888;
   font-size: 11px;
-  font-family: "Roboto Thin", sans-serif;
+  font-family: var(--font-regular); font-weight: var(--font-weight-regular);
   text-anchor: end;
 }
 
@@ -413,7 +413,7 @@ export default {
 .legend-label {
   fill: #888;
   font-size: 12px;
-  font-family: "Roboto Thin", sans-serif;
+  font-family: var(--font-regular); font-weight: var(--font-weight-regular);
 }
 
 /* Tooltip */
@@ -423,7 +423,7 @@ export default {
   color: #fff;
   padding: 8px 12px;
   border-radius: 4px;
-  font-family: "Roboto Thin", sans-serif;
+  font-family: var(--font-regular); font-weight: var(--font-weight-regular);
   font-size: 12px;
   pointer-events: none;
   z-index: 1000;

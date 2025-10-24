@@ -97,15 +97,15 @@ export default {
 
 <style>
 @font-face {
-  font-family: "Roboto Regular";
+  font-family: var(--font-medium); font-weight: var(--font-weight-medium);
   src: url("/assets/fonts/Roboto-Regular-webfont.woff") format("woff");
 }
 @font-face {
-  font-family: "Roboto Thin";
+  font-family: var(--font-regular); font-weight: var(--font-weight-regular);
   src: url("/assets/fonts/Roboto-Thin-webfont.woff") format("woff");
 }
 .LeftBar {
-  font-family: "Roboto Thin";
+  font-family: var(--font-regular); font-weight: var(--font-weight-regular);
   font-size: 15px;
   user-select: none;
   -webkit-user-select: none;
@@ -119,7 +119,7 @@ export default {
   color: #000000;
   border: 1px;
   padding: 5px;
-  font-family: "Roboto Thin";
+  font-family: var(--font-regular); font-weight: var(--font-weight-regular);
 }
 .LeftBar > .layerCategory > .title {
   background-color: rgba(200, 200, 200, 0.2);

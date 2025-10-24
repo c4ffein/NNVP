@@ -43,3 +43,8 @@ Since then, a lot of the code has been modified. We still need to refactor big p
 - [nezoutcarl](https://github.com/nezoutcarl) : Right Bar and initial version of most of the Parameter components, e2e tests.
 - [elbo](https://github.com/elbo) : D3 functionalities, e2e tests.
 - [ChemouneAlaeddine](https://github.com/ChemouneAlaeddine) : D3 functionalities, e2e tests.
+
+### Third-Party Licenses
+This project uses the [Inter typeface](https://github.com/rsms/inter) by Rasmus Andersson, licensed under the [SIL Open Font License 1.1](nnvp-client-vue/src/assets/fonts/OFL-LICENSE.txt).
+
+The rest of this project is licensed under the MIT License (see [LICENSE](/LICENSE)).

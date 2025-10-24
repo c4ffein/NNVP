@@ -183,7 +183,7 @@ export default {
   height: 100%;
   user-select: none;
   cursor: default;
-  font-family: "Roboto Thin";
+  font-family: var(--font-regular); font-weight: var(--font-weight-regular);
   font-size: 15px;
   box-sizing: border-box;
   border-bottom: 1px solid #cccccc;

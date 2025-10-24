@@ -249,18 +249,18 @@ export default {
 
 <style>
 @font-face {
-  font-family: "Roboto Regular";
+  font-family: var(--font-medium); font-weight: var(--font-weight-medium);
   src: url("/assets/fonts/Roboto-Regular-webfont.woff") format("woff");
 }
 @font-face {
-  font-family: "Roboto Thin";
+  font-family: var(--font-regular); font-weight: var(--font-weight-regular);
   src: url("/assets/fonts/Roboto-Thin-webfont.woff") format("woff");
 }
 #BottomTrainer {
   height: 100%;
   width: 100%;
   cursor: default;
-  font-family: "Roboto Thin";
+  font-family: var(--font-regular); font-weight: var(--font-weight-regular);
   font-size: 15px;
   border-top: 1px solid rgba(100, 100, 100, 0.3);
   display: grid;

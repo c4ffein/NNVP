@@ -70,11 +70,11 @@ export default {
 
 <style>
 @font-face {
-  font-family: "Roboto Regular";
+  font-family: var(--font-medium); font-weight: var(--font-weight-medium);
   src: url("/assets/fonts/Roboto-Regular-webfont.woff") format("woff");
 }
 @font-face {
-  font-family: "Roboto Thin";
+  font-family: var(--font-regular); font-weight: var(--font-weight-regular);
   src: url("/assets/fonts/Roboto-Thin-webfont.woff") format("woff");
 }
 

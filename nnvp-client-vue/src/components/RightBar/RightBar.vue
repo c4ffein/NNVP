@@ -175,7 +175,7 @@ export default {
   display: inline-block;
 }
 .rightbar-block {
-  font-family: "Roboto Thin";
+  font-family: var(--font-regular); font-weight: var(--font-weight-regular);
   font-size: 15px;
   user-select: none;
   min-height: 100%;

@@ -51,13 +51,22 @@ export default {
 </script>
 
 <style>
+/* Inter Variable Font - modern, readable font for technical interfaces */
 @font-face {
-  font-family: "Roboto Regular";
-  src: url("./assets/fonts/Roboto-Regular-webfont.woff") format("woff");
+  font-family: "Inter";
+  src: url("./assets/fonts/InterVariable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
 }
-@font-face {
-  font-family: "Roboto Thin";
-  src: url("./assets/fonts/Roboto-Thin-webfont.woff") format("woff");
+
+:root {
+  /* Modern font stack with Inter */
+  --font-regular: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-medium: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
 }
 
 body,html {
@@ -86,7 +95,8 @@ body,html {
   overflow: hidden;
   user-select: none;
   text-align: center;
-  font-family: 'Avenir', Helvetica, Arial, sans-serif;
+  font-family: var(--font-regular);
+  font-weight: var(--font-weight-regular);
 }
 .topBar { grid-area: topBar; }
 .leftBar { grid-area: leftBar; }
@@ -123,7 +133,8 @@ body,html {
 }
 button, input[type="button"], input[type="submit"], input, select {
   color: #000000;
-  font-family: 'Avenir', Helvetica, Arial, sans-serif;
+  font-family: var(--font-regular);
+  font-weight: var(--font-weight-regular);
   background-color: #FFFFFF;
   border: 1px solid;
   border-color: rgba(200,200,200,0.8);
