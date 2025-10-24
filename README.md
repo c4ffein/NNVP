@@ -3,7 +3,7 @@
 The master branch is currently the ongoing Vue 3 migration.  
 Check out `f78d724032e97852b4f40197bedb9579e59cd1a4` if you want that project in a stable state, which is the version in production at [nnvp.io](https://nnvp.io). The current migration is tracked in [tasks.md](/tasks.md)  
 Otherwise, Vue 3 reactivity has been fixed, and modern e2e tests have been added to ensure the whole training process works.  
-Refactors and new theme still prioritized before the updated version is put in production.
+Refactors (moving from D3 and Chartist) and new theme still prioritized before the updated version is put in production. New features related to the **Learn how a neural network works** will then be added in an iterative way.
 
 ## Description
 This project allows you to generate Python/JS code describing a Keras model by creating a graph representing the different layers in your browser.
