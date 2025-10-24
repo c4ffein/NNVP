@@ -6,7 +6,7 @@ But if you read this and you want to get involved, you can actually create one f
 ## High Priority
 
 ### 1. Replace D3.js with modern graph visualization library
-- [ ] Replace Chartist, or make it work with Vue3
+- [x] Replace Chartist, or make it work with Vue3
 - [ ] Research and evaluate D3.js alternatives for neural network visualization
   - Consider: Cytoscape.js, vis.js, Sigma.js, or modern Canvas/WebGL libraries
   - Requirements: Better event handling (click-click connections), performance, touch support
