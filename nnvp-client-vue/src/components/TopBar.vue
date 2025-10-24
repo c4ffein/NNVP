@@ -56,7 +56,7 @@ export default {
           Group() { this.$d3Interface.createGroup(); },
         },
         Training: () => { this.$emit('open-trainer'); },
-        About: () => { window.open('https://about.nnvp.io'); },
+        About: () => { this.$emit('open-about'); },
       },
       activatedState: false,
       activatedChain: [],

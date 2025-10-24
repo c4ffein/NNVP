@@ -1,11 +1,12 @@
 <template>
-  <div id="topBar" class="topBar"><TopBar @open-trainer="openTrainer"/></div>
+  <div id="topBar" class="topBar"><TopBar @open-trainer="openTrainer" @open-about="openAboutModal"/></div>
   <div id="leftBar" class="leftBar"><LeftBar/></div>
   <div id="whiteBoard" class="whiteBoard"><WhiteBoard/></div>
   <div id="rightBar" class="rightBar"><RightBar msg="NNVP"/></div>
   <div id="bottomTrainer" class="bottomTrainer" v-bind:style="{height: trainerHeight+'vh'}">
     <BottomTrainer @close-trainer="closeTrainer" :bottomTrainerSize="trainerHeight"/>
   </div>
+  <AboutModal :show="showAboutModal" @close="closeAboutModal"/>
 </template>
 
 
@@ -15,6 +16,7 @@ import LeftBar from './components/LeftBar/LeftBar.vue';
 import RightBar from './components/RightBar/RightBar.vue';
 import WhiteBoard from './components/WhiteBoard.vue';
 import BottomTrainer from './components/BottomTrainer/BottomTrainer.vue';
+import AboutModal from './components/AboutModal.vue';
 
 export default {
   name: 'app',
@@ -24,6 +26,7 @@ export default {
     RightBar,
     WhiteBoard,
     BottomTrainer,
+    AboutModal,
   },
   methods: {
     openTrainer() {
@@ -33,11 +36,18 @@ export default {
     closeTrainer() {
       this.trainerHeight = 0;
     },
+    openAboutModal() {
+      this.showAboutModal = true;
+    },
+    closeAboutModal() {
+      this.showAboutModal = false;
+    },
   },
   data() {
     return {
       trainerHeight: 0,
       trainerOpenHeight: 50, // TODO : 30 when more efficient
+      showAboutModal: false,
     };
   },
   mounted() {

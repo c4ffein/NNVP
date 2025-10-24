@@ -2131,4 +2131,69 @@ def build_model():
     expect(stillActive).toBe(false);
     console.log('✅ Clicking same handle cancels link mode correctly!');
   });
+
+  test('should open About modal and display content', async ({ page }) => {
+    console.log('\n=== ABOUT MODAL TEST ===');
+    // Click About in the menu
+    const aboutMenu = await page.$('text=About');
+    expect(aboutMenu).not.toBeNull();
+    console.log('Clicking About menu...');
+    await aboutMenu.click();
+    await page.waitForTimeout(500);
+    // Verify modal is visible
+    const modal = await page.$('.modal-overlay');
+    expect(modal).not.toBeNull();
+    const isVisible = await modal.isVisible();
+    console.log('Modal visible:', isVisible);
+    expect(isVisible).toBe(true);
+    // Verify modal contains key content
+    const modalContent = await page.textContent('.modal-container');
+    console.log('Checking modal content...');
+    expect(modalContent).toContain('NNVP');
+    expect(modalContent).toContain('Neural Network Visual Programming');
+    expect(modalContent).toContain('Keras');
+    expect(modalContent).toContain('Vue.js');
+    expect(modalContent).toContain('D3.js');
+    expect(modalContent).toContain('Open Source');
+    expect(modalContent).toContain('GitHub');
+    console.log('✅ Modal content verified');
+    // Test closing with X button
+    const closeButton = await page.$('.modal-close');
+    expect(closeButton).not.toBeNull();
+    console.log('Clicking close button...');
+    await closeButton.click();
+    await page.waitForTimeout(500);
+    // Verify modal is closed
+    const modalAfterClose = await page.$('.modal-overlay');
+    const isVisibleAfterClose = modalAfterClose ? await modalAfterClose.isVisible() : false;
+    console.log('Modal visible after close:', isVisibleAfterClose);
+    expect(isVisibleAfterClose).toBe(false);
+    // Test opening again and closing with ESC
+    console.log('Testing ESC key close...');
+    await aboutMenu.click();
+    await page.waitForTimeout(500);
+    const modalReopened = await page.$('.modal-overlay');
+    expect(await modalReopened.isVisible()).toBe(true);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(500);
+    const modalAfterEsc = await page.$('.modal-overlay');
+    const isVisibleAfterEsc = modalAfterEsc ? await modalAfterEsc.isVisible() : false;
+    console.log('Modal visible after ESC:', isVisibleAfterEsc);
+    expect(isVisibleAfterEsc).toBe(false);
+    // Test closing by clicking overlay
+    console.log('Testing overlay click close...');
+    await aboutMenu.click();
+    await page.waitForTimeout(500);
+    const overlayReopened = await page.$('.modal-overlay');
+    expect(await overlayReopened.isVisible()).toBe(true);
+    // Click on the overlay (not the modal container)
+    const overlayBox = await overlayReopened.boundingBox();
+    await page.mouse.click(overlayBox.x + 10, overlayBox.y + 10);
+    await page.waitForTimeout(500);
+    const modalAfterOverlayClick = await page.$('.modal-overlay');
+    const isVisibleAfterOverlay = modalAfterOverlayClick ? await modalAfterOverlayClick.isVisible() : false;
+    console.log('Modal visible after overlay click:', isVisibleAfterOverlay);
+    expect(isVisibleAfterOverlay).toBe(false);
+    console.log('✅ About modal works correctly!');
+  });
 });
