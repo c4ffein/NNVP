@@ -48,6 +48,8 @@ export default class {
     this.emit('selection-changed');
     this.emit('undo-stack-changed');
     this.emit('redo-stack-changed');
+    // Expose active graph globally for debugging and e2e testing
+    window.nnvpGraphEditor = this.activeGraph;
   }
 
   getActiveElementsContainer() {
