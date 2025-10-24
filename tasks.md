@@ -5,25 +5,16 @@ But if you read this and you want to get involved, you can actually create one f
 
 ## High Priority
 
-### 1. Replace D3.js with modern graph visualization library
-- [x] Replace Chartist, or make it work with Vue3
-- [ ] Research and evaluate D3.js alternatives for neural network visualization
-  - Consider: Cytoscape.js, vis.js, Sigma.js, or modern Canvas/WebGL libraries
-  - Requirements: Better event handling (click-click connections), performance, touch support
-  - Evaluate: API simplicity, bundle size, maintenance status, TypeScript support
-- [ ] Implement click-click connection mechanism using chosen library
-  - First click on anchor: show temporary connection line following cursor
-  - Second click on different anchor: create permanent connection
-  - Click same layer: cancel connection
-  - Should work alongside existing drag-and-drop connections
-
-### 2. Client improvements
-- [ ] Destroy the about.nnvp.io, make it part of this app
+### 1. Client improvements
 - [ ] Fix corrupted Roboto-Thin-webfont.woff font file
+- [ ] Destroy the about.nnvp.io, make it part of this app
 - [ ] Use oxlint instead of eslint
 
-### 3. Deployment
+### 2. Deployment
 - [ ] Migrate from Netlify to GH pages for the SPA
+
+### 3. Code cleaning
+- [ ] Remove all remaining TODOs
 
 ## Documentation & Datasets
 
