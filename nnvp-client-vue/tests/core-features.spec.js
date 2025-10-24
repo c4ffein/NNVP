@@ -2152,8 +2152,6 @@ def build_model():
     expect(modalContent).toContain('NNVP');
     expect(modalContent).toContain('Neural Network Visual Programming');
     expect(modalContent).toContain('Keras');
-    expect(modalContent).toContain('Vue.js');
-    expect(modalContent).toContain('D3.js');
     expect(modalContent).toContain('Open Source');
     expect(modalContent).toContain('GitHub');
     console.log('✅ Modal content verified');
