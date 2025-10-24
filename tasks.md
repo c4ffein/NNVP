@@ -5,43 +5,8 @@ But if you read this and you want to get involved, you can actually create one f
 
 ## High Priority
 
-### 1. Finish Vue 3 migration, check everything works
-- [x] Set up Playwright e2e tests
-- [ ] Write tests and eventually fix issues for core functionality:
-  - [x] **Layer selection & placement:**
-    - [x] Click a layer template and verify it appears on the canvas
-    - [x] Select another template after selecting a previous one
-  - [x] **Code generation:**
-    - [x] Load a template and generate JavaScript code
-    - [x] Load a template and generate Python code
-    - [x] Manually build network and generate JavaScript code (with drag-and-drop)
-    - [x] Manually build network and generate Python code (with drag-and-drop)
-  - [x] **Parameter modification:**
-    - [x] Modify layer parameters from RightBar and verify in generated code
-    - [x] Test integer parameter modification
-    - [x] Test boolean parameter modification
-    - [x] Test float parameter types
-    - [x] Test string parameter types
-    - [x] Test tuple parameter types
-    - [x] Test list parameter types
-    - ~~[ ] Test order parameter types~~ (no layers currently use this parameter type)
-  - [x] **Dataset loading:**
-    - [x] Load a dataset from the BottomTrainer panel
-    - [x] Load fashion mnist after mnist from the BottomTrainer panel
-    - [x] Reload mnist after the mnist -> fashion mnist interaction
-  - [x] **Link/edge manipulation:**
-    - [x] Load template, delete a link between layers, verify network is broken (error state)
-    - [x] Redraw the deleted link, verify network is valid again
-  - [x] **Node manipulation:**
-    - [x] Load template, delete a node, Re-add the node, set parameters from RightBar, Reconnect missing links, verify network is valid
-  - [x] **Undo/Redo:**
-    - [x] Test undo functionality
-    - [x] Test redo functionality
-  - [ ] Whole MNIST training workflow, mark as slow, ideate with Claude
-    - see if can get significant results (for testing lol) with low epochs
-- [ ] Update README to reflect Vue 3 status
-
-### 2. Replace D3.js with modern graph visualization library
+### 1. Replace D3.js with modern graph visualization library
+- [ ] Replace Chartist, or make it work with Vue3
 - [ ] Research and evaluate D3.js alternatives for neural network visualization
   - Consider: Cytoscape.js, vis.js, Sigma.js, or modern Canvas/WebGL libraries
   - Requirements: Better event handling (click-click connections), performance, touch support
@@ -52,12 +17,12 @@ But if you read this and you want to get involved, you can actually create one f
   - Click same layer: cancel connection
   - Should work alongside existing drag-and-drop connections
 
-### 3. Client improvements
+### 2. Client improvements
 - [ ] Destroy the about.nnvp.io, make it part of this app
 - [ ] Fix corrupted Roboto-Thin-webfont.woff font file
 - [ ] Use oxlint instead of eslint
 
-### 4. Deployment
+### 3. Deployment
 - [ ] Migrate from Netlify to GH pages for the SPA
 
 ## Documentation & Datasets
