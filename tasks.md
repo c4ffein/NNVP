@@ -7,12 +7,14 @@ But if you read this and you want to get involved, you can actually create one f
 
 ### 1. Client improvements
 - [x] Fix corrupted Roboto-Thin-webfont.woff font file => Actually switched for Inter
-- [ ] Destroy the about.nnvp.io, make it part of this app
+- [ ] Make what is currently at about.nnvp.io part of this app
 - [ ] Use oxlint instead of eslint
 - [ ] More modern / bold but still minimalistic theme
 
 ### 2. Deployment
-- [ ] Migrate from Netlify to GH pages for the SPA
+- [ ] Migrate from Netlify to OVH for the SPA
+- [ ] Destroy previous nnvp.io hosting
+- [ ] Destroy previous about.nnvp.io hosting
 
 ### 3. Code cleaning
 - [ ] Remove all remaining TODOs
