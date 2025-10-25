@@ -255,10 +255,7 @@ D3GraphEditor.prototype.selectOnNode = function (node) {
   // Like this CSS can identified selected node
   d3.select("#" + node.htmlID).classed("selected", true);
   this.selectedNodes.push(node);
-  // Notify selection change via callback
-  if (this.selectionChangedCallback) {
-    this.selectionChangedCallback();
-  }
+  this.notifySelectionChanged();
 };
 
 /**
@@ -277,10 +274,7 @@ D3GraphEditor.prototype.undoSelection = function () {
   }
   // Next line is implemented that way to keep Vue getters and setters
   this.selectedNodes.splice(0, this.selectedNodes.length);
-  // Notify selection change via callback
-  if (this.selectionChangedCallback) {
-    this.selectionChangedCallback();
-  }
+  this.notifySelectionChanged();
 };
 
 /**
@@ -291,10 +285,7 @@ D3GraphEditor.prototype.selectEdge = function (edge) {
   this.undoSelection();
   d3.select("#" + edge.id).classed("selected", true);
   this.selectedEdge = edge;
-  // Notify selection change via callback
-  if (this.selectionChangedCallback) {
-    this.selectionChangedCallback();
-  }
+  this.notifySelectionChanged();
 };
 
 /**
@@ -325,6 +316,13 @@ D3GraphEditor.prototype.exitLinkMode = function () {
  */
 D3GraphEditor.prototype.onSelectionChanged = function (callback) {
   this.selectionChangedCallback = callback;
+};
+
+/**
+ * Calls the callback registered to the `selection changed` event
+ */
+D3GraphEditor.prototype.notifySelectionChanged = function () {
+  if(this.selectionChangedCallback()) this.selectionChangedCallback();
 };
 
 /**

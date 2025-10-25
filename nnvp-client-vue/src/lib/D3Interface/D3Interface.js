@@ -79,10 +79,7 @@ export default class {
 
   addGraphEditor(graphEditor) {
     this.graphEditors.push(graphEditor);
-    // Register callback for selection changes
-    graphEditor.onSelectionChanged(() => {
-      this.emit('selection-changed');
-    });
+    graphEditor.onSelectionChanged(() => { this.emit('selection-changed'); });
     if (this.graphEditors.length === 1) this.setActiveGraphEditor(graphEditor);
   }
 
