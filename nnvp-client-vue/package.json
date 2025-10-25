@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "test:e2e": "playwright test",
     "test:e2e:xvfb": "xvfb-run --auto-servernum --server-args='-screen 0 1280x720x24' playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "lint": "oxlint src tests",
+    "lint:fix": "oxlint src tests --fix"
   },
   "dependencies": {
     "@tensorflow/tfjs": "^3.3.0",
@@ -22,6 +24,7 @@
     "@playwright/test": "^1.56.0",
     "@vitejs/plugin-vue": "^5.2.1",
     "@vitejs/plugin-vue-jsx": "^4.1.1",
+    "oxlint": "^1.24.0",
     "vite": "^6.4.1"
   }
 }

@@ -1750,7 +1750,7 @@ def build_model():
     try {
       await page.waitForSelector('#data-selector-loading-bar-container', { state: 'hidden', timeout: 30000 });
       console.log('Dataset loading completed (loading bar disappeared)');
-    } catch (error) {
+    } catch {
       console.log('Warning: Loading bar did not disappear within timeout, continuing anyway...');
     }
     // Now click Options tab to set epochs
