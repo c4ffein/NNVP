@@ -8,7 +8,7 @@ But if you read this and you want to get involved, you can actually create one f
 ### 1. Client improvements
 - [x] Fix corrupted Roboto-Thin-webfont.woff font file => Actually switched for Inter
 - [x] Make what is currently at about.nnvp.io part of this app
-- [ ] Use oxlint instead of eslint
+- [x] Use oxlint instead of eslint
 - [ ] More modern / bold but still minimalistic theme
 
 ### 2. Deployment
