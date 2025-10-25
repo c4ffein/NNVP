@@ -81,16 +81,16 @@ export default {
     };
   },
   mounted() {
-    // Set up a watcher to detect changes in selected nodes
-    // Since d3Interface is not reactive, we poll for changes
-    // TODO OMG CLAUDE DID THIS, NOT ME, KEEPING THIS TEMPORARILY TO PASS THE TEST BUT OMG LOL
-    this.pollInterval = setInterval(() => {
+    // Subscribe to selection changes from D3GraphEditor
+    this.selectionChangeHandler = () => {
       this.refreshKey++;
-    }, 100); // Check every 100ms
+    };
+    this.$d3Interface.on('selection-changed', this.selectionChangeHandler);
   },
   beforeUnmount() {
-    if (this.pollInterval) {
-      clearInterval(this.pollInterval);
+    // Unsubscribe from events
+    if (this.selectionChangeHandler) {
+      this.$d3Interface.off('selection-changed', this.selectionChangeHandler);
     }
   },
   computed: {

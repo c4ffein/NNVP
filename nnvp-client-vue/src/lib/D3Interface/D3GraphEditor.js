@@ -65,6 +65,9 @@ export default function D3GraphEditor(svg, model) {
   this.linkSourceLayer = null;
   this.linkSourceHandle = null;
 
+  // Callback for selection changes (registered by D3Interface)
+  this.selectionChangedCallback = null;
+
   this.undoStack = [];
   this.redoStack = [];
 
@@ -252,6 +255,10 @@ D3GraphEditor.prototype.selectOnNode = function (node) {
   // Like this CSS can identified selected node
   d3.select("#" + node.htmlID).classed("selected", true);
   this.selectedNodes.push(node);
+  // Notify selection change via callback
+  if (this.selectionChangedCallback) {
+    this.selectionChangedCallback();
+  }
 };
 
 /**
@@ -270,6 +277,10 @@ D3GraphEditor.prototype.undoSelection = function () {
   }
   // Next line is implemented that way to keep Vue getters and setters
   this.selectedNodes.splice(0, this.selectedNodes.length);
+  // Notify selection change via callback
+  if (this.selectionChangedCallback) {
+    this.selectionChangedCallback();
+  }
 };
 
 /**
@@ -280,6 +291,10 @@ D3GraphEditor.prototype.selectEdge = function (edge) {
   this.undoSelection();
   d3.select("#" + edge.id).classed("selected", true);
   this.selectedEdge = edge;
+  // Notify selection change via callback
+  if (this.selectionChangedCallback) {
+    this.selectionChangedCallback();
+  }
 };
 
 /**
@@ -302,6 +317,14 @@ D3GraphEditor.prototype.exitLinkMode = function () {
   this.linkMode = false;
   this.linkSourceLayer = null;
   this.linkSourceHandle = null;
+};
+
+/**
+ * Register a callback to be called when selection changes
+ * @param callback Function to call when selection changes
+ */
+D3GraphEditor.prototype.onSelectionChanged = function (callback) {
+  this.selectionChangedCallback = callback;
 };
 
 /**
