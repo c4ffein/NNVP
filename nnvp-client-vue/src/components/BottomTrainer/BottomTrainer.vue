@@ -121,7 +121,10 @@ export default {
       const epochs = this.epochs;
       let createModel;
       try {
-        // Create a function scope to avoid const reassignment error
+        // NOTE: Using eval here to execute the generated JavaScript code from the visual graph editor.
+        // The graph is converted to TensorFlow.js code (as a string), then eval'd to get a runnable function.
+        // This is currently safe since the code is generated from the user's own graph structure,
+        // but could be replaced with direct model building from the graph JSON to avoid eval entirely.
         createModel = eval(
           `(function() { const tf = window.tf; ${this.$d3Interface.generateJavascriptNoSave(this.$kerasInterface)} return createModel; })()`
         );
