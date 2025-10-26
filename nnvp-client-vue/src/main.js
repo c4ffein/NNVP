@@ -23,7 +23,6 @@ import * as tf from '@tensorflow/tfjs';
   }
 
   const app = createApp(App)
-  app.config.productionTip = false;  // TODO Check
 
   // This file is generated from api/keras_layers.py. Temporary file for early
   // development versions, should later be automatically generated at build time.
