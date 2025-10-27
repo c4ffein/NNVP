@@ -8,6 +8,7 @@ help:
 	@echo "  make help            - Show this help message"
 	@echo "  make install         - Install dependencies"
 	@echo "  make dev             - Start development server"
+	@echo "  make dev-host        - Start development server, enabling non-localhost connections"
 	@echo "  make test            - Run all tests (unit + e2e)"
 	@echo "  make test-e2e        - Run end-to-end tests with Playwright"
 	@echo "  make test-unit       - Run unit tests"
@@ -22,6 +23,10 @@ install:
 # Start development server
 dev:
 	cd nnvp-client-vue && npm run dev
+
+# Start development server, enabling the non-localhost connections
+dev-host:
+	cd nnvp-client-vue && npm run dev -- --host
 
 # Run all tests
 test: test-e2e
