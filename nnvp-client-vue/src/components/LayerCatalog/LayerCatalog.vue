@@ -1,14 +1,12 @@
 <template>
-  <div class="LeftBar" :key="reloadKey">
-    <!--button
-      id="interfaceTest"
-      v-on:click="
-        $kerasInterface.load(
-          {'TestLayer': {'category': 'Test Layers', 'parameters': {}, }, }
-        );
-        $forceUpdate();"
-    >Interface Test Add</button-->
-    <input id="layerSearchBox" v-model="searchBox" placeholder="Search">
+  <div class="LayerCatalog" :key="reloadKey">
+    <div class="search-container">
+      <svg class="search-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M11 11L14.5 14.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <input id="layerSearchBox" v-model="searchBox" placeholder="Search">
+    </div>
     <div
       v-for="(layers, categoryName) in $kerasInterface.getCategories()"
       v-bind:key="categoryName.id"
@@ -38,7 +36,7 @@
 import LayerTemplate from './LayerTemplate.vue';
 
 export default {
-  name: 'LeftBar',
+  name: 'LayerCatalog',
   components: {
     LayerTemplate,
   },
@@ -87,7 +85,7 @@ export default {
   },
   data: () => ({
     searchBox: '',
-    reloadKey: 0, // Quick hack to reload LeftBar when selected GraphEditor changes
+    reloadKey: 0,
   }),
   mounted() {
     this.$d3Interface.setLeftBarRemountCallback(this.remount);
@@ -104,63 +102,92 @@ export default {
   font-family: var(--font-regular); font-weight: var(--font-weight-regular);
   src: url("/assets/fonts/Roboto-Thin-webfont.woff") format("woff");
 }
-.LeftBar {
+.LayerCatalog {
   font-family: var(--font-regular); font-weight: var(--font-weight-regular);
   font-size: 15px;
   user-select: none;
   -webkit-user-select: none;
+  color: #000000;
+}
+.search-container {
+  position: relative;
+  width: 100%;
+  background-color: #ffffff;
+}
+.search-icon {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: #000000;
+  pointer-events: none;
 }
 #layerSearchBox {
-  background-color: #ffffff;
-  overflow: hidden;
+  background-color: transparent;
   box-sizing: border-box;
   width: 100%;
-  border: 1px solid #c0c0c0;
+  border: none;
   color: #000000;
-  border: 1px;
-  padding: 5px;
-  font-family: var(--font-regular); font-weight: var(--font-weight-regular);
+  padding: 14px 16px 14px 44px;
+  font-family: var(--font-regular);
+  font-weight: var(--font-weight-medium);
+  font-size: 14px;
 }
-.LeftBar > .layerCategory > .title {
-  background-color: rgba(200, 200, 200, 0.2);
+#layerSearchBox:focus {
+  outline: none;
+}
+#layerSearchBox::placeholder {
+  color: #000000;
+}
+.LayerCatalog > .layerCategory > .title {
+  background-color: #f5f5f5;
   overflow: hidden;
   display: grid;
   grid-template-columns: auto 1fr;
   grid-template-areas: "arrow text";
-  border-top: 1px solid rgba(200, 200, 200, 0.5);
-  border-bottom: 1px solid rgba(200, 200, 200, 0.5);
+  border-top: 1px solid #e0e0e0;
+  border-bottom: 1px solid #e0e0e0;
+  font-weight: var(--font-weight-medium);
 }
-.LeftBar > .layerCategory > .title:hover {
-  background-color: rgba(200, 200, 200, 0.6);
+.LayerCatalog > .layerCategory > .title:hover {
+  background-color: #e8e8e8;
 }
-.LeftBar > .layerCategory > .title > .text {
+.LayerCatalog > .layerCategory > .title > .text {
   grid-area: text;
   text-align: left;
-  padding: 5px;
+  padding: 8px 12px;
+  color: #000000;
 }
-.LeftBar > .layerCategory > .title > .arrow {
-  color: rgba(100, 100, 100, 0.7);
+.LayerCatalog > .layerCategory > .title > .arrow {
+  color: #000000;
   grid-area: arrow;
   height: 15px;
   width: 15px;
   transform: rotate(180deg) translateY(-10%);
   vertical-align: middle;
   text-align: center;
-  padding: 5px;
+  padding: 8px;
   font-size: 10px;
 }
-.LeftBar > .layerCategory.closed > .title > .arrow {
+.LayerCatalog > .layerCategory.closed > .title > .arrow {
   transform: rotate(90deg) translateY(-10%);
 }
-.LeftBar > .layerCategory.closed > .layerList {
+.LayerCatalog > .layerCategory.closed > .layerList {
   height: 0;
   overflow: hidden;
 }
-.LeftBar > .layerCategory > .layerList > .layer {
+.LayerCatalog > .layerCategory > .layerList > .layer {
   text-align: left;
-  padding: 3px;
+  padding: 8px 12px;
+  color: #000000;
+  border-left: 3px solid transparent;
+  transition: all 0.15s ease;
 }
-.LeftBar > .layerCategory > .layerList > .layer:hover {
-  outline: 1px solid rgba(150, 150, 150, 0.8);
+.LayerCatalog > .layerCategory > .layerList > .layer:hover {
+  background-color: #f9f9f9;
+  border-left: 3px solid #000000;
+  cursor: pointer;
 }
 </style>

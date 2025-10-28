@@ -115,7 +115,7 @@ export default class {
   // Group layers
   createGroup() {
     if (this.activeGraph !== null) {
-      this.activeGraph.createComposite();
+      this.activeGraph.model.createComposite();
     }
   }
 
@@ -182,5 +182,27 @@ export default class {
 
   getTemplatesContainer() {
     return this.templateIdsContainer;
+  }
+
+  // Debug function to get current board state
+  debugGetBoardState() {
+    if (!this.activeGraph || !this.activeGraph.model) {
+      return {
+        layers: [],
+        inputs: [],
+        outputs: [],
+        edges: [],
+        undoStack: this.undoStackContainer.e.length,
+        redoStack: this.redoStackContainer.e.length,
+      };
+    }
+    return {
+      layers: this.activeGraph.model.layers.map(l => ({ id: l.id, type: l.type })),
+      inputs: this.activeGraph.model.modelInputs,
+      outputs: this.activeGraph.model.modelOutputs,
+      edges: this.activeGraph.model.edges.length,
+      undoStack: this.undoStackContainer.e.length,
+      redoStack: this.redoStackContainer.e.length,
+    };
   }
 }

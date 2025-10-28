@@ -10,13 +10,20 @@ But if you read this and you want to get involved, you can actually create one f
 - [x] Make what is currently at about.nnvp.io part of this app
 - [x] Use oxlint instead of eslint
 - [ ] More modern / bold but still minimalistic theme
+  - [x] v0 new theme
+  - [x] Adapt existing tests
+  - [ ] Comprehensive manual testing to find potential regressions => add more tests + fix
+  - [ ] List last small improvements
 
-### 2. Deployment
+### 2. New tests for broken features
+- [ ] When deselecting a layer, we have to go back to the empty selection in the right panel
+
+### 3. Deployment
 - [ ] Migrate from Netlify to OVH for the SPA
 - [ ] Destroy previous nnvp.io hosting
 - [ ] Destroy previous about.nnvp.io hosting
 
-### 3. Code cleaning
+### 4. Code cleaning
 - [ ] Remove all remaining TODOs
 
 ## Documentation & Datasets

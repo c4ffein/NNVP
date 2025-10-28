@@ -33,5 +33,9 @@ import * as tf from '@tensorflow/tfjs';
   app.config.globalProperties.$d3Interface = d3Interface;
   app.config.globalProperties.$keyboardListener = new KeyboardListener(d3Interface, kerasInterface);
 
+  // Expose for testing
+  window.kerasInterface = kerasInterface;
+  window.d3Interface = d3Interface;
+
   app.mount('#app')
 })();

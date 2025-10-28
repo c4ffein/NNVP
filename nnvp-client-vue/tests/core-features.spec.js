@@ -597,7 +597,7 @@ def build_model():
     expect(consoleErrors.length).toBe(0);
   });
 
-  test('should select a layer and show parameters in RightBar', async ({ page }) => {
+  test('should select a layer and show parameters in LayerOptions', async ({ page }) => {
     // Add a Dense layer
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
@@ -605,21 +605,21 @@ def build_model():
 
     // Click on the layer in the canvas to select it
     const layerOnCanvas = await page.$('.d3Layer');
-    await layerOnCanvas.click();
+    await layerOnCanvas.click({ force: true });
     await page.waitForTimeout(500);
 
-    // Check if RightBar shows parameters
-    const rightBarContent = await page.textContent('#rightBar');
-    const rightbarBlock = await page.$('#rightbar-block');
+    // Check if LayerOptions shows parameters
+    const rightBarContent = await page.textContent('#layerOptions');
+    const rightbarBlock = await page.$('#layeroptions-block');
     const isLayerSelected = await layerOnCanvas.evaluate(el => el.classList.contains('selected'));
 
     console.log('\n=== PARAMETER DISPLAY TEST ===');
     console.log('Layer is selected:', isLayerSelected);
-    console.log('RightBar has content:', rightBarContent.length > 0);
-    console.log('RightBar text (first 100 chars):', rightBarContent.substring(0, 100));
-    console.log('rightbar-block exists:', rightbarBlock !== null);
-    console.log('RightBar contains "units":', rightBarContent.includes('units'));
-    console.log('RightBar contains "No layers selected":', rightBarContent.includes('No layers selected'));
+    console.log('LayerOptions has content:', rightBarContent.length > 0);
+    console.log('LayerOptions text (first 100 chars):', rightBarContent.substring(0, 100));
+    console.log('layeroptions-block exists:', rightbarBlock !== null);
+    console.log('LayerOptions contains "units":', rightBarContent.includes('units'));
+    console.log('LayerOptions contains "No layers selected":', rightBarContent.includes('No layers selected'));
 
     expect(rightBarContent.length).toBeGreaterThan(0);
     expect(consoleErrors.length).toBe(0);
@@ -707,16 +707,16 @@ def build_model():
       const box = await layer.boundingBox();
       await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
       await page.waitForTimeout(1000);
-      const rightBarText = await page.textContent('#rightBar');
+      const rightBarText = await page.textContent('#layerOptions');
       console.log(`Layer ${i}: First 80 chars of rightbar: "${rightBarText.substring(0, 80)}"`);
       if (rightBarText.includes('Dense') && rightBarText.includes('units')) {
         console.log('Found and selected Dense layer');
         denseLayerFound = true;
-        // Check if rightbar-block is visible
-        const rightbarBlock = await page.$('#rightbar-block');
+        // Check if layeroptions-block is visible
+        const rightbarBlock = await page.$('#layeroptions-block');
         expect(rightbarBlock).not.toBeNull();
         // Find and modify the "units" parameter
-        const numberInputs = await page.$$('#rightbar-block input[type="number"]');
+        const numberInputs = await page.$$('#layeroptions-block input[type="number"]');
         console.log('Number inputs found:', numberInputs.length);
         expect(numberInputs.length).toBeGreaterThan(0);
         const initialValue = await numberInputs[0].inputValue();
@@ -758,16 +758,16 @@ def build_model():
     await page.waitForTimeout(500);
     // Click layer to select it
     const layerOnCanvas = await page.$('.d3Layer');
-    await layerOnCanvas.click();
+    await layerOnCanvas.click({ force: true });
     await page.waitForTimeout(1000); // Wait longer for reactive update
-    // Check if rightbar-block is visible
-    const rightbarBlock = await page.$('#rightbar-block');
+    // Check if layeroptions-block is visible
+    const rightbarBlock = await page.$('#layeroptions-block');
     console.log('\n=== BOOLEAN PARAMETER MODIFICATION TEST ===');
     console.log('Rightbar block visible:', rightbarBlock !== null);
-    // rightbar-block MUST exist when a layer is selected
+    // layeroptions-block MUST exist when a layer is selected
     expect(rightbarBlock).not.toBeNull();
     // Find boolean parameter selects
-    const booleanSelects = await page.$$('#rightbar-block select.parameter-boolean');
+    const booleanSelects = await page.$$('#layeroptions-block select.parameter-boolean');
     console.log('Boolean parameters found:', booleanSelects.length);
     // Dense layer MUST have boolean parameters
     expect(booleanSelects.length).toBeGreaterThan(0);
@@ -814,12 +814,12 @@ def build_model():
       const box = await layer.boundingBox();
       await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
       await page.waitForTimeout(1000);
-      const rightBarText = await page.textContent('#rightBar');
+      const rightBarText = await page.textContent('#layerOptions');
       if (rightBarText.includes('Dropout') && rightBarText.includes('rate')) {
         console.log('Found and selected Dropout layer');
         dropoutLayerFound = true;
         // Find the range slider for "rate" parameter (Dropout uses range 0-1)
-        const rangeInputs = await page.$$('#rightbar-block input[type="range"]');
+        const rangeInputs = await page.$$('#layeroptions-block input[type="range"]');
         console.log('Range inputs found:', rangeInputs.length);
         expect(rangeInputs.length).toBeGreaterThan(0);
         const initialValue = await rangeInputs[0].inputValue();
@@ -865,10 +865,10 @@ def build_model():
     const box = await layerOnCanvas.boundingBox();
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
     await page.waitForTimeout(1000);
-    const rightBarText = await page.textContent('#rightBar');
-    console.log('RightBar contains Input:', rightBarText.includes('Input'));
+    const rightBarText = await page.textContent('#layerOptions');
+    console.log('LayerOptions contains Input:', rightBarText.includes('Input'));
     // Find text input for "name" parameter
-    const textInputs = await page.$$('#rightbar-block input[type="text"]');
+    const textInputs = await page.$$('#layeroptions-block input[type="text"]');
     console.log('Text inputs found:', textInputs.length);
     expect(textInputs.length).toBeGreaterThan(0);
     // Find the "name" input (check labels or use the first one)
@@ -919,14 +919,14 @@ def build_model():
       const box = await layer.boundingBox();
       await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
       await page.waitForTimeout(1000);
-      const rightBarText = await page.textContent('#rightBar');
+      const rightBarText = await page.textContent('#layerOptions');
       if (rightBarText.includes('Conv2D') && rightBarText.includes('kernel_size')) {
         console.log('Found and selected Conv2D layer');
         conv2dLayerFound = true;
         // Find tuple inputs for kernel_size
         // Conv2D has: filters (int), kernel_size (tuple), strides (tuple), etc.
         // So we need to find the right tuple inputs
-        const tupleInputs = await page.$$('#rightbar-block input[type="number"]');
+        const tupleInputs = await page.$$('#layeroptions-block input[type="number"]');
         console.log('Number inputs found:', tupleInputs.length);
         // Log all values to see which ones are kernel_size
         for (let i = 0; i < Math.min(tupleInputs.length, 10); i++) {
@@ -989,12 +989,12 @@ def build_model():
       const box = await layer.boundingBox();
       await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
       await page.waitForTimeout(1000);
-      const rightBarText = await page.textContent('#rightBar');
+      const rightBarText = await page.textContent('#layerOptions');
       if (rightBarText.includes('Flatten') && rightBarText.includes('data_format')) {
         console.log('Found and selected Flatten layer');
         flattenLayerFound = true;
         // Find select dropdown for data_format
-        const selectInputs = await page.$$('#rightbar-block select');
+        const selectInputs = await page.$$('#layeroptions-block select');
         console.log('Select inputs found:', selectInputs.length);
         expect(selectInputs.length).toBeGreaterThan(0);
         const initialValue = await selectInputs[0].evaluate(el => el.value);
@@ -1089,19 +1089,26 @@ def build_model():
     expect(consoleErrors.length).toBe(0);
   });
 
-  test('should interact with dataset selector in BottomTrainer', async ({ page }) => {
+  test('should interact with dataset selector in TrainingZone', async ({ page }) => {
     console.log('\n=== DATASET SELECTOR TEST ===');
     // Enable dataset debug logging
     await page.evaluate(() => {
       window.nnvpDebugDatasets = true;
     });
     console.log('Dataset debug logging enabled');
-    // Verify BottomTrainer is visible
-    const bottomTrainer = await page.$('#BottomTrainer');
+
+    // Open TrainingZone by clicking "Training" in GeneralMenu
+    const trainingMenu = await page.$('text=Training');
+    await trainingMenu.click();
+    await page.waitForTimeout(500);
+    console.log('Clicked Training menu to open TrainingZone');
+
+    // Verify TrainingZone is now visible
+    const bottomTrainer = await page.$('#trainingZone');
     expect(bottomTrainer).not.toBeNull();
-    console.log('BottomTrainer panel found');
+    console.log('TrainingZone panel found');
     // Click Dataset tab
-    const datasetTab = await page.$('.BottomTrainer.bar-button:has-text("Dataset")');
+    const datasetTab = await page.$('.TrainingZone.bar-button:has-text("Dataset")');
     await datasetTab.click();
     await page.waitForTimeout(500);
     console.log('Dataset tab clicked');
@@ -1131,7 +1138,7 @@ def build_model():
     await page.waitForTimeout(4000);
     // Check debug logs immediately to see if loading started
     let datasetLogs = consoleMessages.filter(msg =>
-      msg.text.includes('[DatasetSelector]') || msg.text.includes('[BottomTrainer]')
+      msg.text.includes('[DatasetSelector]') || msg.text.includes('[TrainingZone]')
     );
     console.log(`\n📊 Dataset logs after 4s: ${datasetLogs.length} messages`);
     if (datasetLogs.length > 0) {
@@ -1198,7 +1205,7 @@ def build_model():
     expect(canvasSize.height).toBe(28);
     // Verify loading debug logs
     const allDatasetLogs = consoleMessages.filter(msg =>
-      msg.text.includes('[DatasetSelector]') || msg.text.includes('[BottomTrainer]')
+      msg.text.includes('[DatasetSelector]') || msg.text.includes('[TrainingZone]')
     );
     console.log('\nDataset loading logs (' + allDatasetLogs.length + ' messages):');
     allDatasetLogs.slice(0, 10).forEach(log => console.log(`  ${log.type}: ${log.text.substring(0, 100)}`));
@@ -1221,8 +1228,15 @@ def build_model():
     await page.evaluate(() => {
       window.nnvpDebugDatasets = true;
     });
+
+    // Open TrainingZone by clicking "Training" in GeneralMenu
+    const trainingMenu = await page.$('text=Training');
+    await trainingMenu.click();
+    await page.waitForTimeout(500);
+    console.log('Opened TrainingZone');
+
     // Go to Dataset tab
-    const datasetTab = await page.$('.BottomTrainer.bar-button:has-text("Dataset")');
+    const datasetTab = await page.$('.TrainingZone.bar-button:has-text("Dataset")');
     await datasetTab.click();
     await page.waitForTimeout(500);
     const datasetSelector = await page.$('#dataset-selector-selector');
@@ -1326,8 +1340,15 @@ def build_model():
     await page.evaluate(() => {
       window.nnvpDebugDatasets = true;
     });
+
+    // Open TrainingZone by clicking "Training" in GeneralMenu
+    const trainingMenu = await page.$('text=Training');
+    await trainingMenu.click();
+    await page.waitForTimeout(500);
+    console.log('Opened TrainingZone');
+
     // Go to Dataset tab
-    const datasetTab = await page.$('.BottomTrainer.bar-button:has-text("Dataset")');
+    const datasetTab = await page.$('.TrainingZone.bar-button:has-text("Dataset")');
     await datasetTab.click();
     await page.waitForTimeout(500);
     const datasetSelector = await page.$('#dataset-selector-selector');
@@ -1588,12 +1609,12 @@ def build_model():
     const newDenseBox = await newDenseLayer.boundingBox();
     await page.mouse.click(newDenseBox.x + newDenseBox.width / 2, newDenseBox.y + newDenseBox.height / 2);
     await page.waitForTimeout(500);
-    // Verify RightBar shows parameters
-    const rightBarText = await page.textContent('#rightbar-block');
-    console.log('RightBar shows Dense parameters:', rightBarText.includes('units'));
+    // Verify LayerOptions shows parameters
+    const rightBarText = await page.textContent('#layeroptions-block');
+    console.log('LayerOptions shows Dense parameters:', rightBarText.includes('units'));
     expect(rightBarText).toContain('units');
     // Set units parameter to 128
-    const unitsInput = await page.$('#rightbar-block input[type="number"]');
+    const unitsInput = await page.$('#layeroptions-block input[type="number"]');
     await unitsInput.fill('128');
     await unitsInput.dispatchEvent('change');
     await page.waitForTimeout(500);
@@ -1699,7 +1720,7 @@ def build_model():
       if (text.includes('CPU-only mode') || text.includes('CPU backend') ||
           text.includes('Epoch') || text.includes('training') ||
           text.includes('[Charts]') || text.includes('mounted') ||
-          text.includes('[BottomTrainer]') || text.includes('optimizer')) {
+          text.includes('[TrainingZone]') || text.includes('optimizer')) {
         console.log('[BROWSER]', text);
       }
       if (text.includes('error') || text.includes('Error') || text.includes('ERROR') ||
@@ -1724,10 +1745,10 @@ def build_model():
     // Open Training panel via top menu
     await page.click('text=Training');
     await page.waitForTimeout(1000);
-    // Verify BottomTrainer is visible
-    const bottomTrainer = await page.$('#BottomTrainer');
+    // Verify TrainingZone is visible
+    const bottomTrainer = await page.$('#trainingZone');
     expect(bottomTrainer).not.toBeNull();
-    console.log('BottomTrainer panel opened');
+    console.log('TrainingZone panel opened');
     // Enable debug logging
     await page.evaluate(() => {
       window.nnvpDebugDatasets = true;
@@ -2096,8 +2117,10 @@ def build_model():
     console.log('Clicking background to cancel...');
     const svg = await page.$('#svgWrapper svg');
     const svgBox = await svg.boundingBox();
-    // Click on an empty area far from the layer
-    await page.mouse.click(svgBox.x + svgBox.width - 100, svgBox.y + 100);
+    // Click on an empty area in the center-left (avoiding floating panels)
+    // The LayerCatalog is on the left (~234px), GeneralMenu on top (~46px)
+    // So click at around x=400, y=300 which should be clear
+    await page.mouse.click(svgBox.x + 400, svgBox.y + 300);
     await page.waitForTimeout(300);
     // Verify link mode exited
     const stillActive = await sourceHandle.evaluate(el => el.classList.contains('link-source-active'));

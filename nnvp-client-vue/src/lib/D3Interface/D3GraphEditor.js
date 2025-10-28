@@ -11,6 +11,10 @@ import D3Templates from './D3Templates';
 
 var MARGIN_PAGE = 50;
 
+// Floating panel offsets - account for GeneralMenu and LayerCatalog
+var PANEL_OFFSET_X = 244; // LayerCatalog width (220px) + left margin (12px) + right margin (12px)
+var PANEL_OFFSET_Y = 56;  // GeneralMenu height (32px) + top margin (12px) + bottom margin (12px)
+
 var MAP_HEIGHT = 500;
 var MAP_WIDTH = 960;
 var MAP_X = MARGIN_PAGE;
@@ -42,7 +46,8 @@ export default function D3GraphEditor(svg, model) {
   // Help to set the limits out of the whiteboard
   this.marginPage = MARGIN_PAGE;
 
-  this.gTransform = d3.zoomIdentity.translate(0, 0).scale(1);
+  // Initial transform - offset the canvas so (0,0) is visible below GeneralMenu and right of LayerCatalog
+  this.gTransform = d3.zoomIdentity.translate(PANEL_OFFSET_X, PANEL_OFFSET_Y).scale(1);
 
   this.model = model || new D3Model(undefined, undefined, this);
   this.templates = new D3Templates();
@@ -114,6 +119,9 @@ export default function D3GraphEditor(svg, model) {
 
   // Draw all the Background if Whiteboard, Borders and ListenerBorders are created
   D3Background.updateBackground(thisGraph);
+
+  // Apply initial transform to offset canvas for floating panels
+  thisGraph.svgG.attr("transform", thisGraph.gTransform);
 
   // Set two operation on d3 zoom event
   // First the moves and zoom on the WhiteBoard

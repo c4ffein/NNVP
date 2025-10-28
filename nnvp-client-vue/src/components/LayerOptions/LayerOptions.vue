@@ -1,13 +1,31 @@
 <template>
-  <div class="RightBar">
-    <h4 v-if="selectedNode.e.length === 0">No layers selected</h4>
-    <div id="rightbar-block" class="rightbar-block" v-if="nodeIsSelected()">
+  <div class="LayerOptions">
+    <div class="network-stats" v-if="selectedNode.e.length === 0">
+      <h3>Network Overview</h3>
+      <div class="stat-item">
+        <span class="stat-label">Layers</span>
+        <span class="stat-value">{{ totalLayers }}</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Inputs</span>
+        <span class="stat-value">{{ totalInputs }}</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Outputs</span>
+        <span class="stat-value">{{ totalOutputs }}</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Connections</span>
+        <span class="stat-value">{{ totalEdges }}</span>
+      </div>
+    </div>
+    <div id="layeroptions-block" class="layeroptions-block" v-if="nodeIsSelected()">
       <ParamsBlock
         v-for="(selectedLayer, index) in activeLayers"
         v-bind:key="selectedLayer.id"
         v-bind:title="selectedLayer.kerasLayer.name"
       >
-        <component class="RightBar param"
+        <component class="LayerOptions param"
           :key="paramK"
           v-for="(paramV, paramK) in selectedLayer.kerasLayer.parameterDef"
           v-bind:is="parameterToComponentName(paramV)"
@@ -30,7 +48,7 @@
       </ParamsBlock>
 
       <ParamsBlock title="Model Inputs" v-if="inputInLayersAndMoreThanOneInModel">
-        <div class="RightBar param">
+        <div class="LayerOptions param">
           <OrderParameter
             v-bind:itemList="$d3Interface.activeGraph.model.modelInputs"
             :idFunc="e => e.id"
@@ -40,7 +58,7 @@
       </ParamsBlock>
 
       <ParamsBlock title="Model Outputs" v-if="outputInLayers">
-        <div class="RightBar param">
+        <div class="LayerOptions param">
           <OrderParameter
             v-bind:itemList="$d3Interface.activeGraph.model.modelOutputs"
             :idFunc="e => e.id"
@@ -64,7 +82,7 @@ import OrderParameter from '../Parameters/OrderParameter.vue';
 
 
 export default {
-  name: 'RightBar',
+  name: 'LayerOptions',
   components: {
     ParamsBlock,
     ListParameter,
@@ -129,6 +147,26 @@ export default {
       }
       return false;
     },
+    totalLayers() {
+      this.refreshKey; // eslint-disable-line
+      if (!this.$d3Interface?.activeGraph?.model?.layers) return 0;
+      return this.$d3Interface.activeGraph.model.layers.length;
+    },
+    totalInputs() {
+      this.refreshKey; // eslint-disable-line
+      if (!this.$d3Interface?.activeGraph?.model?.modelInputs) return 0;
+      return this.$d3Interface.activeGraph.model.modelInputs.length;
+    },
+    totalOutputs() {
+      this.refreshKey; // eslint-disable-line
+      if (!this.$d3Interface?.activeGraph?.model?.modelOutputs) return 0;
+      return this.$d3Interface.activeGraph.model.modelOutputs.length;
+    },
+    totalEdges() {
+      this.refreshKey; // eslint-disable-line
+      if (!this.$d3Interface?.activeGraph?.model?.edges) return 0;
+      return this.$d3Interface.activeGraph.model.edges.length;
+    },
   },
   methods: {
     nodeIsSelected() {
@@ -165,23 +203,56 @@ export default {
 </script>
 
 <style >
-.RightBar {
+.LayerOptions {
   height: 100%;
   box-sizing: border-box;
   -moz-box-sizing: border-box;
   -webkit-box-sizing: border-box;
+  color: #000000;
 }
-.RightBar > h4 {
-  display: inline-block;
+
+/* Network stats display when no layer is selected */
+.network-stats {
+  padding: 20px;
 }
-.rightbar-block {
+.network-stats h3 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: var(--font-weight-medium);
+  color: #000000;
+  border-bottom: 1px solid #000000;
+  padding-bottom: 8px;
+}
+.stat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #e0e0e0;
+}
+.stat-item:last-child {
+  border-bottom: none;
+}
+.stat-label {
+  font-size: 14px;
+  color: #666666;
+  font-weight: var(--font-weight-regular);
+}
+.stat-value {
+  font-size: 18px;
+  font-weight: var(--font-weight-semibold);
+  color: #000000;
+}
+
+.layeroptions-block {
   font-family: var(--font-regular); font-weight: var(--font-weight-regular);
-  font-size: 15px;
+  font-size: 14px;
   user-select: none;
   min-height: 100%;
+  padding: 12px;
 }
-.RightBar.param {
+.LayerOptions.param {
   text-align: left;
-  padding: 4px;
+  padding: 8px 0;
 }
 </style>

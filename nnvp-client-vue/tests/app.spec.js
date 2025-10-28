@@ -7,7 +7,6 @@ test.describe('NNVP App', () => {
   test.beforeEach(async ({ page }) => {
     consoleMessages = [];
     consoleErrors = [];
-
     // Capture all console messages
     page.on('console', msg => {
       const text = msg.text();
@@ -18,7 +17,6 @@ test.describe('NNVP App', () => {
         consoleErrors.push(text);
       }
     });
-
     // Capture page errors
     page.on('pageerror', error => {
       consoleErrors.push(`PAGE ERROR: ${error.message}`);
@@ -33,7 +31,6 @@ test.describe('NNVP App', () => {
         console.log(`[${type.toUpperCase()}] ${text}`);
       });
     }
-
     // Print errors prominently
     if (consoleErrors.length > 0) {
       console.log('\n=== BROWSER CONSOLE ERRORS ===');
@@ -45,17 +42,14 @@ test.describe('NNVP App', () => {
 
   test('should load the app without console errors', async ({ page }) => {
     await page.goto('/');
-
     // Wait a bit for the app to initialize
     await page.waitForTimeout(2000);
-
     // Check if there are any errors
     if (consoleErrors.length > 0) {
       console.log(`\n⚠️  Found ${consoleErrors.length} console error(s)`);
     } else {
       console.log('\n✅ No console errors detected');
     }
-
     // This will fail if there are errors, helping us identify issues
     expect(consoleErrors.length).toBe(0);
   });
@@ -63,43 +57,68 @@ test.describe('NNVP App', () => {
   test('should render the main components', async ({ page }) => {
     await page.goto('/');
     await page.waitForTimeout(1000);
-
     // Check for basic app structure
     const body = await page.textContent('body');
     console.log('\n=== PAGE LOADED ===');
     console.log('Body has content:', body ? 'yes' : 'no');
-
-    // Check all main UI components
-    const topBar = await page.$('#topBar');
-    const leftBar = await page.$('#leftBar');
-    const rightBar = await page.$('#rightBar');
-    const whiteBoard = await page.$('#whiteBoard');
-    const bottomTrainer = await page.$('#bottomTrainer');
-
+    // Check all main UI components (TrainingZone is not rendered initially - it only appears when opened)
+    const generalMenu = await page.$('#generalMenu');
+    const layerCatalog = await page.$('#layerCatalog');
+    const layerOptions = await page.$('#layerOptions');
+    const whiteBoard = await page.$('#WhiteBoard');
     console.log('\n=== COMPONENT CHECK ===');
-    console.log('TopBar rendered:', topBar !== null);
-    console.log('LeftBar rendered:', leftBar !== null);
-    console.log('RightBar rendered:', rightBar !== null);
+    console.log('GeneralMenu rendered:', generalMenu !== null);
+    console.log('LayerCatalog rendered:', layerCatalog !== null);
+    console.log('LayerOptions rendered:', layerOptions !== null);
     console.log('WhiteBoard rendered:', whiteBoard !== null);
-    console.log('BottomTrainer rendered:', bottomTrainer !== null);
-
-    expect(topBar).not.toBeNull();
-    expect(leftBar).not.toBeNull();
-    expect(rightBar).not.toBeNull();
+    expect(generalMenu).not.toBeNull();
+    expect(layerCatalog).not.toBeNull();
+    expect(layerOptions).not.toBeNull();
     expect(whiteBoard).not.toBeNull();
-    expect(bottomTrainer).not.toBeNull();
+    // TrainingZone should NOT be rendered initially (v-if="trainerHeight > 0")
+    const trainingZone = await page.$('#trainingZone');
+    console.log('TrainingZone rendered on load:', trainingZone !== null);
+    expect(trainingZone).toBeNull();
   });
 
-  test('should display layer templates in left bar', async ({ page }) => {
+  test('should display layer templates in layer catalog', async ({ page }) => {
     await page.goto('/');
     await page.waitForTimeout(1000);
-
-    // Check if LeftBar has layer templates
-    const leftBarContent = await page.textContent('#leftBar');
-    console.log('\n=== LEFT BAR CONTENT CHECK ===');
-    console.log('LeftBar has content:', leftBarContent.length > 0);
-
+    // Check if LayerCatalog has layer templates
+    const layerCatalogContent = await page.textContent('#layerCatalog');
+    console.log('\n=== LAYER CATALOG CONTENT CHECK ===');
+    console.log('LayerCatalog has content:', layerCatalogContent.length > 0);
     // Should have some layer types visible
-    expect(leftBarContent.length).toBeGreaterThan(0);
+    expect(layerCatalogContent.length).toBeGreaterThan(0);
+  });
+
+  test('should position whiteboard canvas below GeneralMenu and right of LayerCatalog', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForTimeout(1000);
+    // Get panel positions
+    const generalMenu = await page.$('#generalMenu');
+    const layerCatalog = await page.$('#layerCatalog');
+    const menuBox = await generalMenu.boundingBox();
+    const catalogBox = await layerCatalog.boundingBox();
+    // Add a layer to test positioning
+    const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
+    await denseLayer.click();
+    await page.waitForTimeout(500);
+    // Get the layer position
+    const canvasLayer = await page.$('.d3Layer');
+    const layerBox = await canvasLayer.boundingBox();
+    console.log('\n=== WHITEBOARD POSITIONING TEST ===');
+    console.log('GeneralMenu bottom:', menuBox.y + menuBox.height);
+    console.log('LayerCatalog right:', catalogBox.x + catalogBox.width);
+    console.log('First layer position:', { x: layerBox.x, y: layerBox.y });
+    // Layer should be below GeneralMenu (not overlapping)
+    const clearOfMenu = layerBox.y > (menuBox.y + menuBox.height);
+    // Layer should be right of LayerCatalog (not overlapping)
+    const clearOfCatalog = layerBox.x > (catalogBox.x + catalogBox.width);
+    console.log('Layer clear of GeneralMenu:', clearOfMenu);
+    console.log('Layer clear of LayerCatalog:', clearOfCatalog);
+    // Layers should be positioned in the visible canvas area
+    expect(clearOfMenu).toBe(true);
+    expect(clearOfCatalog).toBe(true);
   });
 });

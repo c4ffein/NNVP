@@ -1,31 +1,33 @@
 <template>
-  <div id="topBar" class="topBar"><TopBar @open-trainer="openTrainer" @open-about="openAboutModal"/></div>
-  <div id="leftBar" class="leftBar"><LeftBar/></div>
-  <div id="whiteBoard" class="whiteBoard"><WhiteBoard/></div>
-  <div id="rightBar" class="rightBar"><RightBar msg="NNVP"/></div>
-  <div id="bottomTrainer" class="bottomTrainer" v-bind:style="{height: trainerHeight+'vh'}">
-    <BottomTrainer @close-trainer="closeTrainer" :bottomTrainerSize="trainerHeight"/>
+  <div id="canvas-background" class="canvas-background">
+    <WhiteBoard/>
+  </div>
+  <div id="generalMenu" class="floating-panel general-menu"><GeneralMenu @open-trainer="openTrainer" @open-about="openAboutModal"/></div>
+  <div id="layerCatalog" class="floating-panel layer-catalog"><LayerCatalog/></div>
+  <div id="layerOptions" class="floating-panel layer-options"><LayerOptions msg="NNVP"/></div>
+  <div id="trainingZone" class="floating-panel training-zone" v-if="trainerHeight > 0" v-bind:style="{height: trainerHeight+'vh'}">
+    <TrainingZone @close-trainer="closeTrainer" :trainingZoneSize="trainerHeight"/>
   </div>
   <AboutModal :show="showAboutModal" @close="closeAboutModal"/>
 </template>
 
 
 <script>
-import TopBar from './components/TopBar.vue';
-import LeftBar from './components/LeftBar/LeftBar.vue';
-import RightBar from './components/RightBar/RightBar.vue';
+import GeneralMenu from './components/GeneralMenu.vue';
+import LayerCatalog from './components/LayerCatalog/LayerCatalog.vue';
+import LayerOptions from './components/LayerOptions/LayerOptions.vue';
 import WhiteBoard from './components/WhiteBoard.vue';
-import BottomTrainer from './components/BottomTrainer/BottomTrainer.vue';
+import TrainingZone from './components/TrainingZone/TrainingZone.vue';
 import AboutModal from './components/AboutModal.vue';
 
 export default {
   name: 'app',
   components: {
-    TopBar,
-    LeftBar,
-    RightBar,
+    GeneralMenu,
+    LayerCatalog,
+    LayerOptions,
     WhiteBoard,
-    BottomTrainer,
+    TrainingZone,
     AboutModal,
   },
   methods: {
@@ -46,7 +48,7 @@ export default {
   data() {
     return {
       trainerHeight: 0,
-      trainerOpenHeight: 50, // TODO : 30 when more efficient
+      trainerOpenHeight: 50,
       showAboutModal: false,
     };
   },
@@ -61,12 +63,20 @@ export default {
 </script>
 
 <style>
-/* Inter Variable Font - modern, readable font for technical interfaces */
+/* Inter Variable Font 4.1 - modern, readable font for technical interfaces */
 @font-face {
   font-family: "Inter";
   src: url("./assets/fonts/InterVariable.woff2") format("woff2");
   font-weight: 100 900;
   font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Inter";
+  src: url("./assets/fonts/InterVariable-Italic.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: italic;
   font-display: swap;
 }
 
@@ -77,96 +87,131 @@ export default {
   --font-weight-regular: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
+
+  /* New design system colors */
+  --bg-canvas: #f0f0f0;
+  --bg-panel: #ffffff;
+  --border-color: #000000;
+  --border-width: 1px;
+  --border-radius: 15px;
+  --panel-margin: 12px;
 }
 
 body,html {
   position: fixed; /* disable scroll bounce effect for Safari */
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
 }
 
 #app {
   height: 100vh;
   width: 100vw;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  grid-template-rows: auto 1fr auto;
-  grid-template-areas:
-    'topBar topBar topBar'
-    'leftBar whiteBoard rightBar'
-    'bottomTrainer bottomTrainer bottomTrainer';
-  background-color: #FFFFFF;
+  position: relative;
+  background-color: var(--bg-canvas);
   user-select: none;
-  /* still needed for some details with safari */
   -webkit-user-select: none;
-  background-color: rgba(255, 255, 255, 1);
   max-width: 100%;
   max-height: 100%;
   margin: 0;
   padding: 0;
   overflow: hidden;
-  user-select: none;
-  text-align: center;
   font-family: var(--font-regular);
   font-weight: var(--font-weight-regular);
 }
-.topBar { grid-area: topBar; }
-.leftBar { grid-area: leftBar; }
-.rightBar { grid-area: rightBar; }
-.whiteBoard { grid-area: whiteBoard; }
-.bottomTrainer { grid-area: bottomTrainer; }
 
-#app > .topBar {
-  height: 26px;
-  width: 100%;
-  background-color: rgba(240, 240, 240, 1);
+/* Canvas background - full screen underneath panels */
+.canvas-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--bg-canvas);
+  z-index: 0;
 }
 
-#app > .leftBar {
-  width: 208px;
+/* Floating panels - common styling */
+.floating-panel {
+  position: absolute;
+  background-color: var(--bg-panel);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  z-index: 10;
+  pointer-events: auto;  /* Allow the panel background to receive clicks */
+}
+
+/* GeneralMenu - top panel */
+.general-menu {
+  top: var(--panel-margin);
+  left: var(--panel-margin);
+  right: var(--panel-margin);
+  height: 32px;
+  overflow: visible;  /* Allow dropdown menus to show outside the panel */
+  z-index: 100;  /* Ensure dropdowns appear above other panels */
+}
+
+/* LayerCatalog - left panel */
+.layer-catalog {
+  top: calc(32px + var(--panel-margin) * 2);
+  left: var(--panel-margin);
+  bottom: var(--panel-margin);
+  width: 220px;
   overflow-y: auto;
-  background-color: rgba(240, 240, 240, 1);
-  border-right: 1px solid rgba(100, 100, 100, 0.3);
 }
-#app > .rightBar {
-  width: 223px;
+
+/* LayerOptions - right panel */
+.layer-options {
+  top: calc(32px + var(--panel-margin) * 2);
+  right: var(--panel-margin);
+  bottom: var(--panel-margin);
+  width: 240px;
   overflow-y: auto;
-  color: #2c3e50;
-  border-left: 1px solid rgba(100, 100, 100, 0.3);
-  background-color: rgba(255, 255, 255, 0.8);
 }
-#app > .whiteBoard {
-  background-color: rgba(200, 200, 200, 0.8);
-  color: #2c3e50;
+
+/* TrainingZone - bottom panel */
+.training-zone {
+  left: var(--panel-margin);
+  right: var(--panel-margin);
+  bottom: var(--panel-margin);
+  /* height set dynamically via inline style */
 }
-#app > .bottomTrainer {
-  background-color: rgba(255, 255, 255, 1);
-  color: #2c3e50;
-}
+
+/* Adjust spacing for buttons/inputs */
 button, input[type="button"], input[type="submit"], input, select {
   color: #000000;
   font-family: var(--font-regular);
   font-weight: var(--font-weight-regular);
   background-color: #FFFFFF;
-  border: 1px solid;
-  border-color: rgba(200,200,200,0.8);
+  border: 1px solid #cccccc;
+  border-radius: 4px;
+  padding: 4px 8px;
 }
+
 input.arrows {
-  color: #FFFFFF;
+  color: #000000;
   background-color: #FFFFFF;
-  border: 1px solid;
-  border-color: rgba(200,200,200,0.8);
+  border: 1px solid #cccccc;
 }
+
 select {
   -webkit-appearance: none;
   appearance: none;
+  padding: 4px 8px;
 }
+
 select:focus {
-  outline-width: 0; /* not perfect but better */
+  outline: 2px solid #000000;
+  outline-offset: 2px;
 }
+
 select:-moz-focusring {
   color: transparent;
   text-shadow: 0 0 0 #000000;
 }
+
 option:not(:checked) {
-  color: black; /* prevent <option>s from becoming transparent as well */
+  color: black;
 }
 </style>

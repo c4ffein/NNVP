@@ -1,29 +1,32 @@
 <script lang="jsx">
 export default {
-  name: 'TopBar',
+  name: 'GeneralMenu',
   render(h) { // eslint-disable-line
+    // Force reactivity by accessing refreshKey
+    this.menuRefreshKey; // eslint-disable-line
+
     const generateMenu = (menu, level) => {
       if (typeof (menu) === 'string') menu = this[menu] || {}; // eslint-disable-line no-param-reassign
       if (typeof (menu) !== 'function' && !Array.isArray(menu)) {
         const rows = Object.entries(menu).map((entry, i) => (
           <li key={i}
-            class={`menuItem TopBar ${this.isItemDisabled(entry[0], entry[1]) ? 'disabled' : ''}`}
+            class={`menuItem GeneralMenu ${this.isItemDisabled(entry[0], entry[1]) ? 'disabled' : ''}`}
             onClick={() => this.levelNClickHandler(entry[0], entry[1])}
             onMouseover={event => this.levelNHoverHandler(entry[0], entry[1], event, level)}
           >
-            <div class="TopBar">{entry[0].replace('_', ' ')}</div>
+            <div class="GeneralMenu">{entry[0].replace('_', ' ')}</div>
             {generateMenu(entry[1], level + 1)}
           </li>
         ));
-        return (<ul class="dropdown-content TopBar">{rows}</ul>);
+        return (<ul class="dropdown-content GeneralMenu">{rows}</ul>);
       }
       return undefined;
     };
     return (
-      <ul id="TopBar" class="TopBar">
+      <ul id="GeneralMenu" class="GeneralMenu">
         { Object.entries(this.$data.menu).map((object, i) => (
-          <li class="menu TopBar" obj={object} key={i}>
-            <div class="menuTitle TopBar"
+          <li class="menu GeneralMenu" obj={object} key={i}>
+            <div class="menuTitle GeneralMenu"
               onClick={event => this.level0ClickHandler(object[0], object[1], event)}
               onMouseover={event => this.level0HoverHandler(object[0], object[1], event)}
             >
@@ -43,16 +46,14 @@ export default {
           Load() { this.$d3Interface.loadBoard(); },
           Templates: 'templatesMenu',
           Save() { this.$d3Interface.saveBoard(); },
-          // TODO : if connected to backend, should call
-          // generatePythonOnBackend('/api/generate') instead
           Generate() { this.$d3Interface.generatePythonInBrowser(this.$kerasInterface); },
           Generate_Javascript() {
             this.$d3Interface.generateJavascriptInBrowser(this.$kerasInterface);
           },
         },
         Edit: {
-          Undo: [() => this.$d3Interface.undo(), () => (this.undoStackContainer.e.length === 0)],
-          Redo: [() => this.$d3Interface.redo(), () => (this.redoStackContainer.e.length === 0)],
+          Undo: [() => this.$d3Interface.undo(), () => (this.$d3Interface.getUndoStackContainer().e.length === 0)],
+          Redo: [() => this.$d3Interface.redo(), () => (this.$d3Interface.getRedoStackContainer().e.length === 0)],
           Group() { this.$d3Interface.createGroup(); },
         },
         Training: () => { this.$emit('open-trainer'); },
@@ -63,14 +64,21 @@ export default {
       undoStackContainer: this.$d3Interface.getUndoStackContainer(),
       redoStackContainer: this.$d3Interface.getRedoStackContainer(),
       templatesRefreshKey: 0,
+      menuRefreshKey: 0,
     };
   },
   mounted() {
     // Subscribe to templates changes
     this.templatesChangeHandler = () => {
       this.templatesRefreshKey++;
+      this.menuRefreshKey++; // Trigger menu re-render
     };
     this.$d3Interface.on('templates-changed', this.templatesChangeHandler);
+
+    // Trigger initial refresh in case templates were loaded before this component mounted
+    // (WhiteBoard mounts before GeneralMenu, so the templates-changed event fires before we subscribe)
+    this.templatesRefreshKey++;
+    this.menuRefreshKey++;
   },
   beforeUnmount() {
     // Unsubscribe from events
@@ -95,6 +103,10 @@ export default {
   },
   methods: {
     level0ClickHandler(menuTitle, menuContent, event) {
+      event.stopPropagation();
+      // Refresh menu state to update disabled items
+      this.menuRefreshKey++;
+
       if (typeof (menuContent) === 'function') {
         this.deactivateChain();
         menuContent();
@@ -109,7 +121,8 @@ export default {
       }
     },
     clickElseWhere(event) {
-      if (event.target.classList.contains('TopBar')) return;
+      const menuElement = document.getElementById('GeneralMenu');
+      if (menuElement && menuElement.contains(event.target)) return;
       this.deactivateChain();
       document.body.removeEventListener('click', this.clickElseWhere);
     },
@@ -145,7 +158,12 @@ export default {
       while (this.$data.activatedChain.length > level) {
         this.$data.activatedChain.pop().classList.remove('activated');
       }
-      if (typeof (menuContent) !== 'function' && !Array.isArray(menuContent)) {
+      // Resolve string references (like 'templatesMenu') to actual menu objects
+      let resolvedContent = menuContent;
+      if (typeof (menuContent) === 'string') {
+        resolvedContent = this[menuContent] || {};
+      }
+      if (typeof (resolvedContent) !== 'function' && !Array.isArray(resolvedContent)) {
         element.classList.add('activated');
         this.$data.activatedChain.push(element);
       }
@@ -166,7 +184,7 @@ export default {
     },
     getMenuElement(element) {
       let el = element;
-      while (el.classList.contains('TopBar')) {
+      while (el.classList.contains('GeneralMenu')) {
         if (el.classList.contains('menu') || el.classList.contains('menuItem')) {
           return el;
         }
@@ -179,48 +197,69 @@ export default {
 </script>
 
 <style>
-#TopBar {
+#GeneralMenu {
   height: 100%;
   user-select: none;
   cursor: default;
   font-family: var(--font-regular); font-weight: var(--font-weight-regular);
   font-size: 15px;
   box-sizing: border-box;
-  border-bottom: 1px solid #cccccc;
-  overflow: hidden;
+  overflow: visible;
+  color: #000000;
+  padding-left: 12px;  /* Add spacing for rounded corners */
 }
-.TopBar {
+.GeneralMenu {
   padding: 0;
   margin: 0;
   list-style: none;
+  color: #000000;
 }
-#TopBar > .menu {
+#GeneralMenu > .menu {
   float:left;
   height: 100%;
-  overflow: hidden;
+  overflow: visible;
+  position: relative;
 }
-.menu:hover, .menuItem:hover, .activated {
+/* Remove old hover background, use underline instead */
+.menuItem:hover, .activated {
   background-color: rgba(100, 100, 100, 0.15);
 }
 .menuTitle {
   display: flex;
   align-items: center;
-  padding: 0px 5px 0px 5px;
+  padding: 0px 10px 0px 10px;
   box-sizing: border-box;
   height: 100%;
   width: 100%;
+  position: relative;
 }
-#TopBar .dropdown-content {
+/* Animated underline for top-level menu items */
+.menu .menuTitle::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 10px;
+  right: 10px;
+  height: 2px;
+  background-color: #000000;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.2s ease-out;
+}
+.menu:hover .menuTitle::after {
+  transform: scaleX(1);
+}
+#GeneralMenu .dropdown-content {
   display: none;
   position: absolute;
   background-color: #f9f9f9;
   min-width: 180px;
   box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
-  z-index: 1;
+  z-index: 1000;
   border-radius: 3px;
   box-sizing: border-box;
 }
-#TopBar .activated > .dropdown-content {
+#GeneralMenu .activated > .dropdown-content {
   display: block;
 }
 .dropdown-content .menuItem {
@@ -234,10 +273,12 @@ export default {
  border-radius: 2px;
  transition: 0.2s;
 }
-.menuItem.disabled {
-  color: grey;
+.dropdown-content .menuItem.disabled {
+  color: #999999;
+  opacity: 0.5;
+  cursor: not-allowed;
 }
-#TopBar .menuItem > .dropdown-content {
+#GeneralMenu .menuItem > .dropdown-content {
   left: 100%;
   top: 0;
 }

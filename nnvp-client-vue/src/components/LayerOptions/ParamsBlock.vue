@@ -36,48 +36,49 @@ export default {
   box-sizing: border-box;
   -moz-box-sizing: border-box;
   -webkit-box-sizing: border-box;
+  margin-bottom: 12px;
 }
 .ParamsBlock > h4 {
   display: inline-block;
 }
 .ParamsBlock.layer-title {
-  background-color: rgba(200, 200, 200, 0.2);
+  background-color: #f5f5f5;
   overflow: hidden;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-areas: "arrow text";
-  border-top: 1px solid rgba(200, 200, 200, 0.5);
-  border-bottom: 1px solid rgba(200, 200, 200, 0.5);
-  cursor: default;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 10px 12px;
+  font-weight: var(--font-weight-semibold);
+  color: #000000;
+  transition: all 0.15s ease;
 }
 .ParamsBlock.layer-title:hover {
-  background-color: rgba(200, 200, 200, 0.6);
-}
-.ParamsBlock.layer-title > .text {
-  grid-area: text;
-  text-align: left;
-  padding: 5px;
+  background-color: #e8e8e8;
+  border-color: #000000;
 }
 .ParamsBlock > .layer-title > .arrow {
-  color: rgba(100, 100, 100, 0.7);
-  grid-area: arrow;
+  color: #000000;
   height: 15px;
   width: 15px;
-  transform: rotate(180deg) translateY(-10%);
+  transform: rotate(180deg);
   vertical-align: middle;
   text-align: center;
-  padding: 5px;
   font-size: 10px;
+  transition: transform 0.2s ease;
 }
 .ParamsBlock.closed > .layer-title > .arrow {
-  transform: rotate(90deg) translateY(-10%);
+  transform: rotate(90deg);
 }
 .ParamsBlock.params-list {
-  padding-left: 1px;
-  padding-right: 1px;
+  padding: 12px 4px;
+  color: #000000;
 }
 .ParamsBlock.params-list.closed {
   height: 0;
   overflow: hidden;
+  padding: 0;
 }
 </style>

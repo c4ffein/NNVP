@@ -81,24 +81,25 @@ export default {
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.6);
+  background-color: transparent;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   z-index: 9999;
-  backdrop-filter: blur(4px);
+  padding-top: 40px;
 }
 
 .modal-container {
-  background: white;
-  border-radius: 12px;
-  max-width: 600px;
+  background: #ffffff;
+  border-radius: 15px;
+  border: 1px solid #000000;
+  max-width: 480px;
   width: 90%;
   max-height: 85vh;
   overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  box-shadow: none;
   position: relative;
-  padding: 40px;
+  padding: 32px;
 }
 
 .modal-close {
@@ -109,7 +110,7 @@ export default {
   border: none;
   font-size: 32px;
   line-height: 1;
-  color: #999;
+  color: #000000;
   cursor: pointer;
   padding: 0;
   width: 32px;
@@ -117,42 +118,51 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: color 0.2s;
+  transition: opacity 0.2s;
 }
 
 .modal-close:hover {
-  color: #333;
+  opacity: 0.6;
+}
+
+.modal-close:focus {
+  outline: none;
 }
 
 .modal-content {
   font-family: var(--font-regular);
   font-weight: var(--font-weight-regular);
-  color: #333;
+  color: #000000;
   line-height: 1.6;
+  text-align: left;
 }
 
 .modal-content h1 {
   font-family: var(--font-medium);
   font-weight: var(--font-weight-semibold);
-  font-size: 2.5em;
-  margin: 0 0 8px 0;
-  color: #2c3e50;
+  font-size: 2em;
+  margin: 0 0 6px 0;
+  color: #000000;
+  text-align: left;
 }
 
 .subtitle {
   font-family: var(--font-regular);
   font-weight: var(--font-weight-regular);
-  font-size: 1.1em;
-  color: #666;
-  margin: 0 0 32px 0;
+  font-size: 1em;
+  color: #000000;
+  margin: 0 0 24px 0;
+  text-align: left;
 }
 
 .modal-content h2 {
   font-family: var(--font-medium);
   font-weight: var(--font-weight-medium);
-  font-size: 1.4em;
-  margin: 32px 0 16px 0;
-  color: #2c3e50;
+  font-size: 1.2em;
+  margin: 24px 0 12px 0;
+  color: #000000;
+  border-bottom: 1px solid #000000;
+  padding-bottom: 6px;
 }
 
 .modal-content section:first-of-type h2 {
@@ -160,19 +170,19 @@ export default {
 }
 
 .modal-content p {
-  margin: 0 0 16px 0;
+  margin: 0 0 12px 0;
+  font-size: 0.95em;
 }
 
 .modal-content a {
-  color: #646cff;
-  text-decoration: none;
+  color: #000000;
+  text-decoration: underline;
   font-weight: var(--font-weight-medium);
-  transition: color 0.2s;
+  transition: opacity 0.2s;
 }
 
 .modal-content a:hover {
-  color: #535bf2;
-  text-decoration: underline;
+  opacity: 0.6;
 }
 
 .tech-stack {
@@ -183,7 +193,7 @@ export default {
 
 .tech-stack li {
   padding: 8px 0;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid #e0e0e0;
 }
 
 .tech-stack li:last-child {
@@ -193,34 +203,32 @@ export default {
 .tech-stack strong {
   font-family: var(--font-medium);
   font-weight: var(--font-weight-medium);
-  color: #2c3e50;
+  color: #000000;
 }
 
 .note {
   font-size: 0.95em;
-  color: #666;
+  color: #000000;
   font-style: italic;
 }
 
 /* Transition animations */
 .modal-enter-active,
 .modal-leave-active {
-  transition: opacity 0.3s ease;
+  transition: all 0.4s ease-out;
 }
 
 .modal-enter-active .modal-container,
 .modal-leave-active .modal-container {
-  transition: transform 0.3s ease;
+  transition: transform 0.4s ease-out;
 }
 
-.modal-enter-from,
-.modal-leave-to {
-  opacity: 0;
+.modal-enter-from .modal-container {
+  transform: translateY(-100vh);
 }
 
-.modal-enter-from .modal-container,
 .modal-leave-to .modal-container {
-  transform: scale(0.9);
+  transform: translateY(-100vh);
 }
 
 /* Scrollbar styling */
@@ -229,16 +237,16 @@ export default {
 }
 
 .modal-container::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: #f5f5f5;
   border-radius: 4px;
 }
 
 .modal-container::-webkit-scrollbar-thumb {
-  background: #ccc;
+  background: #000000;
   border-radius: 4px;
 }
 
 .modal-container::-webkit-scrollbar-thumb:hover {
-  background: #999;
+  opacity: 0.7;
 }
 </style>

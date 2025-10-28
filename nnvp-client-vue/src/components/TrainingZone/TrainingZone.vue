@@ -1,21 +1,21 @@
 <template>
-  <div id="BottomTrainer" class="BottomTrainer">
-    <div id="trainer-bar" class="BottomTrainer">
-      <div class="BottomTrainer bar-button" v-on:click="datasetClicked">
+  <div id="TrainingZone" class="TrainingZone">
+    <div id="trainer-bar" class="TrainingZone">
+      <div class="TrainingZone bar-button" v-on:click="datasetClicked">
         Dataset
       </div>
-      <div class="BottomTrainer bar-button" v-on:click="compileOptionsClicked">
+      <div class="TrainingZone bar-button" v-on:click="compileOptionsClicked">
         Options
       </div>
-      <div class="BottomTrainer bar-button" v-on:click="chartsClicked">
+      <div class="TrainingZone bar-button" v-on:click="chartsClicked">
         Charts
       </div>
-      <div class="BottomTrainer bar-button" v-on:click="trainClicked">
+      <div class="TrainingZone bar-button" v-on:click="trainClicked">
         {{isTraining ? 'Stop' : 'Train'}}
       </div>
       <div id="button-close-trainer" v-on:click="$emit('close-trainer')">╳</div>
     </div>
-    <div id="bottom-trainer-selector">
+    <div id="training-zone-selector">
       <keep-alive>
         <component
           v-bind:is="selectedPanel"
@@ -50,7 +50,7 @@ import CompileOptions from './CompileOptions.vue';
 import DatasetSelector from './DatasetSelector.vue';
 
 export default {
-  name: 'BottomTrainer',
+  name: 'TrainingZone',
   components: {
     Charts,
     CompileOptions,
@@ -88,7 +88,7 @@ export default {
         { className: 'ct-series-val-loss', name: 'val-loss', data: [] },
       ],
     };
-    console.log('[BottomTrainer] Chart data initialized');
+    console.log('[TrainingZone] Chart data initialized');
   },
   methods: {
     datasetClicked() {
@@ -131,7 +131,7 @@ export default {
       }
       catch (error) {
         alert("Incorrect network : couldn't find Inputs/Outputs, or they weren't connected.");
-        console.error('[BottomTrainer] Error generating model:', error);
+        console.error('[TrainingZone] Error generating model:', error);
         return;
       }
       let model;
@@ -141,16 +141,16 @@ export default {
       catch (error) {
         // Param errors
         alert(error);
-        console.error('[BottomTrainer] Error creating model:', error);
+        console.error('[TrainingZone] Error creating model:', error);
         return;
       }
-      console.log('[BottomTrainer] Compiling model with optimizer:', optimizer);
+      console.log('[TrainingZone] Compiling model with optimizer:', optimizer);
       model.compile({
         optimizer,
         loss: 'categoricalCrossentropy',
         metrics: ['accuracy'],
       });
-      console.log('[BottomTrainer] Model compiled successfully');
+      console.log('[TrainingZone] Model compiled successfully');
       const datasetName = this.selectedDataset;
       await this.loadDataset(datasetName);
       const data = this.datasets[datasetName];
@@ -184,18 +184,17 @@ export default {
       }
       catch (error) {
         if (error == "cancelRequested") return;
-        console.error('[BottomTrainer] Training error:', error);
+        console.error('[TrainingZone] Training error:', error);
         alert(error);
       }
     },
     async loadDataset(name, progressionCallback) {
-      if (window.nnvpDebugDatasets) console.log(`[BottomTrainer] loadDataset called for: ${name}`);
+      if (window.nnvpDebugDatasets) console.log(`[TrainingZone] loadDataset called for: ${name}`);
 
-      // TODO : change behaviour when already loading
       this.datasets = this.datasets || {};
       if (!(name in this.datasets)){
         if (window.nnvpDebugDatasets) {
-          console.log(`[BottomTrainer] Dataset ${name} not cached, loading from:`);
+          console.log(`[TrainingZone] Dataset ${name} not cached, loading from:`);
           console.log(`  - Images: ${this.loadableDatasets[name][0].imagesSpritePath}`);
           console.log(`  - Labels: ${this.loadableDatasets[name][0].labelsPath}`);
         }
@@ -211,18 +210,18 @@ export default {
           this.loadableDatasets[name][0].numTrainElements,
         );
 
-        if (window.nnvpDebugDatasets) console.log(`[BottomTrainer] Starting newDataset.load() for: ${name}`);
+        if (window.nnvpDebugDatasets) console.log(`[TrainingZone] Starting newDataset.load() for: ${name}`);
 
         try {
           await newDataset.load(progressionCallback);
           this.datasets[name] = newDataset;
-          if (window.nnvpDebugDatasets) console.log(`[BottomTrainer] Dataset ${name} loaded and cached successfully`);
+          if (window.nnvpDebugDatasets) console.log(`[TrainingZone] Dataset ${name} loaded and cached successfully`);
         } catch (error) {
-          if (window.nnvpDebugDatasets) console.error(`[BottomTrainer] Error loading dataset ${name}:`, error);
+          if (window.nnvpDebugDatasets) console.error(`[TrainingZone] Error loading dataset ${name}:`, error);
           throw error;
         }
       } else {
-        if (window.nnvpDebugDatasets) console.log(`[BottomTrainer] Dataset ${name} already cached`);
+        if (window.nnvpDebugDatasets) console.log(`[TrainingZone] Dataset ${name} already cached`);
       }
     },
     getWarningMessage(name, progressionCallback) {
@@ -231,19 +230,19 @@ export default {
       }
     },
     getDatasets() {
-      if (window.nnvpDebugDatasets) console.log('[BottomTrainer] getDatasets called, returning:', Object.keys(this.datasets || {}));
+      if (window.nnvpDebugDatasets) console.log('[TrainingZone] getDatasets called, returning:', Object.keys(this.datasets || {}));
       return this.datasets || {};
     },
   },
   props: {
-    bottomTrainerSize: Number,
+    trainingZoneSize: Number,
     cdnDir: {
       type: String,
       default: "https://datasets.nnvp.io/datasets/",
     },
   },
   watch: {
-    bottomTrainerSize (newVal, oldVal) {
+    trainingZoneSize (newVal, oldVal) {
       window.dispatchEvent(new Event('resize')); // Needed for svg resize
     }
   },
@@ -259,15 +258,15 @@ export default {
   font-family: var(--font-regular); font-weight: var(--font-weight-regular);
   src: url("/assets/fonts/Roboto-Thin-webfont.woff") format("woff");
 }
-#BottomTrainer {
+#TrainingZone {
   height: 100%;
   width: 100%;
   cursor: default;
   font-family: var(--font-regular); font-weight: var(--font-weight-regular);
   font-size: 15px;
-  border-top: 1px solid rgba(100, 100, 100, 0.3);
   display: grid;
   grid-template-rows: 24px 1fr;
+  color: #000000;
 }
 #trainer-bar {
   display: table;
@@ -283,7 +282,7 @@ export default {
 #trainer-bar > *:hover {
   background-color: rgba(100, 100, 100, 0.1);
 }
-.BottomTrainer.bar-button{
+.TrainingZone.bar-button{
   display: table-cell;
   height: 100%;
   border-radius: 0;
@@ -296,10 +295,10 @@ export default {
   border: none;
   width: 30px;
 }
-#bottom-trainer-selector {
+#training-zone-selector {
   grid-rows: 2/2;
 }
-.BottomTrainer select, .BottomTrainer input {
+.TrainingZone select, .TrainingZone input {
   border: 1px solid rgba(100, 100, 100, 0.3);
   height: 26px;
   width: auto;

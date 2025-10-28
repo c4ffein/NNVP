@@ -29,18 +29,18 @@ export default {
   },
   mounted() {
     try {
-      // Find the BottomTrainer parent (might be behind KeepAlive wrapper)
+      // Find the TrainingZone parent (might be behind KeepAlive wrapper)
       let parent = this.$parent;
-      while (parent && parent.$options.name !== 'BottomTrainer') {
+      while (parent && parent.$options.name !== 'TrainingZone') {
         parent = parent.$parent;
       }
 
       if (!parent) {
-        console.error('[Charts] Could not find BottomTrainer parent');
+        console.error('[Charts] Could not find TrainingZone parent');
         return;
       }
 
-      // Create chart update interface for BottomTrainer
+      // Create chart update interface for TrainingZone
       parent.batchChart = {
         update: () => {
           this.batchData = { ...parent.chartData0 };
