@@ -1142,7 +1142,7 @@ def build_model():
     const svg = await page.$('#svgWrapper svg');
     const svgBox = await svg.boundingBox();
     await page.mouse.click(svgBox.x + 50, svgBox.y + 50);
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(50);
     layerOptions = await page.textContent('#layerOptions');
     expect(layerOptions).toContain('Network Overview');
     expect(layerOptions).toMatch(/Layers\s*1/); // 1 layer
@@ -1165,7 +1165,7 @@ def build_model():
     await page.waitForTimeout(50);
     const templatesMenu = await page.$('text=Templates');
     await templatesMenu.hover();
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(50);
     const mnistTemplate = await page.$('text=MNIST');
     await mnistTemplate.click();
     await page.waitForTimeout(50);
@@ -1206,19 +1206,19 @@ def build_model():
     // 6. After undoing - deleted layer should be restored
     const editMenu = await page.$('text=Edit');
     await editMenu.click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(50);
     const undoOption = await page.$('text=Undo');
     await undoOption.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(100);
     let layersAfterUndo = await page.$$eval('.d3Layer', layers => layers.length);
     expect(layersAfterUndo).toBe(layersCount);
     console.log('✓ Step 6: After undoing, deleted layer restored');
     // 7. After redoing - layer should be deleted again
     await editMenu.click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(50);
     const redoOption = await page.$('text=Redo');
     await redoOption.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(100);
     const layersAfterRedo = await page.$$eval('.d3Layer', layers => layers.length);
     expect(layersAfterRedo).toBe(layersCount - 1);
     layerOptions = await page.textContent('#layerOptions');
@@ -1258,7 +1258,7 @@ def build_model():
     // 9b. Final Network Overview verification - deselect and check all numbers
     // Click on empty SVG space to deselect (same approach as step 2b)
     await page.mouse.click(svgBox.x + 50, svgBox.y + 50);
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(50);
     const finalLayersCount = await page.$$eval('.d3Layer', layers => layers.length);
     expect(finalLayersCount).toBe(layersCount - 1); // One less than template (deleted 2, added 1 back)
     layerOptions = await page.textContent('#layerOptions');
@@ -1282,18 +1282,18 @@ def build_model():
     // Undo
     const editMenu = await page.$('text=Edit');
     await editMenu.click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(50);
     const undoOption = await page.$('text=Undo');
     await undoOption.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(100);
     const layersAfterUndo = await page.$$eval('.d3Layer', layers => layers.length);
     console.log('Layers after undo:', layersAfterUndo);
     // Redo
     await editMenu.click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(50);
     const redoOption = await page.$('text=Redo');
     await redoOption.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(100);
     const layersAfterRedo = await page.$$eval('.d3Layer', layers => layers.length);
     console.log('Layers after redo:', layersAfterRedo);
     expect(layersAfterRedo).toBe(layersAfterAdd);
