@@ -1255,6 +1255,19 @@ def build_model():
     expect(layerOptions).toContain('Dropout');
     expect(layerOptions).toContain('rate');
     console.log('✓ Step 9: After re-adding node manually, shows Dropout layer parameters');
+    // 9b. Final Network Overview verification - deselect and check all numbers
+    // Click on empty SVG space to deselect (same approach as step 2b)
+    await page.mouse.click(svgBox.x + 50, svgBox.y + 50);
+    await page.waitForTimeout(200);
+    const finalLayersCount = await page.$$eval('.d3Layer', layers => layers.length);
+    expect(finalLayersCount).toBe(layersCount - 1); // One less than template (deleted 2, added 1 back)
+    layerOptions = await page.textContent('#layerOptions');
+    expect(layerOptions).toContain('Network Overview');
+    expect(layerOptions).toMatch(new RegExp(`Layers\\s*${finalLayersCount}`));
+    expect(layerOptions).toMatch(/Inputs\s*\d+/);
+    expect(layerOptions).toMatch(/Outputs\s*\d+/);
+    expect(layerOptions).toMatch(/Connections\s*\d+/);
+    console.log(`✓ Step 9b: Final Network Overview verified - ${finalLayersCount} layers with proper inputs/outputs/connections`);
     console.log('=== COMPREHENSIVE LAYER OPTIONS TEST PASSED ===\n');
   });
 
