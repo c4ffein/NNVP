@@ -1119,12 +1119,11 @@ def build_model():
     // 1. Empty board - should show Network Overview
     let layerOptions = await page.textContent('#layerOptions');
     expect(layerOptions).toContain('Network Overview');
-    expect(layerOptions).toContain('Layers');
-    expect(layerOptions).toContain('0'); // 0 layers
-    expect(layerOptions).toContain('Inputs');
-    expect(layerOptions).toContain('Outputs');
-    expect(layerOptions).toContain('Connections');
-    console.log('✓ Step 1: Empty board shows Network Overview with 0 layers');
+    expect(layerOptions).toMatch(/Layers\s*0/);
+    expect(layerOptions).toMatch(/Inputs\s*0/);
+    expect(layerOptions).toMatch(/Outputs\s*0/);
+    expect(layerOptions).toMatch(/Connections\s*0/);
+    console.log('✓ Step 1: Empty board shows Network Overview with all 0s');
     // 2. After adding a layer - should show layer parameters
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
