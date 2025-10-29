@@ -8,7 +8,6 @@ test.describe('NNVP Core Features', () => {
   test.beforeEach(async ({ page }) => {
     consoleMessages = [];
     consoleErrors = [];
-
     page.on('console', msg => {
       const text = msg.text();
       const type = msg.type();
@@ -17,15 +16,12 @@ test.describe('NNVP Core Features', () => {
         consoleErrors.push(text);
       }
     });
-
     page.on('pageerror', error => {
       consoleErrors.push(`PAGE ERROR: ${error.message}`);
     });
-
     await page.goto('/');
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(50);
   });
-
   test.afterEach(async () => {
     if (consoleErrors.length > 0) {
       console.log('\n=== CONSOLE ERRORS ===');
@@ -36,21 +32,16 @@ test.describe('NNVP Core Features', () => {
   test('should add a layer to canvas by clicking template', async ({ page }) => {
     // Get initial number of layers on canvas
     const layersBeforeCount = await page.$$eval('.d3Layer', layers => layers.length);
-
     console.log('\n=== LAYER PLACEMENT TEST ===');
     console.log('Layers on canvas before:', layersBeforeCount);
-
     // Find and click a Dense layer template
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     expect(denseLayer).not.toBeNull();
-
     await denseLayer.click();
     await page.waitForTimeout(500);
-
     // Check that a layer was added to the canvas
     const layersAfterCount = await page.$$eval('.d3Layer', layers => layers.length);
     console.log('Layers on canvas after:', layersAfterCount);
-
     expect(layersAfterCount).toBe(layersBeforeCount + 1);
     expect(consoleErrors.length).toBe(0);
   });
@@ -60,56 +51,43 @@ test.describe('NNVP Core Features', () => {
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
     await page.waitForTimeout(300);
-
     const afterFirstLayer = await page.$$eval('.d3Layer', layers => layers.length);
-
     // Click Dropout layer (should be in a different category)
     const dropoutLayer = await page.$('.LayerTemplate:has-text("Dropout")');
     await dropoutLayer.click();
     await page.waitForTimeout(300);
-
     const afterSecondLayer = await page.$$eval('.d3Layer', layers => layers.length);
-
     console.log('\n=== MULTIPLE LAYERS TEST ===');
     console.log('After first layer (Dense):', afterFirstLayer);
     console.log('After second layer (Dropout):', afterSecondLayer);
-
     expect(afterSecondLayer).toBe(afterFirstLayer + 1);
     expect(afterSecondLayer).toBeGreaterThanOrEqual(2);
     expect(consoleErrors.length).toBe(0);
   });
 
   test('should load a template from File menu', async ({ page }) => {
-    // TODO WARNING FAILING TEST, STILL COMITTED BEFORE FIX
     // Open File menu
     const fileMenu = await page.$('text=File');
     await fileMenu.click();
     await page.waitForTimeout(500);
-
     // Check if Templates submenu exists
     const templatesOption = await page.$('text=Templates');
-
     console.log('\n=== TEMPLATE LOADING TEST ===');
     console.log('Templates menu available:', templatesOption !== null);
-
     if (templatesOption) {
       // Hover to open Templates submenu
       await templatesOption.hover();
       await page.waitForTimeout(500);
-
       // Get the templates from the nested dropdown under Templates menuItem
       // The structure is: .menuItem (Templates) > .dropdown-content > .menuItem (actual templates)
       const templates = await page.$$('.menuItem:has-text("Templates") > .dropdown-content > .menuItem');
       console.log('Number of templates found:', templates.length);
-
       // If templates exist, find one that's a real template (not a UI command)
       if (templates.length > 0) {
         let templateToLoad = null;
         let templateName = '';
-
         // UI commands to skip
         const uiCommands = ['New', 'Load', 'Save', 'Generate', 'Generate Javascript', 'Templates', 'Undo', 'Redo'];
-
         for (const template of templates) {
           const text = await template.textContent();
           const trimmed = text.trim();
@@ -119,85 +97,66 @@ test.describe('NNVP Core Features', () => {
             break;
           }
         }
-
         // Fallback to first template if all are UI commands (unlikely)
         if (!templateToLoad) {
           templateToLoad = templates[0];
           templateName = await templateToLoad.textContent();
         }
-
         console.log('Loading template:', templateName);
         await templateToLoad.click();
-
         // Wait longer for template to load and render
         await page.waitForTimeout(2000);
-
         // Check for different possible layer selectors
         const d3Layers = await page.$$('.d3Layer');
         const d3CompositeLayers = await page.$$('.d3CompositeLayer');
         const totalLayers = d3Layers.length + d3CompositeLayers.length;
-
         console.log('d3Layer count:', d3Layers.length);
         console.log('d3CompositeLayer count:', d3CompositeLayers.length);
         console.log('Total layers on canvas after template load:', totalLayers);
-
         expect(totalLayers).toBeGreaterThan(0);
-
         // Verify layer types in the loaded template
         const layerTexts = await page.$$eval('.d3Layer text', texts => texts.map(t => t.textContent));
         console.log('Layer types:', layerTexts);
-
         // Template should have Input and Output layers
         expect(layerTexts.some(text => text.includes('Input'))).toBe(true);
         expect(layerTexts.some(text => text.includes('Output'))).toBe(true);
-
         // Should have at least one processing layer (Dense, Conv, etc.)
         const hasProcessingLayer = layerTexts.some(text =>
           text.includes('Dense') || text.includes('Conv') || text.includes('Flatten')
         );
         expect(hasProcessingLayer).toBe(true);
-
         // Verify edges/connections exist
         const edges = await page.$$('.link');
         console.log('Number of edges:', edges.length);
         expect(edges.length).toBeGreaterThan(0);
       }
     }
-
     expect(consoleErrors.length).toBe(0);
   });
 
   test('should generate JavaScript code from manually built network', async ({ page }) => {
     console.log('\n=== MANUAL NETWORK BUILDING TEST (JS) ===');
-
     // Add layers by clicking (they'll be added to canvas)
     const inputLayer = await page.$('.LayerTemplate:has-text("Input")');
     await inputLayer.click();
     await page.waitForTimeout(500);
-
     const flattenLayer = await page.$('.LayerTemplate:has-text("Flatten")');
     await flattenLayer.click();
     await page.waitForTimeout(500);
-
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
     await page.waitForTimeout(500);
-
     await denseLayer.click(); // Second Dense
     await page.waitForTimeout(500);
-
     const outputLayer = await page.$('.LayerTemplate:has-text("Output")');
     await outputLayer.click();
     await page.waitForTimeout(500);
-
     console.log('5 layers added to canvas');
-
     // Enable debug logging to see D3 drag events
     await page.evaluate(() => {
       window.nnvpGraphEditor.debugEvents = true;
     });
     console.log('Debug logging enabled');
-
     // Reposition layers vertically using transitionToXY (drag doesn't update model x/y)
     console.log('Repositioning layers vertically...');
     await page.evaluate(() => {
@@ -218,64 +177,48 @@ test.describe('NNVP Core Features', () => {
       });
     });
     console.log('Layer positions:', JSON.stringify(layerPositions, null, 2));
-
     console.log('Connecting layers using drag-and-drop on anchors...');
-
     // Drag from each layer's bottom anchor to the next layer's center to create connections
     for (let i = 0; i < 4; i++) {
       // Get target layer rect to ensure mouseover_node is set
       const targetLayer = await page.$(`#d3-layer-${i+1} rect`);
       const targetBox = await targetLayer.boundingBox();
-
       const sourceAnchor = await page.$(`#d3-layer-${i} circle.bottom-point`);
       const sourceBox = await sourceAnchor.boundingBox();
-
       // Start drag from source anchor
       await page.mouse.move(sourceBox.x + sourceBox.width/2, sourceBox.y + sourceBox.height/2);
       await page.waitForTimeout(200);
       await page.mouse.down();
       await page.waitForTimeout(200);
-
       // Move to target layer center (to set mouseover_node)
       await page.mouse.move(targetBox.x + targetBox.width/2, targetBox.y + targetBox.height/2);
       await page.waitForTimeout(300);
-
       // Release to create connection
       await page.mouse.up();
       await page.waitForTimeout(500);
-
       const currentEdges = await page.$$eval('.link:not(.dragline)', links => links.length);
       console.log(`Connected layer ${i} to layer ${i+1}, total edges: ${currentEdges}`);
     }
-
     console.log('Finished connecting layers');
-
     // Set up listener for download or popup
     const downloadPromise = page.waitForEvent('download', { timeout: 5000 }).catch(() => null);
-
     // Open File menu and click Generate Javascript
     const fileMenu = await page.$('text=File');
     await fileMenu.click();
     await page.waitForTimeout(300);
-
     const generateJsOption = await page.$('text=Generate Javascript');
     await generateJsOption.click();
     await page.waitForTimeout(1000);
-
     console.log('\n=== JAVASCRIPT GENERATION TEST ===');
-
     // Check if download happened
     const download = await downloadPromise;
     expect(download).not.toBeNull();
-
     console.log('JavaScript code download triggered');
     console.log('Download filename:', download.suggestedFilename());
     expect(download.suggestedFilename()).toContain('.js');
-
     // Check content against golden master
     const path = await download.path();
     const content = fs.readFileSync(path, 'utf-8');
-
     const expectedJS = `function createModel() {
     const model = tf.sequential();
     model.add(tf.layers.flatten({inputShape:[100,100,],}));
@@ -284,11 +227,8 @@ test.describe('NNVP Core Features', () => {
     return model;
 }
 `;
-
     console.log('Generated code:\n', content);
-
     expect(content.trim()).toBe(expectedJS.trim());
-
     expect(consoleErrors.length).toBe(0);
   });
 
@@ -1127,12 +1067,12 @@ def build_model():
     // 2. After adding a layer - should show layer parameters
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
-    await page.waitForTimeout(50);
+    await page.waitForTimeout(10);
     // Click on the layer to select it
     const firstD3Layer = await page.$('.d3Layer');
     const box = await firstD3Layer.boundingBox();
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-    await page.waitForTimeout(50);
+    await page.waitForTimeout(10);
     layerOptions = await page.textContent('#layerOptions');
     expect(layerOptions).toContain('Dense');
     expect(layerOptions).toContain('units');
@@ -1142,7 +1082,7 @@ def build_model():
     const svg = await page.$('#svgWrapper svg');
     const svgBox = await svg.boundingBox();
     await page.mouse.click(svgBox.x + 50, svgBox.y + 50);
-    await page.waitForTimeout(50);
+    await page.waitForTimeout(10);
     layerOptions = await page.textContent('#layerOptions');
     expect(layerOptions).toContain('Network Overview');
     expect(layerOptions).toMatch(/Layers\s*1/); // 1 layer
@@ -1151,9 +1091,9 @@ def build_model():
     // 3. After deleting the layer - should show Network Overview
     // Select layer again before deleting
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-    await page.waitForTimeout(50);
+    await page.waitForTimeout(10);
     await page.keyboard.press('Backspace');
-    await page.waitForTimeout(50);
+    await page.waitForTimeout(10);
     layerOptions = await page.textContent('#layerOptions');
     expect(layerOptions).toContain('Network Overview');
     expect(layerOptions).toMatch(/Layers\s*0/); // 0 layers
@@ -1162,13 +1102,13 @@ def build_model():
     // 4. After loading a template - should show appropriate info
     const fileMenu = await page.$('text=File');
     await fileMenu.click();
-    await page.waitForTimeout(50);
+    await page.waitForTimeout(10);
     const templatesMenu = await page.$('text=Templates');
     await templatesMenu.hover();
-    await page.waitForTimeout(50);
+    await page.waitForTimeout(10);
     const mnistTemplate = await page.$('text=MNIST');
     await mnistTemplate.click();
-    await page.waitForTimeout(50);
+    await page.waitForTimeout(10);
     // Should have loaded multiple layers
     const layersCount = await page.$$eval('.d3Layer', layers => layers.length);
     expect(layersCount).toBeGreaterThan(0);
@@ -1185,7 +1125,7 @@ def build_model():
     const templateLayer = await page.$('.d3Layer');
     const templateBox = await templateLayer.boundingBox();
     await page.mouse.click(templateBox.x + templateBox.width / 2, templateBox.y + templateBox.height / 2);
-    await page.waitForTimeout(50);
+    await page.waitForTimeout(10);
     layerOptions = await page.textContent('#layerOptions');
     // Just verify that we're showing layer info (not Network Overview)
     const showsLayerInfo = !layerOptions.includes('Network Overview');
@@ -1193,7 +1133,7 @@ def build_model():
     console.log('Selected layer - LayerOptions showing layer parameters');
     // Delete the selected node
     await page.keyboard.press('Backspace');
-    await page.waitForTimeout(50);
+    await page.waitForTimeout(10);
     const layersAfterDelete = await page.$$eval('.d3Layer', layers => layers.length);
     expect(layersAfterDelete).toBe(layersCount - 1);
     layerOptions = await page.textContent('#layerOptions');
@@ -1206,19 +1146,19 @@ def build_model():
     // 6. After undoing - deleted layer should be restored
     const editMenu = await page.$('text=Edit');
     await editMenu.click();
-    await page.waitForTimeout(50);
+    await page.waitForTimeout(10);
     const undoOption = await page.$('text=Undo');
     await undoOption.click();
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(50);
     let layersAfterUndo = await page.$$eval('.d3Layer', layers => layers.length);
     expect(layersAfterUndo).toBe(layersCount);
     console.log('✓ Step 6: After undoing, deleted layer restored');
     // 7. After redoing - layer should be deleted again
     await editMenu.click();
-    await page.waitForTimeout(50);
+    await page.waitForTimeout(10);
     const redoOption = await page.$('text=Redo');
     await redoOption.click();
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(50);
     const layersAfterRedo = await page.$$eval('.d3Layer', layers => layers.length);
     expect(layersAfterRedo).toBe(layersCount - 1);
     layerOptions = await page.textContent('#layerOptions');
@@ -1231,9 +1171,9 @@ def build_model():
     const layerToDelete = await page.$('.d3Layer');
     const deleteBox = await layerToDelete.boundingBox();
     await page.mouse.click(deleteBox.x + deleteBox.width / 2, deleteBox.y + deleteBox.height / 2);
-    await page.waitForTimeout(50);
+    await page.waitForTimeout(10);
     await page.keyboard.press('Backspace');
-    await page.waitForTimeout(50);
+    await page.waitForTimeout(10);
     const layersAfterSecondDelete = await page.$$eval('.d3Layer', layers => layers.length);
     expect(layersAfterSecondDelete).toBe(layersCount - 2);
     layerOptions = await page.textContent('#layerOptions');
@@ -1244,13 +1184,13 @@ def build_model():
     // 9. After re-adding the node manually - should show new layer when selected
     const dropoutLayer = await page.$('.LayerTemplate:has-text("Dropout")');
     await dropoutLayer.click();
-    await page.waitForTimeout(50);
+    await page.waitForTimeout(10);
     // Click on the newly added layer to select it
     const newLayer = await page.$$('.d3Layer');
     const lastLayer = newLayer[newLayer.length - 1];
     const newBox = await lastLayer.boundingBox();
     await page.mouse.click(newBox.x + newBox.width / 2, newBox.y + newBox.height / 2);
-    await page.waitForTimeout(50);
+    await page.waitForTimeout(10);
     layerOptions = await page.textContent('#layerOptions');
     expect(layerOptions).toContain('Dropout');
     expect(layerOptions).toContain('rate');
@@ -1258,7 +1198,7 @@ def build_model():
     // 9b. Final Network Overview verification - deselect and check all numbers
     // Click on empty SVG space to deselect (same approach as step 2b)
     await page.mouse.click(svgBox.x + 50, svgBox.y + 50);
-    await page.waitForTimeout(50);
+    await page.waitForTimeout(10);
     const finalLayersCount = await page.$$eval('.d3Layer', layers => layers.length);
     expect(finalLayersCount).toBe(layersCount - 1); // One less than template (deleted 2, added 1 back)
     layerOptions = await page.textContent('#layerOptions');

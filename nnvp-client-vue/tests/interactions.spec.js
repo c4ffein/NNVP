@@ -22,7 +22,7 @@ test.describe('NNVP Interactions', () => {
     });
 
     await page.goto('/');
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(50);
   });
 
   test.afterEach(async () => {
