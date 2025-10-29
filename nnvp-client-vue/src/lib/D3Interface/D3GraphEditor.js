@@ -63,6 +63,8 @@ export default function D3GraphEditor(svg, model) {
   this.linkSourceHandle = null;
   // Callback for selection changes (registered by D3Interface)
   this.selectionChangedCallback = null;
+  // Callback for graph structure changes (registered by D3Interface)
+  this.graphChangedCallback = null;
   // Undo / Redo
   this.undoStack = [];
   this.redoStack = [];
@@ -308,10 +310,24 @@ D3GraphEditor.prototype.onSelectionChanged = function (callback) {
 };
 
 /**
+ * Register a callback to be called when the graph structure changes
+ */
+D3GraphEditor.prototype.onGraphChanged = function (callback) {
+  this.graphChangedCallback = callback;
+};
+
+/**
  * Calls the callback registered to the `selection changed` event
  */
 D3GraphEditor.prototype.notifySelectionChanged = function () {
   if(this.selectionChangedCallback()) this.selectionChangedCallback();
+};
+
+/**
+ * Notify listeners that the graph structure has changed (layers added/removed, template loaded, etc.)
+ */
+D3GraphEditor.prototype.notifyGraphChanged = function () {
+  if(this.graphChangedCallback) this.graphChangedCallback();
 };
 
 /**
@@ -355,6 +371,8 @@ D3GraphEditor.prototype.addLayer = function (kerasLayer, posX, posY) {
   newLayer.drawLayer(this);
   //this.updateGraph();
   D3Background.updateBackground(this);
+  // Notify that graph structure has changed (layer added)
+  this.notifyGraphChanged();
 };
 
 /**
@@ -403,6 +421,8 @@ D3GraphEditor.prototype.deleteSelectedElements = function () {
     D3Background.updateBackground(this);
     // Notify that selection has changed (cleared) so LayerOptions panel updates
     this.notifySelectionChanged();
+    // Notify that graph structure has changed (layers deleted)
+    this.notifyGraphChanged();
   }
   if (this.selectedEdge !== null) {
     this.saveState();
@@ -411,6 +431,8 @@ D3GraphEditor.prototype.deleteSelectedElements = function () {
     this.selectedEdge = null;
     // Notify that selection has changed (cleared) so LayerOptions panel updates
     this.notifySelectionChanged();
+    // Notify that graph structure has changed (edge deleted)
+    this.notifyGraphChanged();
   }
 };
 
@@ -489,6 +511,8 @@ D3GraphEditor.prototype.loadState = function (txtRes) {
   this.clearBoard(true);
   this.model.loadState(txtRes);
   this.updateGraph();
+  // Notify that graph structure has changed
+  this.notifyGraphChanged();
 };
 
 

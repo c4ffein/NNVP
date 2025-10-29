@@ -1114,6 +1114,151 @@ def build_model():
     expect(showsNetworkOverview || showsOtherLayer).toBe(true);
   });
 
+  test('should show correct LayerOptions info through comprehensive workflow states', async ({ page }) => {
+    console.log('\n=== COMPREHENSIVE LAYER OPTIONS TEST ===');
+    // 1. Empty board - should show Network Overview
+    let layerOptions = await page.textContent('#layerOptions');
+    expect(layerOptions).toContain('Network Overview');
+    expect(layerOptions).toContain('Layers');
+    expect(layerOptions).toContain('0'); // 0 layers
+    expect(layerOptions).toContain('Inputs');
+    expect(layerOptions).toContain('Outputs');
+    expect(layerOptions).toContain('Connections');
+    console.log('✓ Step 1: Empty board shows Network Overview with 0 layers');
+    // 2. After adding a layer - should show layer parameters
+    const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
+    await denseLayer.click();
+    await page.waitForTimeout(50);
+    // Click on the layer to select it
+    const firstD3Layer = await page.$('.d3Layer');
+    const box = await firstD3Layer.boundingBox();
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await page.waitForTimeout(50);
+    layerOptions = await page.textContent('#layerOptions');
+    expect(layerOptions).toContain('Dense');
+    expect(layerOptions).toContain('units');
+    console.log('✓ Step 2: After adding layer shows Dense layer parameters');
+    // 2b. Deselect the layer and verify Network Overview appears
+    // Click on empty space to deselect
+    const svg = await page.$('#svgWrapper svg');
+    const svgBox = await svg.boundingBox();
+    await page.mouse.click(svgBox.x + 50, svgBox.y + 50);
+    await page.waitForTimeout(200);
+    layerOptions = await page.textContent('#layerOptions');
+    expect(layerOptions).toContain('Network Overview');
+    expect(layerOptions).toMatch(/Layers\s*1/); // 1 layer
+    expect(layerOptions).toMatch(/Connections\s*0/); // 0 connections
+    console.log('✓ Step 2b: After deselecting shows Network Overview with 1 layer, 0 connections');
+    // 3. After deleting the layer - should show Network Overview
+    // Select layer again before deleting
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await page.waitForTimeout(50);
+    await page.keyboard.press('Backspace');
+    await page.waitForTimeout(50);
+    layerOptions = await page.textContent('#layerOptions');
+    expect(layerOptions).toContain('Network Overview');
+    expect(layerOptions).toMatch(/Layers\s*0/); // 0 layers
+    expect(layerOptions).toMatch(/Connections\s*0/); // 0 connections
+    console.log('✓ Step 3: After deleting layer shows Network Overview with 0 layers');
+    // 4. After loading a template - should show appropriate info
+    const fileMenu = await page.$('text=File');
+    await fileMenu.click();
+    await page.waitForTimeout(50);
+    const templatesMenu = await page.$('text=Templates');
+    await templatesMenu.hover();
+    await page.waitForTimeout(100);
+    const mnistTemplate = await page.$('text=MNIST');
+    await mnistTemplate.click();
+    await page.waitForTimeout(50);
+    // Should have loaded multiple layers
+    const layersCount = await page.$$eval('.d3Layer', layers => layers.length);
+    expect(layersCount).toBeGreaterThan(0);
+    // Count edges to verify connections
+    const edgesCount = await page.$$eval('.edge', edges => edges.length);
+    // Get Network Overview to verify numbers
+    layerOptions = await page.textContent('#layerOptions');
+    expect(layerOptions).toContain('Network Overview');
+    expect(layerOptions).toMatch(new RegExp(`Layers\\s*${layersCount}`));
+    expect(layerOptions).toMatch(new RegExp(`Connections\\s*${edgesCount}`));
+    console.log(`✓ Step 4: After loading template, ${layersCount} layers, ${edgesCount} connections verified`);
+    // 5. After deleting a node - should update correctly
+    // Click on the first layer to select it
+    const templateLayer = await page.$('.d3Layer');
+    const templateBox = await templateLayer.boundingBox();
+    await page.mouse.click(templateBox.x + templateBox.width / 2, templateBox.y + templateBox.height / 2);
+    await page.waitForTimeout(50);
+    layerOptions = await page.textContent('#layerOptions');
+    // Just verify that we're showing layer info (not Network Overview)
+    const showsLayerInfo = !layerOptions.includes('Network Overview');
+    expect(showsLayerInfo).toBe(true);
+    console.log('Selected layer - LayerOptions showing layer parameters');
+    // Delete the selected node
+    await page.keyboard.press('Backspace');
+    await page.waitForTimeout(50);
+    const layersAfterDelete = await page.$$eval('.d3Layer', layers => layers.length);
+    expect(layersAfterDelete).toBe(layersCount - 1);
+    layerOptions = await page.textContent('#layerOptions');
+    // Should show Network Overview since nothing is selected after deletion
+    expect(layerOptions).toContain('Network Overview');
+    expect(layerOptions).toMatch(new RegExp(`Layers\\s*${layersAfterDelete}`));
+    // Just verify connections are shown (actual count depends on template structure)
+    expect(layerOptions).toMatch(/Connections\s*\d+/);
+    console.log(`✓ Step 5: After deleting node shows Network Overview with ${layersAfterDelete} layers`);
+    // 6. After undoing - deleted layer should be restored
+    const editMenu = await page.$('text=Edit');
+    await editMenu.click();
+    await page.waitForTimeout(300);
+    const undoOption = await page.$('text=Undo');
+    await undoOption.click();
+    await page.waitForTimeout(500);
+    let layersAfterUndo = await page.$$eval('.d3Layer', layers => layers.length);
+    expect(layersAfterUndo).toBe(layersCount);
+    console.log('✓ Step 6: After undoing, deleted layer restored');
+    // 7. After redoing - layer should be deleted again
+    await editMenu.click();
+    await page.waitForTimeout(300);
+    const redoOption = await page.$('text=Redo');
+    await redoOption.click();
+    await page.waitForTimeout(500);
+    const layersAfterRedo = await page.$$eval('.d3Layer', layers => layers.length);
+    expect(layersAfterRedo).toBe(layersCount - 1);
+    layerOptions = await page.textContent('#layerOptions');
+    expect(layerOptions).toContain('Network Overview');
+    expect(layerOptions).toMatch(new RegExp(`Layers\\s*${layersAfterRedo}`));
+    expect(layerOptions).toMatch(/Connections\s*\d+/);
+    console.log(`✓ Step 7: After redoing, layer deleted again, Network Overview shows ${layersAfterRedo} layers`);
+    // 8. After deleting a node again
+    // Select and delete a layer (we should have layersCount-1 after the redo)
+    const layerToDelete = await page.$('.d3Layer');
+    const deleteBox = await layerToDelete.boundingBox();
+    await page.mouse.click(deleteBox.x + deleteBox.width / 2, deleteBox.y + deleteBox.height / 2);
+    await page.waitForTimeout(50);
+    await page.keyboard.press('Backspace');
+    await page.waitForTimeout(50);
+    const layersAfterSecondDelete = await page.$$eval('.d3Layer', layers => layers.length);
+    expect(layersAfterSecondDelete).toBe(layersCount - 2);
+    layerOptions = await page.textContent('#layerOptions');
+    expect(layerOptions).toContain('Network Overview');
+    expect(layerOptions).toMatch(new RegExp(`Layers\\s*${layersAfterSecondDelete}`));
+    expect(layerOptions).toMatch(/Connections\s*\d+/);
+    console.log(`✓ Step 8: After deleting node again, Network Overview shows ${layersAfterSecondDelete} layers`);
+    // 9. After re-adding the node manually - should show new layer when selected
+    const dropoutLayer = await page.$('.LayerTemplate:has-text("Dropout")');
+    await dropoutLayer.click();
+    await page.waitForTimeout(50);
+    // Click on the newly added layer to select it
+    const newLayer = await page.$$('.d3Layer');
+    const lastLayer = newLayer[newLayer.length - 1];
+    const newBox = await lastLayer.boundingBox();
+    await page.mouse.click(newBox.x + newBox.width / 2, newBox.y + newBox.height / 2);
+    await page.waitForTimeout(50);
+    layerOptions = await page.textContent('#layerOptions');
+    expect(layerOptions).toContain('Dropout');
+    expect(layerOptions).toContain('rate');
+    console.log('✓ Step 9: After re-adding node manually, shows Dropout layer parameters');
+    console.log('=== COMPREHENSIVE LAYER OPTIONS TEST PASSED ===\n');
+  });
+
   test('should test REDO functionality', async ({ page }) => {
     // Add a layer
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');

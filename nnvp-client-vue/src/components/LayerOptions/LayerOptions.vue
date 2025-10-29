@@ -104,11 +104,19 @@ export default {
       this.refreshKey++;
     };
     this.$d3Interface.on('selection-changed', this.selectionChangeHandler);
+    // Subscribe to graph structure changes (layers added/removed, template loaded, etc.)
+    this.graphChangeHandler = () => {
+      this.refreshKey++;
+    };
+    this.$d3Interface.on('graph-changed', this.graphChangeHandler);
   },
   beforeUnmount() {
     // Unsubscribe from events
     if (this.selectionChangeHandler) {
       this.$d3Interface.off('selection-changed', this.selectionChangeHandler);
+    }
+    if (this.graphChangeHandler) {
+      this.$d3Interface.off('graph-changed', this.graphChangeHandler);
     }
   },
   computed: {
@@ -149,8 +157,8 @@ export default {
     },
     totalLayers() {
       this.refreshKey; // eslint-disable-line
-      if (!this.$d3Interface?.activeGraph?.model?.layers) return 0;
-      return this.$d3Interface.activeGraph.model.layers.length;
+      if (!this.$d3Interface?.activeGraph?.model?.d3Layers) return 0;
+      return this.$d3Interface.activeGraph.model.d3Layers.length;
     },
     totalInputs() {
       this.refreshKey; // eslint-disable-line
@@ -164,8 +172,8 @@ export default {
     },
     totalEdges() {
       this.refreshKey; // eslint-disable-line
-      if (!this.$d3Interface?.activeGraph?.model?.edges) return 0;
-      return this.$d3Interface.activeGraph.model.edges.length;
+      if (!this.$d3Interface?.activeGraph?.model?.d3Edges) return 0;
+      return this.$d3Interface.activeGraph.model.d3Edges.length;
     },
   },
   methods: {

@@ -80,6 +80,7 @@ export default class {
   addGraphEditor(graphEditor) {
     this.graphEditors.push(graphEditor);
     graphEditor.onSelectionChanged(() => { this.emit('selection-changed'); });
+    graphEditor.onGraphChanged(() => { this.emit('graph-changed'); });
     if (this.graphEditors.length === 1) this.setActiveGraphEditor(graphEditor);
   }
 
