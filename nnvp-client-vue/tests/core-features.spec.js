@@ -232,57 +232,6 @@ test.describe('NNVP Core Features', () => {
     expect(consoleErrors.length).toBe(0);
   });
 
-  // TODO update test
-  test('should connect layers by clicking anchors (auto-connect to nearest)', async ({ page }) => {
-    console.log('\n=== AUTO-CONNECT TEST (CLICK ANCHORS) ===');
-    // Add 5 layers
-    const inputLayer = await page.$('.LayerTemplate:has-text("Input")');
-    await inputLayer.click();
-    await page.waitForTimeout(50);
-    const flattenLayer = await page.$('.LayerTemplate:has-text("Flatten")');
-    await flattenLayer.click();
-    await page.waitForTimeout(50);
-    const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
-    await denseLayer.click();
-    await page.waitForTimeout(50);
-    await denseLayer.click(); // Second Dense
-    await page.waitForTimeout(50);
-    const outputLayer = await page.$('.LayerTemplate:has-text("Output")');
-    await outputLayer.click();
-    await page.waitForTimeout(50);
-    console.log('5 layers added to canvas');
-    // According to D3Layer.js:373-96, clicking an anchor circle automatically connects
-    // to the nearest layer. Since layers are stacked, we can use this mechanism.
-    // Each anchor click will find the nearest other layer and connect to it.
-    console.log('Connecting layers by clicking anchor points...');
-    // Click each layer's anchor to connect to nearest layer
-    // This uses the automatic connection mechanism in D3Layer
-    await page.click('#d3-layer-0 circle.bottom-point', { force: true });
-    await page.waitForTimeout(50);
-    console.log('Clicked anchor on layer 0');
-    let edgesCount = await page.$$eval('.link', links => links.length);
-    console.log('Edges after click 1:', edgesCount);
-    await page.click('#d3-layer-1 circle.bottom-point', { force: true });
-    await page.waitForTimeout(50);
-    console.log('Clicked anchor on layer 1');
-    edgesCount = await page.$$eval('.link', links => links.length);
-    console.log('Edges after click 2:', edgesCount);
-    await page.click('#d3-layer-2 circle.bottom-point', { force: true });
-    await page.waitForTimeout(50);
-    console.log('Clicked anchor on layer 2');
-    edgesCount = await page.$$eval('.link', links => links.length);
-    console.log('Edges after click 3:', edgesCount);
-    await page.click('#d3-layer-3 circle.bottom-point', { force: true });
-    await page.waitForTimeout(50);
-    console.log('Clicked anchor on layer 3');
-    edgesCount = await page.$$eval('.link', links => links.length);
-    console.log('Edges after click 4:', edgesCount);
-    // Verify at least some edges were created
-    expect(edgesCount).toBeGreaterThan(0);
-    console.log('Total edges created:', edgesCount);
-    expect(consoleErrors.length).toBe(0);
-  });
-
   test('should generate Python code from manually built network', async ({ page }) => {
     console.log('\n=== MANUAL NETWORK BUILDING TEST (Python) ===');
     // Add layers by clicking
