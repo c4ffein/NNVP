@@ -73,6 +73,8 @@ export default {
 .d3Layer rect {
   fill: white;
   stroke: black;
+  rx: 15px;
+  ry: 15px;
 }
 .d3Layer rect.isolated {
   stroke: red;
@@ -87,6 +89,8 @@ export default {
 .d3CompositeLayer rect {
   fill: white;
   stroke: black;
+  rx: 15px;
+  ry: 15px;
 }
 path.link {
   fill: none;

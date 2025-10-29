@@ -42,22 +42,18 @@ export default {
   display: inline-block;
 }
 .ParamsBlock.layer-title {
-  background-color: #f5f5f5;
+  background-color: transparent;
   overflow: hidden;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
+  border: 1px solid #000000;
+  border-radius: 15px;
   cursor: pointer;
   padding: 10px 12px;
   font-weight: var(--font-weight-semibold);
   color: #000000;
   transition: all 0.15s ease;
-}
-.ParamsBlock.layer-title:hover {
-  background-color: #e8e8e8;
-  border-color: #000000;
 }
 .ParamsBlock > .layer-title > .arrow {
   color: #000000;

@@ -228,19 +228,19 @@ export default {
   justify-content: space-between;
   align-items: center;
   padding: 12px 0;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid #000000;
 }
 .stat-item:last-child {
   border-bottom: none;
 }
 .stat-label {
   font-size: 14px;
-  color: #666666;
+  color: #000000;
   font-weight: var(--font-weight-regular);
 }
 .stat-value {
   font-size: 18px;
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-regular);
   color: #000000;
 }
 

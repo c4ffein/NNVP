@@ -28,7 +28,6 @@ var MIN_TRANSLATE_Y = MAP_Y - MAP_HEIGHT/2 ;
 
 export default function D3GraphEditor(svg, model) {
   let thisGraph = this;
-
   // Whiteboard's dimension and position
   this.minHeight = MAP_HEIGHT;
   this.minWidth = MAP_WIDTH;
@@ -36,7 +35,6 @@ export default function D3GraphEditor(svg, model) {
   this.mapWidth = MAP_WIDTH;
   this.mapX = MAP_X;
   this.mapY = MAP_Y;
-
   // Set the default limits out of the whiteboard
   // It's D3Background.updateBackground that really define limits
   this.minTranslateX = MIN_TRANSLATE_X;
@@ -45,66 +43,50 @@ export default function D3GraphEditor(svg, model) {
   this.maxTranslateY = MAX_TRANSLATE_Y;
   // Help to set the limits out of the whiteboard
   this.marginPage = MARGIN_PAGE;
-
   // Initial transform - offset the canvas so (0,0) is visible below GeneralMenu and right of LayerCatalog
   this.gTransform = d3.zoomIdentity.translate(PANEL_OFFSET_X, PANEL_OFFSET_Y).scale(1);
-
   this.model = model || new D3Model(undefined, undefined, this);
   this.templates = new D3Templates();
-
   // Debug flag for event logging (set to true to see click/drag events in console)
   this.debugEvents = false;
-
   // ID's counter
   this.nodeId = 0;
-
   // The event's variables. Their state change according to certain events
   this.selectedNodes = [];
   this.selectedEdge = null;
   this.mouseover_node = null;
   this.selectedText = null;
   this.layerDrag = false;
-
   // Click-to-link mode state
   this.linkMode = false;
   this.linkSourceLayer = null;
   this.linkSourceHandle = null;
-
   // Callback for selection changes (registered by D3Interface)
   this.selectionChangedCallback = null;
-
+  // Undo / Redo
   this.undoStack = [];
   this.redoStack = [];
-
+  // Copy
   this.nodesCopy = []
-
   // Svg is the html tag svg selected with d3.select()
   this.svg = svg;
-
   // BE CARFUL: order to the next line is IMPORTANT,
   // It create html tag, and the order of the tag's define the priorities
   // When there is some overlap (crossover) between elements
-
   // Init The Maker needed to draw edges
   D3Edge.createMakerHtml(thisGraph.svg);
-
   // Create the whiteboard's background
   D3Background.createBackground(thisGraph.svg);
-
   // Create the first g html tag needed for drag event:
   // Only elements in g element can be drag
   thisGraph.svgG = svg.append("g");
-
   // Create 8 rectangle at the border to add extensible function
   let border = thisGraph.svgG.append("g").attr("class", "border");
   D3Background.createBorder(border);
-
   // Create the Whiteboard
   D3Background.createWhiteboard(thisGraph.svgG);
-
   // Init the egde displayed when dragging between nodes
   thisGraph.dragLine = D3Edge.createDragLine(thisGraph.svgG);
-
   // Container specially for composites, define it before layers to temporarily fix legacy bug
   this.svgD3LayerComposites = thisGraph.svgG.append("g").attr("class", "d3LayerComposites");
   // Create two elements to contain respectively nodes and edges
@@ -112,28 +94,24 @@ export default function D3GraphEditor(svg, model) {
   this.svgD3Layers = thisGraph.svgG.append("g").attr("class", "d3Layers");
   // Create g element for layer shape when drag from letfbar
   thisGraph.svgG.append("g").attr("id", "dragFromLeftbar");
-
   // Add Listener on the border to extend the white page
   let borderListener = thisGraph.svgG.append("g").attr("class", "borderListener");
   D3Background.createListenerBorder(thisGraph, borderListener);
-
   // Draw all the Background if Whiteboard, Borders and ListenerBorders are created
   D3Background.updateBackground(thisGraph);
-
   // Apply initial transform to offset canvas for floating panels
   thisGraph.svgG.attr("transform", thisGraph.gTransform);
-
   // Set two operation on d3 zoom event
   // First the moves and zoom on the WhiteBoard
   // Second the multiple selection with a rectangle
   let origineSelection = null;
   let transformOrigin = null
-  thisGraph.svg.call(d3.zoom()
+  const zoomBehavior = d3.zoom()
     .scaleExtent([0.5, 2.5])
     .on("start", event => {
       //transformOrigin = {x: event.transform.x, y: event.transform.y};
       // If shiftKey is down, trigger multiple selection
-      if (event.sourceEvent.shiftKey) {
+      if (event.sourceEvent && event.sourceEvent.shiftKey) {
         thisGraph.svgG.append("g").attr("id", "selectionRect").selectAll("rect")
           .data([origineSelection = {
             x:d3.pointer(event, thisGraph.svgG.node())[0], y:d3.pointer(event, thisGraph.svgG.node())[1]
@@ -149,7 +127,7 @@ export default function D3GraphEditor(svg, model) {
     .on("zoom", event => {
       // During the zoom (drag + wheel on mouse)
       // If shiftKey isn't down, apply the transformation on all the svgG using attribute transform
-      if (!(event.sourceEvent.shiftKey)) {
+      if (!(event.sourceEvent && event.sourceEvent.shiftKey)) {
         thisGraph.zoomed.call(thisGraph, event);
       }
       // else, extend or reduce the selection's rectangle
@@ -188,11 +166,15 @@ export default function D3GraphEditor(svg, model) {
         // default function to move on the whiteboard and zoom with the wheel
         thisGraph.endZoomed.call(thisGraph);
       }
-    })
-  );
+    });
+
+  // Apply the zoom behavior to the SVG
+  thisGraph.svg.call(zoomBehavior);
+  // Initialize the zoom with the panel offset transform
+  // This ensures panning starts from the correct position (accounting for GeneralMenu and LayerCatalog)
+  thisGraph.svg.call(zoomBehavior.transform, thisGraph.gTransform);
   // Remove zoom action on dblclick event
   thisGraph.svg.on("dblclick.zoom", null);
-
   // If a click occur directely on the svg and not node call undoSelection
   thisGraph.svg.on('click', (d, event) => {
     thisGraph.undoSelection();
@@ -201,7 +183,6 @@ export default function D3GraphEditor(svg, model) {
       thisGraph.exitLinkMode();
     }
   });
-
   // Add ESC key handler to cancel link mode
   d3.select(document).on('keydown', (event) => {
     if (event.key === 'Escape' && thisGraph.linkMode) {
@@ -396,10 +377,8 @@ D3GraphEditor.prototype.updateGraph = function () {
   this.model.d3Edges.forEach(edge => edge.remove());
   this.model.d3Edges.forEach(edge => edge.drawEdge(this.svgD3Edges, this));
   //D3Edge.drawEdges(thisGraph.svgG.select("g.d3Edges"), thisGraph);
-
   this.model.d3Layers.forEach(layer => layer.remove());
   this.model.d3Layers.forEach(layer => layer.drawLayer(this));
-
   D3GraphValidation.isCycle(this);
   //D3Layer.drawLayers(thisGraph.svgG.select("g.d3Layers"), thisGraph);
   // Update whiteboard dimension
@@ -422,12 +401,16 @@ D3GraphEditor.prototype.deleteSelectedElements = function () {
     // Next line is implemented that way to keep Vue getters and setters
     this.selectedNodes.splice(0, this.selectedNodes.length);
     D3Background.updateBackground(this);
+    // Notify that selection has changed (cleared) so LayerOptions panel updates
+    this.notifySelectionChanged();
   }
   if (this.selectedEdge !== null) {
     this.saveState();
     this.model.d3Edges.splice(this.model.d3Edges.indexOf(this.selectedEdge), 1);
     this.selectedEdge.delete(this);
     this.selectedEdge = null;
+    // Notify that selection has changed (cleared) so LayerOptions panel updates
+    this.notifySelectionChanged();
   }
 };
 
@@ -632,7 +615,6 @@ D3GraphEditor.prototype.uploadToBoard = function (uploadFileEvent) {
   if (window.File && window.FileReader && window.FileList && window.Blob) {
     var uploadFile = uploadFileEvent.files[0];
     var filereader = new window.FileReader();
-
     filereader.onload = () => {
       try {
         this.saveState();
@@ -650,7 +632,6 @@ D3GraphEditor.prototype.uploadToBoard = function (uploadFileEvent) {
         console.error(error);
       }
     };
-
     filereader.readAsText(uploadFile);
   }
   else {

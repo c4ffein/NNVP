@@ -12,7 +12,6 @@ test.describe('NNVP App', () => {
       const text = msg.text();
       const type = msg.type();
       consoleMessages.push({ type, text });
-
       if (type === 'error') {
         consoleErrors.push(text);
       }
@@ -118,6 +117,83 @@ test.describe('NNVP App', () => {
     console.log('Layer clear of GeneralMenu:', clearOfMenu);
     console.log('Layer clear of LayerCatalog:', clearOfCatalog);
     // Layers should be positioned in the visible canvas area
+    expect(clearOfMenu).toBe(true);
+    expect(clearOfCatalog).toBe(true);
+  });
+
+  test('should pan the board correctly without resetting to 0,0', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForTimeout(1000);
+    console.log('\n=== BOARD PANNING TEST ===');
+    // Get initial SVG transform
+    const svg = await page.$('#svgWrapper svg');
+    const svgBox = await svg.boundingBox();
+    const initialTransform = await page.evaluate(() => {
+      const svg = document.querySelector('#svgWrapper svg');
+      const g = svg.querySelector('g');
+      const transform = g.getAttribute('transform');
+      console.log('Initial transform:', transform);
+      return transform;
+    });
+    console.log('Initial transform:', initialTransform);
+    // Add a layer to have a reference point
+    const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
+    await denseLayer.click();
+    await page.waitForTimeout(500);
+    // Get initial layer position
+    const initialLayerPos = await page.evaluate(() => {
+      const layer = document.querySelector('.d3Layer');
+      const rect = layer.getBoundingClientRect();
+      return { x: rect.x, y: rect.y };
+    });
+    console.log('Initial layer position:', initialLayerPos);
+    // Perform a pan by dragging on empty space
+    // Click and drag from center of SVG to pan it
+    const startX = svgBox.x + 400;
+    const startY = svgBox.y + 300;
+    const endX = startX + 100; // Pan 100px to the right
+    const endY = startY + 50;  // Pan 50px down
+    console.log(`Panning from (${startX}, ${startY}) to (${endX}, ${endY})`);
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.waitForTimeout(100); // Small delay to ensure drag is recognized
+    await page.mouse.move(endX, endY);
+    await page.mouse.up();
+    await page.waitForTimeout(500);
+    // Get final transform and layer position
+    const finalTransform = await page.evaluate(() => {
+      const svg = document.querySelector('#svgWrapper svg');
+      const g = svg.querySelector('g');
+      const transform = g.getAttribute('transform');
+      console.log('Final transform:', transform);
+      return transform;
+    });
+    const finalLayerPos = await page.evaluate(() => {
+      const layer = document.querySelector('.d3Layer');
+      const rect = layer.getBoundingClientRect();
+      return { x: rect.x, y: rect.y };
+    });
+    console.log('Final transform:', finalTransform);
+    console.log('Final layer position:', finalLayerPos);
+    // Calculate how much the layer moved
+    const deltaX = finalLayerPos.x - initialLayerPos.x;
+    const deltaY = finalLayerPos.y - initialLayerPos.y;
+    console.log('Layer moved by:', { deltaX, deltaY });
+    // The transform should have changed
+    expect(finalTransform).not.toBe(initialTransform);
+    // The layer should have moved approximately by the drag amount
+    // (within a reasonable tolerance, accounting for any transform calculations)
+    expect(Math.abs(deltaX - 100)).toBeLessThan(20); // Within 20px tolerance
+    expect(Math.abs(deltaY - 50)).toBeLessThan(20);
+    // Most importantly: the layer should still be clear of the panels after panning
+    const generalMenu = await page.$('#generalMenu');
+    const layerCatalog = await page.$('#layerCatalog');
+    const menuBox = await generalMenu.boundingBox();
+    const catalogBox = await layerCatalog.boundingBox();
+    const clearOfMenu = finalLayerPos.y > (menuBox.y + menuBox.height);
+    const clearOfCatalog = finalLayerPos.x > (catalogBox.x + catalogBox.width);
+    console.log('After panning - Layer clear of GeneralMenu:', clearOfMenu);
+    console.log('After panning - Layer clear of LayerCatalog:', clearOfCatalog);
     expect(clearOfMenu).toBe(true);
     expect(clearOfCatalog).toBe(true);
   });

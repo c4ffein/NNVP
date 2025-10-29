@@ -10,6 +10,10 @@ import D3GraphValidation from './D3GraphValidation';
 import KerasLayer from '../KerasInterface/KerasLayer';
 import jsonKeras from '../KerasInterface/generatedKerasLayers.json'
 
+// Handle radius constants
+const HANDLE_RADIUS_DEFAULT = 1.4;
+const HANDLE_RADIUS_LAYER_HOVER = 4;
+const HANDLE_RADIUS_HANDLE_HOVER = 10;
 
 /**
  * Constructor of a Layer
@@ -257,7 +261,7 @@ D3Layer.prototype.setBottomPoint = function(bottomPoint){
 };
 
 D3Layer.prototype.addCircle = function(gElement, classAttr){
-  return gElement.append("circle").attr("class", classAttr).attr("r", 2);
+  return gElement.append("circle").attr("class", classAttr).attr("r", HANDLE_RADIUS_DEFAULT);
 };
 
 /**
@@ -331,14 +335,14 @@ D3Layer.prototype.drawLayer = function (graph) {
       graph.mouseover_node = thisLayer;
       thisLayer.mouseOver(graph);
       d3.select(this.parentNode).selectAll("circle")
-        .attr("r", 4);
+        .attr("r", HANDLE_RADIUS_LAYER_HOVER);
     })
     .on("mouseleave", () => {
       gElement.select("rect").classed("over-layer", false);
       graph.mouseover_node = null;
       // if(D3Layer.tip) D3Layer.tip.hide();
       gElement.selectAll("circle")
-        .attr("r", 2);
+        .attr("r", HANDLE_RADIUS_DEFAULT);
     });
 
   // Track whether a drag actually occurred (not just click)
@@ -348,12 +352,12 @@ D3Layer.prototype.drawLayer = function (graph) {
     .on("mouseover", function () {
       d3.select(this).classed("active-point", true);
       graph.mouseover_node = thisLayer;
-      d3.select(this).attr("r", 10);
+      d3.select(this).attr("r", HANDLE_RADIUS_HANDLE_HOVER);
     })
     .on("mouseleave", function () {
       d3.select(this).classed("active-point", false);
       graph.mouseover_node = null;
-      d3.select(this).attr("r", 2);
+      d3.select(this).attr("r", HANDLE_RADIUS_LAYER_HOVER);
     })
     .call(d3.drag()
       .subject( () => { return { x: thisLayer.x, y: thisLayer.y }; })
@@ -450,7 +454,7 @@ D3Layer.prototype.appendText = function (gElement, graph) {
       graph.mouseover_node = null;
       // if(D3Layer.tip) D3Layer.tip.hide();
       gElement.selectAll("circle")
-        .attr("r", 2);
+        .attr("r", HANDLE_RADIUS_DEFAULT);
     })
     .on("dblclick", function () {
       thisLayer.changeTextOfNode(gElement, graph);
@@ -617,7 +621,7 @@ D3Layer.prototype.mouseOver = function (graph) {
     }
   }
   gElement.selectAll("circle")
-    .attr("r", 4);
+    .attr("r", HANDLE_RADIUS_LAYER_HOVER);
 };
 
 D3Layer.prototype.primeAncestorOfId = function (id) {

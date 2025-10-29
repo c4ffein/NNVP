@@ -1,6 +1,11 @@
 <script lang="jsx">
+import AnimatedUnderline from './AnimatedUnderline.vue';
+
 export default {
   name: 'GeneralMenu',
+  components: {
+    AnimatedUnderline
+  },
   render(h) { // eslint-disable-line
     // Force reactivity by accessing refreshKey
     this.menuRefreshKey; // eslint-disable-line
@@ -8,16 +13,25 @@ export default {
     const generateMenu = (menu, level) => {
       if (typeof (menu) === 'string') menu = this[menu] || {}; // eslint-disable-line no-param-reassign
       if (typeof (menu) !== 'function' && !Array.isArray(menu)) {
-        const rows = Object.entries(menu).map((entry, i) => (
-          <li key={i}
-            class={`menuItem GeneralMenu ${this.isItemDisabled(entry[0], entry[1]) ? 'disabled' : ''}`}
-            onClick={() => this.levelNClickHandler(entry[0], entry[1])}
-            onMouseover={event => this.levelNHoverHandler(entry[0], entry[1], event, level)}
-          >
-            <div class="GeneralMenu">{entry[0].replace('_', ' ')}</div>
-            {generateMenu(entry[1], level + 1)}
-          </li>
-        ));
+        const rows = Object.entries(menu).map((entry, i) => {
+          const itemKey = `${level}-${i}-${entry[0]}`;
+          const isDisabled = this.isItemDisabled(entry[0], entry[1]);
+          return (
+            <li key={i}
+              class={`menuItem GeneralMenu ${isDisabled ? 'disabled' : ''}`}
+              onClick={() => this.levelNClickHandler(entry[0], entry[1])}
+              onMouseover={event => this.levelNHoverHandler(entry[0], entry[1], event, level)}
+              onMouseenter={() => this.hoveredDropdownItem = itemKey}
+              onMouseleave={() => this.hoveredDropdownItem = null}
+            >
+              <div class="GeneralMenu dropdown-item-content">
+                {entry[0].replace('_', ' ')}
+                {!isDisabled && <AnimatedUnderline isHovered={this.hoveredDropdownItem === itemKey} />}
+              </div>
+              {generateMenu(entry[1], level + 1)}
+            </li>
+          );
+        });
         return (<ul class="dropdown-content GeneralMenu">{rows}</ul>);
       }
       return undefined;
@@ -29,8 +43,11 @@ export default {
             <div class="menuTitle GeneralMenu"
               onClick={event => this.level0ClickHandler(object[0], object[1], event)}
               onMouseover={event => this.level0HoverHandler(object[0], object[1], event)}
+              onMouseenter={() => this.hoveredMenuIndex = i}
+              onMouseleave={() => this.hoveredMenuIndex = null}
             >
               {object[0]}
+              <AnimatedUnderline isHovered={this.hoveredMenuIndex === i} />
             </div>
             {generateMenu(object[1], 1)}
           </li>
@@ -40,6 +57,8 @@ export default {
   },
   data() {
     return {
+      hoveredMenuIndex: null,
+      hoveredDropdownItem: null,
       menu: {
         File: {
           New() { this.$d3Interface.clearBoard(); },
@@ -220,10 +239,7 @@ export default {
   overflow: visible;
   position: relative;
 }
-/* Remove old hover background, use underline instead */
-.menuItem:hover, .activated {
-  background-color: rgba(100, 100, 100, 0.15);
-}
+/* Hover background removed - using animated underline instead */
 .menuTitle {
   display: flex;
   align-items: center;
@@ -233,22 +249,7 @@ export default {
   width: 100%;
   position: relative;
 }
-/* Animated underline for top-level menu items */
-.menu .menuTitle::after {
-  content: '';
-  position: absolute;
-  bottom: 4px;
-  left: 10px;
-  right: 10px;
-  height: 2px;
-  background-color: #000000;
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 0.2s ease-out;
-}
-.menu:hover .menuTitle::after {
-  transform: scaleX(1);
-}
+/* Animated underline is now handled by AnimatedUnderline component */
 #GeneralMenu .dropdown-content {
   display: none;
   position: absolute;
@@ -274,9 +275,12 @@ export default {
  transition: 0.2s;
 }
 .dropdown-content .menuItem.disabled {
-  color: #999999;
-  opacity: 0.5;
-  cursor: not-allowed;
+  color: #000000;
+  text-decoration: line-through;
+  cursor: default;
+}
+.dropdown-item-content {
+  position: relative;
 }
 #GeneralMenu .menuItem > .dropdown-content {
   left: 100%;

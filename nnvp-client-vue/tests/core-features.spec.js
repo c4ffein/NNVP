@@ -1060,6 +1060,60 @@ def build_model():
     expect(consoleErrors.length).toBe(0);
   });
 
+  test('should update LayerOptions panel after deleting a layer', async ({ page }) => {
+    console.log('\n=== LAYER OPTIONS UPDATE ON DELETE TEST ===');
+    // Add two different layers
+    const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
+    await denseLayer.click();
+    await page.waitForTimeout(500);
+    const dropoutLayer = await page.$('.LayerTemplate:has-text("Dropout")');
+    await dropoutLayer.click();
+    await page.waitForTimeout(500);
+    const layersCount = await page.$$eval('.d3Layer', layers => layers.length);
+    console.log('Total layers:', layersCount);
+    expect(layersCount).toBe(2);
+    // Select the first layer
+    const firstLayer = await page.$('.d3Layer');
+    const box = await firstLayer.boundingBox();
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await page.waitForTimeout(500);
+    // Check what LayerOptions shows (could be Dense or Dropout depending on layer order)
+    const layerOptionsBeforeDelete = await page.textContent('#layerOptions');
+    console.log('LayerOptions before delete (first 100 chars):', layerOptionsBeforeDelete.substring(0, 100));
+    // Identify which layer is selected by checking the parameters shown
+    const isDenseSelected = layerOptionsBeforeDelete.includes('Dense') && layerOptionsBeforeDelete.includes('units');
+    const isDropoutSelected = layerOptionsBeforeDelete.includes('Dropout') && layerOptionsBeforeDelete.includes('rate');
+    console.log('Dense selected:', isDenseSelected);
+    console.log('Dropout selected:', isDropoutSelected);
+    // One of them should be selected
+    expect(isDenseSelected || isDropoutSelected).toBe(true);
+    const selectedLayerName = isDenseSelected ? 'Dense' : 'Dropout';
+    const selectedLayerParam = isDenseSelected ? 'units' : 'rate';
+    console.log('Selected layer:', selectedLayerName);
+    // Delete the layer
+    await page.keyboard.press('Backspace');
+    await page.waitForTimeout(500);
+    const layersAfterDelete = await page.$$eval('.d3Layer', layers => layers.length);
+    console.log('Layers after delete:', layersAfterDelete);
+    expect(layersAfterDelete).toBe(1);
+    // Check LayerOptions after delete - should either show "No layers selected" or the other layer
+    const layerOptionsAfterDelete = await page.textContent('#layerOptions');
+    console.log('LayerOptions after delete (first 100 chars):', layerOptionsAfterDelete.substring(0, 100));
+    // It should NOT still show the deleted layer's parameters
+    const stillShowsDeletedLayer = layerOptionsAfterDelete.includes(selectedLayerName) &&
+                                    layerOptionsAfterDelete.includes(selectedLayerParam);
+    console.log(`LayerOptions still shows deleted ${selectedLayerName} layer:`, stillShowsDeletedLayer);
+    // Should either show "Network Overview" (default when nothing selected) or the other layer
+    const showsNetworkOverview = layerOptionsAfterDelete.includes('Network Overview');
+    const otherLayerName = selectedLayerName === 'Dense' ? 'Dropout' : 'Dense';
+    const showsOtherLayer = layerOptionsAfterDelete.includes(otherLayerName);
+    console.log('Shows "Network Overview":', showsNetworkOverview);
+    console.log(`Shows other layer (${otherLayerName}):`, showsOtherLayer);
+    // THIS IS THE BUG: LayerOptions should update after deletion
+    expect(stillShowsDeletedLayer).toBe(false);
+    expect(showsNetworkOverview || showsOtherLayer).toBe(true);
+  });
+
   test('should test REDO functionality', async ({ page }) => {
     // Add a layer
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');

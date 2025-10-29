@@ -17,9 +17,12 @@
         class="title"
         v-on:click="toggleCategory(divId(categoryName))"
         v-if="layersNotEmptyAfterSearch(layers, categoryName)"
+        @mouseenter="hoveredCategory = categoryName"
+        @mouseleave="hoveredCategory = null"
       >
         <div class="text">{{ categoryName }}</div>
         <div class="arrow">▲</div>
+        <AnimatedUnderline :isHovered="hoveredCategory === categoryName" />
       </div>
       <div class="layerList">
         <LayerTemplate
@@ -34,11 +37,13 @@
 
 <script>
 import LayerTemplate from './LayerTemplate.vue';
+import AnimatedUnderline from '../AnimatedUnderline.vue';
 
 export default {
   name: 'LayerCatalog',
   components: {
     LayerTemplate,
+    AnimatedUnderline,
   },
   methods: {
     toggleCategory: categoryDiv => document.getElementById(categoryDiv).classList.toggle('closed'),
@@ -86,6 +91,7 @@ export default {
   data: () => ({
     searchBox: '',
     reloadKey: 0,
+    hoveredCategory: null,
   }),
   mounted() {
     this.$d3Interface.setLeftBarRemountCallback(this.remount);
@@ -142,17 +148,19 @@ export default {
   color: #000000;
 }
 .LayerCatalog > .layerCategory > .title {
-  background-color: #f5f5f5;
+  background-color: transparent;
   overflow: hidden;
   display: grid;
   grid-template-columns: auto 1fr;
   grid-template-areas: "arrow text";
-  border-top: 1px solid #e0e0e0;
-  border-bottom: 1px solid #e0e0e0;
+  border-top: 1px solid #000000;
+  border-left: 1px solid #000000;
+  border-right: 1px solid #000000;
+  border-radius: 15px 15px 0 0;
   font-weight: var(--font-weight-medium);
-}
-.LayerCatalog > .layerCategory > .title:hover {
-  background-color: #e8e8e8;
+  position: relative;
+  margin-left: -1px;
+  margin-right: -1px;
 }
 .LayerCatalog > .layerCategory > .title > .text {
   grid-area: text;
@@ -186,8 +194,6 @@ export default {
   transition: all 0.15s ease;
 }
 .LayerCatalog > .layerCategory > .layerList > .layer:hover {
-  background-color: #f9f9f9;
-  border-left: 3px solid #000000;
   cursor: pointer;
 }
 </style>
