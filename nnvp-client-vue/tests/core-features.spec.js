@@ -838,6 +838,33 @@ def build_model():
     expect(consoleErrors.length).toBe(0);
   });
 
+  test('should delete a layer using Backspace key', async ({ page }) => {
+    // Add a layer
+    const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
+    await denseLayer.click();
+    await page.waitForTimeout(50);
+    const layersBeforeDelete = await page.$$eval('.d3Layer', layers => layers.length);
+    // Click on the layer using force to bypass the text element
+    const d3LayerElement = await page.$('.d3Layer');
+    const box = await d3LayerElement.boundingBox();
+    // Click in the center of the layer
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await page.waitForTimeout(50);
+    // Check if layer is selected (has 'selected' class)
+    const isSelected = await d3LayerElement.evaluate(el => el.classList.contains('selected'));
+    console.log('\n=== LAYER DELETION TEST (BACKSPACE) ===');
+    console.log('Layers before delete:', layersBeforeDelete);
+    console.log('Layer is selected:', isSelected);
+    expect(isSelected).toBe(true);
+    // Delete with Backspace
+    await page.keyboard.press('Backspace');
+    await page.waitForTimeout(50);
+    const layersAfterDelete = await page.$$eval('.d3Layer', layers => layers.length);
+    console.log('Layers after Backspace:', layersAfterDelete);
+    expect(layersAfterDelete).toBe(layersBeforeDelete - 1);
+    expect(consoleErrors.length).toBe(0);
+  });
+
   test('should delete a layer using Delete key', async ({ page }) => {
     // Add a layer
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
@@ -852,23 +879,16 @@ def build_model():
     await page.waitForTimeout(50);
     // Check if layer is selected (has 'selected' class)
     const isSelected = await d3LayerElement.evaluate(el => el.classList.contains('selected'));
-    console.log('\n=== LAYER DELETION TEST ===');
+    console.log('\n=== LAYER DELETION TEST (DELETE) ===');
     console.log('Layers before delete:', layersBeforeDelete);
     console.log('Layer is selected:', isSelected);
-    // Try Backspace first (as per KeyboardListener.js)
-    await page.keyboard.press('Backspace');
+    expect(isSelected).toBe(true);
+    // Delete with Delete key
+    await page.keyboard.press('Delete');
     await page.waitForTimeout(50);
-    let layersAfterDelete = await page.$$eval('.d3Layer', layers => layers.length);
-    console.log('Layers after Backspace:', layersAfterDelete);
-    // If Backspace didn't work, try Delete
-    // TODO Actually 2 separate tests for delete and backspace
-    if (layersAfterDelete === layersBeforeDelete) {
-      await page.keyboard.press('Delete');
-      await page.waitForTimeout(50);
-      layersAfterDelete = await page.$$eval('.d3Layer', layers => layers.length);
-      console.log('Layers after Delete:', layersAfterDelete);
-    }
-    expect(layersAfterDelete).toBeLessThan(layersBeforeDelete);
+    const layersAfterDelete = await page.$$eval('.d3Layer', layers => layers.length);
+    console.log('Layers after Delete:', layersAfterDelete);
+    expect(layersAfterDelete).toBe(layersBeforeDelete - 1);
     expect(consoleErrors.length).toBe(0);
   });
 

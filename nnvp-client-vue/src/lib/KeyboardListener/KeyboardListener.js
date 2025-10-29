@@ -90,6 +90,7 @@ export default class {
 
       switch (event.code) {
         case 'Backspace':
+        case 'Delete':
           d3Interface.deleteSelectedElements();
           break;
         default:
