@@ -42,7 +42,7 @@ test.describe('NNVP App', () => {
   test('should load the app without console errors', async ({ page }) => {
     await page.goto('/');
     // Wait a bit for the app to initialize
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(100);
     // Check if there are any errors
     if (consoleErrors.length > 0) {
       console.log(`\n⚠️  Found ${consoleErrors.length} console error(s)`);
@@ -55,7 +55,7 @@ test.describe('NNVP App', () => {
 
   test('should render the main components', async ({ page }) => {
     await page.goto('/');
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(100);
     // Check for basic app structure
     const body = await page.textContent('body');
     console.log('\n=== PAGE LOADED ===');
@@ -82,7 +82,7 @@ test.describe('NNVP App', () => {
 
   test('should display layer templates in layer catalog', async ({ page }) => {
     await page.goto('/');
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(100);
     // Check if LayerCatalog has layer templates
     const layerCatalogContent = await page.textContent('#layerCatalog');
     console.log('\n=== LAYER CATALOG CONTENT CHECK ===');
@@ -93,7 +93,7 @@ test.describe('NNVP App', () => {
 
   test('should position whiteboard canvas below GeneralMenu and right of LayerCatalog', async ({ page }) => {
     await page.goto('/');
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(100);
     // Get panel positions
     const generalMenu = await page.$('#generalMenu');
     const layerCatalog = await page.$('#layerCatalog');
@@ -102,7 +102,7 @@ test.describe('NNVP App', () => {
     // Add a layer to test positioning
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     // Get the layer position
     const canvasLayer = await page.$('.d3Layer');
     const layerBox = await canvasLayer.boundingBox();
@@ -123,7 +123,7 @@ test.describe('NNVP App', () => {
 
   test('should pan the board correctly without resetting to 0,0', async ({ page }) => {
     await page.goto('/');
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(100);
     console.log('\n=== BOARD PANNING TEST ===');
     // Get initial SVG transform
     const svg = await page.$('#svgWrapper svg');
@@ -139,7 +139,7 @@ test.describe('NNVP App', () => {
     // Add a layer to have a reference point
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     // Get initial layer position
     const initialLayerPos = await page.evaluate(() => {
       const layer = document.querySelector('.d3Layer');
@@ -159,7 +159,7 @@ test.describe('NNVP App', () => {
     await page.waitForTimeout(100); // Small delay to ensure drag is recognized
     await page.mouse.move(endX, endY);
     await page.mouse.up();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     // Get final transform and layer position
     const finalTransform = await page.evaluate(() => {
       const svg = document.querySelector('#svgWrapper svg');

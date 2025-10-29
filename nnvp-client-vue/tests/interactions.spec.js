@@ -42,7 +42,7 @@ test.describe('NNVP Interactions', () => {
 
     // Type "dense" in the search box
     await searchBox.type('dense');
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
 
     // Get content after search
     const leftBarTextAfter = await page.textContent('.LayerCatalog');
@@ -86,7 +86,7 @@ test.describe('NNVP Interactions', () => {
     console.log('Initially activated menus:', initialActivated.length);
     // Click on File menu
     await fileMenu.click();
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(20);
     // Check activated state after click
     const afterClickActivated = await page.$$('.menu.activated');
     console.log('Activated menus after click:', afterClickActivated.length);
@@ -149,7 +149,7 @@ test.describe('NNVP Interactions', () => {
 
   test('should not have any runtime errors after 3 seconds', async ({ page }) => {
     // Wait a bit to let any async operations complete
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(100);
     console.log('\n=== RUNTIME STABILITY TEST ===');
     console.log('Total console messages:', consoleMessages.length);
     console.log('Console errors found:', consoleErrors.length);
@@ -167,13 +167,13 @@ test.describe('NNVP Interactions', () => {
       // Open Edit menu
       const editMenu = await page.$('#GeneralMenu .menuTitle:has-text("Edit")');
       await editMenu.click();
-      await page.waitForTimeout(200);
+      await page.waitForTimeout(20);
       // Check if the menu item has disabled class
       const menuItem = await page.$(`#GeneralMenu .menuItem:has-text("${itemText}")`);
       const isDisabled = await menuItem.evaluate(el => el.classList.contains('disabled'));
       // Close menu by clicking elsewhere
       await page.click('body', { position: { x: 0, y: 0 } });
-      await page.waitForTimeout(100);
+      await page.waitForTimeout(10);
       return isDisabled;
     };
     // 1. Check initial state - both should be disabled
@@ -186,7 +186,7 @@ test.describe('NNVP Interactions', () => {
     // 2. Click on Dense layer to add it (we don't need to verify it was added, just that it triggers undo stack)
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     console.log('Clicked Dense layer in catalog');
     // 3. Check Undo is now enabled, Redo still disabled
     const undoDisabledAfterAdd = await isMenuItemDisabled('Undo');
@@ -198,10 +198,10 @@ test.describe('NNVP Interactions', () => {
     // 4. Click Undo
     const editMenu = await page.$('#GeneralMenu .menuTitle:has-text("Edit")');
     await editMenu.click();
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(20);
     const undoItem = await page.$('#GeneralMenu .menuItem:has-text("Undo")');
     await undoItem.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     console.log('Clicked Undo');
     // 5. Check Undo is disabled, Redo is enabled
     const undoDisabledAfterUndo = await isMenuItemDisabled('Undo');
@@ -213,10 +213,10 @@ test.describe('NNVP Interactions', () => {
     // 6. Click Redo
     const editMenu2 = await page.$('#GeneralMenu .menuTitle:has-text("Edit")');
     await editMenu2.click();
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(20);
     const redoItem = await page.$('#GeneralMenu .menuItem:has-text("Redo")');
     await redoItem.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     console.log('Clicked Redo');
     // 7. Check Undo is enabled, Redo is disabled
     const undoDisabledAfterRedo = await isMenuItemDisabled('Undo');

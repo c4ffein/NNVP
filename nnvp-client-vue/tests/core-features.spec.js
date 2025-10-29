@@ -38,7 +38,7 @@ test.describe('NNVP Core Features', () => {
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     expect(denseLayer).not.toBeNull();
     await denseLayer.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     // Check that a layer was added to the canvas
     const layersAfterCount = await page.$$eval('.d3Layer', layers => layers.length);
     console.log('Layers on canvas after:', layersAfterCount);
@@ -50,12 +50,12 @@ test.describe('NNVP Core Features', () => {
     // Click Dense layer
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(30);
     const afterFirstLayer = await page.$$eval('.d3Layer', layers => layers.length);
     // Click Dropout layer (should be in a different category)
     const dropoutLayer = await page.$('.LayerTemplate:has-text("Dropout")');
     await dropoutLayer.click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(30);
     const afterSecondLayer = await page.$$eval('.d3Layer', layers => layers.length);
     console.log('\n=== MULTIPLE LAYERS TEST ===');
     console.log('After first layer (Dense):', afterFirstLayer);
@@ -69,7 +69,7 @@ test.describe('NNVP Core Features', () => {
     // Open File menu
     const fileMenu = await page.$('text=File');
     await fileMenu.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     // Check if Templates submenu exists
     const templatesOption = await page.$('text=Templates');
     console.log('\n=== TEMPLATE LOADING TEST ===');
@@ -77,7 +77,7 @@ test.describe('NNVP Core Features', () => {
     if (templatesOption) {
       // Hover to open Templates submenu
       await templatesOption.hover();
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(50);
       // Get the templates from the nested dropdown under Templates menuItem
       // The structure is: .menuItem (Templates) > .dropdown-content > .menuItem (actual templates)
       const templates = await page.$$('.menuItem:has-text("Templates") > .dropdown-content > .menuItem');
@@ -105,7 +105,7 @@ test.describe('NNVP Core Features', () => {
         console.log('Loading template:', templateName);
         await templateToLoad.click();
         // Wait longer for template to load and render
-        await page.waitForTimeout(2000);
+        await page.waitForTimeout(100);
         // Check for different possible layer selectors
         const d3Layers = await page.$$('.d3Layer');
         const d3CompositeLayers = await page.$$('.d3CompositeLayer');
@@ -139,18 +139,18 @@ test.describe('NNVP Core Features', () => {
     // Add layers by clicking (they'll be added to canvas)
     const inputLayer = await page.$('.LayerTemplate:has-text("Input")');
     await inputLayer.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     const flattenLayer = await page.$('.LayerTemplate:has-text("Flatten")');
     await flattenLayer.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     await denseLayer.click(); // Second Dense
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     const outputLayer = await page.$('.LayerTemplate:has-text("Output")');
     await outputLayer.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     console.log('5 layers added to canvas');
     // Enable debug logging to see D3 drag events
     await page.evaluate(() => {
@@ -166,9 +166,8 @@ test.describe('NNVP Core Features', () => {
         layer.transitionToXY(300, targetY);
       }
     });
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(100);
     console.log('All layers repositioned using transitionToXY');
-
     // Verify layers are properly positioned
     const layerPositions = await page.evaluate(() => {
       return Array.from({length: 5}, (_, i) => {
@@ -178,6 +177,7 @@ test.describe('NNVP Core Features', () => {
     });
     console.log('Layer positions:', JSON.stringify(layerPositions, null, 2));
     console.log('Connecting layers using drag-and-drop on anchors...');
+    await page.waitForTimeout(500);
     // Drag from each layer's bottom anchor to the next layer's center to create connections
     for (let i = 0; i < 4; i++) {
       // Get target layer rect to ensure mouseover_node is set
@@ -187,12 +187,12 @@ test.describe('NNVP Core Features', () => {
       const sourceBox = await sourceAnchor.boundingBox();
       // Start drag from source anchor
       await page.mouse.move(sourceBox.x + sourceBox.width/2, sourceBox.y + sourceBox.height/2);
-      await page.waitForTimeout(200);
+      await page.waitForTimeout(100);
       await page.mouse.down();
-      await page.waitForTimeout(200);
+      await page.waitForTimeout(100);
       // Move to target layer center (to set mouseover_node)
       await page.mouse.move(targetBox.x + targetBox.width/2, targetBox.y + targetBox.height/2);
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(100);
       // Release to create connection
       await page.mouse.up();
       await page.waitForTimeout(500);
@@ -205,10 +205,10 @@ test.describe('NNVP Core Features', () => {
     // Open File menu and click Generate Javascript
     const fileMenu = await page.$('text=File');
     await fileMenu.click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(30);
     const generateJsOption = await page.$('text=Generate Javascript');
     await generateJsOption.click();
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(100);
     console.log('\n=== JAVASCRIPT GENERATION TEST ===');
     // Check if download happened
     const download = await downloadPromise;
@@ -232,106 +232,82 @@ test.describe('NNVP Core Features', () => {
     expect(consoleErrors.length).toBe(0);
   });
 
+  // TODO update test
   test('should connect layers by clicking anchors (auto-connect to nearest)', async ({ page }) => {
     console.log('\n=== AUTO-CONNECT TEST (CLICK ANCHORS) ===');
-
     // Add 5 layers
     const inputLayer = await page.$('.LayerTemplate:has-text("Input")');
     await inputLayer.click();
-    await page.waitForTimeout(500);
-
+    await page.waitForTimeout(50);
     const flattenLayer = await page.$('.LayerTemplate:has-text("Flatten")');
     await flattenLayer.click();
-    await page.waitForTimeout(500);
-
+    await page.waitForTimeout(50);
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
-    await page.waitForTimeout(500);
-
+    await page.waitForTimeout(50);
     await denseLayer.click(); // Second Dense
-    await page.waitForTimeout(500);
-
+    await page.waitForTimeout(50);
     const outputLayer = await page.$('.LayerTemplate:has-text("Output")');
     await outputLayer.click();
-    await page.waitForTimeout(500);
-
+    await page.waitForTimeout(50);
     console.log('5 layers added to canvas');
-
     // According to D3Layer.js:373-96, clicking an anchor circle automatically connects
     // to the nearest layer. Since layers are stacked, we can use this mechanism.
     // Each anchor click will find the nearest other layer and connect to it.
-
     console.log('Connecting layers by clicking anchor points...');
-
     // Click each layer's anchor to connect to nearest layer
     // This uses the automatic connection mechanism in D3Layer
     await page.click('#d3-layer-0 circle.bottom-point', { force: true });
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     console.log('Clicked anchor on layer 0');
-
     let edgesCount = await page.$$eval('.link', links => links.length);
     console.log('Edges after click 1:', edgesCount);
-
     await page.click('#d3-layer-1 circle.bottom-point', { force: true });
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     console.log('Clicked anchor on layer 1');
-
     edgesCount = await page.$$eval('.link', links => links.length);
     console.log('Edges after click 2:', edgesCount);
-
     await page.click('#d3-layer-2 circle.bottom-point', { force: true });
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     console.log('Clicked anchor on layer 2');
-
     edgesCount = await page.$$eval('.link', links => links.length);
     console.log('Edges after click 3:', edgesCount);
-
     await page.click('#d3-layer-3 circle.bottom-point', { force: true });
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     console.log('Clicked anchor on layer 3');
-
     edgesCount = await page.$$eval('.link', links => links.length);
     console.log('Edges after click 4:', edgesCount);
-
     // Verify at least some edges were created
     expect(edgesCount).toBeGreaterThan(0);
-
     console.log('Total edges created:', edgesCount);
-
     expect(consoleErrors.length).toBe(0);
   });
 
   test('should generate Python code from manually built network', async ({ page }) => {
     console.log('\n=== MANUAL NETWORK BUILDING TEST (Python) ===');
-
     // Add layers by clicking
     const inputLayer = await page.$('.LayerTemplate:has-text("Input")');
     await inputLayer.click();
-    await page.waitForTimeout(500);
-
+    await page.waitForTimeout(50);
     const flattenLayer = await page.$('.LayerTemplate:has-text("Flatten")');
     await flattenLayer.click();
-    await page.waitForTimeout(500);
-
+    await page.waitForTimeout(50);
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
-    await page.waitForTimeout(500);
-
+    await page.waitForTimeout(50);
     await denseLayer.click(); // Second Dense
-    await page.waitForTimeout(500);
-
+    await page.waitForTimeout(50);
     const outputLayer = await page.$('.LayerTemplate:has-text("Output")');
     await outputLayer.click();
-    await page.waitForTimeout(500);
-
+    await page.waitForTimeout(50);
     console.log('5 layers added to canvas');
-
+    // Wait for all layers to fully initialize
+    await page.waitForTimeout(500);
     // Enable debug logging
     await page.evaluate(() => {
       window.nnvpGraphEditor.debugEvents = true;
     });
     console.log('Debug logging enabled');
-
     // Reposition layers vertically
     console.log('Repositioning layers vertically...');
     await page.evaluate(() => {
@@ -341,9 +317,8 @@ test.describe('NNVP Core Features', () => {
         layer.transitionToXY(300, targetY);
       }
     });
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(100);
     console.log('All layers repositioned using transitionToXY');
-
     // Verify positions
     const layerPositions = await page.evaluate(() => {
       return Array.from({length: 5}, (_, i) => {
@@ -352,62 +327,48 @@ test.describe('NNVP Core Features', () => {
       });
     });
     console.log('Layer positions:', JSON.stringify(layerPositions, null, 2));
-
     console.log('Connecting layers using drag-and-drop on anchors...');
-
+    // Extra wait before drag-and-drop operations for D3 stabilization
+    await page.waitForTimeout(500);
     // Drag to connect layers
     for (let i = 0; i < 4; i++) {
       const targetLayer = await page.$(`#d3-layer-${i+1} rect`);
       const targetBox = await targetLayer.boundingBox();
-
       const sourceAnchor = await page.$(`#d3-layer-${i} circle.bottom-point`);
       const sourceBox = await sourceAnchor.boundingBox();
-
       await page.mouse.move(sourceBox.x + sourceBox.width/2, sourceBox.y + sourceBox.height/2);
-      await page.waitForTimeout(200);
+      await page.waitForTimeout(50);
       await page.mouse.down();
-      await page.waitForTimeout(200);
-
+      await page.waitForTimeout(50);
       await page.mouse.move(targetBox.x + targetBox.width/2, targetBox.y + targetBox.height/2);
-      await page.waitForTimeout(300);
-
+      await page.waitForTimeout(50);
       await page.mouse.up();
-      await page.waitForTimeout(500);
-
+      await page.waitForTimeout(100);
       const currentEdges = await page.$$eval('.link:not(.dragline)', links => links.length);
       console.log(`Connected layer ${i} to layer ${i+1}, total edges: ${currentEdges}`);
     }
-
     console.log('Finished connecting layers');
-
     // Set up listener for download
     const downloadPromise = page.waitForEvent('download', { timeout: 5000 }).catch(() => null);
-
     // Open File menu and click Generate
     const fileMenu = await page.$('text=File');
     await fileMenu.click();
-    await page.waitForTimeout(300);
-
+    await page.waitForTimeout(30);
     const generateOption = await page.$('text=Generate');
     const generateText = await generateOption.textContent();
     expect(generateText.trim()).toBe('Generate');
     await generateOption.click();
-    await page.waitForTimeout(1000);
-
+    await page.waitForTimeout(100);
     console.log('\n=== PYTHON GENERATION TEST ===');
-
     // Check if download happened
     const download = await downloadPromise;
     expect(download).not.toBeNull();
-
     console.log('Python code download triggered');
     console.log('Download filename:', download.suggestedFilename());
     expect(download.suggestedFilename()).toContain('.py');
-
     // Check content against golden master
     const path = await download.path();
     const content = fs.readFileSync(path, 'utf-8');
-
     const expectedPython = `from tensorflow import keras
 
 def build_model():
@@ -417,29 +378,22 @@ def build_model():
     model.add(keras.layers.Dense())
     return model
 `;
-
     console.log('Generated code:\n', content);
-
     expect(content.trim()).toBe(expectedPython.trim());
-
     expect(consoleErrors.length).toBe(0);
   });
 
   test('should generate JavaScript code from template', async ({ page }) => {
     console.log('\n=== JAVASCRIPT GENERATION FROM TEMPLATE TEST ===');
-
     // Load a template
     const fileMenu = await page.$('text=File');
     await fileMenu.click();
-    await page.waitForTimeout(300);
-
+    await page.waitForTimeout(30);
     const templatesOption = await page.$('text=Templates');
     await templatesOption.hover();
-    await page.waitForTimeout(500);
-
+    await page.waitForTimeout(50);
     const templates = await page.$$('.menuItem:has-text("Templates") > .dropdown-content > .menuItem');
     const uiCommands = ['New', 'Load', 'Save', 'Generate', 'Generate Javascript', 'Templates'];
-
     let templateLoaded = false;
     for (const template of templates) {
       const text = await template.textContent();
@@ -450,52 +404,41 @@ def build_model():
         break;
       }
     }
-
     expect(templateLoaded).toBe(true);
-    await page.waitForTimeout(2000);
-
+    await page.waitForTimeout(100);
     // Generate JavaScript code
     const downloadPromise = page.waitForEvent('download', { timeout: 5000 });
     await fileMenu.click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(30);
     const generateJsOption = await page.$('text=Generate Javascript');
     await generateJsOption.click();
-    await page.waitForTimeout(1000);
-
+    await page.waitForTimeout(100);
     const download = await downloadPromise;
     expect(download).not.toBeNull();
-
     const path = await download.path();
     const content = fs.readFileSync(path, 'utf-8');
-
     console.log('Code length:', content.length);
     console.log('Has content:', content.length > 200);
     console.log('Full generated JS code:');
     console.log(content);
-
     expect(content.length).toBeGreaterThan(200);
     // JS uses lowercase: tf.layers.dense() or tf.layers.conv2d()
     expect(content.includes('layers.dense') || content.includes('layers.conv')).toBe(true);
     expect(content.includes('tf.')).toBe(true);
-
     expect(consoleErrors.length).toBe(0);
   });
 
   test('should generate Python code from template', async ({ page }) => {
     console.log('\n=== PYTHON GENERATION FROM TEMPLATE TEST ===');
-
     // Load a template
     const fileMenu = await page.$('text=File');
     await fileMenu.click();
-    await page.waitForTimeout(300);
-
+    await page.waitForTimeout(30);
     const templatesOption = await page.$('text=Templates');
     await templatesOption.hover();
-    await page.waitForTimeout(500);
-
+    await page.waitForTimeout(50);
     const templates = await page.$$('.menuItem:has-text("Templates") > .dropdown-content > .menuItem');
     const uiCommands = ['New', 'Load', 'Save', 'Generate', 'Generate Javascript', 'Templates'];
-
     let templateLoaded = false;
     for (const template of templates) {
       const text = await template.textContent();
@@ -506,34 +449,27 @@ def build_model():
         break;
       }
     }
-
     expect(templateLoaded).toBe(true);
-    await page.waitForTimeout(2000);
-
+    await page.waitForTimeout(100);
     // Generate Python code
     const downloadPromise = page.waitForEvent('download', { timeout: 5000 });
     await fileMenu.click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(30);
     const generateOption = await page.$('text=Generate');
     const generateText = await generateOption.textContent();
     expect(generateText.trim()).toBe('Generate');
     await generateOption.click();
-    await page.waitForTimeout(1000);
-
+    await page.waitForTimeout(100);
     const download = await downloadPromise;
     expect(download).not.toBeNull();
-
     const path = await download.path();
     const content = fs.readFileSync(path, 'utf-8');
-
     console.log('Code length:', content.length);
     console.log('Has content:', content.length > 200);
     console.log('Contains Dense or Conv:', content.includes('Dense') || content.includes('Conv'));
-
     expect(content.length).toBeGreaterThan(200);
     expect(content.includes('Dense') || content.includes('Conv')).toBe(true);
     expect(content.includes('keras') || content.includes('tensorflow')).toBe(true);
-
     expect(consoleErrors.length).toBe(0);
   });
 
@@ -541,18 +477,15 @@ def build_model():
     // Add a Dense layer
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
-    await page.waitForTimeout(500);
-
+    await page.waitForTimeout(50);
     // Click on the layer in the canvas to select it
     const layerOnCanvas = await page.$('.d3Layer');
     await layerOnCanvas.click({ force: true });
-    await page.waitForTimeout(500);
-
+    await page.waitForTimeout(50);
     // Check if LayerOptions shows parameters
     const rightBarContent = await page.textContent('#layerOptions');
     const rightbarBlock = await page.$('#layeroptions-block');
     const isLayerSelected = await layerOnCanvas.evaluate(el => el.classList.contains('selected'));
-
     console.log('\n=== PARAMETER DISPLAY TEST ===');
     console.log('Layer is selected:', isLayerSelected);
     console.log('LayerOptions has content:', rightBarContent.length > 0);
@@ -560,7 +493,6 @@ def build_model():
     console.log('layeroptions-block exists:', rightbarBlock !== null);
     console.log('LayerOptions contains "units":', rightBarContent.includes('units'));
     console.log('LayerOptions contains "No layers selected":', rightBarContent.includes('No layers selected'));
-
     expect(rightBarContent.length).toBeGreaterThan(0);
     expect(consoleErrors.length).toBe(0);
   });
@@ -569,38 +501,29 @@ def build_model():
     // Add two layers
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
-    await page.waitForTimeout(300);
-
+    await page.waitForTimeout(30);
     await denseLayer.click();
-    await page.waitForTimeout(300);
-
+    await page.waitForTimeout(30);
     const layersAfterAdd = await page.$$eval('.d3Layer', layers => layers.length);
-
     console.log('\n=== UNDO TEST ===');
     console.log('Layers after adding 2:', layersAfterAdd);
-
     // Click Edit menu -> Undo
     const editMenu = await page.$('text=Edit');
     await editMenu.click();
-    await page.waitForTimeout(300);
-
+    await page.waitForTimeout(30);
     const undoOption = await page.$('text=Undo');
     await undoOption.click();
-    await page.waitForTimeout(500);
-
+    await page.waitForTimeout(50);
     const layersAfterUndo1 = await page.$$eval('.d3Layer', layers => layers.length);
     console.log('Layers after first undo:', layersAfterUndo1);
-
     // Undo again
     await editMenu.click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(30);
     const undoOption2 = await page.$('text=Undo');
     await undoOption2.click();
-    await page.waitForTimeout(500);
-
+    await page.waitForTimeout(50);
     const layersAfterUndo2 = await page.$$eval('.d3Layer', layers => layers.length);
     console.log('Layers after second undo:', layersAfterUndo2);
-
     expect(layersAfterUndo2).toBeLessThan(layersAfterAdd);
     expect(consoleErrors.length).toBe(0);
   });
@@ -610,15 +533,15 @@ def build_model():
     // Load a template to get a complete connected network
     const fileMenu = await page.$('text=File');
     await fileMenu.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     // Hover over Templates to open submenu
     const templatesOption = await page.$('text=Templates');
     await templatesOption.hover();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     // Select "2D Dense for MNIST" template from submenu
     const template = await page.$('text=2D Dense for MNIST');
     await template.click();
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(100);
     console.log('Loaded template: 2D Dense for MNIST');
     // Verify we have Dense layers
     const allLayersText = await page.$$eval('.d3Layer text', texts => texts.map(t => t.textContent));
@@ -628,10 +551,10 @@ def build_model():
     // Generate code BEFORE modification
     const downloadPromise1 = page.waitForEvent('download', { timeout: 5000 });
     await fileMenu.click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(30);
     const generateOption1 = await page.$('text=Generate');
     await generateOption1.click();
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(100);
     const download1 = await downloadPromise1;
     const path1 = await download1.path();
     const contentBefore = fs.readFileSync(path1, 'utf-8');
@@ -646,7 +569,7 @@ def build_model():
       // Use mouse.click to bypass text element interception
       const box = await layer.boundingBox();
       await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(100);
       const rightBarText = await page.textContent('#layerOptions');
       console.log(`Layer ${i}: First 80 chars of rightbar: "${rightBarText.substring(0, 80)}"`);
       if (rightBarText.includes('Dense') && rightBarText.includes('units')) {
@@ -664,7 +587,7 @@ def build_model():
         // Change to a distinctive value: 256
         await numberInputs[0].fill('256');
         await numberInputs[0].dispatchEvent('change');
-        await page.waitForTimeout(500);
+        await page.waitForTimeout(50);
         const newValue = await numberInputs[0].inputValue();
         console.log('Modified units value to:', newValue);
         expect(newValue).toBe('256');
@@ -675,10 +598,10 @@ def build_model():
     // Generate code AFTER modification
     const downloadPromise2 = page.waitForEvent('download', { timeout: 5000 });
     await fileMenu.click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(30);
     const generateOption2 = await page.$('text=Generate');
     await generateOption2.click();
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(100);
     const download2 = await downloadPromise2;
     const path2 = await download2.path();
     const contentAfter = fs.readFileSync(path2, 'utf-8');
@@ -695,11 +618,11 @@ def build_model():
     // Add a Dense layer
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     // Click layer to select it
     const layerOnCanvas = await page.$('.d3Layer');
     await layerOnCanvas.click({ force: true });
-    await page.waitForTimeout(1000); // Wait longer for reactive update
+    await page.waitForTimeout(100); // Wait longer for reactive update
     // Check if layeroptions-block is visible
     const rightbarBlock = await page.$('#layeroptions-block');
     console.log('\n=== BOOLEAN PARAMETER MODIFICATION TEST ===');
@@ -715,7 +638,7 @@ def build_model():
     console.log('Initial value:', initialValue);
     // Click to toggle
     await booleanSelects[0].click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     const newValue = await booleanSelects[0].evaluate(el => el.value);
     console.log('Value after click:', newValue);
     expect(newValue).not.toBe('void');
@@ -727,21 +650,21 @@ def build_model():
     // Load a template with Dropout layer (has float "rate" parameter)
     const fileMenu = await page.$('text=File');
     await fileMenu.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     const templatesOption = await page.$('text=Templates');
     await templatesOption.hover();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     const template = await page.$('text=2D Conv for MNIST');
     await template.click();
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(100);
     console.log('Loaded template: 2D Conv for MNIST');
     // Generate code BEFORE modification
     const downloadPromiseBefore = page.waitForEvent('download', { timeout: 5000 });
     await fileMenu.click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(30);
     let generateOption = await page.$('text=Generate');
     await generateOption.click();
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(100);
     const downloadBefore = await downloadPromiseBefore;
     const pathBefore = await downloadBefore.path();
     const contentBefore = fs.readFileSync(pathBefore, 'utf-8');
@@ -753,7 +676,7 @@ def build_model():
       const layer = layersOnCanvas[i];
       const box = await layer.boundingBox();
       await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(100);
       const rightBarText = await page.textContent('#layerOptions');
       if (rightBarText.includes('Dropout') && rightBarText.includes('rate')) {
         console.log('Found and selected Dropout layer');
@@ -767,7 +690,7 @@ def build_model():
         // Change to 0.75 (this is a slider, so fill works)
         await rangeInputs[0].fill('0.75');
         await rangeInputs[0].dispatchEvent('change');
-        await page.waitForTimeout(1000); // Wait for Vue reactivity
+        await page.waitForTimeout(100); // Wait for Vue reactivity
         const newValue = await rangeInputs[0].inputValue();
         console.log('Modified rate value to:', newValue);
         expect(newValue).toBe('0.75');
@@ -778,10 +701,10 @@ def build_model():
     // Generate code AFTER modification
     const downloadPromiseAfter = page.waitForEvent('download', { timeout: 5000 });
     await fileMenu.click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(30);
     generateOption = await page.$('text=Generate');
     await generateOption.click();
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(100);
     const downloadAfter = await downloadPromiseAfter;
     const pathAfter = await downloadAfter.path();
     const contentAfter = fs.readFileSync(pathAfter, 'utf-8');
@@ -799,12 +722,12 @@ def build_model():
     // Add an Input layer (has string "name" parameter)
     const inputLayer = await page.$('.LayerTemplate:has-text("Input")');
     await inputLayer.click();
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(100);
     // Click to select the Input layer
     const layerOnCanvas = await page.$('.d3Layer');
     const box = await layerOnCanvas.boundingBox();
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(100);
     const rightBarText = await page.textContent('#layerOptions');
     console.log('LayerOptions contains Input:', rightBarText.includes('Input'));
     // Find text input for "name" parameter
@@ -818,7 +741,7 @@ def build_model():
     // Set a distinctive name
     await nameInput.fill('test_input_layer');
     await nameInput.dispatchEvent('change');
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(100);
     const newValue = await nameInput.inputValue();
     console.log('Modified name value to:', newValue);
     expect(newValue).toBe('test_input_layer');
@@ -826,10 +749,10 @@ def build_model():
     const downloadPromise = page.waitForEvent('download', { timeout: 5000 });
     const fileMenu = await page.$('text=File');
     await fileMenu.click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(30);
     const generateOption = await page.$('text=Generate');
     await generateOption.click();
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(100);
     const download = await downloadPromise;
     const path = await download.path();
     const content = fs.readFileSync(path, 'utf-8');
@@ -844,13 +767,13 @@ def build_model():
     // Load template with Conv2D (has tuple "kernel_size" parameter)
     const fileMenu = await page.$('text=File');
     await fileMenu.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     const templatesOption = await page.$('text=Templates');
     await templatesOption.hover();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     const template = await page.$('text=2D Conv for MNIST');
     await template.click();
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(100);
     // Find and select Conv2D layer
     const layersOnCanvas = await page.$$('.d3Layer');
     let conv2dLayerFound = false;
@@ -858,7 +781,7 @@ def build_model():
       const layer = layersOnCanvas[i];
       const box = await layer.boundingBox();
       await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(100);
       const rightBarText = await page.textContent('#layerOptions');
       if (rightBarText.includes('Conv2D') && rightBarText.includes('kernel_size')) {
         console.log('Found and selected Conv2D layer');
@@ -880,10 +803,10 @@ def build_model():
         // Change kernel_size (indices 1,2) to (5, 5)
         await tupleInputs[1].fill('5');
         await tupleInputs[1].dispatchEvent('change');
-        await page.waitForTimeout(200);
+        await page.waitForTimeout(20);
         await tupleInputs[2].fill('5');
         await tupleInputs[2].dispatchEvent('change');
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(100);
         const newValue1 = await tupleInputs[1].inputValue();
         const newValue2 = await tupleInputs[2].inputValue();
         console.log(`Modified kernel_size to: (${newValue1}, ${newValue2})`);
@@ -896,10 +819,10 @@ def build_model():
     // Generate code and verify
     const downloadPromise = page.waitForEvent('download', { timeout: 5000 });
     await fileMenu.click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(30);
     const generateOption = await page.$('text=Generate');
     await generateOption.click();
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(100);
     const download = await downloadPromise;
     const path = await download.path();
     const content = fs.readFileSync(path, 'utf-8');
@@ -914,13 +837,13 @@ def build_model():
     // Load template with Flatten (has list "data_format" parameter)
     const fileMenu = await page.$('text=File');
     await fileMenu.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     const templatesOption = await page.$('text=Templates');
     await templatesOption.hover();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     const template = await page.$('text=2D Dense for MNIST');
     await template.click();
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(100);
     // Find and select Flatten layer
     const layersOnCanvas = await page.$$('.d3Layer');
     let flattenLayerFound = false;
@@ -928,7 +851,7 @@ def build_model():
       const layer = layersOnCanvas[i];
       const box = await layer.boundingBox();
       await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(100);
       const rightBarText = await page.textContent('#layerOptions');
       if (rightBarText.includes('Flatten') && rightBarText.includes('data_format')) {
         console.log('Found and selected Flatten layer');
@@ -942,7 +865,7 @@ def build_model():
         // Change to channels_first
         await selectInputs[0].selectOption('channels_first');
         await selectInputs[0].dispatchEvent('change');
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(100);
         const newValue = await selectInputs[0].evaluate(el => el.value);
         console.log('Modified data_format to:', newValue);
         expect(newValue).toBe('channels_first');
@@ -953,10 +876,10 @@ def build_model():
     // Generate code and verify
     const downloadPromise = page.waitForEvent('download', { timeout: 5000 });
     await fileMenu.click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(30);
     const generateOption = await page.$('text=Generate');
     await generateOption.click();
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(100);
     const download = await downloadPromise;
     const path = await download.path();
     const content = fs.readFileSync(path, 'utf-8');
@@ -970,14 +893,14 @@ def build_model():
     // Add a layer
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     const layersBeforeDelete = await page.$$eval('.d3Layer', layers => layers.length);
     // Click on the layer using force to bypass the text element
     const d3LayerElement = await page.$('.d3Layer');
     const box = await d3LayerElement.boundingBox();
     // Click in the center of the layer
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     // Check if layer is selected (has 'selected' class)
     const isSelected = await d3LayerElement.evaluate(el => el.classList.contains('selected'));
     console.log('\n=== LAYER DELETION TEST ===');
@@ -985,14 +908,14 @@ def build_model():
     console.log('Layer is selected:', isSelected);
     // Try Backspace first (as per KeyboardListener.js)
     await page.keyboard.press('Backspace');
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     let layersAfterDelete = await page.$$eval('.d3Layer', layers => layers.length);
     console.log('Layers after Backspace:', layersAfterDelete);
     // If Backspace didn't work, try Delete
     // TODO Actually 2 separate tests for delete and backspace
     if (layersAfterDelete === layersBeforeDelete) {
       await page.keyboard.press('Delete');
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(50);
       layersAfterDelete = await page.$$eval('.d3Layer', layers => layers.length);
       console.log('Layers after Delete:', layersAfterDelete);
     }
@@ -1005,10 +928,10 @@ def build_model():
     // Add two different layers
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     const dropoutLayer = await page.$('.LayerTemplate:has-text("Dropout")');
     await dropoutLayer.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     const layersCount = await page.$$eval('.d3Layer', layers => layers.length);
     console.log('Total layers:', layersCount);
     expect(layersCount).toBe(2);
@@ -1016,7 +939,7 @@ def build_model():
     const firstLayer = await page.$('.d3Layer');
     const box = await firstLayer.boundingBox();
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     // Check what LayerOptions shows (could be Dense or Dropout depending on layer order)
     const layerOptionsBeforeDelete = await page.textContent('#layerOptions');
     console.log('LayerOptions before delete (first 100 chars):', layerOptionsBeforeDelete.substring(0, 100));
@@ -1032,7 +955,7 @@ def build_model():
     console.log('Selected layer:', selectedLayerName);
     // Delete the layer
     await page.keyboard.press('Backspace');
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     const layersAfterDelete = await page.$$eval('.d3Layer', layers => layers.length);
     console.log('Layers after delete:', layersAfterDelete);
     expect(layersAfterDelete).toBe(1);
@@ -1215,7 +1138,7 @@ def build_model():
     // Add a layer
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     const layersAfterAdd = await page.$$eval('.d3Layer', layers => layers.length);
     console.log('\n=== REDO TEST ===');
     console.log('Layers after adding:', layersAfterAdd);
@@ -1247,13 +1170,11 @@ def build_model():
       window.nnvpDebugDatasets = true;
     });
     console.log('Dataset debug logging enabled');
-
     // Open TrainingZone by clicking "Training" in GeneralMenu
     const trainingMenu = await page.$('text=Training');
     await trainingMenu.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     console.log('Clicked Training menu to open TrainingZone');
-
     // Verify TrainingZone is now visible
     const bottomTrainer = await page.$('#trainingZone');
     expect(bottomTrainer).not.toBeNull();
@@ -1261,7 +1182,7 @@ def build_model():
     // Click Dataset tab
     const datasetTab = await page.$('.TrainingZone.bar-button:has-text("Dataset")');
     await datasetTab.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     console.log('Dataset tab clicked');
     // Verify dataset selector exists
     const datasetSelector = await page.$('#dataset-selector-selector');
@@ -1286,7 +1207,7 @@ def build_model():
     expect(initialDescription.length).toBeGreaterThan(20);
     // Wait for MNIST auto-load to start (3 second setTimeout in mounted())
     console.log('Waiting for MNIST auto-load to start (3s timeout in mounted())...');
-    await page.waitForTimeout(4000);
+    await page.waitForTimeout(50);
     // Check debug logs immediately to see if loading started
     let datasetLogs = consoleMessages.filter(msg =>
       msg.text.includes('[DatasetSelector]') || msg.text.includes('[TrainingZone]')
@@ -1327,7 +1248,7 @@ def build_model():
     // If no canvases, wait a bit more
     if (samplesDebug.canvasCount === 0) {
       console.log('No canvases yet, waiting 5 more seconds...');
-      await page.waitForTimeout(5000);
+      await page.waitForTimeout(50);
 
       const samplesDebug2 = await page.evaluate(() => {
         const samplesDiv = document.querySelector('#samples');
@@ -1379,21 +1300,19 @@ def build_model():
     await page.evaluate(() => {
       window.nnvpDebugDatasets = true;
     });
-
     // Open TrainingZone by clicking "Training" in GeneralMenu
     const trainingMenu = await page.$('text=Training');
     await trainingMenu.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     console.log('Opened TrainingZone');
-
     // Go to Dataset tab
     const datasetTab = await page.$('.TrainingZone.bar-button:has-text("Dataset")');
     await datasetTab.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     const datasetSelector = await page.$('#dataset-selector-selector');
     // Wait for MNIST auto-load to complete
     console.log('Waiting for MNIST auto-load...');
-    await page.waitForTimeout(4000);
+    await page.waitForTimeout(50);
     await page.waitForFunction(
       () => {
         const samplesDiv = document.querySelector('#samples');
@@ -1427,7 +1346,7 @@ def build_model():
     console.log('Changing to FashionMNIST...');
     await page.selectOption('#dataset-selector-selector', 'FashionMNIST');
     // Wait for FashionMNIST to load
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(50);
     // Verify selector changed
     const newDataset = await datasetSelector.evaluate(el => el.value);
     console.log('Selector value:', newDataset);
@@ -1491,21 +1410,19 @@ def build_model():
     await page.evaluate(() => {
       window.nnvpDebugDatasets = true;
     });
-
     // Open TrainingZone by clicking "Training" in GeneralMenu
     const trainingMenu = await page.$('text=Training');
     await trainingMenu.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     console.log('Opened TrainingZone');
-
     // Go to Dataset tab
     const datasetTab = await page.$('.TrainingZone.bar-button:has-text("Dataset")');
     await datasetTab.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     const datasetSelector = await page.$('#dataset-selector-selector');
     // Wait for MNIST auto-load
     console.log('Waiting for initial MNIST...');
-    await page.waitForTimeout(4000);
+    await page.waitForTimeout(50);
     await page.waitForFunction(
       () => {
         const samplesDiv = document.querySelector('#samples');
@@ -1517,7 +1434,7 @@ def build_model():
     // Change to FashionMNIST using the dropdown selector
     console.log('Loading FashionMNIST...');
     await page.selectOption('#dataset-selector-selector', 'FashionMNIST');
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(100);
     // Wait for FashionMNIST to load
     await page.waitForFunction(
       () => {
@@ -1548,7 +1465,7 @@ def build_model():
     // Now reload MNIST using the dropdown selector
     console.log('Reloading MNIST...');
     await page.selectOption('#dataset-selector-selector', 'MNIST');
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(100);
     // Verify selector changed back
     const finalDataset = await datasetSelector.evaluate(el => el.value);
     console.log('Final selector value:', finalDataset);
@@ -1607,13 +1524,13 @@ def build_model():
     console.log('\n=== EDGE DELETION TEST ===');
     // Load a template with connected layers
     await page.click('text=File');
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     const templatesOption = await page.$('text=Templates');
     await templatesOption.hover();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     const template = await page.$('text=2D Dense for MNIST');
     await template.click();
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(100);
     // Count initial edges
     const initialEdges = await page.$$('.edge');
     console.log('Initial edges:', initialEdges.length);
@@ -1627,14 +1544,14 @@ def build_model():
     expect(firstEdge).not.toBeNull();
     const edgeBox = await firstEdge.boundingBox();
     await page.mouse.click(edgeBox.x + edgeBox.width / 2, edgeBox.y + edgeBox.height / 2);
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     // Verify edge is selected
     const selectedEdge = await page.$('.edge.selected');
     expect(selectedEdge).not.toBeNull();
     console.log('Edge selected:', await selectedEdge.evaluate(el => el.id));
     // Press Backspace key to delete the edge (alternative to Delete)
     await page.keyboard.press('Backspace');
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(100);
     // Count edges after deletion
     const edgesAfter = await page.$$('.edge');
     console.log('Edges after deletion:', edgesAfter.length);
@@ -1648,16 +1565,15 @@ def build_model():
 
   test('should redraw deleted edge and verify network is valid again', async ({ page }) => {
     console.log('\n=== EDGE RECREATION TEST ===');
-
     // Load a template with connected layers
     await page.click('text=File');
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     const templatesOption = await page.$('text=Templates');
     await templatesOption.hover();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     const template = await page.$('text=2D Dense for MNIST');
     await template.click();
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(100);
     // Get all layers to identify source and target for reconnection
     const layers = await page.$$('.d3Layer');
     console.log('Total layers:', layers.length);
@@ -1672,9 +1588,9 @@ def build_model():
     const firstEdgePath = await page.$('.edge path');
     const edgeBox = await firstEdgePath.boundingBox();
     await page.mouse.click(edgeBox.x + edgeBox.width / 2, edgeBox.y + edgeBox.height / 2);
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     await page.keyboard.press('Backspace');
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(100);
     // Verify edge was deleted
     const edgesAfterDelete = await page.$$('.edge');
     expect(edgesAfterDelete.length).toBe(initialEdges.length - 1);
@@ -1691,13 +1607,13 @@ def build_model():
     const targetBox = await targetLayer.boundingBox();
     // Drag from source anchor to target layer center
     await page.mouse.move(sourceBox.x + sourceBox.width/2, sourceBox.y + sourceBox.height/2);
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(100);
     await page.mouse.down();
     await page.waitForTimeout(200);
     await page.mouse.move(targetBox.x + targetBox.width/2, targetBox.y + targetBox.height/2);
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(200);
     await page.mouse.up();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(300);
     // Count edges after reconnection
     const edgesAfterReconnect = await page.$$('.edge');
     console.log('Edges after reconnection:', edgesAfterReconnect.length);
@@ -1713,13 +1629,13 @@ def build_model():
     console.log('\n=== NODE MANIPULATION TEST ===');
     // Load a template with multiple connected layers
     await page.click('text=File');
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     const templatesOption = await page.$('text=Templates');
     await templatesOption.hover();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     const template = await page.$('text=2D Dense for MNIST');
     await template.click();
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(100);
     // Get initial state
     const initialLayers = await page.$$('.d3Layer');
     const initialEdges = await page.$$('.edge');
@@ -1729,14 +1645,14 @@ def build_model():
     const denseLayer = initialLayers[2];
     const denseBox = await denseLayer.boundingBox();
     await page.mouse.click(denseBox.x + denseBox.width / 2, denseBox.y + denseBox.height / 2);
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     // Verify layer is selected
     const isSelected = await denseLayer.evaluate(el => el.classList.contains('selected'));
     console.log('Dense layer selected:', isSelected);
     expect(isSelected).toBe(true);
     // Delete the layer
     await page.keyboard.press('Backspace');
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(100);
     // Verify layer was deleted
     const layersAfterDelete = await page.$$('.d3Layer');
     const edgesAfterDelete = await page.$$('.edge');
@@ -1750,7 +1666,7 @@ def build_model():
     // Re-add a Dense layer
     const denseTemplate = await page.$('.LayerTemplate:has-text("Dense")');
     await denseTemplate.click();
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(100);
     // Verify layer was added
     const layersAfterAdd = await page.$$('.d3Layer');
     console.log('Layers after re-adding Dense:', layersAfterAdd.length);
@@ -1759,7 +1675,7 @@ def build_model():
     const newDenseLayer = layersAfterAdd[layersAfterAdd.length - 1];
     const newDenseBox = await newDenseLayer.boundingBox();
     await page.mouse.click(newDenseBox.x + newDenseBox.width / 2, newDenseBox.y + newDenseBox.height / 2);
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     // Verify LayerOptions shows parameters
     const rightBarText = await page.textContent('#layeroptions-block');
     console.log('LayerOptions shows Dense parameters:', rightBarText.includes('units'));
@@ -1768,7 +1684,7 @@ def build_model():
     const unitsInput = await page.$('#layeroptions-block input[type="number"]');
     await unitsInput.fill('128');
     await unitsInput.dispatchEvent('change');
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     const unitsValue = await unitsInput.inputValue();
     console.log('Set units to:', unitsValue);
     expect(unitsValue).toBe('128');
@@ -1794,13 +1710,13 @@ def build_model():
     const newDenseLayerFinal = allLayersAfterAdd[4];
     const newDenseBoxFinal = await newDenseLayerFinal.boundingBox();
     await page.mouse.move(flattenAnchorBox.x + flattenAnchorBox.width/2, flattenAnchorBox.y + flattenAnchorBox.height/2);
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(20);
     await page.mouse.down();
     await page.waitForTimeout(200);
     await page.mouse.move(newDenseBoxFinal.x + newDenseBoxFinal.width/2, newDenseBoxFinal.y + newDenseBoxFinal.height/2);
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(30);
     await page.mouse.up();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(300);
     console.log('Connected Flatten to new Dense');
     let currentEdges = await page.$$('.edge');
     console.log('Edges after first connection:', currentEdges.length);
@@ -1812,13 +1728,13 @@ def build_model():
     await page.mouse.move(
       newDenseAnchorBox.x + newDenseAnchorBox.width/2, newDenseAnchorBox.y + newDenseAnchorBox.height/2
     );
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(20);
     await page.mouse.down();
     await page.waitForTimeout(200);
     await page.mouse.move(oldDenseBox.x + oldDenseBox.width/2, oldDenseBox.y + oldDenseBox.height/2);
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(30);
     await page.mouse.up();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(300);
     console.log('Connected new Dense to old Dense');
     currentEdges = await page.$$('.edge');
     console.log('Edges after second connection:', currentEdges.length);
@@ -1834,10 +1750,10 @@ def build_model():
     const fileMenu = await page.$('text=File');
     const downloadPromise = page.waitForEvent('download', { timeout: 10000 });
     await fileMenu.click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(30);
     const generateOption = await page.$('text=Generate');
     await generateOption.click();
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(100);
     const download = await downloadPromise;
     const path = await download.path();
     const content = fs.readFileSync(path, 'utf8');
@@ -1882,20 +1798,20 @@ def build_model():
     // Navigate to the app with CPU backend parameter
     // This forces TensorFlow.js to use CPU instead of WebGL (which doesn't work in xvfb)
     await page.goto('http://localhost:5173?backend=cpu');
-    await page.waitForTimeout(2000); // Wait for CPU backend to initialize
+    await page.waitForTimeout(100); // Wait for CPU backend to initialize
     // Load a template for training
     await page.click('text=File');
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     const templatesOption = await page.$('text=Templates');
     await templatesOption.hover();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     const template = await page.$('text=2D Dense for MNIST');
     await template.click();
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(100);
     console.log('Loaded template: 2D Dense for MNIST');
     // Open Training panel via top menu
     await page.click('text=Training');
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(100);
     // Verify TrainingZone is visible
     const bottomTrainer = await page.$('#trainingZone');
     expect(bottomTrainer).not.toBeNull();
@@ -1908,7 +1824,7 @@ def build_model():
     console.log('Enabled debug logging');
     // Click Dataset tab to show the dataset selector
     await page.click('text=Dataset');
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(100);
     console.log('Dataset tab clicked');
     // Select MNIST from the dropdown
     const datasetSelector = await page.$('#dataset-selector-selector');
@@ -1917,7 +1833,7 @@ def build_model():
     console.log('Selected MNIST from dropdown');
     // Wait for dataset loading to complete
     // The loading bar should appear and then disappear
-    await page.waitForTimeout(2000); // Give it time to start loading
+    await page.waitForTimeout(100); // Give it time to start loading
     // Wait for loading to complete (loading bar to disappear)
     try {
       await page.waitForSelector('#data-selector-loading-bar-container', { state: 'hidden', timeout: 30000 });
@@ -1927,12 +1843,12 @@ def build_model():
     }
     // Now click Options tab to set epochs
     await page.click('text=Options');
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     // Set epochs to 10 for meaningful training progress verification
     const epochsInput = await page.$('#CompileOptions input[type="number"]');
     await epochsInput.fill('10');
     await epochsInput.dispatchEvent('input');
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(30);
     const epochsValue = await epochsInput.inputValue();
     console.log('Set epochs to:', epochsValue);
     expect(epochsValue).toBe('10');
@@ -1940,7 +1856,7 @@ def build_model():
     const optimizerSelector = await page.$('#optimizer-selector select');
     expect(optimizerSelector).not.toBeNull();
     await optimizerSelector.selectOption('adam');
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(30);
     const optimizerValue = await optimizerSelector.inputValue();
     console.log('Set optimizer to:', optimizerValue);
     expect(optimizerValue).toBe('adam');
@@ -1958,7 +1874,7 @@ def build_model():
     await trainButton.click({ force: true });
     console.log('Clicked Train button (method 1: direct element click)');
     // Wait for either training to start or an alert
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(30);
     // Check if we got any alerts
     if (alerts.length > 0) {
       console.log('Alerts received:', alerts);
@@ -1976,7 +1892,7 @@ def build_model():
       }
       // Wait a bit more in case training is slow to start
       console.log('Waiting 5 more seconds...');
-      await page.waitForTimeout(5000);
+      await page.waitForTimeout(50);
       stopButton = await page.$('text=Stop');
       console.log('Stop button found after 8s total:', stopButton !== null);
       if (!stopButton) {
@@ -1994,8 +1910,8 @@ def build_model():
         });
       }
     }
-    //     expect(stopButton).not.toBeNull();
-    console.log('Training started (Stop button visible)');
+    // expect(stopButton).not.toBeNull();  // May want to actually check for the stop button
+    console.log('Training started');
     // Verify Charts tab is active (automatically switches during training)
     const chartsPanel = await page.$('#Charts');
     expect(chartsPanel).not.toBeNull();
@@ -2012,6 +1928,8 @@ def build_model():
     // WARNING: BEGIN TOOLTIP TEST ZONE, SHOULD PUT IN ANOTHER SPECIFIC TEST - BUT ACTUALLY ENABLES TO VERIFY COHERENCE
     // Test tooltip functionality by hovering over a chart point
     console.log('Testing tooltip functionality...');
+    // Additional time after training completion
+    await page.waitForTimeout(2000);
     // Find all hover points in the epoch chart (second chart)
     const hoverPoints = await page.$$('svg.line-chart-svg circle.hover-point');
     expect(hoverPoints.length).toBeGreaterThan(0);
@@ -2138,9 +2056,9 @@ def build_model():
     // Add two layers
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     await denseLayer.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     const layers = await page.$$('.d3Layer');
     console.log('Added layers:', layers.length);
     expect(layers.length).toBe(2);
@@ -2151,7 +2069,7 @@ def build_model():
     await page.mouse.down();
     await page.mouse.move(layer1Box.x + layer1Box.width/2, layer1Box.y + layer1Box.height/2 + 150);
     await page.mouse.up();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(300);
     // Get initial edge count
     const edgesBefore = await page.$$('.edge');
     console.log('Edges before drag:', edgesBefore.length);
@@ -2162,13 +2080,13 @@ def build_model():
     const targetBox = await targetLayer.boundingBox();
     console.log('Dragging from layer 0 bottom handle to layer 1...');
     await page.mouse.move(sourceBox.x + sourceBox.width/2, sourceBox.y + sourceBox.height/2);
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(100);
     await page.mouse.down();
     await page.waitForTimeout(200);
     await page.mouse.move(targetBox.x + targetBox.width/2, targetBox.y + targetBox.height/2);
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(200);
     await page.mouse.up();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(300);
     // Verify edge was created
     const edgesAfter = await page.$$('.edge');
     console.log('Edges after drag:', edgesAfter.length);
@@ -2181,9 +2099,9 @@ def build_model():
     // Add two layers
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     await denseLayer.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     const layers = await page.$$('.d3Layer');
     console.log('Added layers:', layers.length);
     expect(layers.length).toBe(2);
@@ -2194,7 +2112,7 @@ def build_model():
     await page.mouse.down();
     await page.mouse.move(layer1Box.x + layer1Box.width/2, layer1Box.y + layer1Box.height/2 + 150);
     await page.mouse.up();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(300);
     // Get initial edge count
     const edgesBefore = await page.$$('.edge');
     console.log('Edges before click-to-link:', edgesBefore.length);
@@ -2202,7 +2120,7 @@ def build_model():
     const sourceHandle = await page.$('#d3-layer-0 circle.bottom-point');
     console.log('Clicking source handle to enter link mode...');
     await sourceHandle.click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(30);
     // Verify link mode active by checking if handle has link-source-active class
     const hasActiveClass = await sourceHandle.evaluate(el => el.classList.contains('link-source-active'));
     console.log('Source handle has link-source-active class:', hasActiveClass);
@@ -2211,7 +2129,7 @@ def build_model():
     const targetHandle = await page.$('#d3-layer-1 circle.top-point');
     console.log('Clicking target handle to create edge...');
     await targetHandle.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     // Verify edge was created
     const edgesAfter = await page.$$('.edge');
     console.log('Edges after click-to-link:', edgesAfter.length);
@@ -2228,12 +2146,12 @@ def build_model():
     // Add one layer
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     // Click handle to enter link mode
     const sourceHandle = await page.$('#d3-layer-0 circle.bottom-point');
     console.log('Entering link mode...');
     await sourceHandle.click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(30);
     // Verify link mode active
     const hasActiveClass = await sourceHandle.evaluate(el => el.classList.contains('link-source-active'));
     console.log('Link mode active:', hasActiveClass);
@@ -2241,7 +2159,7 @@ def build_model():
     // Press ESC to cancel
     console.log('Pressing ESC to cancel...');
     await page.keyboard.press('Escape');
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(30);
     // Verify link mode exited
     const stillActive = await sourceHandle.evaluate(el => el.classList.contains('link-source-active'));
     console.log('Link mode cancelled (class removed):', !stillActive);
@@ -2254,12 +2172,12 @@ def build_model():
     // Add one layer
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     // Click handle to enter link mode
     const sourceHandle = await page.$('#d3-layer-0 circle.bottom-point');
     console.log('Entering link mode...');
     await sourceHandle.click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(30);
     // Verify link mode active
     const hasActiveClass = await sourceHandle.evaluate(el => el.classList.contains('link-source-active'));
     console.log('Link mode active:', hasActiveClass);
@@ -2272,7 +2190,7 @@ def build_model():
     // The LayerCatalog is on the left (~234px), GeneralMenu on top (~46px)
     // So click at around x=400, y=300 which should be clear
     await page.mouse.click(svgBox.x + 400, svgBox.y + 300);
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(30);
     // Verify link mode exited
     const stillActive = await sourceHandle.evaluate(el => el.classList.contains('link-source-active'));
     console.log('Link mode cancelled (class removed):', !stillActive);
@@ -2285,12 +2203,12 @@ def build_model():
     // Add one layer
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     // Click handle to enter link mode
     const sourceHandle = await page.$('#d3-layer-0 circle.bottom-point');
     console.log('Entering link mode...');
     await sourceHandle.click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(30);
     // Verify link mode active
     const hasActiveClass = await sourceHandle.evaluate(el => el.classList.contains('link-source-active'));
     console.log('Link mode active:', hasActiveClass);
@@ -2298,7 +2216,7 @@ def build_model():
     // Click same handle again to cancel
     console.log('Clicking same handle to cancel...');
     await sourceHandle.click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(30);
     // Verify link mode exited
     const stillActive = await sourceHandle.evaluate(el => el.classList.contains('link-source-active'));
     console.log('Link mode cancelled (class removed):', !stillActive);
@@ -2313,7 +2231,7 @@ def build_model():
     expect(aboutMenu).not.toBeNull();
     console.log('Clicking About menu...');
     await aboutMenu.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(50);
     // Verify modal is visible
     const modal = await page.$('.modal-overlay');
     expect(modal).not.toBeNull();
@@ -2334,7 +2252,8 @@ def build_model():
     expect(closeButton).not.toBeNull();
     console.log('Clicking close button...');
     await closeButton.click();
-    await page.waitForTimeout(500);
+    // close animation
+    await page.waitForTimeout(1000);
     // Verify modal is closed
     const modalAfterClose = await page.$('.modal-overlay');
     const isVisibleAfterClose = modalAfterClose ? await modalAfterClose.isVisible() : false;
@@ -2343,11 +2262,11 @@ def build_model():
     // Test opening again and closing with ESC
     console.log('Testing ESC key close...');
     await aboutMenu.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1000);
     const modalReopened = await page.$('.modal-overlay');
     expect(await modalReopened.isVisible()).toBe(true);
     await page.keyboard.press('Escape');
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1000);
     const modalAfterEsc = await page.$('.modal-overlay');
     const isVisibleAfterEsc = modalAfterEsc ? await modalAfterEsc.isVisible() : false;
     console.log('Modal visible after ESC:', isVisibleAfterEsc);
@@ -2355,13 +2274,13 @@ def build_model():
     // Test closing by clicking overlay
     console.log('Testing overlay click close...');
     await aboutMenu.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1000);
     const overlayReopened = await page.$('.modal-overlay');
     expect(await overlayReopened.isVisible()).toBe(true);
     // Click on the overlay (not the modal container)
     const overlayBox = await overlayReopened.boundingBox();
     await page.mouse.click(overlayBox.x + 10, overlayBox.y + 10);
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1000);
     const modalAfterOverlayClick = await page.$('.modal-overlay');
     const isVisibleAfterOverlay = modalAfterOverlayClick ? await modalAfterOverlayClick.isVisible() : false;
     console.log('Modal visible after overlay click:', isVisibleAfterOverlay);
