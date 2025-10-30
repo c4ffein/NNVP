@@ -176,13 +176,15 @@ export default {
 
 .modal-content a {
   color: #000000;
-  text-decoration: underline;
+  text-decoration: none;
   font-weight: var(--font-weight-medium);
-  transition: opacity 0.2s;
+  display: inline-block;
+  transition: transform 0.15s ease;
 }
 
 .modal-content a:hover {
-  opacity: 0.6;
+  transform: translate(1px, -1px);
+  cursor: pointer;
 }
 
 .tech-stack {

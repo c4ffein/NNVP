@@ -3,25 +3,18 @@
     draggable="true"
     v-on:dragstart="$event.dataTransfer.setData('text/html', '<h1>test</h1>')"
     @click="$d3Interface.addLayer(layerContent.clone())"
-    @mouseenter="isHovered = true"
-    @mouseleave="isHovered = false"
   >
     {{ this.layerName }}
-    <AnimatedUnderline :isHovered="isHovered" />
   </div>
 </template>
 
 <script>
-import AnimatedUnderline from '../AnimatedUnderline.vue';
-
 export default {
   name: 'LayerTemplate',
   components: {
-    AnimatedUnderline,
   },
   data() {
     return {
-      isHovered: false,
     };
   },
   methods: {
@@ -46,5 +39,11 @@ export default {
   text-align: left;
   padding: 3px;
   position: relative;
+  transition: transform 0.15s ease;
+}
+
+.LayerTemplate:hover {
+  transform: translate(1px, -1px);
+  cursor: pointer;
 }
 </style>

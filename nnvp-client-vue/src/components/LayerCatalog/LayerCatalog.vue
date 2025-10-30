@@ -17,12 +17,9 @@
         class="title"
         v-on:click="toggleCategory(divId(categoryName))"
         v-if="layersNotEmptyAfterSearch(layers, categoryName)"
-        @mouseenter="hoveredCategory = categoryName"
-        @mouseleave="hoveredCategory = null"
       >
         <div class="text">{{ categoryName }}</div>
         <div class="arrow">▲</div>
-        <AnimatedUnderline :isHovered="hoveredCategory === categoryName" />
       </div>
       <div class="layerList">
         <LayerTemplate
@@ -37,13 +34,11 @@
 
 <script>
 import LayerTemplate from './LayerTemplate.vue';
-import AnimatedUnderline from '../AnimatedUnderline.vue';
 
 export default {
   name: 'LayerCatalog',
   components: {
     LayerTemplate,
-    AnimatedUnderline,
   },
   methods: {
     toggleCategory: categoryDiv => document.getElementById(categoryDiv).classList.toggle('closed'),
@@ -91,7 +86,6 @@ export default {
   data: () => ({
     searchBox: '',
     reloadKey: 0,
-    hoveredCategory: null,
   }),
   mounted() {
     this.$d3Interface.setLeftBarRemountCallback(this.remount);
@@ -167,6 +161,12 @@ export default {
   text-align: left;
   padding: 8px 12px;
   color: #000000;
+  transition: transform 0.15s ease;
+}
+
+.LayerCatalog > .layerCategory > .title:hover > .text {
+  transform: translate(1px, -1px);
+  cursor: pointer;
 }
 .LayerCatalog > .layerCategory > .title > .arrow {
   color: #000000;

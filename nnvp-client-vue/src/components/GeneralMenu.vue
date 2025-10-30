@@ -1,10 +1,7 @@
 <script lang="jsx">
-import AnimatedUnderline from './AnimatedUnderline.vue';
-
 export default {
   name: 'GeneralMenu',
   components: {
-    AnimatedUnderline
   },
   render(h) { // eslint-disable-line
     // Force reactivity by accessing refreshKey
@@ -21,12 +18,9 @@ export default {
               class={`menuItem GeneralMenu ${isDisabled ? 'disabled' : ''}`}
               onClick={() => this.levelNClickHandler(entry[0], entry[1])}
               onMouseover={event => this.levelNHoverHandler(entry[0], entry[1], event, level)}
-              onMouseenter={() => this.hoveredDropdownItem = itemKey}
-              onMouseleave={() => this.hoveredDropdownItem = null}
             >
               <div class="GeneralMenu dropdown-item-content">
                 {entry[0].replace('_', ' ')}
-                {!isDisabled && <AnimatedUnderline isHovered={this.hoveredDropdownItem === itemKey} />}
               </div>
               {generateMenu(entry[1], level + 1)}
             </li>
@@ -43,11 +37,8 @@ export default {
             <div class="menuTitle GeneralMenu"
               onClick={event => this.level0ClickHandler(object[0], object[1], event)}
               onMouseover={event => this.level0HoverHandler(object[0], object[1], event)}
-              onMouseenter={() => this.hoveredMenuIndex = i}
-              onMouseleave={() => this.hoveredMenuIndex = null}
             >
               {object[0]}
-              <AnimatedUnderline isHovered={this.hoveredMenuIndex === i} />
             </div>
             {generateMenu(object[1], 1)}
           </li>
@@ -57,8 +48,6 @@ export default {
   },
   data() {
     return {
-      hoveredMenuIndex: null,
-      hoveredDropdownItem: null,
       menu: {
         File: {
           New() { this.$d3Interface.clearBoard(); },
@@ -239,7 +228,6 @@ export default {
   overflow: visible;
   position: relative;
 }
-/* Hover background removed - using animated underline instead */
 .menuTitle {
   display: flex;
   align-items: center;
@@ -248,8 +236,13 @@ export default {
   height: 100%;
   width: 100%;
   position: relative;
+  transition: transform 0.15s ease;
 }
-/* Animated underline is now handled by AnimatedUnderline component */
+
+.menuTitle:hover {
+  transform: translate(1px, -1px);
+  cursor: pointer;
+}
 #GeneralMenu .dropdown-content {
   display: none;
   position: absolute;
@@ -272,7 +265,12 @@ export default {
  text-align: left;
  margin: 2px 2px 2px 2px;
  border-radius: 2px;
- transition: 0.2s;
+ transition: transform 0.15s ease;
+}
+
+.dropdown-content .menuItem:not(.disabled):hover {
+  transform: translate(1px, -1px);
+  cursor: pointer;
 }
 .dropdown-content .menuItem.disabled {
   color: #000000;

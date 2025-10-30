@@ -1076,21 +1076,22 @@ def build_model():
     // 9. After re-adding the node manually - should show new layer when selected
     const dropoutLayer = await page.$('.LayerTemplate:has-text("Dropout")');
     await dropoutLayer.click();
-    await page.waitForTimeout(10);
+    await page.waitForTimeout(100);  // Longer wait for layer to be added and positioned
     // Click on the newly added layer to select it
     const newLayer = await page.$$('.d3Layer');
     const lastLayer = newLayer[newLayer.length - 1];
     const newBox = await lastLayer.boundingBox();
     await page.mouse.click(newBox.x + newBox.width / 2, newBox.y + newBox.height / 2);
-    await page.waitForTimeout(10);
+    await page.waitForTimeout(100);  // Longer wait for selection to register
     layerOptions = await page.textContent('#layerOptions');
     expect(layerOptions).toContain('Dropout');
     expect(layerOptions).toContain('rate');
     console.log('✓ Step 9: After re-adding node manually, shows Dropout layer parameters');
     // 9b. Final Network Overview verification - deselect and check all numbers
-    // Click on empty SVG space to deselect (same approach as step 2b)
-    await page.mouse.click(svgBox.x + 50, svgBox.y + 50);
-    await page.waitForTimeout(10);
+    // Click directly on the canvas background to deselect
+    const canvasBackground = await page.$('.canvas-background');
+    await canvasBackground.click();
+    await page.waitForTimeout(50);
     const finalLayersCount = await page.$$eval('.d3Layer', layers => layers.length);
     expect(finalLayersCount).toBe(layersCount - 1); // One less than template (deleted 2, added 1 back)
     layerOptions = await page.textContent('#layerOptions');
@@ -1734,9 +1735,11 @@ def build_model():
   // big e2e test to ensure the whole typical workflow works
   // this may be against the "easy to debug" practices
   // but there are other tests to help you debug specific features anyway
-  test('should complete full MNIST training workflow', async ({ browser }) => {
-    test.slow(); // Mark as slow test - training takes time with 10 epochs
-    test.setTimeout(120000); // Set explicit timeout of 2 minutes for training
+  // Training tests run serially to avoid resource contention
+  test.describe.serial('Training tests', () => {
+    test('should complete full MNIST training workflow', async ({ browser }) => {
+      test.slow(); // Mark as slow test - training takes time with 10 epochs
+      test.setTimeout(120000); // Set explicit timeout of 2 minutes for training
     console.log('\n=== MNIST TRAINING WORKFLOW TEST ===');
     // Create a new context
     const context = await browser.newContext();
@@ -1897,8 +1900,8 @@ def build_model():
     // WARNING: BEGIN TOOLTIP TEST ZONE, SHOULD PUT IN ANOTHER SPECIFIC TEST - BUT ACTUALLY ENABLES TO VERIFY COHERENCE
     // Test tooltip functionality by hovering over a chart point
     console.log('Testing tooltip functionality...');
-    // Additional time after training completion
-    await page.waitForTimeout(2000);
+    // Additional time after training completion (longer wait for parallel execution)
+    await page.waitForTimeout(3000);
     // Find all hover points in the epoch chart (second chart)
     const hoverPoints = await page.$$('svg.line-chart-svg circle.hover-point');
     expect(hoverPoints.length).toBeGreaterThan(0);
@@ -2018,6 +2021,7 @@ def build_model():
     console.log('✅ MNIST training workflow completed successfully with verified progress!');
     // Cleanup
     await context.close();
+    });
   });
 
   test('should create edge by dragging from handle to handle (verify drag still works)', async ({ page }) => {
