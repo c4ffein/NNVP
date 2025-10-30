@@ -31,9 +31,9 @@ export default class {
     this.listeners[event].forEach(callback => callback(data));
   }
 
-  // Get the layer corresponding to the id on the active graph
-  getLayerById(id) {
-    return this.activeGraph.getLayerById(id); // TODO : Alienor : rename this function
+  // Find the layer corresponding to the id on the active graph
+  findLayerById(id) {
+    return this.activeGraph.findLayerById(id);
   }
 
   setActiveGraphEditor(graphEditor) {

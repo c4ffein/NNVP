@@ -142,13 +142,13 @@ D3LayerComposite.prototype.delete = function (graph) {
   thisComposite.remove();
   thisComposite.children.forEach(child => child.delete(graph));
   thisComposite.inputLayers.forEach(inputLayerId => {
-    let inputLayer = graph.getLayerById(inputLayerId);
+    let inputLayer = graph.findLayerById(inputLayerId);
     if (inputLayer != null) {
       inputLayer.removeOutputLayer(thisComposite);
     }
   });
   thisComposite.outputLayers.forEach(outputLayerId => {
-    let outputLayer = graph.getLayerById(outputLayerId);
+    let outputLayer = graph.findLayerById(outputLayerId);
     if (outputLayer != null) {
       outputLayer.removeInputLayer(thisComposite);
     }

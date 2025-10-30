@@ -90,15 +90,15 @@ D3Model.prototype.loadState = function (txtRes) {
   this.d3Layers = newLayers;
   var newEdges = jsonObj.edges;
   newEdges.forEach((e, i) => {
-    let source = this.getLayerById(e.source);
-    let target = this.getLayerById(e.target);
+    let source = this.findLayerById(e.source);
+    let target = this.findLayerById(e.target);
     newEdges[i] = new D3Edge (source , target);
   });
   this.d3Edges = newEdges;
   this.modelInputs.length = 0;
-  jsonObj.inputs.forEach(jsonInputId => this.modelInputs.push(this.getLayerById(jsonInputId)));
+  jsonObj.inputs.forEach(jsonInputId => this.modelInputs.push(this.findLayerById(jsonInputId)));
   this.modelOutputs.length = 0;
-  jsonObj.outputs.forEach(jsonOutputId => this.modelOutputs.push(this.getLayerById(jsonOutputId)));
+  jsonObj.outputs.forEach(jsonOutputId => this.modelOutputs.push(this.findLayerById(jsonOutputId)));
 };
 
 
@@ -136,10 +136,10 @@ D3Model.prototype.toJSON = function () {
  * @param id the ID of the Layer to get
  * @returns true if the Layer exists else null
  */
-D3Model.prototype.getLayerById = function (id) {
+D3Model.prototype.findLayerById = function (id) {
   let res = null;
   this.d3Layers.forEach(layer => {
-    let tmp = layer.getLayerById(id);
+    let tmp = layer.findLayerById(id);
     if (tmp) {
       res = tmp;
     }
@@ -155,7 +155,7 @@ D3Model.prototype.getLayerById = function (id) {
 D3Model.prototype.primeAncestorOfId = function (id) {
   let res = null;
   this.d3Layers.forEach(layer => {
-    let tmp = layer.getLayerById(id);
+    let tmp = layer.findLayerById(id);
     if (tmp !== null) {
       res = layer;
     }
@@ -173,19 +173,19 @@ D3Model.prototype.loadJSON = function (txtRes) {
 
   var newEdges = jsonObj.edges;
   newEdges.forEach((e, i) => {
-    let source = this.getLayerById(e.source);
-    let target = this.getLayerById(e.target);
+    let source = this.findLayerById(e.source);
+    let target = this.findLayerById(e.target);
     newEdges[i] = new D3Edge (source , target);
   });
   this.d3Edges = newEdges;
 
   this.modelInputs.length = 0;
   jsonObj.inputs.forEach(id => {
-    this.modelInputs.push(this.getLayerById(id));
+    this.modelInputs.push(this.findLayerById(id));
   });
 
   this.modelOutputs.length = 0;
   jsonObj.outputs.forEach(id => {
-    this.modelOutputs.push(this.getLayerById(id));
+    this.modelOutputs.push(this.findLayerById(id));
   });
 };

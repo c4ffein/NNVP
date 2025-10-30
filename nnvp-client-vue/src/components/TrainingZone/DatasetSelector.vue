@@ -24,6 +24,17 @@
       </div>
       <div v-bind:style="{display: loadingShown ? 'none' : 'block'}" id="samples"></div>
     </div>
+
+    <!-- Warning Modal -->
+    <div v-if="showWarning" class="warning-modal-overlay" @click.self="cancelWarning">
+      <div class="warning-modal">
+        <div class="warning-modal-message">{{ warningMessage }}</div>
+        <div class="warning-modal-buttons">
+          <button @click="cancelWarning" class="warning-modal-button warning-cancel">Cancel</button>
+          <button @click="confirmWarning" class="warning-modal-button warning-confirm">Load Dataset</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -50,6 +61,9 @@ export default {
       currentLoadingId: null,
       loadingPercentage: 0,
       loadingShown: true,
+      showWarning: false,
+      warningMessage: '',
+      pendingDataset: null,
     };
   },
   methods: {
@@ -58,14 +72,31 @@ export default {
 
       const warningMessage = this.getWarningMessage(name);
       if (warningMessage) {
-        // TODO : better than confirm
-        if (!confirm(warningMessage)) { // eslint-disable-line
-          document.getElementById('dataset-selector-selector').value = this.value;
-          this.value = this.newestSelected;
-          if (window.nnvpDebugDatasets) console.log(`[DatasetSelector] User cancelled warning for: ${name}`);
-          return;
-        }
+        this.warningMessage = warningMessage;
+        this.pendingDataset = name;
+        this.showWarning = true;
+        document.getElementById('dataset-selector-selector').value = this.value;
+        return;
       }
+      this.proceedWithDatasetLoad(name);
+    },
+    confirmWarning() {
+      this.showWarning = false;
+      const datasetName = this.pendingDataset;
+      this.pendingDataset = null;
+      this.warningMessage = '';
+      if (window.nnvpDebugDatasets) console.log(`[DatasetSelector] User confirmed warning for: ${datasetName}`);
+      this.proceedWithDatasetLoad(datasetName);
+    },
+    cancelWarning() {
+      this.showWarning = false;
+      const cancelledDataset = this.pendingDataset;
+      this.pendingDataset = null;
+      this.warningMessage = '';
+      document.getElementById('dataset-selector-selector').value = this.value;
+      if (window.nnvpDebugDatasets) console.log(`[DatasetSelector] User cancelled warning for: ${cancelledDataset}`);
+    },
+    async proceedWithDatasetLoad(name) {
       this.newestSelected = name;
       this.$emit('input', name);
       const loadId = ++this.loadingId;
@@ -202,5 +233,68 @@ export default {
 }
 #samples {
   margin: 15px 0 0 0;
+}
+
+/* Warning Modal */
+.warning-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.warning-modal {
+  background-color: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 15px;
+  padding: 30px;
+  max-width: 400px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.warning-modal-message {
+  color: #000000;
+  font-size: 15px;
+  line-height: 1.5;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.warning-modal-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.warning-modal-button {
+  padding: 8px 20px;
+  border: 1px solid #000000;
+  border-radius: 15px;
+  background-color: #ffffff;
+  color: #000000;
+  font-size: 14px;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+  font-family: var(--font-regular);
+  font-weight: var(--font-weight-regular);
+}
+
+.warning-modal-button:hover {
+  transform: translate(1px, -1px);
+}
+
+.warning-confirm {
+  background-color: #000000;
+  color: #ffffff;
+}
+
+.warning-confirm:hover {
+  background-color: #000000;
 }
 </style>

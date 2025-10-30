@@ -40,7 +40,7 @@
           v-bind:title="selectedLayer.kerasLayer.parameterDef[1]"
           v-bind:itemList="selectedLayer.inputLayers"
           v-bind:idFunc="e => e"
-          v-bind:nameFunc="e => $d3Interface.getLayerById(e).kerasLayer.name"
+          v-bind:nameFunc="e => $d3Interface.findLayerById(e).kerasLayer.name"
         />
         <div v-if="index != selectedNode.e.length - 1">
           <br>

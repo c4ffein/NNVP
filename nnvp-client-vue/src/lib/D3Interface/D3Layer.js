@@ -202,13 +202,13 @@ D3Layer.prototype.delete = function (graph) {
   thisLayer.deleteState = true;
   thisLayer.remove();
   thisLayer.inputLayers.forEach(inputLayerId => {
-    let inputLayer = graph.getLayerById(inputLayerId);
+    let inputLayer = graph.findLayerById(inputLayerId);
     if (inputLayer != null) {
       inputLayer.removeOutputLayer(thisLayer);
     }
   });
   thisLayer.outputLayers.forEach(outputLayerId => {
-    let outputLayer = graph.getLayerById(outputLayerId);
+    let outputLayer = graph.findLayerById(outputLayerId);
     if (outputLayer != null) {
       outputLayer.removeInputLayer(thisLayer);
     }
@@ -555,7 +555,7 @@ D3Layer.prototype.tempTransitionToXY = function (x, y) {
   this.y = foreverY;
 };
 
-D3Layer.prototype.getLayerById = function (id) {
+D3Layer.prototype.findLayerById = function (id) {
   if (this.id === id) {
     return this;
   }
@@ -563,7 +563,7 @@ D3Layer.prototype.getLayerById = function (id) {
     return null;
   }
   for (const child of this.children){
-    const tmp = child.getLayerById(id);
+    const tmp = child.findLayerById(id);
     if (tmp !== null){
       return tmp;
     }
@@ -630,7 +630,7 @@ D3Layer.prototype.primeAncestorOfId = function (id) {
   }
   let res = null;
   this.children.forEach(layer => {
-    let tmp = layer.getLayerById(id);
+    let tmp = layer.findLayerById(id);
     if (tmp != null) {
       res = layer;
     }

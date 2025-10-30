@@ -380,7 +380,7 @@ D3GraphEditor.prototype.addLayer = function (kerasLayer, posX, posY) {
  * @returns an ID of a node
  */
 D3GraphEditor.prototype.getNodeId = function () {
-  while(this.getLayerById(this.nodeId)) {
+  while(this.findLayerById(this.nodeId)) {
     if (++this.nodeId >= Number.MAX_SAFE_INTEGER) {
       this.nodeId = 0;
     }
@@ -610,8 +610,8 @@ D3GraphEditor.prototype.generateJavascriptNoSave = function (kerasInterface) {
  * @param id the ID of the Layer to get
  * @returns true if the Layer exists else null
  */
-D3GraphEditor.prototype.getLayerById = function (id) {
-  return this.model.getLayerById(id);
+D3GraphEditor.prototype.findLayerById = function (id) {
+  return this.model.findLayerById(id);
 };
 
 /**
@@ -622,7 +622,7 @@ D3GraphEditor.prototype.getLayerById = function (id) {
 D3GraphEditor.prototype.primeAncestorOfId = function (id) {
   let res = null;
   this.model.d3Layers.forEach(layer => {
-    let tmp = layer.getLayerById(id);
+    let tmp = layer.findLayerById(id);
     if (tmp !== null) {
       res = layer;
     }
