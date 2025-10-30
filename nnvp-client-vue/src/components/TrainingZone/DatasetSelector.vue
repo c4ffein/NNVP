@@ -168,15 +168,19 @@ export default {
   grid-columns: 2/2;
 }
 #data-selector-loading-bar-container {
-  background-color: rgba(100, 100, 100, 0.3);
+  background-color: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 15px;
   width: calc(100% - 40px);
   height: 23px;
   box-sizing: border-box;
-  padding: 1px;
+  padding: 2px;
   margin: 20px;
+  overflow: hidden;
 }
 #data-selector-loading-bar-contained {
-  background-color: rgba(255, 255, 255, 1);
+  background-color: #000000;
+  border-radius: 13px;
   height: 100%;
 }
 .DatasetSelector.dataset-select {
