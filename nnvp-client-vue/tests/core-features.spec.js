@@ -2260,4 +2260,100 @@ def build_model():
     expect(isVisibleAfterOverlay).toBe(false);
     console.log('✅ About modal works correctly!');
   });
+
+  test('should detect cycles in the graph and mark edges with linkCycle class', async ({ page }) => {
+    console.log('\n=== CYCLE DETECTION TEST ===');
+    // Step 1: Create a simple valid DAG first (no cycle)
+    console.log('Step 1: Creating valid DAG (A -> B -> C)');
+    const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
+    // Add 3 layers
+    await denseLayer.click();
+    await page.waitForTimeout(50);
+    await denseLayer.click();
+    await page.waitForTimeout(50);
+    await denseLayer.click();
+    await page.waitForTimeout(50);
+    const layers = await page.$$('.d3Layer');
+    expect(layers.length).toBe(3);
+    console.log(`✓ Added ${layers.length} layers`);
+    // Position layers in a vertical line to make connections easier
+    for (let i = 0; i < layers.length; i++) {
+      const layer = await page.$(`#d3-layer-${i} rect`);
+      const box = await layer.boundingBox();
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(400, 200 + (i * 150));
+      await page.mouse.up();
+      await page.waitForTimeout(50);
+    }
+    console.log('✓ Positioned layers vertically');
+    // Connect layer 0 -> layer 1
+    const layer0Anchor = await page.$('#d3-layer-0 circle.bottom-point');
+    const layer0AnchorBox = await layer0Anchor.boundingBox();
+    const layer1Rect = await page.$('#d3-layer-1 rect');
+    const layer1Box = await layer1Rect.boundingBox();
+    await page.mouse.move(layer0AnchorBox.x + layer0AnchorBox.width / 2, layer0AnchorBox.y + layer0AnchorBox.height / 2);
+    await page.mouse.down();
+    await page.waitForTimeout(100);
+    await page.mouse.move(layer1Box.x + layer1Box.width / 2, layer1Box.y + layer1Box.height / 2);
+    await page.mouse.up();
+    await page.waitForTimeout(100);
+    // Connect layer 1 -> layer 2
+    const layer1Anchor = await page.$('#d3-layer-1 circle.bottom-point');
+    const layer1AnchorBox = await layer1Anchor.boundingBox();
+    const layer2Rect = await page.$('#d3-layer-2 rect');
+    const layer2Box = await layer2Rect.boundingBox();
+    await page.mouse.move(layer1AnchorBox.x + layer1AnchorBox.width / 2, layer1AnchorBox.y + layer1AnchorBox.height / 2);
+    await page.mouse.down();
+    await page.waitForTimeout(100);
+    await page.mouse.move(layer2Box.x + layer2Box.width / 2, layer2Box.y + layer2Box.height / 2);
+    await page.mouse.up();
+    await page.waitForTimeout(100);
+    let edges = await page.$$('.edge');
+    expect(edges.length).toBe(2);
+    console.log('✓ Created 2 edges in valid DAG');
+    // Step 2: Verify no cycle is detected yet
+    const edgesWithoutCycle = await page.$$eval('.edge path', paths =>
+      paths.filter(path => path.classList.contains('linkCycle')).length
+    );
+    expect(edgesWithoutCycle).toBe(0);
+    console.log('✓ No cycles detected in valid DAG (0 edges marked)');
+    // Step 3: Create a cycle by connecting layer 2 back to layer 0
+    console.log('Step 2: Creating cycle by connecting C -> A');
+    const layer2Anchor = await page.$('#d3-layer-2 circle.bottom-point');
+    const layer2AnchorBox = await layer2Anchor.boundingBox();
+    const layer0Rect = await page.$('#d3-layer-0 rect');
+    const layer0Box = await layer0Rect.boundingBox();
+    await page.mouse.move(layer2AnchorBox.x + layer2AnchorBox.width / 2, layer2AnchorBox.y + layer2AnchorBox.height / 2);
+    await page.mouse.down();
+    await page.waitForTimeout(100);
+    await page.mouse.move(layer0Box.x + layer0Box.width / 2, layer0Box.y + layer0Box.height / 2);
+    await page.mouse.up();
+    await page.waitForTimeout(200); // Give time for cycle detection to run
+    edges = await page.$$('.edge');
+    expect(edges.length).toBe(3);
+    console.log('✓ Created 3rd edge, completing the cycle (A -> B -> C -> A)');
+    // Step 4: Verify cycle is detected - all edges in the cycle should be marked
+    const edgesWithCycle = await page.$$eval('.edge path', paths =>
+      paths.filter(path => path.classList.contains('linkCycle')).length
+    );
+    console.log(`Edges marked with linkCycle: ${edgesWithCycle}`);
+    expect(edgesWithCycle).toBeGreaterThan(0);
+    console.log('✓ Cycle detected! Edges marked with linkCycle class');
+    // Step 5: Break the cycle by deleting one edge and verify cycle detection clears
+    console.log('Step 3: Breaking cycle by deleting edge');
+    const firstEdge = await page.$('.edge');
+    await firstEdge.click();
+    await page.waitForTimeout(50);
+    await page.keyboard.press('Delete');
+    await page.waitForTimeout(100); // Give time for cycle detection to run
+    edges = await page.$$('.edge');
+    expect(edges.length).toBe(2);
+    const edgesAfterBreak = await page.$$eval('.edge path', paths =>
+      paths.filter(path => path.classList.contains('linkCycle')).length
+    );
+    expect(edgesAfterBreak).toBe(0);
+    console.log('✓ Cycle broken! No edges marked with linkCycle (cycle detection cleared)');
+    console.log('✅ CYCLE DETECTION TEST PASSED');
+  });
 });

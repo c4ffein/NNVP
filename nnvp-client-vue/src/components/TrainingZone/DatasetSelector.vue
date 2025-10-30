@@ -46,7 +46,8 @@ export default {
     return {
       newestSelected: null, // Needed to simplify access before propagation
       neededSamples: null,
-      loadingToken: null, // Will not be needed anymore when loading will be cancellable
+      loadingId: 0, // Incrementing ID to cancel stale loading operations
+      currentLoadingId: null,
       loadingPercentage: 0,
       loadingShown: true,
     };
@@ -67,22 +68,22 @@ export default {
       }
       this.newestSelected = name;
       this.$emit('input', name);
-      const randomChecker = Math.random(); // TODO : better solution than using a token
-      this.loadingToken = randomChecker;
+      const loadId = ++this.loadingId;
+      this.currentLoadingId = loadId;
       this.loadingShown = true;
 
-      if (window.nnvpDebugDatasets) console.log(`[DatasetSelector] Starting load for: ${name}, token: ${randomChecker}`);
+      if (window.nnvpDebugDatasets) console.log(`[DatasetSelector] Starting load for: ${name}, ID: ${loadId}`);
 
-      const updateProgressCheckRandom = (progress, random) => {
-        if (random !== this.loadingToken) return;
+      const updateProgress = (progress, id) => {
+        if (id !== this.currentLoadingId) return;
         this.loadingShown = true;
         this.loadingPercentage = progress;
         if (window.nnvpDebugDatasets) console.log(`[DatasetSelector] Loading progress for ${name}: ${(progress * 100).toFixed(1)}%`);
       };
-      this.loadDataset(name, x => updateProgressCheckRandom(x, randomChecker))
+      this.loadDataset(name, x => updateProgress(x, loadId))
         .then(async () => {
-          if (this.loadingToken !== randomChecker) {
-            if (window.nnvpDebugDatasets) console.log(`[DatasetSelector] Load cancelled for: ${name} (token mismatch)`);
+          if (this.currentLoadingId !== loadId) {
+            if (window.nnvpDebugDatasets) console.log(`[DatasetSelector] Load cancelled for: ${name} (ID mismatch: ${loadId} vs ${this.currentLoadingId})`);
             return;
           }
           if (window.nnvpDebugDatasets) console.log(`[DatasetSelector] Load complete for: ${name}, filling samples...`);
@@ -105,7 +106,8 @@ export default {
       drawArea.innerHTML = '';
       const dataset = this.getDatasets()[name];
       if(!dataset) {
-        console.log(`No dataset named ${name}`);  // TODO Handle better
+        console.error(`Dataset "${name}" not found`);
+        drawArea.innerHTML = `<div style="color: #000000; padding: 20px; text-align: center;">Error: Dataset "${name}" could not be loaded</div>`;
         return;
       }
       const examples = dataset.nextTestBatch(40);

@@ -88,13 +88,11 @@ D3GraphValidation.isKerasError = function (graph, edge) {
 };
 
 /**
- * Check if there is a cycle in the graph
+ * Check if there is a cycle in the graph using DFS with recursion stack
  * @param graph the graph to check in
  * @returns true if there is a cycle in the graph, false else
  */
 D3GraphValidation.isCycle = function (graph) {
-  return false; // TODO : fix this legacy code
-
   let isCycle = false;
   if(graph.model.d3Edges.length > 2 && graph.model.d3Layers.length > 2){
 
