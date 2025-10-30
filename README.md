@@ -1,50 +1,44 @@
 # NNVP
-## REFACTOR WARNING
-The master branch is currently the ongoing Vue 3 migration.  
-Check out `f78d724032e97852b4f40197bedb9579e59cd1a4` if you want that project in a stable state, which is the version in production at [nnvp.io](https://nnvp.io). The current migration is tracked in [tasks.md](/tasks.md)  
-Otherwise, Vue 3 reactivity has been fixed, and modern e2e tests have been added to ensure the whole training process works.  
-Refactors (moving from D3 and Chartist) and new theme still prioritized before the updated version is put in production. New features related to the **Learn how a neural network works** will then be added in an iterative way.
 
-## Description
-This project allows you to generate Python/JS code describing a Keras model by creating a graph representing the different layers in your browser.
-Functionalities to launch the compilation and training on the server could be added if we keep developping it.
-A demo is available at [nnvp.io](https://nnvp.io).
+**Neural Network Visual Programming** - Generate Python/JS code describing a Keras model by creating a graph representing the different layers in your browser.
 
-## How to run
-### Only the standalone client
-As we aren't working on an updated backend right now, you can just go to the `nnvp-client-vue` folder:
- - `npm install`
- - `npm run dev` / `npm run dev-host` to run a development version
- - `npm run build` then serve the content of the `nnvp-client-vue/dist` folder.
+🔗 **Demo**: [nnvp.io](https://nnvp.io)
 
-## Running the tests
-The e2e test suite uses Playwright and covers most of the original features.
-- `make test-e2e` - Tests run in Chromium by default
+## Quick Start
 
-## Future improvements
-- Check [tasks.md](/tasks.md)
+See the Makefile for all available commands:
+```bash
+make help
+```
 
-## Credits
-### History
-This project was initially carried out as part of my first year of master's degree. The client was forked from Draw.io, as it provided a really good user experience.
-Continuing to work on it was proposed as a subject for one of the the second year's projects, this time for a bigger team, although with a much shorter development time.
-Modifying the existing codebase to implement new features was still a really difficult task, as Draw.io was totally not designed to run graph algorithms.
-Hence, we decided to re-code the client from scratch, this time using Vue.js for interface components and D3.js for graph visualization and edition.
-We only adapted backend for our new client, which was now simpler as we didn't need to work with the files saved from our Draw.io fork.
+Or use these common commands directly:
 
-We managed to produce a somehow usable tool, missing lots of features and without a satisactory user experience.
-Since then, a lot of the code has been modified. We still need to refactor big parts of it. You can now generate Keras code without backend, we will focus on client and continue to develop backend only to enable training on it.
+**Development:**
+```bash
+make install  # Install dependencies
+make dev      # Start development server
+```
 
-### People who worked on it at the university
-- [c4ffein](https://github.com/c4ffein) : Both university projects, most of back-end except the file describing all types of Keras layers. As for the client, interface between the Vue.js and D3.js code, code managing the Keras layers, top bar and left bar components, Docker.
-- [Firstein](https://github.com/Firstein) : Most of the D3 codebase.
-- [aliuc](https://github.com/aliuc) : Only participated in the first project, wrote the initial file describing Keras layers.
-- [leducLouis](https://github.com/leducLouis) : Re-wrote most of this file to specify input and output types, some missing parameter types.
-- [nezoutcarl](https://github.com/nezoutcarl) : Right Bar and initial version of most of the Parameter components, e2e tests.
-- [elbo](https://github.com/elbo) : D3 functionalities, e2e tests.
-- [ChemouneAlaeddine](https://github.com/ChemouneAlaeddine) : D3 functionalities, e2e tests.
+**Production:**
+```bash
+cd nnvp-client-vue
+npm install
+npm run build
+# Serve the content of nnvp-client-vue/dist
+```
 
-### Third-Party Licenses
+**Testing:**
+```bash
+make test-e2e  # Run Playwright e2e tests
+```
+
+## Documentation
+
+- [Project History](docs/history.md) - Origin story and contributors
+- [Tasks & Roadmap](docs/tasks.md) - Current priorities and future features
+
+## License
+
 This project uses the [Inter typeface](https://github.com/rsms/inter) by Rasmus Andersson, licensed under the [SIL Open Font License 1.1](nnvp-client-vue/src/assets/fonts/OFL-LICENSE.txt).
 
 The rest of this project is licensed under the MIT License (see [LICENSE](/LICENSE)).
