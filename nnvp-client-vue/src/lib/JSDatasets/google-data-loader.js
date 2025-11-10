@@ -18,6 +18,7 @@
  */
 
 import * as tf from '@tensorflow/tfjs';
+import LabelEncoder from './label-encoder';
 
 /**
  * A class that fetches the sprited MNIST dataset and returns shuffled batches.
@@ -51,6 +52,9 @@ export default class Dataset {
     this.shuffledTestIndex = 0;
     this.imagePixelSize = this.shape[0] * this.shape[1];
     this.imageByteSize = this.shape.reduce((a, b) => a * b);
+
+    // Create label encoder for this dataset
+    this.labelEncoder = new LabelEncoder(this.numClasses);
   }
 
   async load(progressionCallback, isSequential = true) {
@@ -142,41 +146,39 @@ export default class Dataset {
     });
   }
 
-  nextTrainBatch(batchSize) {
+  nextTrainBatch(batchSize, encoding = 'one-hot-tf') {
     return this.nextBatch(
       batchSize, [this.trainImages, this.trainLabels], () => {
         this.shuffledTrainIndex = (this.shuffledTrainIndex + 1) % this.trainIndices.length;
         return this.trainIndices[this.shuffledTrainIndex];
       },
+      encoding
     );
   }
 
-  nextTestBatch(batchSize) {
+  nextTestBatch(batchSize, encoding = 'one-hot-tf') {
     return this.nextBatch(batchSize, [this.testImages, this.testLabels], () => {
       this.shuffledTestIndex = (this.shuffledTestIndex + 1) % this.testIndices.length;
       return this.testIndices[this.shuffledTestIndex];
-    });
+    }, encoding);
   }
 
-  nextBatch(batchSize, data, index) {
+  nextBatch(batchSize, data, index, encoding = 'one-hot-tf') {
     const batchImagesArray = new Float32Array(batchSize * this.imageByteSize);
-    // const batchLabelsArray = new Uint8Array(batchSize * this.labelSize);  // TODO
-    const batchLabelsArray = new Uint8Array(batchSize * this.numClasses);
+    const batchLabelsArray = new Int32Array(batchSize);
 
     for (let i = 0; i < batchSize; i++) {
       const idx = index();
-
+      // set images
       const image = data[0].slice(idx * this.imageByteSize, (idx + 1) * this.imageByteSize);
       batchImagesArray.set(image, i * this.imageByteSize);
-
+      // set labels
       const label = data[1].slice(idx * this.labelSize, idx * this.labelSize + this.labelSize);
-      const label2 = Uint8Array.from([...Array(10)].map((_, p) => p + 1 === label[0] ? 1 : 0));  // TODO : Remove
-      batchLabelsArray.set(label2, i * this.numClasses);  // TODO
+      batchLabelsArray[i] = label[0];
     }
 
     const xs = tf.tensor2d(batchImagesArray, [batchSize, this.imageByteSize]);
-    const labels = tf.tensor2d(batchLabelsArray, [batchSize, this.numClasses]);
-    // const labels = tf.tensor2d(batchLabelsArray, [batchSize, this.labelSize]);  // TODO
+    const labels = this.labelEncoder.encode(batchLabelsArray, encoding);
 
     return { xs, labels };
   }
