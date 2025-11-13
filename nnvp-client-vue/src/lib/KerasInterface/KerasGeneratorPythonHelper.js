@@ -42,10 +42,16 @@ export default class KerasGeneratorPythonHelper {
     return tupleString;
   }
 
-  generateParams(parameterValues) {
+  generateParams(parameterValues, parameterDefinitions) {
     let paramString = '';
     // eslint-disable-next-line
     for (const [param, value] of Object.entries(parameterValues)) {
+      // Skip parameters that shouldn't be in the output
+      const paramDef = parameterDefinitions ? parameterDefinitions[param] : null;
+      if (paramDef && paramDef.skipInGeneration === true) {
+        continue; // eslint-disable-line no-continue
+      }
+
       if (typeof value === 'string') {
         paramString += `${param}='${value}',`;
       } else if (Array.isArray(value)) {
@@ -69,8 +75,10 @@ export default class KerasGeneratorPythonHelper {
 
     rs += 'keras.layers.';
     rs += this.graph[node].keras_data.name;
-    // TODO : use parametersDef?
-    rs += `(${this.generateParams(this.graph[node].keras_data.parameterValues).slice(0, -1)})`;
+    // Using parameterDef for filtering and special handling
+    rs += `(${this.generateParams(
+      this.graph[node].keras_data.parameterValues, this.graph[node].keras_data.parameterDef,
+    ).slice(0, -1)})`;
 
     if (this.graph[node].sources.length > 0) {
       rs += '(';
@@ -102,7 +110,9 @@ export default class KerasGeneratorPythonHelper {
         )}`}`;
 
     return `model.add(keras.layers.${this.graph[node].keras_data.name}(${
-      this.generateParams(this.graph[node].keras_data.parameterValues).slice(0, -1)}${
+      this.generateParams(
+        this.graph[node].keras_data.parameterValues, this.graph[node].keras_data.parameterDef,
+      ).slice(0, -1)}${
       inputShapeParam}))\n`;
   }
 

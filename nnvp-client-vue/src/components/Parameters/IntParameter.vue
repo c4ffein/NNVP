@@ -1,13 +1,15 @@
 <template>
   <div class="parameter-block">
     <label class="parameter-name">
-      {{name}}
+      {{name}}<span v-if="hasRange" class="range-hint"> ({{minCond}}-{{maxCond}})</span>
       <input
         v-if="isConditionsNotRanged()"
         type="number"
         v-bind:min="minCond"
         v-bind:max="maxCond"
+        v-bind:class="{ 'invalid-input': !isValid }"
         placeholder="Enter Int Value"
+        @input="validateInput"
         @change="updateParamFromKerasLayer"
         v-model="valueContainer"
       >
@@ -21,6 +23,7 @@
         >
          : {{valueContainer}}
       </div>
+      <div v-if="!isValid && errorMessage" class="error-message">{{errorMessage}}</div>
     </label>
   </div>
 </template>
@@ -39,7 +42,30 @@ export default {
       valueContainer: this.activeLayer.parameterValues[this.name],
       minCond: '',
       maxCond: '',
+      errorMessage: '',
     };
+  },
+
+  computed: {
+    hasRange() {
+      return this.minCond !== '' || this.maxCond !== '';
+    },
+    isValid() {
+      if (this.valueContainer === '' || this.valueContainer === null) {
+        return true; // Empty is valid, let HTML5 required handle it if needed
+      }
+      const numValue = parseInt(this.valueContainer, 10);
+      if (isNaN(numValue)) {
+        return false;
+      }
+      if (this.minCond !== '' && numValue < this.minCond) {
+        return false;
+      }
+      if (this.maxCond !== '' && numValue > this.maxCond) {
+        return false;
+      }
+      return true;
+    },
   },
 
   created() {
@@ -48,6 +74,32 @@ export default {
   },
 
   methods: {
+    validateInput() {
+      if (this.valueContainer === '' || this.valueContainer === null) {
+        this.errorMessage = '';
+        return;
+      }
+      const numValue = parseInt(this.valueContainer, 10);
+      if (isNaN(numValue)) {
+        this.errorMessage = 'Please enter a valid integer';
+        return;
+      }
+      if (this.minCond !== '' && this.maxCond !== '') {
+        if (numValue < this.minCond) {
+          this.errorMessage = `Value must be at least ${this.minCond}`;
+        } else if (numValue > this.maxCond) {
+          this.errorMessage = `Value must be at most ${this.maxCond}`;
+        } else {
+          this.errorMessage = '';
+        }
+      } else if (this.minCond !== '' && numValue < this.minCond) {
+        this.errorMessage = `Value must be at least ${this.minCond}`;
+      } else if (this.maxCond !== '' && numValue > this.maxCond) {
+        this.errorMessage = `Value must be at most ${this.maxCond}`;
+      } else {
+        this.errorMessage = '';
+      }
+    },
     updateParamFromKerasLayer() {
       this.activeLayer.setParameterValue(this.name, parseInt(this.valueContainer, 10));
     },
@@ -87,7 +139,6 @@ export default {
     },
   },
 };
-// TODO Maybe manage int range in the component getting spec from parameter Details
 </script>
 
 <style>
@@ -97,5 +148,22 @@ export default {
 .parameter-select > input{
   -webkit-appearance: none;
   appearance: none;
+}
+
+.range-hint {
+  font-size: 0.85em;
+  color: #666;
+  font-weight: normal;
+}
+
+.invalid-input {
+  border: 1px solid #ff0000 !important;
+  background-color: #fff5f5;
+}
+
+.error-message {
+  color: #ff0000;
+  font-size: 0.85em;
+  margin-top: 4px;
 }
 </style>

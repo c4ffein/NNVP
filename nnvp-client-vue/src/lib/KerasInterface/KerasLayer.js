@@ -14,8 +14,10 @@ export default class {
   }
 
   setParameterValue(parameterName, parameterValue) {
-    // TODO implement check
-    // console.log(parameterName + '- , -' + parameterValue);
+    // Validate that parameter exists in definition
+    if (!this.parameterDef[parameterName]) {
+      console.warn(`Parameter "${parameterName}" not found in layer definition for "${this.name}"`);
+    }
     this.parameterValues[parameterName] = parameterValue;
   }
 
@@ -35,8 +37,13 @@ export default class {
         if (['searchTerms', 'parameterValues'].includes(prop)) clone[prop] = JSON.parse(JSON.stringify(this[prop]));
         else if (prop === 'parameterDef') {
           if (this.customUserLayer) {
-            // TODO : check ParametersDef are serializable
-            clone[prop] = JSON.parse(JSON.stringify(this[prop]));
+            // Check ParametersDef are serializable by attempting JSON round-trip
+            try {
+              clone[prop] = JSON.parse(JSON.stringify(this[prop]));
+            } catch (error) {
+              console.error(`Failed to serialize parameterDef for custom layer "${this.name}":`, error);
+              throw new Error(`Custom layer "${this.name}" has non-serializable parameterDef`);
+            }
           } else {
             clone[prop] = this[prop];
           }
@@ -51,8 +58,19 @@ export default class {
       if (jsonObj.hasOwnProperty(prop)) { // eslint-disable-line
         if (['searchTerms', 'parameterValues'].includes(prop)) this[prop] = JSON.parse(JSON.stringify(jsonObj[prop]));
         else if (prop === 'parameterDef') {
-          this[prop] = JSON.parse(JSON.stringify(jsonObj[prop]));
-          // TODO : if not custom, check for existing parameterDef?
+          const loadedDef = JSON.parse(JSON.stringify(jsonObj[prop]));
+          // If not custom, warn if loaded definition differs from existing
+          if (!jsonObj.customUserLayer && Object.keys(this[prop]).length > 0) {
+            const existingKeys = Object.keys(this[prop]).sort();
+            const loadedKeys = Object.keys(loadedDef).sort();
+            if (JSON.stringify(existingKeys) !== JSON.stringify(loadedKeys)) {
+              console.warn(
+                `Loaded parameterDef for "${this.name}" differs from existing definition. ` +
+                `Existing: [${existingKeys.join(', ')}], Loaded: [${loadedKeys.join(', ')}]`
+              );
+            }
+          }
+          this[prop] = loadedDef;
         } else this[prop] = jsonObj[prop];
       }
     }

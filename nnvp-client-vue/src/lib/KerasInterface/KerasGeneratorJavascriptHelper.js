@@ -81,7 +81,7 @@ export default class KerasGeneratorJavascriptHelper {
 
     rs += 'tf.layers.';
     rs += this.pythonToJsLayerName(this.graph[node].keras_data.name);
-    // TODO : use D3Interface parameterDef if not present in the instance
+    // Using parameterDef for type conversions and special handling
     rs += `(${this.generateParams(
       this.graph[node].keras_data.parameterValues, this.graph[node].keras_data.parameterDef,
     )})`;
