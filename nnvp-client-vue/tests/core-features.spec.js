@@ -2356,4 +2356,108 @@ def build_model():
     console.log('✓ Cycle broken! No edges marked with linkCycle (cycle detection cleared)');
     console.log('✅ CYCLE DETECTION TEST PASSED');
   });
+
+  test('should save graph to file, clear with NEW, and load from file', async ({ page }) => {
+    console.log('\n=== SAVE/LOAD FILE TEST ===');
+    // Step 1: Load a template to get some content
+    console.log('Step 1: Loading a template to get initial content...');
+    const fileMenu = await page.$('text=File');
+    await fileMenu.click();
+    await page.waitForTimeout(50);
+    const templatesOption = await page.$('text=Templates');
+    expect(templatesOption).not.toBeNull();
+    await templatesOption.hover();
+    await page.waitForTimeout(50);
+    // Get first available template
+    const templates = await page.$$('.menuItem:has-text("Templates") > .dropdown-content > .menuItem');
+    expect(templates.length).toBeGreaterThan(0);
+    const firstTemplate = templates[0];
+    const templateName = await firstTemplate.textContent();
+    console.log(`Loading template: "${templateName}"`);
+    await firstTemplate.click();
+    await page.waitForTimeout(150);
+    // Step 2: Verify graph has content
+    console.log('Step 2: Verifying graph has content...');
+    const layersAfterLoad = await page.$$('.d3Layer');
+    const edgesAfterLoad = await page.$$('.link');
+    console.log(`Layers after template load: ${layersAfterLoad.length}`);
+    console.log(`Edges after template load: ${edgesAfterLoad.length}`);
+    expect(layersAfterLoad.length).toBeGreaterThan(0);
+    // Store layer count and edge count for later comparison
+    const initialLayerCount = layersAfterLoad.length;
+    const initialEdgeCount = edgesAfterLoad.length;
+    // Get layer names for verification
+    const initialLayerNames = await page.$$eval('.d3Layer text', texts =>
+      texts.map(t => t.textContent)
+    );
+    console.log('Initial layer types:', initialLayerNames);
+    // Step 3: Save the graph to a file
+    console.log('Step 3: Saving graph to file...');
+    const fileMenu2 = await page.$('text=File');
+    await fileMenu2.click();
+    await page.waitForTimeout(50);
+    // Set up download listener before clicking Save
+    const downloadPromise = page.waitForEvent('download');
+    const saveOption = await page.$('text=Save');
+    expect(saveOption).not.toBeNull();
+    await saveOption.click();
+    // Wait for download and save to buffer
+    const download = await downloadPromise;
+    const downloadPath = await download.path();
+    console.log(`Graph saved to: ${downloadPath}`);
+    expect(downloadPath).not.toBeNull();
+    // Step 4: Click File > New to clear the board
+    console.log('Step 4: Clearing board with File > New...');
+    // Set up dialog handler to accept the confirmation
+    page.once('dialog', async dialog => {
+      console.log(`Confirmation dialog: "${dialog.message()}"`);
+      await dialog.accept();
+    });
+    const fileMenu3 = await page.$('text=File');
+    await fileMenu3.click();
+    await page.waitForTimeout(50);
+    const newOption = await page.$('text=New');
+    expect(newOption).not.toBeNull();
+    await newOption.click();
+    await page.waitForTimeout(150);
+    // Step 5: Verify the board is empty
+    console.log('Step 5: Verifying board is empty...');
+    const layersAfterNew = await page.$$('.d3Layer');
+    const edgesAfterNew = await page.$$('.link');
+    console.log(`Layers after NEW: ${layersAfterNew.length}`);
+    console.log(`Edges after NEW: ${edgesAfterNew.length}`);
+    expect(layersAfterNew.length).toBe(0);
+    // Note: 1 virtual edge remains - it's used for instant edge spawning when user creates connections
+    expect(edgesAfterNew.length).toBeLessThanOrEqual(1);
+    // Step 6: Load the saved file
+    console.log('Step 6: Loading saved file...');
+    const fileMenu4 = await page.$('text=File');
+    await fileMenu4.click();
+    await page.waitForTimeout(50);
+    // Set up file chooser listener before clicking Load
+    const fileChooserPromise = page.waitForEvent('filechooser');
+    const loadOption = await page.$('text=Load');
+    expect(loadOption).not.toBeNull();
+    await loadOption.click();
+    // Upload the saved file
+    const fileChooser = await fileChooserPromise;
+    await fileChooser.setFiles(downloadPath);
+    await page.waitForTimeout(150);
+    // Step 7: Verify the graph is restored correctly
+    console.log('Step 7: Verifying graph restored from file...');
+    const layersAfterReload = await page.$$('.d3Layer');
+    const edgesAfterReload = await page.$$('.link');
+    console.log(`Layers after reload: ${layersAfterReload.length}`);
+    console.log(`Edges after reload: ${edgesAfterReload.length}`);
+    expect(layersAfterReload.length).toBe(initialLayerCount);
+    expect(edgesAfterReload.length).toBe(initialEdgeCount);
+    // Verify layer types match
+    const reloadedLayerNames = await page.$$eval('.d3Layer text', texts =>
+      texts.map(t => t.textContent)
+    );
+    console.log('Reloaded layer types:', reloadedLayerNames);
+    expect(reloadedLayerNames.sort()).toEqual(initialLayerNames.sort());
+    console.log('✅ SAVE/LOAD FILE TEST PASSED');
+    expect(consoleErrors.length).toBe(0);
+  });
 });
