@@ -68,7 +68,8 @@ export default {
   },
   methods: {
     async datasetSet(name) {
-      if (window.nnvpDebugDatasets) console.log(`[DatasetSelector] datasetSet called with: ${name}`);
+      const debugEnabled = window.nnvp?.debug?.enableDatasets;
+      if (debugEnabled) console.log(`[DatasetSelector] datasetSet called with: ${name}`);
 
       const warningMessage = this.getWarningMessage(name);
       if (warningMessage) {
@@ -81,49 +82,52 @@ export default {
       this.proceedWithDatasetLoad(name);
     },
     confirmWarning() {
+      const debugEnabled = window.nnvp?.debug?.enableDatasets;
       this.showWarning = false;
       const datasetName = this.pendingDataset;
       this.pendingDataset = null;
       this.warningMessage = '';
-      if (window.nnvpDebugDatasets) console.log(`[DatasetSelector] User confirmed warning for: ${datasetName}`);
+      if (debugEnabled) console.log(`[DatasetSelector] User confirmed warning for: ${datasetName}`);
       this.proceedWithDatasetLoad(datasetName);
     },
     cancelWarning() {
+      const debugEnabled = window.nnvp?.debug?.enableDatasets;
       this.showWarning = false;
       const cancelledDataset = this.pendingDataset;
       this.pendingDataset = null;
       this.warningMessage = '';
       document.getElementById('dataset-selector-selector').value = this.value;
-      if (window.nnvpDebugDatasets) console.log(`[DatasetSelector] User cancelled warning for: ${cancelledDataset}`);
+      if (debugEnabled) console.log(`[DatasetSelector] User cancelled warning for: ${cancelledDataset}`);
     },
     async proceedWithDatasetLoad(name) {
+      const debugEnabled = window.nnvp?.debug?.enableDatasets;
       this.newestSelected = name;
       this.$emit('input', name);
       const loadId = ++this.loadingId;
       this.currentLoadingId = loadId;
       this.loadingShown = true;
 
-      if (window.nnvpDebugDatasets) console.log(`[DatasetSelector] Starting load for: ${name}, ID: ${loadId}`);
+      if (debugEnabled) console.log(`[DatasetSelector] Starting load for: ${name}, ID: ${loadId}`);
 
       const updateProgress = (progress, id) => {
         if (id !== this.currentLoadingId) return;
         this.loadingShown = true;
         this.loadingPercentage = progress;
-        if (window.nnvpDebugDatasets) console.log(`[DatasetSelector] Loading progress for ${name}: ${(progress * 100).toFixed(1)}%`);
+        if (debugEnabled) console.log(`[DatasetSelector] Loading progress for ${name}: ${(progress * 100).toFixed(1)}%`);
       };
       this.loadDataset(name, x => updateProgress(x, loadId))
         .then(async () => {
           if (this.currentLoadingId !== loadId) {
-            if (window.nnvpDebugDatasets) console.log(`[DatasetSelector] Load cancelled for: ${name} (ID mismatch: ${loadId} vs ${this.currentLoadingId})`);
+            if (debugEnabled) console.log(`[DatasetSelector] Load cancelled for: ${name} (ID mismatch: ${loadId} vs ${this.currentLoadingId})`);
             return;
           }
-          if (window.nnvpDebugDatasets) console.log(`[DatasetSelector] Load complete for: ${name}, filling samples...`);
+          if (debugEnabled) console.log(`[DatasetSelector] Load complete for: ${name}, filling samples...`);
           await this.fillSamples(name);
           this.loadingShown = false;
-          if (window.nnvpDebugDatasets) console.log(`[DatasetSelector] Samples filled for: ${name}`);
+          if (debugEnabled) console.log(`[DatasetSelector] Samples filled for: ${name}`);
         })
         .catch(error => {
-          if (window.nnvpDebugDatasets) console.error(`[DatasetSelector] Error loading ${name}:`, error);
+          if (debugEnabled) console.error(`[DatasetSelector] Error loading ${name}:`, error);
         });
     },
     // Mostly from https://storage.googleapis.com/tfjs-vis/mnist/dist/index.html

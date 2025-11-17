@@ -56,7 +56,9 @@ export default class {
     this.emit('undo-stack-changed');
     this.emit('redo-stack-changed');
     // Expose active graph globally for debugging and e2e testing
-    window.nnvpGraphEditor = this.activeGraph;
+    window.nnvp = window.nnvp || {};
+    window.nnvp.debug = window.nnvp.debug || {};
+    window.nnvp.debug.graphEditor = this.activeGraph;
   }
 
   getActiveElementsContainer() {

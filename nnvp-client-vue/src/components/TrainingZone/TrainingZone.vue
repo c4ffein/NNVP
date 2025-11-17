@@ -144,18 +144,22 @@ export default {
       const optimizer = this.selectedOptimizer;
       const epochs = this.epochs;
       let createModel;
+      let generatedCode;
       try {
         // NOTE: Using eval here to execute the generated JavaScript code from the visual graph editor.
         // The graph is converted to TensorFlow.js code (as a string), then eval'd to get a runnable function.
         // This is currently safe since the code is generated from the user's own graph structure,
         // but could be replaced with direct model building from the graph JSON to avoid eval entirely.
+        generatedCode = this.$d3Interface.generateJavascriptNoSave(this.$kerasInterface);
+        console.log('[TrainingZone] Generated JavaScript code:\n', generatedCode);
         createModel = eval(
-          `(function() { const tf = window.tf; ${this.$d3Interface.generateJavascriptNoSave(this.$kerasInterface)} return createModel; })()`
+          `(function() { const tf = window.tf; ${generatedCode} return createModel; })()`
         );
       }
       catch (error) {
         alert("Incorrect network : couldn't find Inputs/Outputs, or they weren't connected.");
         console.error('[TrainingZone] Error generating model:', error);
+        console.error('[TrainingZone] Generated code that failed:\n', generatedCode);
         return;
       }
       let model;
@@ -170,16 +174,24 @@ export default {
       }
       // Build optimizer config with parameters
       let optimizerConfig = optimizer;
-      if (Object.keys(this.optimizerParams).length > 0) {
-        // Filter out empty/undefined params
-        const filteredParams = Object.fromEntries(
-          Object.entries(this.optimizerParams).filter(([k, v]) => v !== undefined && v !== null && v !== '')
-        );
-        if (Object.keys(filteredParams).length > 0) {
-          optimizerConfig = window.tf.train[optimizer](filteredParams);
-        }
+      const filteredParams = Object.fromEntries(
+        Object.entries(this.optimizerParams).filter(([k, v]) => v !== undefined && v !== null && v !== '')
+      );
+      if (Object.keys(filteredParams).length > 0) {
+        optimizerConfig = window.tf.train[optimizer](filteredParams);
       }
       console.log('[TrainingZone] Compiling model with optimizer:', optimizer, 'params:', this.optimizerParams);
+
+      // Expose compilation config for testing/debugging
+      window.nnvp = window.nnvp || {};
+      window.nnvp.debug = window.nnvp.debug || {};
+      window.nnvp.debug.trainingConfig = {
+        optimizer,
+        optimizerParams: filteredParams,
+        loss: this.selectedLoss,
+        epochs: this.epochs,
+      };
+
       model.compile({
         optimizer: optimizerConfig,
         loss: this.selectedLoss,
@@ -224,11 +236,12 @@ export default {
       }
     },
     async loadDataset(name, progressionCallback) {
-      if (window.nnvpDebugDatasets) console.log(`[TrainingZone] loadDataset called for: ${name}`);
+      const debugEnabled = window.nnvp?.debug?.enableDatasets;
+      if (debugEnabled) console.log(`[TrainingZone] loadDataset called for: ${name}`);
 
       this.datasets = this.datasets || {};
       if (!(name in this.datasets)){
-        if (window.nnvpDebugDatasets) {
+        if (debugEnabled) {
           console.log(`[TrainingZone] Dataset ${name} not cached, loading from:`);
           console.log(`  - Images: ${this.loadableDatasets[name][0].imagesSpritePath}`);
           console.log(`  - Labels: ${this.loadableDatasets[name][0].labelsPath}`);
@@ -245,18 +258,18 @@ export default {
           this.loadableDatasets[name][0].numTrainElements,
         );
 
-        if (window.nnvpDebugDatasets) console.log(`[TrainingZone] Starting newDataset.load() for: ${name}`);
+        if (debugEnabled) console.log(`[TrainingZone] Starting newDataset.load() for: ${name}`);
 
         try {
           await newDataset.load(progressionCallback);
           this.datasets[name] = newDataset;
-          if (window.nnvpDebugDatasets) console.log(`[TrainingZone] Dataset ${name} loaded and cached successfully`);
+          if (debugEnabled) console.log(`[TrainingZone] Dataset ${name} loaded and cached successfully`);
         } catch (error) {
-          if (window.nnvpDebugDatasets) console.error(`[TrainingZone] Error loading dataset ${name}:`, error);
+          if (debugEnabled) console.error(`[TrainingZone] Error loading dataset ${name}:`, error);
           throw error;
         }
       } else {
-        if (window.nnvpDebugDatasets) console.log(`[TrainingZone] Dataset ${name} already cached`);
+        if (debugEnabled) console.log(`[TrainingZone] Dataset ${name} already cached`);
       }
     },
     getWarningMessage(name, progressionCallback) {
@@ -265,7 +278,8 @@ export default {
       }
     },
     getDatasets() {
-      if (window.nnvpDebugDatasets) console.log('[TrainingZone] getDatasets called, returning:', Object.keys(this.datasets || {}));
+      const debugEnabled = window.nnvp?.debug?.enableDatasets;
+      if (debugEnabled) console.log('[TrainingZone] getDatasets called, returning:', Object.keys(this.datasets || {}));
       return this.datasets || {};
     },
   },

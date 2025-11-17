@@ -44,7 +44,8 @@ export default {
       parent.batchChart = {
         update: () => {
           this.batchData = { ...parent.chartData0 };
-          if (window.nnvpDebugTraining) {
+          const debugEnabled = window.nnvp?.debug?.enableTraining;
+          if (debugEnabled) {
             console.log('[Charts] Batch chart update:', JSON.stringify(this.batchData));
           }
         }
@@ -53,7 +54,8 @@ export default {
       parent.epochChart = {
         update: () => {
           this.epochData = { ...parent.chartData1 };
-          if (window.nnvpDebugTraining) {
+          const debugEnabled = window.nnvp?.debug?.enableTraining;
+          if (debugEnabled) {
             console.log('[Charts] Epoch chart update:', JSON.stringify(this.epochData));
           }
         }

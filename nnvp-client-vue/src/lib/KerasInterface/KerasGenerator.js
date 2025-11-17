@@ -110,6 +110,7 @@ export default class KerasGenerator {
   isSequential() {
     if (this.inputs.length !== 1) return false;
     if (this.outputs.length !== 1) return false;
+    // Check that all layers form a linear chain
     for (const layer of Object.values(this.graph)) { // eslint-disable-line
       if (layer.sources.length !== 1) {
         if (!(layer.keras_data.name === 'Input' && layer.sources.length === 0)) return false;

@@ -221,4 +221,87 @@ test.describe('Training Compile Options', () => {
     expect(isChecked).toBe(true);
     expect(consoleErrors.length).toBe(0);
   });
+
+  test('should expose actual training configuration that matches UI settings', async ({ page }) => {
+    console.log('\n=== TRAINING CONFIGURATION VERIFICATION TEST ===');
+    // Load a template to get a valid model
+    console.log('Loading a valid model template...');
+    // Wait for templates to be loaded
+    await page.waitForTimeout(500);
+    const fileMenu = await page.$('#GeneralMenu .menuTitle:has-text("File")');
+    await fileMenu.click();
+    await page.waitForTimeout(200);
+    const templatesMenu = await page.$('text=Templates');
+    await templatesMenu.hover();
+    await page.waitForTimeout(50);
+    // Select template from submenu
+    const template = await page.$('text=2D Dense for MNIST');
+    await template.click();
+    await page.waitForTimeout(100);
+    // Open Training panel
+    console.log('Opening Training panel...');
+    const trainingMenu = await page.$('#GeneralMenu .menuTitle:has-text("Training")');
+    await trainingMenu.click();
+    await page.waitForTimeout(100);
+    // Switch to Dataset tab and select a dataset
+    console.log('Selecting dataset...');
+    const datasetTab = await page.$('.TrainingZone.bar-button:has-text("Dataset")');
+    await datasetTab.click();
+    await page.waitForTimeout(100);
+    const mnistOption = await page.$('.dataset-option:has-text("MNIST")');
+    if (mnistOption) {
+      await mnistOption.click();
+      await page.waitForTimeout(500); // Wait for dataset to load
+    }
+    // Now switch to Options tab and set custom parameters
+    console.log('Opening CompileOptions...');
+    const optionsTab = await page.$('.TrainingZone.bar-button:has-text("Options")');
+    await optionsTab.click();
+    await page.waitForTimeout(100);
+    // Set custom optimizer parameters
+    console.log('Setting custom optimizer parameters for Adam...');
+    await page.selectOption('.option-section:first-child select', 'adam');
+    await page.waitForTimeout(100);
+    // Set learning rate
+    const learningRateInput = await page.$('.optimizer-param:has-text("Learning Rate") input[type="number"]');
+    await learningRateInput.fill('0.002');
+    await page.waitForTimeout(50);
+    // Set beta1
+    const beta1Input = await page.$('.optimizer-param:has-text("Beta 1") input[type="number"]');
+    await beta1Input.fill('0.95');
+    await page.waitForTimeout(50);
+    // Set loss function
+    console.log('Setting loss function to meanSquaredError...');
+    await page.selectOption('.option-section:nth-child(2) select', 'meanSquaredError');
+    await page.waitForTimeout(50);
+    // Set epochs
+    console.log('Setting epochs to 15...');
+    const epochsInput = await page.$('.option-section:nth-child(3) input[type="number"]');
+    await epochsInput.fill('15');
+    await page.waitForTimeout(50);
+    // Click Train button to trigger compilation
+    console.log('Clicking Train button to trigger compilation...');
+    const trainButton = await page.$('.TrainingZone.bar-button:has-text("Train")');
+    await trainButton.click();
+    await page.waitForTimeout(800); // Wait for model compilation
+    // Check the exposed training configuration (using new namespace)
+    const trainingConfig = await page.evaluate(() => window.nnvp?.debug?.trainingConfig);
+    console.log('Exposed training config:', trainingConfig);
+    // Verify optimizer
+    expect(trainingConfig.optimizer).toBe('adam');
+    console.log('✓ Optimizer matches: adam');
+    // Verify optimizer parameters
+    expect(trainingConfig.optimizerParams.learningRate).toBe(0.002);
+    console.log('✓ Learning rate matches: 0.002');
+    expect(trainingConfig.optimizerParams.beta1).toBe(0.95);
+    console.log('✓ Beta1 matches: 0.95');
+    // Verify loss function
+    expect(trainingConfig.loss).toBe('meanSquaredError');
+    console.log('✓ Loss function matches: meanSquaredError');
+    // Verify epochs
+    expect(trainingConfig.epochs).toBe(15);
+    console.log('✓ Epochs match: 15');
+    console.log('✅ All training configuration values match UI settings!');
+    expect(consoleErrors.length).toBe(0);
+  });
 });

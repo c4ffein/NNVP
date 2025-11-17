@@ -154,14 +154,14 @@ test.describe('NNVP Core Features', () => {
     console.log('5 layers added to canvas');
     // Enable debug logging to see D3 drag events
     await page.evaluate(() => {
-      window.nnvpGraphEditor.debugEvents = true;
+      window.nnvp.debug.graphEditor.debugEvents = true;
     });
     console.log('Debug logging enabled');
     // Reposition layers vertically using transitionToXY (drag doesn't update model x/y)
     console.log('Repositioning layers vertically...');
     await page.evaluate(() => {
       for (let i = 0; i < 5; i++) {
-        const layer = window.nnvpGraphEditor.model.d3Layers[i];
+        const layer = window.nnvp.debug.graphEditor.model.d3Layers[i];
         const targetY = 100 + i * 120;
         layer.transitionToXY(300, targetY);
       }
@@ -171,7 +171,7 @@ test.describe('NNVP Core Features', () => {
     // Verify layers are properly positioned
     const layerPositions = await page.evaluate(() => {
       return Array.from({length: 5}, (_, i) => {
-        const layer = window.nnvpGraphEditor.model.d3Layers[i];
+        const layer = window.nnvp.debug.graphEditor.model.d3Layers[i];
         return { id: layer.htmlID, x: layer.x, y: layer.y };
       });
     });
@@ -254,14 +254,14 @@ test.describe('NNVP Core Features', () => {
     await page.waitForTimeout(500);
     // Enable debug logging
     await page.evaluate(() => {
-      window.nnvpGraphEditor.debugEvents = true;
+      window.nnvp.debug.graphEditor.debugEvents = true;
     });
     console.log('Debug logging enabled');
     // Reposition layers vertically
     console.log('Repositioning layers vertically...');
     await page.evaluate(() => {
       for (let i = 0; i < 5; i++) {
-        const layer = window.nnvpGraphEditor.model.d3Layers[i];
+        const layer = window.nnvp.debug.graphEditor.model.d3Layers[i];
         const targetY = 100 + i * 120;
         layer.transitionToXY(300, targetY);
       }
@@ -271,7 +271,7 @@ test.describe('NNVP Core Features', () => {
     // Verify positions
     const layerPositions = await page.evaluate(() => {
       return Array.from({length: 5}, (_, i) => {
-        const layer = window.nnvpGraphEditor.model.d3Layers[i];
+        const layer = window.nnvp.debug.graphEditor.model.d3Layers[i];
         return { id: layer.htmlID, x: layer.x, y: layer.y };
       });
     });
@@ -1137,7 +1137,7 @@ def build_model():
     console.log('\n=== DATASET SELECTOR TEST ===');
     // Enable dataset debug logging
     await page.evaluate(() => {
-      window.nnvpDebugDatasets = true;
+      window.nnvp = window.nnvp || {}; window.nnvp.debug = window.nnvp.debug || {}; window.nnvp.debug.enableDatasets = true;
     });
     console.log('Dataset debug logging enabled');
     // Open TrainingZone by clicking "Training" in GeneralMenu
@@ -1268,7 +1268,7 @@ def build_model():
     console.log('\n=== FASHION MNIST LOADING TEST ===');
     // Enable debug logging
     await page.evaluate(() => {
-      window.nnvpDebugDatasets = true;
+      window.nnvp = window.nnvp || {}; window.nnvp.debug = window.nnvp.debug || {}; window.nnvp.debug.enableDatasets = true;
     });
     // Open TrainingZone by clicking "Training" in GeneralMenu
     const trainingMenu = await page.$('text=Training');
@@ -1378,7 +1378,7 @@ def build_model():
     console.log('\n=== RELOAD MNIST TEST ===');
     // Enable debug logging
     await page.evaluate(() => {
-      window.nnvpDebugDatasets = true;
+      window.nnvp = window.nnvp || {}; window.nnvp.debug = window.nnvp.debug || {}; window.nnvp.debug.enableDatasets = true;
     });
     // Open TrainingZone by clicking "Training" in GeneralMenu
     const trainingMenu = await page.$('text=Training');
@@ -1790,8 +1790,8 @@ def build_model():
     console.log('TrainingZone panel opened');
     // Enable debug logging
     await page.evaluate(() => {
-      window.nnvpDebugDatasets = true;
-      window.nnvpDebugTraining = true;
+      window.nnvp = window.nnvp || {}; window.nnvp.debug = window.nnvp.debug || {}; window.nnvp.debug.enableDatasets = true;
+      window.nnvp.debug.enableTraining = true;
     });
     console.log('Enabled debug logging');
     // Click Dataset tab to show the dataset selector
@@ -1825,7 +1825,7 @@ def build_model():
     console.log('Set epochs to:', epochsValue);
     expect(epochsValue).toBe('10');
     // Set optimizer to 'adam' for consistent results
-    const optimizerSelector = await page.$('#optimizer-selector select');
+    const optimizerSelector = await page.$('.optimizer-section select');
     expect(optimizerSelector).not.toBeNull();
     await optimizerSelector.selectOption('adam');
     await page.waitForTimeout(30);

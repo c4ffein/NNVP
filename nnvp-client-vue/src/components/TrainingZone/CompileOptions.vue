@@ -3,7 +3,7 @@
     <div class="CompileOptions options-container">
 
       <!-- Optimizer Section -->
-      <div class="option-section">
+      <div class="option-section optimizer-section">
         <div class="section-header">
           <span class="section-title">Optimizer</span>
           <span class="help-icon" data-tooltip="Algorithm that updates model weights during training">?</span>
@@ -54,7 +54,7 @@
       </div>
 
       <!-- Loss Function Section -->
-      <div class="option-section">
+      <div class="option-section loss-section">
         <div class="section-header">
           <span class="section-title">Loss Function</span>
           <span class="help-icon" data-tooltip="Measures how well the model predictions match the actual data">?</span>
@@ -79,7 +79,7 @@
       </div>
 
       <!-- Training Parameters Section -->
-      <div class="option-section">
+      <div class="option-section training-params-section">
         <div class="section-header">
           <span class="section-title">Training Parameters</span>
           <span class="help-icon" data-tooltip="Controls how the training process runs">?</span>
