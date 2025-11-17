@@ -37,7 +37,7 @@ export default {
 <style>
 .LayerTemplate {
   text-align: left;
-  padding: 3px;
+  padding: 4px 4px 4px 12px;
   position: relative;
   transition: transform 0.15s ease;
 }

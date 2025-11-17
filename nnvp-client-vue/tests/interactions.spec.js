@@ -7,7 +7,6 @@ test.describe('NNVP Interactions', () => {
   test.beforeEach(async ({ page }) => {
     consoleMessages = [];
     consoleErrors = [];
-
     page.on('console', msg => {
       const text = msg.text();
       const type = msg.type();
@@ -16,11 +15,9 @@ test.describe('NNVP Interactions', () => {
         consoleErrors.push(text);
       }
     });
-
     page.on('pageerror', error => {
       consoleErrors.push(`PAGE ERROR: ${error.message}`);
     });
-
     await page.goto('/');
     await page.waitForTimeout(50);
   });
@@ -35,25 +32,20 @@ test.describe('NNVP Interactions', () => {
   test('should be able to search for layers', async ({ page }) => {
     const searchBox = await page.$('#layerSearchBox');
     expect(searchBox).not.toBeNull();
-
     // Get content before search
     const leftBarTextBefore = await page.textContent('.LayerCatalog');
     const visibleLayersBefore = await page.$$('.LayerTemplate');
-
     // Type "dense" in the search box
     await searchBox.type('dense');
     await page.waitForTimeout(50);
-
     // Get content after search
     const leftBarTextAfter = await page.textContent('.LayerCatalog');
     const visibleLayersAfter = await page.$$('.LayerTemplate');
-
     console.log('\n=== SEARCH TEST ===');
     console.log('Search box found and typed "dense"');
     console.log('Visible layers before search:', visibleLayersBefore.length);
     console.log('Visible layers after search:', visibleLayersAfter.length);
     console.log('Content changed after search:', leftBarTextBefore !== leftBarTextAfter);
-
     // Search should filter results (fewer visible items, since we're searching for "dense")
     expect(visibleLayersAfter.length).toBeLessThan(visibleLayersBefore.length);
     expect(visibleLayersAfter.length).toBeGreaterThan(0); // Should still show some results
@@ -225,6 +217,41 @@ test.describe('NNVP Interactions', () => {
     console.log('After Redo - Redo disabled:', redoDisabledAfterRedo);
     expect(undoDisabledAfterRedo).toBe(false);
     expect(redoDisabledAfterRedo).toBe(true);
+    expect(consoleErrors.length).toBe(0);
+  });
+
+  test('should NOT show beforeunload warning when graph is empty', async ({ page }) => {
+    console.log('\n=== BEFOREUNLOAD WARNING TEST (EMPTY GRAPH) ===');
+
+    // Graph starts empty, so beforeunload should return undefined
+    const beforeunloadResult = await page.evaluate(() => {
+      const event = new Event('beforeunload');
+      return window.onbeforeunload(event);
+    });
+
+    console.log('Beforeunload result on empty graph:', beforeunloadResult);
+    expect(beforeunloadResult).toBeUndefined();
+    expect(consoleErrors.length).toBe(0);
+  });
+
+  test('should show beforeunload warning when graph has layers', async ({ page }) => {
+    console.log('\n=== BEFOREUNLOAD WARNING TEST (GRAPH WITH LAYERS) ===');
+    // Add a layer to the graph
+    const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
+    expect(denseLayer).not.toBeNull();
+    await denseLayer.click();
+    await page.waitForTimeout(50);
+    // Verify layer was added
+    const layers = await page.$$('.d3Layer');
+    console.log('Layers on canvas:', layers.length);
+    expect(layers.length).toBeGreaterThan(0);
+    // Now beforeunload should return a warning message
+    const beforeunloadResult = await page.evaluate(() => {
+      const event = new Event('beforeunload');
+      return window.onbeforeunload(event);
+    });
+    console.log('Beforeunload result with layers:', beforeunloadResult);
+    expect(beforeunloadResult).toBe('Warning : all unsaved data will be lost');
     expect(consoleErrors.length).toBe(0);
   });
 });

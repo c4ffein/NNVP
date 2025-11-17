@@ -27,6 +27,11 @@
           v-bind:selectedOptimizer="selectedOptimizer"
           @changeSelectedOptimizer="changeSelectedOptimizer"
           v-bind:selectableOptimizers="selectableOptimizers"
+          v-bind:optimizerParams="optimizerParams"
+          @changeOptimizerParam="changeOptimizerParam"
+          v-bind:selectedLoss="selectedLoss"
+          v-bind:selectableLosses="selectableLosses"
+          @changeSelectedLoss="changeSelectedLoss"
           v-bind:epochs="epochs"
           @changeEpochs="changeEpochs"
           v-bind:loadDataset="loadDataset"
@@ -63,9 +68,18 @@ export default {
       selectedDataset: 'MNIST',
       loadableDatasets: loadableDatasets(this.cdnDir),
       selectedOptimizer: 'rmsprop',
+      optimizerParams: {},
       epochs: 10,
       selectableOptimizers: [
         'sgd', 'adagrad', 'adadelta', 'adam', 'adamax', 'rmsprop'
+      ],
+      selectedLoss: 'categoricalCrossentropy',
+      selectableLosses: [
+        'categoricalCrossentropy',
+        'sparseCategoricalCrossentropy',
+        'binaryCrossentropy',
+        'meanSquaredError',
+        'meanAbsoluteError',
       ],
       selectedPanel: "DatasetSelector",
       // Initialize chart data here so it's always available
@@ -113,7 +127,17 @@ export default {
       this.cancelRequested = false;
       this.isTraining = false;
     },
-    changeSelectedOptimizer(value) { this.selectedOptimizer = value; },
+    changeSelectedOptimizer(value) {
+      this.selectedOptimizer = value;
+      // Reset optimizer params when switching optimizers
+      this.optimizerParams = {};
+    },
+    changeOptimizerParam(paramName, paramValue) {
+      this.optimizerParams = { ...this.optimizerParams, [paramName]: paramValue };
+    },
+    changeSelectedLoss(value) {
+      this.selectedLoss = value;
+    },
     changeEpochs(value) { this.epochs = value; },
     async startTraining() {
       window.tf = tf;
@@ -144,10 +168,21 @@ export default {
         console.error('[TrainingZone] Error creating model:', error);
         return;
       }
-      console.log('[TrainingZone] Compiling model with optimizer:', optimizer);
+      // Build optimizer config with parameters
+      let optimizerConfig = optimizer;
+      if (Object.keys(this.optimizerParams).length > 0) {
+        // Filter out empty/undefined params
+        const filteredParams = Object.fromEntries(
+          Object.entries(this.optimizerParams).filter(([k, v]) => v !== undefined && v !== null && v !== '')
+        );
+        if (Object.keys(filteredParams).length > 0) {
+          optimizerConfig = window.tf.train[optimizer](filteredParams);
+        }
+      }
+      console.log('[TrainingZone] Compiling model with optimizer:', optimizer, 'params:', this.optimizerParams);
       model.compile({
-        optimizer,
-        loss: 'categoricalCrossentropy',
+        optimizer: optimizerConfig,
+        loss: this.selectedLoss,
         metrics: ['accuracy'],
       });
       console.log('[TrainingZone] Model compiled successfully');

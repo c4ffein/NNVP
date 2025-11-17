@@ -9,8 +9,15 @@ export default class {
     this.leftBarRemountCallback = () => false;
     // Event listeners for reactive updates
     this.listeners = {};
-    // TODO : next line, boolean to know if there is data?
-    window.onbeforeunload = () => 'Warning : all unsaved data will be lost';
+    // Only warn about unsaved data if graph is not empty
+    // Future improvement: track dirty state (modified but not saved) instead of just checking emptiness
+    window.onbeforeunload = () => {
+      if (this.activeGraph && this.activeGraph.model.d3Layers.length > 0) {
+        return 'Warning : all unsaved data will be lost';
+      }
+      // Return undefined to allow navigation without warning
+      return undefined;
+    };
   }
 
   // Event system for framework-agnostic reactivity
