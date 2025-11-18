@@ -298,7 +298,7 @@ test.describe('Training Compile Options', () => {
     console.log('Clicking Train button to trigger training...');
     const trainButton = await page.$('.TrainingZone.bar-button:has-text("Train")');
     await trainButton.click();
-    await page.waitForTimeout(2000); // Wait for training to start and log debug info
+    await page.waitForTimeout(4000); // Wait longer for training to start and log debug info (increased for CI)
     // Check the exposed training configuration (using new namespace)
     const trainingConfig = await page.evaluate(() => window.nnvp?.debug?.trainingConfig);
     console.log('Exposed training config:', trainingConfig);
@@ -329,6 +329,12 @@ test.describe('Training Compile Options', () => {
     console.log('✓ TF.js loss function matches: meanSquaredError');
     // THE ULTIMATE VERIFICATION: Check console logs during actual training runtime
     console.log('Verifying TensorFlow.js runtime configuration from console logs...');
+    console.log(`Total console messages captured: ${consoleMessages.length}`);
+
+    // Debug: Show last 10 console messages for troubleshooting
+    const recentMessages = consoleMessages.slice(-10).map(msg => msg.text || msg.type);
+    console.log('Recent console messages:', recentMessages);
+
     const trainingStartMsg = consoleMessages.find(msg =>
       msg.text && msg.text.includes('[TrainingZone] Starting training with TensorFlow.js configuration')
     );
