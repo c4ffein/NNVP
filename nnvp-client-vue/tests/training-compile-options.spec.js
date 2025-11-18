@@ -286,21 +286,47 @@ test.describe('Training Compile Options', () => {
     const epochsInput = await page.$('.option-section:nth-child(3) input[type="number"]');
     await epochsInput.fill('1');
     await page.waitForTimeout(50);
-
     // Enable debug logging to see TensorFlow.js training config
     await page.evaluate(() => {
       window.nnvp = window.nnvp || {};
       window.nnvp.debug = window.nnvp.debug || {};
       window.nnvp.debug.enableTraining = true;
     });
-
     // Click Train button to trigger compilation AND training
     console.log('Clicking Train button to trigger training...');
     const trainButton = await page.$('.TrainingZone.bar-button:has-text("Train")');
     await trainButton.click();
-    await page.waitForTimeout(10000); // Wait 10s for training to start and log debug info (CI can be very slow)
-    // Check the exposed training configuration (using new namespace)
-    const trainingConfig = await page.evaluate(() => window.nnvp?.debug?.trainingConfig);
+    // Poll for compiled model config AND training start message (check every 0.5s, timeout after 10s)
+    console.log('Polling for compiled model config and training start (checking every 0.5s, max 10s)...');
+    let compiledModel = null;
+    let trainingConfig = null;
+    let trainingStarted = false;
+    const startTime = Date.now();
+    const timeout = 10000; // 10 seconds
+    const pollInterval = 500; // 0.5 seconds
+    while (Date.now() - startTime < timeout) {
+      // Check for both configs
+      const result = await page.evaluate(() => ({
+        compiled: window.nnvp?.debug?.compiledModel,
+        training: window.nnvp?.debug?.trainingConfig,
+      }));
+      // Check for training start message in console
+      const trainingStartMsg = consoleMessages.find(msg =>
+        msg.text && msg.text.includes('[TrainingZone] Starting training with TensorFlow.js configuration')
+      );
+      if (result.compiled && result.training && trainingStartMsg) {
+        compiledModel = result.compiled;
+        trainingConfig = result.training;
+        trainingStarted = true;
+        console.log(`✓ All configs and training start found after ${Date.now() - startTime}ms`);
+        break;
+      }
+      await page.waitForTimeout(pollInterval);
+    }
+    if (!compiledModel || !trainingConfig || !trainingStarted) {
+      throw new Error(`Timeout: Training not fully started after ${timeout}ms (compiledModel: ${!!compiledModel}, trainingConfig: ${!!trainingConfig}, trainingStarted: ${trainingStarted})`);
+    }
+    // Check the exposed training configuration
     console.log('Exposed training config:', trainingConfig);
     // Verify optimizer
     expect(trainingConfig.optimizer).toBe('adam');
@@ -316,9 +342,7 @@ test.describe('Training Compile Options', () => {
     // Verify epochs
     expect(trainingConfig.epochs).toBe(1);
     console.log('✓ Epochs match: 1');
-
     // Verify the ACTUAL TensorFlow.js compiled model configuration
-    const compiledModel = await page.evaluate(() => window.nnvp?.debug?.compiledModel);
     console.log('Compiled model config:', compiledModel);
     // TensorFlow.js wraps optimizer params in a nested object
     expect(compiledModel.optimizerConfig.learningRate.learningRate).toBe(0.002);
@@ -330,11 +354,9 @@ test.describe('Training Compile Options', () => {
     // THE ULTIMATE VERIFICATION: Check console logs during actual training runtime
     console.log('Verifying TensorFlow.js runtime configuration from console logs...');
     console.log(`Total console messages captured: ${consoleMessages.length}`);
-
     // Debug: Show last 10 console messages for troubleshooting
     const recentMessages = consoleMessages.slice(-10).map(msg => msg.text || msg.type);
     console.log('Recent console messages:', recentMessages);
-
     const trainingStartMsg = consoleMessages.find(msg =>
       msg.text && msg.text.includes('[TrainingZone] Starting training with TensorFlow.js configuration')
     );
