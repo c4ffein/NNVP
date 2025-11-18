@@ -198,6 +198,13 @@ export default {
         metrics: ['accuracy'],
       });
       console.log('[TrainingZone] Model compiled successfully');
+
+      // Expose compiled model configuration for testing
+      window.nnvp.debug.compiledModel = {
+        optimizerConfig: model.optimizer.getConfig(),
+        loss: model.loss,
+      };
+
       const datasetName = this.selectedDataset;
       await this.loadDataset(datasetName);
       const data = this.datasets[datasetName];
@@ -214,6 +221,19 @@ export default {
           const d = data.nextTestBatch(testDataSize);
           return [d.xs.reshape([testDataSize, ...shape]), d.labels];
         });
+
+        // Debug: Log actual TensorFlow.js training configuration
+        const debugEnabled = window.nnvp?.debug?.enableTraining;
+        if (debugEnabled) {
+          const optimizerConfig = model.optimizer.getConfig();
+          console.log('[TrainingZone] Starting training with TensorFlow.js configuration:');
+          console.log('[TrainingZone]   Optimizer:', model.optimizer.getClassName());
+          console.log('[TrainingZone]   Learning Rate:', optimizerConfig.learningRate?.learningRate || optimizerConfig.learningRate);
+          console.log('[TrainingZone]   Loss:', model.loss);
+          console.log('[TrainingZone]   Epochs:', epochs);
+          console.log('[TrainingZone]   Batch Size:', BATCH_SIZE);
+        }
+
         return model.fit(trainXs, trainYs, {
           batchSize: BATCH_SIZE,
           validationData: [testXs, testYs],
