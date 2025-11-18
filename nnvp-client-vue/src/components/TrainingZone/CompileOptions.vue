@@ -345,7 +345,7 @@ export default {
   font-family: var(--font-regular); font-weight: var(--font-weight-regular);
   font-size: 15px;
   overflow-y: auto;
-  overflow-x: visible;
+  overflow-x: hidden;
 }
 
 .CompileOptions.options-container {
@@ -354,7 +354,6 @@ export default {
   flex-direction: row;
   gap: 16px;
   align-items: flex-start;
-  overflow: visible;
 }
 
 /* Section Boxes */
@@ -363,7 +362,7 @@ export default {
   border: 1px solid #e0e0e0;
   border-radius: 8px;
   padding: 0;
-  overflow: visible;
+  overflow: hidden;
   flex: 1;
   min-width: 280px;
 }
