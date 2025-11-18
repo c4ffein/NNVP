@@ -298,7 +298,7 @@ test.describe('Training Compile Options', () => {
     console.log('Clicking Train button to trigger training...');
     const trainButton = await page.$('.TrainingZone.bar-button:has-text("Train")');
     await trainButton.click();
-    await page.waitForTimeout(4000); // Wait longer for training to start and log debug info (increased for CI)
+    await page.waitForTimeout(10000); // Wait 10s for training to start and log debug info (CI can be very slow)
     // Check the exposed training configuration (using new namespace)
     const trainingConfig = await page.evaluate(() => window.nnvp?.debug?.trainingConfig);
     console.log('Exposed training config:', trainingConfig);
