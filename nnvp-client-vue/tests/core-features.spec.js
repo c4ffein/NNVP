@@ -1958,9 +1958,9 @@ def build_model():
     const lastAccFromConsole = lastEpochData.series[0].data[lastEpochData.series[0].data.length - 1];
     const lastLossFromConsole = lastEpochData.series[2].data[lastEpochData.series[2].data.length - 1];
     console.log('Console data - last acc:', lastAccFromConsole, 'last loss:', lastLossFromConsole);
-    // Now hover over one of the last few points and verify the tooltip shows a value close to console
+    // Now hover over the LAST point and verify the tooltip shows the last epoch's values
     const lastFewPoints = hoverPoints.slice(-10);
-    await lastFewPoints[5].hover(); // Hover over a point near the end
+    await lastFewPoints[lastFewPoints.length - 1].hover(); // Hover over the LAST point
     await page.waitForTimeout(100);
     const dataTooltip = await page.$('.tooltip');
     const dataTooltipText = await dataTooltip.textContent();
