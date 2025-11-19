@@ -2,11 +2,26 @@
   <div class="ParamsBlock">
     <div class="ParamsBlock layer-title" @click="toggleLayer()">
       {{title}}
-      <div class="arrow">▲</div>
+      <div class="layer-title-actions">
+        <span v-if="layerType" class="help-icon" @click.stop="openModal" title="Learn about this layer">?</span>
+        <div class="arrow">▲</div>
+      </div>
     </div>
     <div class="ParamsBlock params-list" v-bind:class="{ closed: isClosed}">
       <slot></slot>
     </div>
+
+    <!-- Help Modal -->
+    <Teleport to="body">
+      <div v-if="showModal" class="layer-help-modal-overlay" @click="closeModal">
+        <div class="layer-help-modal-container" @click.stop>
+          <button class="layer-help-modal-close" @click="closeModal">&times;</button>
+          <div class="layer-help-modal-body">
+            <div v-html="getLayerHelp()"></div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -16,15 +31,246 @@ export default {
   name: 'ParamsBlock',
   props: {
     title: String,
+    layerType: String, // The Keras layer type (e.g., 'Dense', 'Conv2D', etc.)
   },
   data() {
     return {
       isClosed: false,
+      showModal: false,
     };
   },
   methods: {
     toggleLayer() {
       this.isClosed = !this.isClosed;
+    },
+    openModal() {
+      this.showModal = true;
+    },
+    closeModal() {
+      this.showModal = false;
+    },
+    getLayerHelp() {
+      const layerHelp = {
+        'Dense': `
+          <h2>Dense Layer (Fully Connected)</h2>
+          <p><strong>What it does:</strong> A Dense layer connects every input to every output. It's the most basic and common layer type in neural networks.</p>
+
+          <h3>How it works:</h3>
+          <p>Each neuron in a Dense layer receives input from ALL neurons in the previous layer, multiplies each by a weight, adds them up, and applies an activation function.</p>
+
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Classification:</strong> Final layer for predicting classes</li>
+            <li><strong>Feature learning:</strong> Hidden layers to learn patterns</li>
+            <li><strong>After flattening:</strong> To process flattened convolutional outputs</li>
+          </ul>
+
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>units:</strong> Number of neurons in the layer</li>
+            <li><strong>activation:</strong> Function applied to output (relu, sigmoid, softmax, etc.)</li>
+          </ul>
+
+          <p><em>💡 Tip: Use 'relu' activation for hidden layers, 'softmax' for multi-class output, 'sigmoid' for binary output!</em></p>
+        `,
+        'Conv2D': `
+          <h2>Conv2D Layer (2D Convolution)</h2>
+          <p><strong>What it does:</strong> Applies sliding filters over 2D images to detect patterns like edges, textures, and shapes.</p>
+
+          <h3>How it works:</h3>
+          <p>A small filter (e.g., 3×3) slides across the image, computing dot products at each position. This creates a feature map highlighting where patterns appear.</p>
+
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Image recognition:</strong> Detecting features in photos</li>
+            <li><strong>Computer vision:</strong> Object detection, segmentation</li>
+            <li><strong>Spatial patterns:</strong> Any grid-like data with local patterns</li>
+          </ul>
+
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>filters:</strong> Number of different patterns to learn</li>
+            <li><strong>kernel_size:</strong> Size of the sliding window (e.g., 3×3)</li>
+            <li><strong>strides:</strong> How far the filter moves each step</li>
+            <li><strong>padding:</strong> 'same' keeps size, 'valid' shrinks output</li>
+          </ul>
+
+          <p><em>💡 Tip: Start with 32 filters and 3×3 kernels. Use 'same' padding to preserve dimensions!</em></p>
+        `,
+        'MaxPooling2D': `
+          <h2>MaxPooling2D Layer</h2>
+          <p><strong>What it does:</strong> Reduces the spatial size of feature maps by taking the maximum value in each region.</p>
+
+          <h3>How it works:</h3>
+          <p>Divides the input into regions (e.g., 2×2) and outputs only the maximum value from each region. This reduces computation and helps the network focus on the strongest features.</p>
+
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>After Conv layers:</strong> To reduce size and computation</li>
+            <li><strong>Translation invariance:</strong> Makes the network less sensitive to small shifts</li>
+            <li><strong>Overfitting prevention:</strong> Reduces parameters to learn</li>
+          </ul>
+
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>pool_size:</strong> Size of pooling window (typically 2×2)</li>
+            <li><strong>strides:</strong> How far the window moves (usually same as pool_size)</li>
+          </ul>
+
+          <p><em>💡 Tip: 2×2 pooling is standard. Apply after 1-2 Conv layers!</em></p>
+        `,
+        'Flatten': `
+          <h2>Flatten Layer</h2>
+          <p><strong>What it does:</strong> Converts multi-dimensional data (like images) into a 1D vector.</p>
+
+          <h3>How it works:</h3>
+          <p>Takes a multi-dimensional input (e.g., 28×28×32) and reshapes it into a single vector (e.g., 25088 values).</p>
+
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Before Dense layers:</strong> Dense layers need 1D input</li>
+            <li><strong>After Conv layers:</strong> To transition from spatial features to classification</li>
+            <li><strong>Required transition:</strong> Between convolutional and fully connected parts</li>
+          </ul>
+
+          <h3>Key parameters:</h3>
+          <p>No parameters! It just reshapes the data.</p>
+
+          <p><em>💡 Tip: Always use Flatten before Dense layers when working with images!</em></p>
+        `,
+        'Dropout': `
+          <h2>Dropout Layer</h2>
+          <p><strong>What it does:</strong> Randomly "drops" (sets to zero) a percentage of neurons during training to prevent overfitting.</p>
+
+          <h3>How it works:</h3>
+          <p>During training, each neuron has a random chance of being temporarily removed. This forces the network to learn redundant representations and not rely too heavily on any single neuron.</p>
+
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Overfitting:</strong> When training accuracy is much higher than validation</li>
+            <li><strong>After Dense layers:</strong> Especially in deep networks</li>
+            <li><strong>Regularization:</strong> To make the model generalize better</li>
+          </ul>
+
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>rate:</strong> Fraction of neurons to drop (0.2 = 20%, 0.5 = 50%)</li>
+          </ul>
+
+          <p><em>💡 Tip: Start with 0.2-0.5. Higher rates for larger layers!</em></p>
+        `,
+        'LSTM': `
+          <h2>LSTM Layer (Long Short-Term Memory)</h2>
+          <p><strong>What it does:</strong> Processes sequences of data while remembering important information from the past and forgetting irrelevant details.</p>
+
+          <h3>How it works:</h3>
+          <p>Uses special gates (forget, input, output) to control information flow through time. This allows it to learn long-term dependencies in sequential data.</p>
+
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Time series:</strong> Stock prices, weather forecasting</li>
+            <li><strong>Text:</strong> Language modeling, translation</li>
+            <li><strong>Sequential data:</strong> Any data with temporal dependencies</li>
+          </ul>
+
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>units:</strong> Number of LSTM cells (memory capacity)</li>
+            <li><strong>return_sequences:</strong> True if feeding to another RNN layer</li>
+          </ul>
+
+          <p><em>💡 Tip: Use 64-256 units. Set return_sequences=True for stacked LSTMs!</em></p>
+        `,
+        'Activation': `
+          <h2>Activation Layer</h2>
+          <p><strong>What it does:</strong> Applies a non-linear activation function to the input.</p>
+
+          <h3>How it works:</h3>
+          <p>Transforms values through a mathematical function. This adds non-linearity, allowing the network to learn complex patterns.</p>
+
+          <h3>Common activations:</h3>
+          <ul>
+            <li><strong>ReLU:</strong> Max(0, x) - Fast and works well for hidden layers</li>
+            <li><strong>Sigmoid:</strong> Squashes to 0-1 - Good for binary output</li>
+            <li><strong>Tanh:</strong> Squashes to -1 to 1 - Centered around zero</li>
+            <li><strong>Softmax:</strong> Converts to probabilities - Use for final classification</li>
+          </ul>
+
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Separate layer:</strong> When you want explicit control</li>
+            <li><strong>Advanced activations:</strong> Like LeakyReLU, ELU</li>
+          </ul>
+
+          <p><em>💡 Tip: Usually better to specify activation in the layer itself (like Dense(activation='relu'))!</em></p>
+        `,
+        'BatchNormalization': `
+          <h2>Batch Normalization Layer</h2>
+          <p><strong>What it does:</strong> Normalizes the inputs of each layer to have mean 0 and variance 1, making training faster and more stable.</p>
+
+          <h3>How it works:</h3>
+          <p>For each mini-batch, it normalizes the activations, then applies learnable scaling and shifting parameters.</p>
+
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Deep networks:</strong> Helps train deeper models</li>
+            <li><strong>After Conv/Dense:</strong> Before or after activation (both work)</li>
+            <li><strong>Faster training:</strong> Allows higher learning rates</li>
+          </ul>
+
+          <h3>Benefits:</h3>
+          <ul>
+            <li>Reduces internal covariate shift</li>
+            <li>Acts as regularization (slight effect)</li>
+            <li>Allows higher learning rates</li>
+          </ul>
+
+          <p><em>💡 Tip: Place after Conv2D/Dense and before Activation. Very powerful for training stability!</em></p>
+        `,
+        'Input': `
+          <h2>Input Layer</h2>
+          <p><strong>What it does:</strong> Defines the shape of input data for your neural network.</p>
+
+          <h3>How it works:</h3>
+          <p>Specifies the dimensions of the data your model will receive. This is always the first layer in a model.</p>
+
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Always required:</strong> Every model needs an Input layer</li>
+            <li><strong>Functional API:</strong> Explicitly defined when using Model API</li>
+            <li><strong>Multiple inputs:</strong> When your model has several input sources</li>
+          </ul>
+
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>shape:</strong> Dimensions of input (e.g., (28, 28, 1) for MNIST)</li>
+          </ul>
+
+          <p><em>💡 Tip: Don't include batch size in shape. For images: (height, width, channels)!</em></p>
+        `,
+        'Output': `
+          <h2>Output Layer</h2>
+          <p><strong>What it does:</strong> Marks the final output of your neural network.</p>
+
+          <h3>How it works:</h3>
+          <p>This is typically a Dense layer with activation matching your task: softmax for multi-class, sigmoid for binary, or linear for regression.</p>
+
+          <h3>Common configurations:</h3>
+          <ul>
+            <li><strong>Multi-class classification:</strong> Dense(num_classes, activation='softmax')</li>
+            <li><strong>Binary classification:</strong> Dense(1, activation='sigmoid')</li>
+            <li><strong>Regression:</strong> Dense(1, activation='linear' or None)</li>
+          </ul>
+
+          <p><em>💡 Tip: Match activation to your loss function! Softmax + categorical_crossentropy, Sigmoid + binary_crossentropy!</em></p>
+        `,
+      };
+
+      return layerHelp[this.layerType] || `
+        <h2>${this.layerType}</h2>
+        <p>This is a ${this.layerType} layer. Documentation coming soon!</p>
+        <p>Check the <a href="https://keras.io/api/layers/" target="_blank">Keras documentation</a> for more details.</p>
+      `;
     },
   },
 };
@@ -76,5 +322,135 @@ export default {
   height: 0;
   overflow: hidden;
   padding: 0;
+}
+
+/* Help button and actions */
+.layer-title-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.help-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #000000;
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.help-icon:hover {
+  background: #333333;
+  transform: scale(1.1);
+}
+
+/* Modal styling - matching CompileOptions theme */
+.layer-help-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: transparent;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  z-index: 10000;
+  padding-top: 40px;
+}
+
+.layer-help-modal-container {
+  background: #ffffff;
+  border-radius: 15px;
+  border: 1px solid #000000;
+  max-width: 600px;
+  width: 90%;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: none;
+  position: relative;
+  padding: 32px;
+  font-family: var(--font-regular);
+  font-weight: var(--font-weight-regular);
+  color: #000000;
+  line-height: 1.6;
+  text-align: left;
+}
+
+.layer-help-modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: transparent;
+  border: none;
+  font-size: 32px;
+  line-height: 1;
+  color: #000000;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease;
+}
+
+.layer-help-modal-close:hover {
+  transform: scale(1.1);
+}
+
+.layer-help-modal-body h2 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-size: 24px;
+  font-weight: var(--font-weight-semibold);
+  color: #000000;
+}
+
+.layer-help-modal-body h3 {
+  margin-top: 20px;
+  margin-bottom: 12px;
+  font-size: 18px;
+  font-weight: var(--font-weight-semibold);
+  color: #000000;
+}
+
+.layer-help-modal-body p {
+  margin-bottom: 12px;
+}
+
+.layer-help-modal-body ul,
+.layer-help-modal-body ol {
+  margin-bottom: 12px;
+  padding-left: 24px;
+}
+
+.layer-help-modal-body li {
+  margin-bottom: 8px;
+}
+
+.layer-help-modal-body em {
+  display: block;
+  margin-top: 16px;
+  font-style: italic;
+  color: #666666;
+}
+
+.layer-help-modal-body a {
+  color: #0066cc;
+  text-decoration: underline;
+}
+
+.layer-help-modal-body a:hover {
+  color: #0052a3;
 }
 </style>

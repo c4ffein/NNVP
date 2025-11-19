@@ -24,6 +24,7 @@
         v-for="(selectedLayer, index) in activeLayers"
         v-bind:key="selectedLayer.id"
         v-bind:title="selectedLayer.kerasLayer.name"
+        v-bind:layerType="selectedLayer.kerasLayer.name"
       >
         <component class="LayerOptions param"
           :key="paramK"
