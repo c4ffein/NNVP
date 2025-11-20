@@ -427,6 +427,749 @@ export default {
           <p>No parameters! Inputs must have same shape.</p>
           <p><em>💡 Tip: Useful for attention-like mechanisms and gating!</em></p>
         `,
+        // Advanced Activations
+        'LeakyReLU': `
+          <h2>LeakyReLU Layer</h2>
+          <p><strong>What it does:</strong> Like ReLU but allows small negative values instead of zero.</p>
+          <h3>How it works:</h3>
+          <p>For positive values: output = input. For negative values: output = alpha * input (where alpha is small, like 0.3).</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Dying ReLU problem:</strong> When ReLU neurons get stuck at zero</li>
+            <li><strong>Better gradient flow:</strong> Gradients flow even for negative inputs</li>
+            <li><strong>GANs:</strong> Very popular in generative models</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>alpha:</strong> Slope for negative values (default 0.3)</li>
+          </ul>
+          <p><em>💡 Tip: Good default alternative to ReLU. Try it if ReLU isn't working well!</em></p>
+        `,
+        'PReLU': `
+          <h2>PReLU Layer (Parametric ReLU)</h2>
+          <p><strong>What it does:</strong> Like LeakyReLU but learns the slope for negative values during training.</p>
+          <h3>How it works:</h3>
+          <p>The alpha parameter is learned rather than fixed. Each channel can have its own alpha.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>When you're unsure:</strong> Let the network learn the best slope</li>
+            <li><strong>Complex models:</strong> Where different channels need different behaviors</li>
+            <li><strong>Fine-tuning:</strong> Can improve over fixed LeakyReLU</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <p>No parameters - alpha is learned automatically!</p>
+          <p><em>💡 Tip: More flexible than LeakyReLU but adds a few more parameters to learn!</em></p>
+        `,
+        'ELU': `
+          <h2>ELU Layer (Exponential Linear Unit)</h2>
+          <p><strong>What it does:</strong> Smooth activation that can output negative values, reducing bias shift.</p>
+          <h3>How it works:</h3>
+          <p>For positive: output = input. For negative: output = alpha * (exp(input) - 1). Smooth transition!</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Better than ReLU:</strong> Often faster convergence</li>
+            <li><strong>Smooth gradients:</strong> No dead neurons problem</li>
+            <li><strong>Deep networks:</strong> Helps with vanishing gradients</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>alpha:</strong> Controls saturation for negative values (default 1.0)</li>
+          </ul>
+          <p><em>💡 Tip: Often outperforms ReLU but slightly slower to compute!</em></p>
+        `,
+        'ThresholdedReLU': `
+          <h2>ThresholdedReLU Layer</h2>
+          <p><strong>What it does:</strong> ReLU with a threshold - only activates above a certain value.</p>
+          <h3>How it works:</h3>
+          <p>If input > theta: output = input. Otherwise: output = 0.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Sparse activations:</strong> Want even more sparsity than ReLU</li>
+            <li><strong>Noise filtering:</strong> Ignore small activations</li>
+            <li><strong>Experimental:</strong> Less common, try if you want sparsity</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>theta:</strong> Threshold value (default 1.0)</li>
+          </ul>
+          <p><em>💡 Tip: Not widely used - stick with ReLU/LeakyReLU for most cases!</em></p>
+        `,
+        'ReLU': `
+          <h2>ReLU Layer (Rectified Linear Unit)</h2>
+          <p><strong>What it does:</strong> Outputs input if positive, zero if negative. Simple and effective!</p>
+          <h3>How it works:</h3>
+          <p>output = max(0, input). Dead simple, but works amazingly well.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Default choice:</strong> Start here for hidden layers</li>
+            <li><strong>Fast training:</strong> No vanishing gradient like sigmoid/tanh</li>
+            <li><strong>Sparse activations:</strong> Many neurons output zero</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>max_value:</strong> Cap maximum output (optional)</li>
+            <li><strong>negative_slope:</strong> Can make it behave like LeakyReLU</li>
+            <li><strong>threshold:</strong> Can make it behave like ThresholdedReLU</li>
+          </ul>
+          <p><em>💡 Tip: The default activation for most deep learning! Start here!</em></p>
+        `,
+        'Softmax': `
+          <h2>Softmax Layer</h2>
+          <p><strong>What it does:</strong> Converts logits to probabilities that sum to 1.</p>
+          <h3>How it works:</h3>
+          <p>Applies exponential to each value, then normalizes so they sum to 1. Larger values get higher probabilities.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Multi-class output:</strong> Final layer for classification</li>
+            <li><strong>Attention mechanisms:</strong> Computing attention weights</li>
+            <li><strong>Probability distributions:</strong> When you need valid probabilities</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>axis:</strong> Which axis to apply softmax (default -1)</li>
+          </ul>
+          <p><em>💡 Tip: Use with categorical_crossentropy loss for multi-class classification!</em></p>
+        `,
+        // More Pooling
+        'MaxPooling1D': `
+          <h2>MaxPooling1D Layer</h2>
+          <p><strong>What it does:</strong> MaxPooling for 1D sequences (like text or time series).</p>
+          <h3>How it works:</h3>
+          <p>Takes maximum value in each window along the sequence dimension.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>After Conv1D:</strong> Reduce sequence length</li>
+            <li><strong>Text/sequences:</strong> Downsample temporal features</li>
+            <li><strong>Extract strongest features:</strong> Focus on peaks</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>pool_size:</strong> Size of window (typically 2)</li>
+            <li><strong>strides:</strong> How far to move the window</li>
+          </ul>
+          <p><em>💡 Tip: Use after Conv1D layers for efficient sequence processing!</em></p>
+        `,
+        'MaxPooling3D': `
+          <h2>MaxPooling3D Layer</h2>
+          <p><strong>What it does:</strong> MaxPooling for 3D data (videos, volumetric data).</p>
+          <h3>How it works:</h3>
+          <p>Takes maximum in 3D regions. Reduces spatial and temporal/depth dimensions.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>After Conv3D:</strong> Downsample videos or volumes</li>
+            <li><strong>Medical imaging:</strong> 3D scans (CT, MRI)</li>
+            <li><strong>Video processing:</strong> Reduce spatio-temporal size</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>pool_size:</strong> 3D window size (e.g., (2,2,2))</li>
+          </ul>
+          <p><em>💡 Tip: Computationally expensive - use wisely!</em></p>
+        `,
+        'AveragePooling1D': `
+          <h2>AveragePooling1D Layer</h2>
+          <p><strong>What it does:</strong> AveragePooling for 1D sequences.</p>
+          <h3>How it works:</h3>
+          <p>Takes average value in each window. Smoother than MaxPooling1D.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Smooth downsampling:</strong> Preserve more information</li>
+            <li><strong>After Conv1D:</strong> Alternative to MaxPooling1D</li>
+            <li><strong>Signal processing:</strong> When averaging makes sense</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>pool_size:</strong> Window size (typically 2)</li>
+          </ul>
+          <p><em>💡 Tip: Try both Max and Average pooling - depends on your data!</em></p>
+        `,
+        'AveragePooling3D': `
+          <h2>AveragePooling3D Layer</h2>
+          <p><strong>What it does:</strong> AveragePooling for 3D data.</p>
+          <h3>How it works:</h3>
+          <p>Takes average in 3D regions. Smoother downsampling than MaxPooling3D.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>After Conv3D:</strong> Alternative to MaxPooling3D</li>
+            <li><strong>Smooth features:</strong> When you want less aggressive pooling</li>
+            <li><strong>Medical/video:</strong> Preserve subtle patterns</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>pool_size:</strong> 3D window (e.g., (2,2,2))</li>
+          </ul>
+          <p><em>💡 Tip: Less common than Max but worth trying!</em></p>
+        `,
+        'GlobalMaxPooling1D': `
+          <h2>GlobalMaxPooling1D Layer</h2>
+          <p><strong>What it does:</strong> Takes max across entire sequence, one value per channel.</p>
+          <h3>How it works:</h3>
+          <p>For each channel, finds the single maximum value across all time steps.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Sequence classification:</strong> Before final Dense layer</li>
+            <li><strong>Text classification:</strong> Capture most important features</li>
+            <li><strong>After Conv1D:</strong> Reduce to fixed size for variable-length sequences</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <p>No parameters!</p>
+          <p><em>💡 Tip: Great for variable-length sequences. Position-invariant!</em></p>
+        `,
+        'GlobalAveragePooling1D': `
+          <h2>GlobalAveragePooling1D Layer</h2>
+          <p><strong>What it does:</strong> Takes average across entire sequence, one value per channel.</p>
+          <h3>How it works:</h3>
+          <p>For each channel, computes the average across all time steps.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Sequence classification:</strong> More robust to outliers than GlobalMax</li>
+            <li><strong>After Conv1D:</strong> Fixed-size output from variable sequences</li>
+            <li><strong>Smooth aggregation:</strong> When average is meaningful</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <p>No parameters!</p>
+          <p><em>💡 Tip: Often works better than GlobalMax for text classification!</em></p>
+        `,
+        // More Merge
+        'Subtract': `
+          <h2>Subtract Layer (Merge)</h2>
+          <p><strong>What it does:</strong> Element-wise subtraction of two tensors.</p>
+          <h3>How it works:</h3>
+          <p>Takes two inputs of same shape and subtracts second from first: output = input1 - input2.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Difference detection:</strong> Finding changes between inputs</li>
+            <li><strong>Residual learning:</strong> Computing residuals</li>
+            <li><strong>Custom architectures:</strong> When subtraction is meaningful</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <p>No parameters! Inputs must have same shape.</p>
+          <p><em>💡 Tip: Less common than Add but useful for specific tasks!</em></p>
+        `,
+        'Average': `
+          <h2>Average Layer (Merge)</h2>
+          <p><strong>What it does:</strong> Element-wise average of multiple tensors.</p>
+          <h3>How it works:</h3>
+          <p>Takes multiple inputs of same shape and averages them element by element.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Ensemble-like:</strong> Averaging multiple pathways</li>
+            <li><strong>Smoothing:</strong> Reduce variance in merged features</li>
+            <li><strong>Model averaging:</strong> Combining predictions</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <p>No parameters! All inputs must have same shape.</p>
+          <p><em>💡 Tip: Good for combining features from different pathways!</em></p>
+        `,
+        'Maximum': `
+          <h2>Maximum Layer (Merge)</h2>
+          <p><strong>What it does:</strong> Element-wise maximum of multiple tensors.</p>
+          <h3>How it works:</h3>
+          <p>For each position, outputs the maximum value across all inputs.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Maxout networks:</strong> Specific architecture style</li>
+            <li><strong>Feature competition:</strong> Let strongest feature win</li>
+            <li><strong>Custom operations:</strong> When max makes sense</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <p>No parameters! Inputs must have same shape.</p>
+          <p><em>💡 Tip: Used in Maxout networks for regularization!</em></p>
+        `,
+        'Minimum': `
+          <h2>Minimum Layer (Merge)</h2>
+          <p><strong>What it does:</strong> Element-wise minimum of multiple tensors.</p>
+          <h3>How it works:</h3>
+          <p>For each position, outputs the minimum value across all inputs.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Rare:</strong> Not commonly used</li>
+            <li><strong>Clamping:</strong> Enforce upper bounds</li>
+            <li><strong>Custom operations:</strong> When min is meaningful</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <p>No parameters! Inputs must have same shape.</p>
+          <p><em>💡 Tip: Very uncommon - use only if you have specific needs!</em></p>
+        `,
+        'Dot': `
+          <h2>Dot Layer (Merge)</h2>
+          <p><strong>What it does:</strong> Computes dot product between samples in two tensors.</p>
+          <h3>How it works:</h3>
+          <p>Performs dot product along specified axes. Can compute attention-like operations.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Attention mechanisms:</strong> Query-key similarity</li>
+            <li><strong>Similarity computation:</strong> Measure vector similarity</li>
+            <li><strong>Custom operations:</strong> When dot product is needed</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>axes:</strong> Which axes to compute dot product along</li>
+            <li><strong>normalize:</strong> Whether to normalize (cosine similarity)</li>
+          </ul>
+          <p><em>💡 Tip: Core operation for attention mechanisms!</em></p>
+        `,
+        // Image Processing
+        'UpSampling2D': `
+          <h2>UpSampling2D Layer</h2>
+          <p><strong>What it does:</strong> Increases spatial dimensions by repeating rows and columns.</p>
+          <h3>How it works:</h3>
+          <p>Repeats each row and column a specified number of times. Simple upscaling without learning.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Decoder networks:</strong> Autoencoders, segmentation</li>
+            <li><strong>GANs:</strong> Generating larger images</li>
+            <li><strong>Before convolution:</strong> Increase resolution</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>size:</strong> Upsampling factors (e.g., (2,2) doubles dimensions)</li>
+            <li><strong>interpolation:</strong> 'nearest' (default) or 'bilinear'</li>
+          </ul>
+          <p><em>💡 Tip: Fast but simple. Consider Conv2DTranspose for learnable upsampling!</em></p>
+        `,
+        'UpSampling1D': `
+          <h2>UpSampling1D Layer</h2>
+          <p><strong>What it does:</strong> Increases sequence length by repeating each timestep.</p>
+          <h3>How it works:</h3>
+          <p>Repeats each timestep a specified number of times along the temporal dimension.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Sequence generation:</strong> Decoder for sequences</li>
+            <li><strong>Audio/signal:</strong> Increase sampling rate</li>
+            <li><strong>Before Conv1D:</strong> Increase temporal resolution</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>size:</strong> Upsampling factor (e.g., 2 doubles length)</li>
+          </ul>
+          <p><em>💡 Tip: Simple repetition - no learning involved!</em></p>
+        `,
+        'UpSampling3D': `
+          <h2>UpSampling3D Layer</h2>
+          <p><strong>What it does:</strong> Increases 3D dimensions by repeating along all three axes.</p>
+          <h3>How it works:</h3>
+          <p>Repeats data in 3D space. Used for volumetric or video upsampling.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>3D segmentation:</strong> Medical imaging</li>
+            <li><strong>Video generation:</strong> Increase resolution</li>
+            <li><strong>Volumetric data:</strong> Decoder networks</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>size:</strong> Upsampling factors for 3 dimensions</li>
+          </ul>
+          <p><em>💡 Tip: Very memory intensive - use carefully!</em></p>
+        `,
+        'ZeroPadding2D': `
+          <h2>ZeroPadding2D Layer</h2>
+          <p><strong>What it does:</strong> Adds rows and columns of zeros around the input image.</p>
+          <h3>How it works:</h3>
+          <p>Pads borders with zeros. Used to control output size or prevent information loss at edges.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Before Conv2D:</strong> Control output dimensions</li>
+            <li><strong>Preserve size:</strong> Keep spatial dimensions constant</li>
+            <li><strong>Manual padding:</strong> When you need specific padding</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>padding:</strong> Number of rows/cols to add (e.g., (1,1) or ((1,1),(2,2)))</li>
+          </ul>
+          <p><em>💡 Tip: Usually Conv2D's 'same' padding is enough, but this gives more control!</em></p>
+        `,
+        'ZeroPadding1D': `
+          <h2>ZeroPadding1D Layer</h2>
+          <p><strong>What it does:</strong> Adds zeros at the beginning and end of sequences.</p>
+          <h3>How it works:</h3>
+          <p>Pads temporal dimension with zeros on both sides.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Before Conv1D:</strong> Control sequence length</li>
+            <li><strong>Causal padding:</strong> Add padding at start only</li>
+            <li><strong>Manual control:</strong> Specific padding requirements</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>padding:</strong> How much to add (e.g., 1 or (1,2) for asymmetric)</li>
+          </ul>
+          <p><em>💡 Tip: Useful for causal convolutions in time series!</em></p>
+        `,
+        'ZeroPadding3D': `
+          <h2>ZeroPadding3D Layer</h2>
+          <p><strong>What it does:</strong> Adds zeros around 3D data (videos, volumes).</p>
+          <h3>How it works:</h3>
+          <p>Pads all three spatial/temporal dimensions with zeros.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Before Conv3D:</strong> Control output dimensions</li>
+            <li><strong>3D data processing:</strong> Medical imaging, videos</li>
+            <li><strong>Manual padding:</strong> Specific 3D padding needs</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>padding:</strong> Padding for 3 dimensions</li>
+          </ul>
+          <p><em>💡 Tip: Rarely needed - Conv3D padding usually sufficient!</em></p>
+        `,
+        'Cropping2D': `
+          <h2>Cropping2D Layer</h2>
+          <p><strong>What it does:</strong> Removes rows and columns from the edges of images.</p>
+          <h3>How it works:</h3>
+          <p>Crops borders to reduce spatial dimensions. Opposite of padding.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Dimension matching:</strong> Make sizes compatible</li>
+            <li><strong>U-Net architectures:</strong> Match encoder/decoder sizes</li>
+            <li><strong>Remove borders:</strong> Eliminate edge artifacts</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>cropping:</strong> How much to remove (e.g., (1,1) or ((1,2),(3,4)))</li>
+          </ul>
+          <p><em>💡 Tip: Essential for U-Net style architectures!</em></p>
+        `,
+        'Cropping1D': `
+          <h2>Cropping1D Layer</h2>
+          <p><strong>What it does:</strong> Removes timesteps from beginning and/or end of sequences.</p>
+          <h3>How it works:</h3>
+          <p>Crops temporal dimension by removing steps from edges.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Sequence alignment:</strong> Match lengths</li>
+            <li><strong>Remove padding:</strong> After processing</li>
+            <li><strong>Temporal trimming:</strong> Focus on middle portion</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>cropping:</strong> How much to crop (e.g., (1,1))</li>
+          </ul>
+          <p><em>💡 Tip: Opposite of ZeroPadding1D!</em></p>
+        `,
+        'Cropping3D': `
+          <h2>Cropping3D Layer</h2>
+          <p><strong>What it does:</strong> Removes slices from 3D data edges.</p>
+          <h3>How it works:</h3>
+          <p>Crops three dimensions to reduce volume size.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>3D U-Net:</strong> Match encoder/decoder dimensions</li>
+            <li><strong>Volume trimming:</strong> Remove unnecessary regions</li>
+            <li><strong>Dimension matching:</strong> Make compatible sizes</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>cropping:</strong> Crop amounts for 3 dimensions</li>
+          </ul>
+          <p><em>💡 Tip: Useful in 3D segmentation architectures!</em></p>
+        `,
+        'SeparableConv2D': `
+          <h2>SeparableConv2D Layer</h2>
+          <p><strong>What it does:</strong> Efficient convolution that separates spatial and channel-wise operations.</p>
+          <h3>How it works:</h3>
+          <p>Performs depthwise convolution (spatial) followed by pointwise convolution (channels). Much fewer parameters than regular Conv2D!</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Mobile models:</strong> Reduce parameters and computation</li>
+            <li><strong>Limited resources:</strong> Faster and smaller models</li>
+            <li><strong>Similar performance:</strong> Often works as well as Conv2D</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>filters:</strong> Number of output channels</li>
+            <li><strong>kernel_size:</strong> Spatial filter size</li>
+            <li><strong>depth_multiplier:</strong> Depthwise filter multiplier</li>
+          </ul>
+          <p><em>💡 Tip: Key to MobileNet efficiency. Much faster than regular Conv2D!</em></p>
+        `,
+        'SeparableConv1D': `
+          <h2>SeparableConv1D Layer</h2>
+          <p><strong>What it does:</strong> Efficient 1D convolution with separated operations.</p>
+          <h3>How it works:</h3>
+          <p>Like SeparableConv2D but for sequences. Depthwise then pointwise convolution.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Efficient sequence models:</strong> Reduce parameters</li>
+            <li><strong>Mobile/embedded:</strong> Faster inference</li>
+            <li><strong>Time series:</strong> When efficiency matters</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>filters:</strong> Output channels</li>
+            <li><strong>kernel_size:</strong> Temporal filter size</li>
+          </ul>
+          <p><em>💡 Tip: More efficient than Conv1D with similar performance!</em></p>
+        `,
+        'DepthwiseConv2D': `
+          <h2>DepthwiseConv2D Layer</h2>
+          <p><strong>What it does:</strong> Applies a separate filter to each input channel independently.</p>
+          <h3>How it works:</h3>
+          <p>Unlike regular Conv2D, doesn't mix channels - each channel gets its own spatial filter.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Part of separable conv:</strong> First step before pointwise</li>
+            <li><strong>Channel independence:</strong> When channels shouldn't mix</li>
+            <li><strong>Efficient models:</strong> Fewer parameters</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>kernel_size:</strong> Spatial filter size</li>
+            <li><strong>depth_multiplier:</strong> Output channels per input channel</li>
+          </ul>
+          <p><em>💡 Tip: Usually followed by pointwise (1x1) conv to mix channels!</em></p>
+        `,
+        'Conv2DTranspose': `
+          <h2>Conv2DTranspose Layer (Deconvolution)</h2>
+          <p><strong>What it does:</strong> Learnable upsampling - opposite of Conv2D.</p>
+          <h3>How it works:</h3>
+          <p>Also called "deconvolution". Learns how to upsample while processing features. More powerful than UpSampling2D!</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Autoencoders:</strong> Decoder that learns upsampling</li>
+            <li><strong>GANs:</strong> Generator networks</li>
+            <li><strong>Segmentation:</strong> U-Net decoder paths</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>filters:</strong> Number of output channels</li>
+            <li><strong>kernel_size:</strong> Filter size</li>
+            <li><strong>strides:</strong> Upsampling factor (>1 increases size)</li>
+          </ul>
+          <p><em>💡 Tip: Better than UpSampling + Conv2D. Learns optimal upsampling!</em></p>
+        `,
+        'Conv1DTranspose': `
+          <h2>Conv1DTranspose Layer</h2>
+          <p><strong>What it does:</strong> Learnable upsampling for sequences.</p>
+          <h3>How it works:</h3>
+          <p>Opposite of Conv1D. Increases sequence length while learning features.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Sequence generation:</strong> Decoder networks</li>
+            <li><strong>Audio synthesis:</strong> Upsampling audio signals</li>
+            <li><strong>Time series:</strong> When you need learnable upsampling</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>filters:</strong> Output channels</li>
+            <li><strong>kernel_size:</strong> Filter size</li>
+            <li><strong>strides:</strong> Upsampling factor</li>
+          </ul>
+          <p><em>💡 Tip: Used in WaveNet and other audio generation models!</em></p>
+        `,
+        'Conv3DTranspose': `
+          <h2>Conv3DTranspose Layer</h2>
+          <p><strong>What it does:</strong> Learnable 3D upsampling.</p>
+          <h3>How it works:</h3>
+          <p>Opposite of Conv3D. Increases volumetric size with learned filters.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>3D generation:</strong> Volumetric GANs</li>
+            <li><strong>Medical imaging:</strong> 3D segmentation decoders</li>
+            <li><strong>Video generation:</strong> Spatio-temporal upsampling</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>filters:</strong> Output channels</li>
+            <li><strong>kernel_size:</strong> 3D filter size</li>
+            <li><strong>strides:</strong> Upsampling factors</li>
+          </ul>
+          <p><em>💡 Tip: Very computationally expensive!</em></p>
+        `,
+        // Advanced Recurrent
+        'Bidirectional': `
+          <h2>Bidirectional Layer (Wrapper)</h2>
+          <p><strong>What it does:</strong> Processes sequences in both forward and backward directions.</p>
+          <h3>How it works:</h3>
+          <p>Wraps an RNN layer (LSTM/GRU) and runs it twice - once forward, once backward. Concatenates outputs.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Text classification:</strong> Context from both directions</li>
+            <li><strong>Named entity recognition:</strong> See full context</li>
+            <li><strong>Not for generation:</strong> Can't use when predicting next token</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>layer:</strong> The RNN layer to wrap (LSTM/GRU)</li>
+            <li><strong>merge_mode:</strong> How to combine directions (concat, sum, etc.)</li>
+          </ul>
+          <p><em>💡 Tip: Great for classification tasks. Doubles the number of outputs!</em></p>
+        `,
+        'ConvLSTM2D': `
+          <h2>ConvLSTM2D Layer</h2>
+          <p><strong>What it does:</strong> LSTM with convolutional connections instead of fully connected.</p>
+          <h3>How it works:</h3>
+          <p>Like LSTM but uses convolutions for spatial patterns. Perfect for video and spatio-temporal data!</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Video prediction:</strong> Next frame prediction</li>
+            <li><strong>Weather forecasting:</strong> Spatial + temporal patterns</li>
+            <li><strong>Action recognition:</strong> Motion in videos</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>filters:</strong> Number of convolutional filters</li>
+            <li><strong>kernel_size:</strong> Spatial filter size</li>
+            <li><strong>return_sequences:</strong> True for stacking layers</li>
+          </ul>
+          <p><em>💡 Tip: Powerful for video tasks. Combines CNN and RNN strengths!</em></p>
+        `,
+        'TimeDistributed': `
+          <h2>TimeDistributed Layer (Wrapper)</h2>
+          <p><strong>What it does:</strong> Applies a layer independently to each timestep in a sequence.</p>
+          <h3>How it works:</h3>
+          <p>Wraps any layer and applies it to every timestep separately. Useful for sequence-to-sequence tasks.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Dense after RNN:</strong> Apply Dense to each timestep</li>
+            <li><strong>Video frames:</strong> Process each frame independently</li>
+            <li><strong>Sequence labeling:</strong> Output for each input step</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>layer:</strong> The layer to apply at each timestep</li>
+          </ul>
+          <p><em>💡 Tip: Essential for sequence-to-sequence models!</em></p>
+        `,
+        // Utility
+        'Permute': `
+          <h2>Permute Layer</h2>
+          <p><strong>What it does:</strong> Rearranges the dimensions of the input.</p>
+          <h3>How it works:</h3>
+          <p>Swaps axes around. Like transpose but for any number of dimensions.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Format conversion:</strong> Change data layout (channels first/last)</li>
+            <li><strong>Dimension reordering:</strong> Prepare for specific layers</li>
+            <li><strong>Custom architectures:</strong> When you need specific axis order</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>dims:</strong> New order of dimensions (e.g., (2, 1) swaps first two)</li>
+          </ul>
+          <p><em>💡 Tip: Useful for RNN input format changes!</em></p>
+        `,
+        'RepeatVector': `
+          <h2>RepeatVector Layer</h2>
+          <p><strong>What it does:</strong> Repeats input vector n times to create a sequence.</p>
+          <h3>How it works:</h3>
+          <p>Takes a 1D vector and copies it to create a 2D sequence of specified length.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Seq2Seq models:</strong> Connect encoder to decoder</li>
+            <li><strong>After Dense:</strong> Create sequence from single vector</li>
+            <li><strong>Broadcasting context:</strong> Repeat context across timesteps</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>n:</strong> Number of times to repeat</li>
+          </ul>
+          <p><em>💡 Tip: Common in encoder-decoder architectures!</em></p>
+        `,
+        'Lambda': `
+          <h2>Lambda Layer</h2>
+          <p><strong>What it does:</strong> Applies arbitrary operations/functions to inputs.</p>
+          <h3>How it works:</h3>
+          <p>Wraps any custom function as a layer. Great for simple operations without creating custom layers.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Custom operations:</strong> Simple math not in standard layers</li>
+            <li><strong>Preprocessing:</strong> Normalization, scaling in model</li>
+            <li><strong>Quick experiments:</strong> Test ideas without custom layer code</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>function:</strong> The function to apply</li>
+          </ul>
+          <p><em>💡 Tip: Great for quick custom operations, but can't be saved in all formats!</em></p>
+        `,
+        'Masking': `
+          <h2>Masking Layer</h2>
+          <p><strong>What it does:</strong> Masks timesteps in sequences so they're skipped during processing.</p>
+          <h3>How it works:</h3>
+          <p>Tells subsequent RNN layers to ignore certain timesteps (usually padding). Improves efficiency and accuracy!</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Variable-length sequences:</strong> With padding</li>
+            <li><strong>Before RNN layers:</strong> Skip padded timesteps</li>
+            <li><strong>Irregular time series:</strong> Ignore missing values</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>mask_value:</strong> Value to mask (typically 0.0)</li>
+          </ul>
+          <p><em>💡 Tip: Essential for efficient variable-length sequence processing!</em></p>
+        `,
+        'ActivityRegularization': `
+          <h2>ActivityRegularization Layer</h2>
+          <p><strong>What it does:</strong> Adds regularization penalty based on layer activations.</p>
+          <h3>How it works:</h3>
+          <p>Applies L1 and/or L2 penalties to activations during training. Encourages specific activation patterns.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Sparse activations:</strong> L1 encourages sparsity</li>
+            <li><strong>Prevent large activations:</strong> L2 keeps activations small</li>
+            <li><strong>Autoencoders:</strong> Enforce sparse representations</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>l1:</strong> L1 regularization factor</li>
+            <li><strong>l2:</strong> L2 regularization factor</li>
+          </ul>
+          <p><em>💡 Tip: Different from weight regularization - this regularizes outputs!</em></p>
+        `,
+        // Regularization
+        'GaussianNoise': `
+          <h2>GaussianNoise Layer</h2>
+          <p><strong>What it does:</strong> Adds random Gaussian noise to inputs during training.</p>
+          <h3>How it works:</h3>
+          <p>Adds noise with mean 0 and specified standard deviation. Only active during training, not inference!</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Regularization:</strong> Prevent overfitting</li>
+            <li><strong>Robust models:</strong> More resilient to input variations</li>
+            <li><strong>Data augmentation:</strong> In-model augmentation</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>stddev:</strong> Standard deviation of noise</li>
+          </ul>
+          <p><em>💡 Tip: Acts like data augmentation. Start with small stddev (0.1)!</em></p>
+        `,
+        'GaussianDropout': `
+          <h2>GaussianDropout Layer</h2>
+          <p><strong>What it does:</strong> Multiplicative Gaussian noise - like Dropout but continuous.</p>
+          <h3>How it works:</h3>
+          <p>Multiplies inputs by random values from Gaussian distribution. Smoother than binary Dropout.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Alternative to Dropout:</strong> More gradual regularization</li>
+            <li><strong>Continuous scaling:</strong> When binary dropout is too harsh</li>
+            <li><strong>Experimentation:</strong> See if it works better than Dropout</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>rate:</strong> Drop probability (like Dropout)</li>
+          </ul>
+          <p><em>💡 Tip: Less common than Dropout but worth trying!</em></p>
+        `,
+        'AlphaDropout': `
+          <h2>AlphaDropout Layer</h2>
+          <p><strong>What it does:</strong> Special Dropout that maintains self-normalizing properties.</p>
+          <h3>How it works:</h3>
+          <p>Designed for SELU activation. Keeps mean and variance stable unlike regular Dropout.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>With SELU:</strong> Specifically for self-normalizing networks</li>
+            <li><strong>Deep networks:</strong> Using SELU activations</li>
+            <li><strong>Not for ReLU:</strong> Use regular Dropout with ReLU</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>rate:</strong> Drop probability</li>
+          </ul>
+          <p><em>💡 Tip: Only use with SELU activation. Use regular Dropout otherwise!</em></p>
+        `,
       };
 
       return layerHelp[this.layerType] || `
