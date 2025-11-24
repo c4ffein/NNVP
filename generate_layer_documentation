@@ -1,0 +1,55 @@
+#!/bin/bash
+
+# Generate Keras layer documentation in HTML format
+# Usage: ./generate_layer_documentation <LayerName>
+
+if [ -z "$1" ]; then
+  echo "Usage: $0 <LayerName>"
+  echo "Example: $0 AveragePooling3D"
+  exit 1
+fi
+
+LAYER_NAME="$1"
+
+# Craft the prompt for Opus
+PROMPT="Generate HTML documentation for the Keras layer: ${LAYER_NAME}
+
+The documentation should follow this EXACT format and structure:
+
+\`\`\`html
+'${LAYER_NAME}': \`
+  <h2>${LAYER_NAME} Layer</h2>
+  <p><strong>What it does:</strong> [One clear sentence explaining the layer's purpose]</p>
+  <h3>How it works:</h3>
+  <p>[1-2 sentences explaining the mechanism/algorithm]</p>
+  <h3>When to use:</h3>
+  <ul>
+    <li><strong>[Use case 1]:</strong> [Description]</li>
+    <li><strong>[Use case 2]:</strong> [Description]</li>
+    <li><strong>[Use case 3]:</strong> [Description]</li>
+  </ul>
+  <h3>Key parameters:</h3>
+  <ul>
+    <li><strong>[param1]:</strong> [Description]</li>
+    <li><strong>[param2]:</strong> [Description]</li>
+  </ul>
+  <p><em>💡 Tip: [Practical advice for using this layer!]</em></p>
+\`,
+\`\`\`
+
+IMPORTANT CONSTRAINTS:
+1. This is for an educational neural network visual programming tool
+2. Keep explanations clear and beginner-friendly
+3. Focus on practical use cases
+4. Include 2-4 key parameters (most important ones)
+5. Include 2-4 use cases with bullet points
+6. The tip should be genuinely helpful and practical
+7. Use the EXACT HTML structure shown above
+8. Do NOT add any explanatory text before or after the HTML
+9. Output ONLY the HTML code block shown above, nothing else
+10. Be accurate about the layer's technical details
+
+Generate the documentation now:"
+
+# Call ai (Opus) with the prompt
+ai "$PROMPT"
