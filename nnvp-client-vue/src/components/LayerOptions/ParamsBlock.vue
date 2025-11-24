@@ -431,173 +431,191 @@ export default {
           <p><em>💡 Tip: Always verify that your input tensors have matching dimensions except for the concatenation axis - mismatched shapes are a common source of errors!</em></p>
         `,
         'Add': `
-          <h2>Add Layer (Merge)</h2>
-          <p><strong>What it does:</strong> Element-wise addition of multiple tensors.</p>
+          <h2>Add Layer</h2>
+          <p><strong>What it does:</strong> Performs element-wise addition of two or more input tensors with the same shape.</p>
           <h3>How it works:</h3>
-          <p>Takes inputs of the same shape and adds them element by element. Used in skip connections.</p>
+          <p>The layer takes multiple input tensors and adds them together element by element, producing a single output tensor. All input tensors must have identical shapes for the operation to work.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Residual connections:</strong> ResNet-style architectures</li>
-            <li><strong>Skip connections:</strong> Helping gradient flow</li>
-            <li><strong>Combining features:</strong> When addition makes sense</li>
+            <li><strong>Residual connections:</strong> Creating skip connections in ResNet-style architectures to help gradients flow and prevent vanishing gradient problems</li>
+            <li><strong>Feature fusion:</strong> Combining features from different branches of a network that process the same input differently</li>
+            <li><strong>Ensemble predictions:</strong> Merging outputs from multiple parallel pathways or models for improved predictions</li>
           </ul>
           <h3>Key parameters:</h3>
-          <p>No parameters! Inputs must have same shape.</p>
-          <p><em>💡 Tip: Core of ResNet architecture. Helps train very deep networks!</em></p>
+          <ul>
+            <li><strong>inputs:</strong> A list of input tensors (minimum 2) that must all have the same shape</li>
+            <li><strong>**kwargs:</strong> Standard layer keyword arguments like name and trainable (the Add layer itself has no weights)</li>
+          </ul>
+          <p><em>💡 Tip: Add layers are essential for residual blocks - always ensure your tensors have matching dimensions by using padding='same' in convolutions or adding projection layers when needed!</em></p>
         `,
         'Multiply': `
-          <h2>Multiply Layer (Merge)</h2>
-          <p><strong>What it does:</strong> Element-wise multiplication of multiple tensors.</p>
+          <h2>Multiply Layer</h2>
+          <p><strong>What it does:</strong> Performs element-wise multiplication between two or more input tensors of the same shape.</p>
           <h3>How it works:</h3>
-          <p>Takes inputs of the same shape and multiplies them element by element.</p>
+          <p>Takes multiple input tensors and multiplies them together element by element, producing a single output tensor. All inputs must have identical shapes or be broadcastable to the same shape.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Attention mechanisms:</strong> Gating information flow</li>
-            <li><strong>Feature weighting:</strong> Emphasizing important features</li>
-            <li><strong>Custom operations:</strong> When multiplication is meaningful</li>
+            <li><strong>Attention mechanisms:</strong> Multiply attention weights with feature maps to focus on important regions</li>
+            <li><strong>Gating mechanisms:</strong> Implement gates in custom RNN architectures or highway networks</li>
+            <li><strong>Feature modulation:</strong> Scale features dynamically based on learned importance weights</li>
           </ul>
           <h3>Key parameters:</h3>
-          <p>No parameters! Inputs must have same shape.</p>
-          <p><em>💡 Tip: Useful for attention-like mechanisms and gating!</em></p>
+          <ul>
+            <li><strong>inputs:</strong> List of input tensors to be multiplied (minimum 2 tensors required)</li>
+            <li><strong>**kwargs:</strong> Standard layer keyword arguments like name and dtype</li>
+          </ul>
+          <p><em>💡 Tip: Multiply layers are perfect for creating attention gates - try multiplying your features with a sigmoid-activated attention map to highlight important regions!</em></p>
         `,
         // Advanced Activations
         'LeakyReLU': `
           <h2>LeakyReLU Layer</h2>
-          <p><strong>What it does:</strong> Like ReLU but allows small negative values instead of zero.</p>
+          <p><strong>What it does:</strong> Applies a leaky rectified linear unit activation function that allows small negative values to pass through instead of zeroing them out completely.</p>
           <h3>How it works:</h3>
-          <p>For positive values: output = input. For negative values: output = alpha * input (where alpha is small, like 0.3).</p>
+          <p>For positive inputs, it returns the input unchanged; for negative inputs, it returns the input multiplied by a small slope coefficient (alpha). This prevents "dying neurons" by maintaining a small gradient even for negative values.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Dying ReLU problem:</strong> When ReLU neurons get stuck at zero</li>
-            <li><strong>Better gradient flow:</strong> Gradients flow even for negative inputs</li>
-            <li><strong>GANs:</strong> Very popular in generative models</li>
+            <li><strong>Preventing dead neurons:</strong> When standard ReLU causes too many neurons to become inactive during training</li>
+            <li><strong>Deep networks:</strong> Particularly useful in very deep architectures where gradient flow is critical</li>
+            <li><strong>Regression tasks:</strong> When you need to preserve negative information that might be important for predictions</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>alpha:</strong> Slope for negative values (default 0.3)</li>
+            <li><strong>alpha:</strong> The slope for negative inputs (default: 0.3, typically between 0.01 and 0.3)</li>
+            <li><strong>negative_slope:</strong> Alternative name for alpha in some implementations</li>
           </ul>
-          <p><em>💡 Tip: Good default alternative to ReLU. Try it if ReLU isn't working well!</em></p>
+          <p><em>💡 Tip: Start with the default alpha value of 0.3, but if you see many dead neurons, try increasing it; if your model isn't learning well, try decreasing it to 0.01!</em></p>
         `,
         'PReLU': `
-          <h2>PReLU Layer (Parametric ReLU)</h2>
-          <p><strong>What it does:</strong> Like LeakyReLU but learns the slope for negative values during training.</p>
+          <h2>PReLU Layer</h2>
+          <p><strong>What it does:</strong> Applies the Parametric Rectified Linear Unit activation function, which allows negative values to pass through with a learnable slope instead of zeroing them out.</p>
           <h3>How it works:</h3>
-          <p>The alpha parameter is learned rather than fixed. Each channel can have its own alpha.</p>
+          <p>PReLU outputs the input directly when positive, but multiplies negative inputs by a learnable parameter α (alpha). This parameter is optimized during training, allowing the network to learn the best negative slope for each neuron or channel.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>When you're unsure:</strong> Let the network learn the best slope</li>
-            <li><strong>Complex models:</strong> Where different channels need different behaviors</li>
-            <li><strong>Fine-tuning:</strong> Can improve over fixed LeakyReLU</li>
+            <li><strong>Deep networks:</strong> Helps prevent dying ReLU problems in very deep architectures by allowing gradients to flow through negative values</li>
+            <li><strong>Computer vision tasks:</strong> Often improves performance in CNNs compared to standard ReLU, especially for image classification</li>
+            <li><strong>When ReLU underperforms:</strong> Try PReLU when standard ReLU activation leads to many dead neurons or poor convergence</li>
           </ul>
           <h3>Key parameters:</h3>
-          <p>No parameters - alpha is learned automatically!</p>
-          <p><em>💡 Tip: More flexible than LeakyReLU but adds a few more parameters to learn!</em></p>
+          <ul>
+            <li><strong>alpha_initializer:</strong> Initializer for the learnable alpha parameter (default: 'zeros')</li>
+            <li><strong>alpha_regularizer:</strong> Optional regularizer for the alpha parameter to prevent overfitting</li>
+            <li><strong>shared_axes:</strong> Axes along which to share the same alpha parameter (useful for convolutions)</li>
+          </ul>
+          <p><em>💡 Tip: PReLU adds a small number of parameters to your model - use shared_axes=[1,2] in convolutional layers to share parameters across spatial dimensions and reduce overfitting!</em></p>
         `,
         'ELU': `
-          <h2>ELU Layer (Exponential Linear Unit)</h2>
-          <p><strong>What it does:</strong> Smooth activation that can output negative values, reducing bias shift.</p>
+          <h2>ELU Layer</h2>
+          <p><strong>What it does:</strong> Applies the Exponential Linear Unit activation function, which helps neurons learn faster by allowing negative values while avoiding the "dying ReLU" problem.</p>
           <h3>How it works:</h3>
-          <p>For positive: output = input. For negative: output = alpha * (exp(input) - 1). Smooth transition!</p>
+          <p>For positive inputs, ELU acts like the identity function (output = input). For negative inputs, it applies an exponential curve that approaches -alpha as input becomes very negative, providing smooth gradients even for negative values.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Better than ReLU:</strong> Often faster convergence</li>
-            <li><strong>Smooth gradients:</strong> No dead neurons problem</li>
-            <li><strong>Deep networks:</strong> Helps with vanishing gradients</li>
+            <li><strong>Deep networks:</strong> When building very deep networks where vanishing gradients are a concern</li>
+            <li><strong>Faster convergence needed:</strong> When you want faster training compared to ReLU while maintaining good performance</li>
+            <li><strong>Noise-robust models:</strong> When your data has noise and you need more robust activation than ReLU</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>alpha:</strong> Controls saturation for negative values (default 1.0)</li>
+            <li><strong>alpha:</strong> Scale factor for negative inputs (default: 1.0) - controls how negative the output can be</li>
+            <li><strong>input_shape:</strong> Shape of input data (only needed for first layer in a model)</li>
           </ul>
-          <p><em>💡 Tip: Often outperforms ReLU but slightly slower to compute!</em></p>
+          <p><em>💡 Tip: ELU often works better than ReLU in hidden layers but is computationally more expensive due to the exponential calculation - use it when accuracy matters more than training speed!</em></p>
         `,
         'ThresholdedReLU': `
           <h2>ThresholdedReLU Layer</h2>
-          <p><strong>What it does:</strong> ReLU with a threshold - only activates above a certain value.</p>
+          <p><strong>What it does:</strong> Applies a thresholded version of ReLU activation where values below a specified threshold are set to zero, while values above it remain unchanged.</p>
           <h3>How it works:</h3>
-          <p>If input > theta: output = input. Otherwise: output = 0.</p>
+          <p>The layer outputs the input value if it's greater than the threshold, otherwise outputs zero. This creates a "dead zone" below the threshold, helping to filter out small, potentially noisy activations.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Sparse activations:</strong> Want even more sparsity than ReLU</li>
-            <li><strong>Noise filtering:</strong> Ignore small activations</li>
-            <li><strong>Experimental:</strong> Less common, try if you want sparsity</li>
+            <li><strong>Noise reduction:</strong> When you want to suppress small activation values that might represent noise in your data</li>
+            <li><strong>Sparse representations:</strong> To encourage sparsity in neural networks by zeroing out weak activations</li>
+            <li><strong>Feature selection:</strong> When you want only strong features to pass through, filtering out weak signals</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>theta:</strong> Threshold value (default 1.0)</li>
+            <li><strong>theta:</strong> The threshold value (default: 1.0) - activations below this are set to zero</li>
+            <li><strong>name:</strong> Optional name for the layer to identify it in the model</li>
           </ul>
-          <p><em>💡 Tip: Not widely used - stick with ReLU/LeakyReLU for most cases!</em></p>
+          <p><em>💡 Tip: Start with theta=1.0 and adjust based on your activation value ranges - too high and you'll kill too many neurons, too low and it behaves like regular ReLU!</em></p>
         `,
         'ReLU': `
-          <h2>ReLU Layer (Rectified Linear Unit)</h2>
-          <p><strong>What it does:</strong> Outputs input if positive, zero if negative. Simple and effective!</p>
+          <h2>ReLU Layer</h2>
+          <p><strong>What it does:</strong> Applies the Rectified Linear Unit activation function that outputs the input directly if positive, otherwise outputs zero.</p>
           <h3>How it works:</h3>
-          <p>output = max(0, input). Dead simple, but works amazingly well.</p>
+          <p>ReLU computes f(x) = max(0, x) for each input element, effectively removing negative values while keeping positive values unchanged. This simple non-linear transformation helps neural networks learn complex patterns while avoiding the vanishing gradient problem.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Default choice:</strong> Start here for hidden layers</li>
-            <li><strong>Fast training:</strong> No vanishing gradient like sigmoid/tanh</li>
-            <li><strong>Sparse activations:</strong> Many neurons output zero</li>
+            <li><strong>Hidden layers in deep networks:</strong> Default choice for most feedforward and convolutional neural networks due to computational efficiency and good performance</li>
+            <li><strong>Computer vision tasks:</strong> Standard activation for CNN architectures like ResNet, VGG, and most image classification models</li>
+            <li><strong>When training speed matters:</strong> Faster to compute than sigmoid or tanh, making it ideal for large-scale models</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>max_value:</strong> Cap maximum output (optional)</li>
-            <li><strong>negative_slope:</strong> Can make it behave like LeakyReLU</li>
-            <li><strong>threshold:</strong> Can make it behave like ThresholdedReLU</li>
+            <li><strong>max_value:</strong> Optional upper threshold to clip the maximum output value (default: None)</li>
+            <li><strong>negative_slope:</strong> Slope for negative inputs, setting this > 0 creates a Leaky ReLU (default: 0)</li>
+            <li><strong>threshold:</strong> Threshold value for thresholded activation (default: 0)</li>
           </ul>
-          <p><em>💡 Tip: The default activation for most deep learning! Start here!</em></p>
+          <p><em>💡 Tip: ReLU can cause "dying neurons" where neurons output zero for all inputs - if this happens, try using LeakyReLU or reducing your learning rate!</em></p>
         `,
         'Softmax': `
           <h2>Softmax Layer</h2>
-          <p><strong>What it does:</strong> Converts logits to probabilities that sum to 1.</p>
+          <p><strong>What it does:</strong> Converts a vector of raw scores (logits) into a probability distribution where all outputs sum to 1.</p>
           <h3>How it works:</h3>
-          <p>Applies exponential to each value, then normalizes so they sum to 1. Larger values get higher probabilities.</p>
+          <p>The Softmax function applies the exponential function to each element and then normalizes by dividing by the sum of all exponentials. This ensures outputs are between 0 and 1 and represent probabilities for each class.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Multi-class output:</strong> Final layer for classification</li>
-            <li><strong>Attention mechanisms:</strong> Computing attention weights</li>
-            <li><strong>Probability distributions:</strong> When you need valid probabilities</li>
+            <li><strong>Multi-class classification:</strong> When you need to classify inputs into one of multiple exclusive categories (e.g., classifying images as cat, dog, or bird)</li>
+            <li><strong>Final layer of classification networks:</strong> As the last activation function to convert raw network outputs into interpretable probabilities</li>
+            <li><strong>Probability distribution generation:</strong> When you need outputs that represent confidence scores or likelihood across multiple options</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>axis:</strong> Which axis to apply softmax (default -1)</li>
+            <li><strong>axis:</strong> Integer or list of integers specifying which axis to compute softmax over (default is -1, the last axis)</li>
+            <li><strong>dtype:</strong> Data type of the layer's computations (default is None, which uses the model's default dtype)</li>
           </ul>
-          <p><em>💡 Tip: Use with categorical_crossentropy loss for multi-class classification!</em></p>
+          <p><em>💡 Tip: Always use Softmax with categorical crossentropy loss for multi-class problems, but avoid adding Softmax if using sparse_categorical_crossentropy as it's already included!</em></p>
         `,
         // More Pooling
         'MaxPooling1D': `
           <h2>MaxPooling1D Layer</h2>
-          <p><strong>What it does:</strong> MaxPooling for 1D sequences (like text or time series).</p>
+          <p><strong>What it does:</strong> Downsamples 1D input data by taking the maximum value from each pooling window, reducing the sequence length while preserving the most prominent features.</p>
           <h3>How it works:</h3>
-          <p>Takes maximum value in each window along the sequence dimension.</p>
+          <p>The layer slides a window across the input sequence and outputs only the maximum value from each window position. This reduces the temporal resolution while keeping the strongest signal in each local region.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>After Conv1D:</strong> Reduce sequence length</li>
-            <li><strong>Text/sequences:</strong> Downsample temporal features</li>
-            <li><strong>Extract strongest features:</strong> Focus on peaks</li>
+            <li><strong>Text classification:</strong> Reduce sequence length after convolutional layers while preserving important feature detections</li>
+            <li><strong>Time series analysis:</strong> Downsample temporal data to focus on peak values and reduce computational load</li>
+            <li><strong>Audio processing:</strong> Extract dominant frequencies or amplitudes from audio signal segments</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>pool_size:</strong> Size of window (typically 2)</li>
-            <li><strong>strides:</strong> How far to move the window</li>
+            <li><strong>pool_size:</strong> Integer specifying the size of the pooling window (default: 2)</li>
+            <li><strong>strides:</strong> Integer or None for the stride length (default: None, which equals pool_size)</li>
+            <li><strong>padding:</strong> Either 'valid' (no padding) or 'same' (pad to keep output length same as input)</li>
           </ul>
-          <p><em>💡 Tip: Use after Conv1D layers for efficient sequence processing!</em></p>
+          <p><em>💡 Tip: Use pool_size=2 with strides=2 for standard 2x downsampling, or set strides=1 for overlapping windows to preserve more temporal information!</em></p>
         `,
         'MaxPooling3D': `
           <h2>MaxPooling3D Layer</h2>
-          <p><strong>What it does:</strong> MaxPooling for 3D data (videos, volumetric data).</p>
+          <p><strong>What it does:</strong> Performs max pooling operations on 3D data (spatial or spatiotemporal) by selecting the maximum value from each pooling window to reduce dimensionality.</p>
           <h3>How it works:</h3>
-          <p>Takes maximum in 3D regions. Reduces spatial and temporal/depth dimensions.</p>
+          <p>The layer slides a 3D window across the input volume and outputs the maximum value from each window region. This downsamples the input along its three spatial dimensions (depth, height, width), reducing computational complexity while retaining the most prominent features.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>After Conv3D:</strong> Downsample videos or volumes</li>
-            <li><strong>Medical imaging:</strong> 3D scans (CT, MRI)</li>
-            <li><strong>Video processing:</strong> Reduce spatio-temporal size</li>
+            <li><strong>3D Medical Imaging:</strong> Processing CT scans, MRI volumes, or other volumetric medical data to reduce spatial dimensions while preserving important features</li>
+            <li><strong>Video Analysis:</strong> Downsampling video data where the third dimension represents temporal frames to capture dominant motion patterns</li>
+            <li><strong>3D Object Recognition:</strong> Reducing the resolution of 3D voxel data or point clouds while maintaining critical spatial information</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>pool_size:</strong> 3D window size (e.g., (2,2,2))</li>
+            <li><strong>pool_size:</strong> Tuple of 3 integers specifying the pooling window size for each dimension (default: (2, 2, 2))</li>
+            <li><strong>strides:</strong> Tuple of 3 integers for the stride length in each dimension (default: None, which uses pool_size)</li>
+            <li><strong>padding:</strong> Either 'valid' (no padding) or 'same' (pad input to maintain output dimensions)</li>
+            <li><strong>data_format:</strong> Either 'channels_last' or 'channels_first' to specify the input dimension ordering</li>
           </ul>
-          <p><em>💡 Tip: Computationally expensive - use wisely!</em></p>
+          <p><em>💡 Tip: Start with pool_size=(2,2,2) to halve each spatial dimension - if you're losing too much detail, try smaller pool sizes or use strides smaller than pool_size for overlapping windows!</em></p>
         `,
         'AveragePooling1D': `
           <h2>AveragePooling1D Layer</h2>
