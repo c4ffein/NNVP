@@ -111,121 +111,133 @@ export default {
         `,
         'Flatten': `
           <h2>Flatten Layer</h2>
-          <p><strong>What it does:</strong> Converts multi-dimensional data (like images) into a 1D vector.</p>
+          <p><strong>What it does:</strong> Converts multi-dimensional input tensors into a single continuous vector by "flattening" all dimensions except the batch dimension.</p>
           <h3>How it works:</h3>
-          <p>Takes a multi-dimensional input (e.g., 28×28×32) and reshapes it into a single vector (e.g., 25088 values).</p>
+          <p>The layer reshapes the input by preserving the batch size and collapsing all other dimensions into a single dimension. For example, an input shape of (batch_size, 28, 28, 3) becomes (batch_size, 2352).</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Before Dense layers:</strong> Dense layers need 1D input</li>
-            <li><strong>After Conv layers:</strong> To transition from spatial features to classification</li>
-            <li><strong>Required transition:</strong> Between convolutional and fully connected parts</li>
+            <li><strong>Transitioning from convolutional to dense layers:</strong> Essential when connecting CNN feature extraction layers to fully connected classification layers</li>
+            <li><strong>Preparing image data for dense networks:</strong> Converts 2D/3D image tensors into 1D vectors for traditional neural network processing</li>
+            <li><strong>Feature vector creation:</strong> When you need to transform spatial feature maps into a single feature vector for downstream tasks</li>
           </ul>
           <h3>Key parameters:</h3>
-          <p>No parameters! It just reshapes the data.</p>
-          <p><em>💡 Tip: Always use Flatten before Dense layers when working with images!</em></p>
+          <ul>
+            <li><strong>data_format:</strong> Specifies whether channels are first or last in the input ('channels_last' by default)</li>
+            <li><strong>Input shape:</strong> Accepts any tensor shape; automatically calculates the flattened output dimension</li>
+          </ul>
+          <p><em>💡 Tip: Flatten preserves the total number of elements - use it right before Dense layers but avoid it if you need to maintain spatial relationships for later convolutional operations!</em></p>
         `,
         'Dropout': `
           <h2>Dropout Layer</h2>
-          <p><strong>What it does:</strong> Randomly "drops" (sets to zero) a percentage of neurons during training to prevent overfitting.</p>
+          <p><strong>What it does:</strong> Randomly deactivates a percentage of neurons during training to prevent overfitting and improve model generalization.</p>
           <h3>How it works:</h3>
-          <p>During training, each neuron has a random chance of being temporarily removed. This forces the network to learn redundant representations and not rely too heavily on any single neuron.</p>
+          <p>During each training step, Dropout randomly sets a fraction of input units to 0, forcing the network to learn redundant representations. During inference (testing), all neurons are active but their outputs are scaled by the dropout rate to maintain consistency.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Overfitting:</strong> When training accuracy is much higher than validation</li>
-            <li><strong>After Dense layers:</strong> Especially in deep networks</li>
-            <li><strong>Regularization:</strong> To make the model generalize better</li>
+            <li><strong>Overfitting prevention:</strong> When your model performs well on training data but poorly on validation data</li>
+            <li><strong>Large networks:</strong> Essential for deep neural networks with many parameters</li>
+            <li><strong>Limited training data:</strong> Helps when you have a small dataset relative to model complexity</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>rate:</strong> Fraction of neurons to drop (0.2 = 20%, 0.5 = 50%)</li>
+            <li><strong>rate:</strong> Fraction of input units to drop (0.2-0.5 typical, where 0.2 means 20% dropout)</li>
+            <li><strong>seed:</strong> Random seed for reproducible dropout patterns during training</li>
           </ul>
-          <p><em>💡 Tip: Start with 0.2-0.5. Higher rates for larger layers!</em></p>
+          <p><em>💡 Tip: Start with dropout rates of 0.2-0.3 for input layers and 0.5 for hidden layers. Remember that Dropout is automatically disabled during model evaluation!</em></p>
         `,
         'LSTM': `
-          <h2>LSTM Layer (Long Short-Term Memory)</h2>
-          <p><strong>What it does:</strong> Processes sequences of data while remembering important information from the past and forgetting irrelevant details.</p>
+          <h2>LSTM Layer</h2>
+          <p><strong>What it does:</strong> Processes sequential data by learning long-term dependencies, using memory cells that can remember or forget information over extended time periods.</p>
           <h3>How it works:</h3>
-          <p>Uses special gates (forget, input, output) to control information flow through time. This allows it to learn long-term dependencies in sequential data.</p>
+          <p>LSTMs use special gates (input, forget, and output gates) to control the flow of information through memory cells. This architecture allows the network to selectively remember important patterns while forgetting irrelevant information, solving the vanishing gradient problem that affects standard RNNs.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Time series:</strong> Stock prices, weather forecasting</li>
-            <li><strong>Text:</strong> Language modeling, translation</li>
-            <li><strong>Sequential data:</strong> Any data with temporal dependencies</li>
+            <li><strong>Time series prediction:</strong> Forecasting stock prices, weather patterns, or sales data where past values influence future outcomes</li>
+            <li><strong>Natural language processing:</strong> Text generation, sentiment analysis, or machine translation where word order and context matter</li>
+            <li><strong>Sequence classification:</strong> Analyzing sensor data, speech recognition, or video frame analysis where temporal patterns are crucial</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>units:</strong> Number of LSTM cells (memory capacity)</li>
-            <li><strong>return_sequences:</strong> True if feeding to another RNN layer</li>
+            <li><strong>units:</strong> Number of LSTM units (memory cells) - higher values capture more complex patterns but increase computation</li>
+            <li><strong>return_sequences:</strong> Whether to return the full sequence (True) or just the last output (False) - use True for sequence-to-sequence tasks</li>
+            <li><strong>dropout:</strong> Fraction of units to drop during training (0-1) to prevent overfitting</li>
           </ul>
-          <p><em>💡 Tip: Use 64-256 units. Set return_sequences=True for stacked LSTMs!</em></p>
+          <p><em>💡 Tip: Start with 50-100 units and increase if underfitting. Use return_sequences=True when stacking multiple LSTM layers, but set to False for the last LSTM before a Dense layer!</em></p>
         `,
         'Activation': `
           <h2>Activation Layer</h2>
-          <p><strong>What it does:</strong> Applies a non-linear activation function to the input.</p>
+          <p><strong>What it does:</strong> Applies a specified activation function (like ReLU, sigmoid, or tanh) to the input tensor element-wise.</p>
           <h3>How it works:</h3>
-          <p>Transforms values through a mathematical function. This adds non-linearity, allowing the network to learn complex patterns.</p>
-          <h3>Common activations:</h3>
-          <ul>
-            <li><strong>ReLU:</strong> Max(0, x) - Fast and works well for hidden layers</li>
-            <li><strong>Sigmoid:</strong> Squashes to 0-1 - Good for binary output</li>
-            <li><strong>Tanh:</strong> Squashes to -1 to 1 - Centered around zero</li>
-            <li><strong>Softmax:</strong> Converts to probabilities - Use for final classification</li>
-          </ul>
+          <p>The layer transforms each input value through a mathematical function, introducing non-linearity to help the network learn complex patterns. Without activation functions, stacking multiple layers would be equivalent to a single linear transformation.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Separate layer:</strong> When you want explicit control</li>
-            <li><strong>Advanced activations:</strong> Like LeakyReLU, ELU</li>
-          </ul>
-          <p><em>💡 Tip: Usually better to specify activation in the layer itself (like Dense(activation='relu'))!</em></p>
-        `,
-        'BatchNormalization': `
-          <h2>Batch Normalization Layer</h2>
-          <p><strong>What it does:</strong> Normalizes the inputs of each layer to have mean 0 and variance 1, making training faster and more stable.</p>
-          <h3>How it works:</h3>
-          <p>For each mini-batch, it normalizes the activations, then applies learnable scaling and shifting parameters.</p>
-          <h3>When to use:</h3>
-          <ul>
-            <li><strong>Deep networks:</strong> Helps train deeper models</li>
-            <li><strong>After Conv/Dense:</strong> Before or after activation (both work)</li>
-            <li><strong>Faster training:</strong> Allows higher learning rates</li>
-          </ul>
-          <h3>Benefits:</h3>
-          <ul>
-            <li>Reduces internal covariate shift</li>
-            <li>Acts as regularization (slight effect)</li>
-            <li>Allows higher learning rates</li>
-          </ul>
-          <p><em>💡 Tip: Place after Conv2D/Dense and before Activation. Very powerful for training stability!</em></p>
-        `,
-        'Input': `
-          <h2>Input Layer</h2>
-          <p><strong>What it does:</strong> Defines the shape of input data for your neural network.</p>
-          <h3>How it works:</h3>
-          <p>Specifies the dimensions of the data your model will receive. This is always the first layer in a model.</p>
-          <h3>When to use:</h3>
-          <ul>
-            <li><strong>Always required:</strong> Every model needs an Input layer</li>
-            <li><strong>Functional API:</strong> Explicitly defined when using Model API</li>
-            <li><strong>Multiple inputs:</strong> When your model has several input sources</li>
+            <li><strong>After Dense layers:</strong> Add non-linearity between fully connected layers to enable learning of complex relationships</li>
+            <li><strong>Custom architectures:</strong> When you need explicit control over activation placement separate from other layers</li>
+            <li><strong>Legacy model conversion:</strong> When converting models that use separate activation layers rather than built-in activations</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>shape:</strong> Dimensions of input (e.g., (28, 28, 1) for MNIST)</li>
+            <li><strong>activation:</strong> The activation function to use (e.g., 'relu', 'sigmoid', 'tanh', 'softmax')</li>
+            <li><strong>name:</strong> Optional string name for the layer to identify it in the model</li>
           </ul>
-          <p><em>💡 Tip: Don't include batch size in shape. For images: (height, width, channels)!</em></p>
+          <p><em>💡 Tip: While you can use separate Activation layers, it's often more convenient to specify activation directly in Dense or Conv2D layers using their activation parameter!</em></p>
+        `,
+        'BatchNormalization': `
+          <h2>BatchNormalization Layer</h2>
+          <p><strong>What it does:</strong> Normalizes the inputs of each batch to have a mean of 0 and standard deviation of 1, helping stabilize and accelerate neural network training.</p>
+          <h3>How it works:</h3>
+          <p>For each mini-batch, it subtracts the batch mean and divides by the batch standard deviation, then applies a learned scale and shift. During inference, it uses moving averages of mean and variance computed during training.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Deep networks:</strong> Essential for training very deep networks (>10 layers) where gradients can vanish or explode</li>
+            <li><strong>Faster convergence:</strong> When you need to speed up training and use higher learning rates</li>
+            <li><strong>Reducing sensitivity:</strong> When your model is sensitive to weight initialization or you want more stable training</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>axis:</strong> The axis to be normalized (typically the features axis, default is -1)</li>
+            <li><strong>momentum:</strong> Momentum for moving average updates (default 0.99)</li>
+            <li><strong>epsilon:</strong> Small constant added for numerical stability (default 0.001)</li>
+          </ul>
+          <p><em>💡 Tip: Place BatchNormalization after dense or convolutional layers but BEFORE activation functions for best results!</em></p>
+        `,
+        'Input': `
+          <h2>Input Layer</h2>
+          <p><strong>What it does:</strong> Creates an entry point for data to flow into your neural network model by defining the shape and type of input data.</p>
+          <h3>How it works:</h3>
+          <p>The Input layer acts as a placeholder that tells Keras what shape and data type to expect when you feed data into your model. It doesn't perform any computations itself but establishes the tensor specifications that subsequent layers will receive.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Starting any model:</strong> Every neural network needs at least one Input layer to define where data enters the network</li>
+            <li><strong>Multi-input models:</strong> Use multiple Input layers when your model needs to process different types of data simultaneously (e.g., images and text)</li>
+            <li><strong>Functional API models:</strong> Required when building complex architectures with branches, merges, or non-sequential connections</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>shape:</strong> Tuple specifying the expected shape of input samples (e.g., (28, 28) for images, (100,) for sequences)</li>
+            <li><strong>dtype:</strong> Data type of the input (default is float32, can be int32, bool, etc.)</li>
+            <li><strong>name:</strong> Optional string to identify this input layer, especially useful in multi-input models</li>
+            <li><strong>sparse:</strong> Boolean indicating whether the input is a sparse tensor (useful for categorical data with many classes)</li>
+          </ul>
+          <p><em>💡 Tip: Don't include the batch size in the shape parameter - Keras handles batching automatically! For a batch of 28x28 images, use shape=(28, 28), not shape=(None, 28, 28).</em></p>
         `,
         'Output': `
           <h2>Output Layer</h2>
-          <p><strong>What it does:</strong> Marks the final output of your neural network.</p>
+          <p><strong>What it does:</strong> Creates a named output tensor that defines an endpoint for your model, allowing you to specify multiple outputs in complex architectures.</p>
           <h3>How it works:</h3>
-          <p>This is typically a Dense layer with activation matching your task: softmax for multi-class, sigmoid for binary, or linear for regression.</p>
-          <h3>Common configurations:</h3>
+          <p>The Output layer wraps an existing tensor and assigns it a name, marking it as an output of the model. This is particularly useful in functional API models where you need to explicitly define which tensors should be returned as outputs.</p>
+          <h3>When to use:</h3>
           <ul>
-            <li><strong>Multi-class classification:</strong> Dense(num_classes, activation='softmax')</li>
-            <li><strong>Binary classification:</strong> Dense(1, activation='sigmoid')</li>
-            <li><strong>Regression:</strong> Dense(1, activation='linear' or None)</li>
+            <li><strong>Multi-output models:</strong> When your model needs to produce multiple predictions simultaneously (e.g., classification and regression together)</li>
+            <li><strong>Intermediate outputs:</strong> To extract features from middle layers for visualization or transfer learning</li>
+            <li><strong>Custom loss per output:</strong> When different outputs need different loss functions or metrics</li>
           </ul>
-          <p><em>💡 Tip: Match activation to your loss function! Softmax + categorical_crossentropy, Sigmoid + binary_crossentropy!</em></p>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>name:</strong> String identifier for this output (required) - used to reference this output in training and prediction</li>
+            <li><strong>dtype:</strong> Data type of the output tensor (optional) - defaults to the input tensor's dtype</li>
+          </ul>
+          <p><em>💡 Tip: Always give meaningful names to your outputs - they'll be used as keys in the model's output dictionary during training and prediction!</em></p>
         `,
         'GRU': `
           <h2>GRU Layer (Gated Recurrent Unit)</h2>
