@@ -340,85 +340,95 @@ export default {
         `,
         'GlobalMaxPooling2D': `
           <h2>GlobalMaxPooling2D Layer</h2>
-          <p><strong>What it does:</strong> Takes the maximum value across the entire spatial dimensions, reducing to 1 value per channel.</p>
+          <p><strong>What it does:</strong> Reduces each feature map to a single value by taking the maximum value across all spatial locations, converting 4D tensors to 2D.</p>
           <h3>How it works:</h3>
-          <p>For each channel, finds the single maximum value. Converts (height, width, channels) to just (channels).</p>
+          <p>For each channel in the input feature maps, it finds the maximum value across all height and width positions. This transforms an input of shape (batch_size, height, width, channels) into (batch_size, channels).</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Before final Dense:</strong> Alternative to Flatten</li>
-            <li><strong>Translation invariance:</strong> Position doesn't matter</li>
-            <li><strong>Reduce parameters:</strong> Fewer values than Flatten</li>
+            <li><strong>Before final classification layers:</strong> Replace flatten layers to reduce parameters while preserving the most important features</li>
+            <li><strong>Feature extraction networks:</strong> Create fixed-size representations from variable-sized input images</li>
+            <li><strong>Reducing overfitting:</strong> Dramatically reduces parameters compared to flattening, helping prevent overfitting in small datasets</li>
           </ul>
           <h3>Key parameters:</h3>
-          <p>No parameters!</p>
-          <p><em>💡 Tip: Often used in modern architectures instead of Flatten. More compact!</em></p>
+          <ul>
+            <li><strong>data_format:</strong> Either 'channels_last' (default) or 'channels_first' to specify the input format</li>
+            <li><strong>keepdims:</strong> Boolean, whether to keep spatial dimensions as size 1 (default: False)</li>
+          </ul>
+          <p><em>💡 Tip: GlobalMaxPooling2D is excellent for replacing Flatten layers before Dense layers - it reduces parameters by 99%+ while often maintaining similar accuracy!</em></p>
         `,
         'GlobalAveragePooling2D': `
           <h2>GlobalAveragePooling2D Layer</h2>
-          <p><strong>What it does:</strong> Takes the average value across entire spatial dimensions, one value per channel.</p>
+          <p><strong>What it does:</strong> Computes the average value for each feature map across its entire spatial dimensions, reducing each feature map to a single value.</p>
           <h3>How it works:</h3>
-          <p>For each channel, computes the average. More robust to outliers than GlobalMaxPooling.</p>
+          <p>For each channel in the input, it calculates the mean of all spatial locations (height × width), transforming a 4D tensor (batch, height, width, channels) into a 2D tensor (batch, channels). This operation effectively summarizes the entire spatial information of each feature map into one representative value.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Before final Dense:</strong> Popular in modern CNNs</li>
-            <li><strong>Regularization:</strong> Reduces overfitting</li>
-            <li><strong>Smooth features:</strong> Less sensitive to noise</li>
+            <li><strong>Before final classification layer:</strong> Replace Flatten() to reduce parameters and prevent overfitting while maintaining spatial invariance</li>
+            <li><strong>Feature extraction:</strong> Create compact representations of images for transfer learning or similarity comparisons</li>
+            <li><strong>Reducing model size:</strong> Dramatically decrease the number of parameters compared to using fully connected layers after convolutions</li>
           </ul>
           <h3>Key parameters:</h3>
-          <p>No parameters!</p>
-          <p><em>💡 Tip: Very popular in modern architectures (ResNet, MobileNet). Try it!</em></p>
+          <ul>
+            <li><strong>data_format:</strong> Either 'channels_last' (default) or 'channels_first' to specify the input format</li>
+            <li><strong>keepdims:</strong> Boolean to keep spatial dimensions as 1 (resulting in shape batch × 1 × 1 × channels) or remove them entirely</li>
+          </ul>
+          <p><em>💡 Tip: GlobalAveragePooling2D is excellent for modern architectures like ResNet and MobileNet - it reduces overfitting compared to Flatten() + Dense layers and creates more interpretable feature maps where each channel corresponds to a specific class or concept!</em></p>
         `,
         'Embedding': `
           <h2>Embedding Layer</h2>
-          <p><strong>What it does:</strong> Converts integers (like word IDs) into dense vectors of fixed size.</p>
+          <p><strong>What it does:</strong> Transforms integer indices (like word IDs) into dense vectors of fixed size, creating learnable representations for discrete items.</p>
           <h3>How it works:</h3>
-          <p>Learns a lookup table mapping each integer to a dense vector. Similar words end up with similar vectors.</p>
+          <p>The layer maintains a lookup table where each integer index maps to a trainable vector. During forward pass, it retrieves the corresponding vectors for input indices and can be trained via backpropagation to learn meaningful representations.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Text processing:</strong> Converting words to vectors</li>
-            <li><strong>Categorical features:</strong> With many categories</li>
-            <li><strong>First layer for sequences:</strong> Before LSTM/GRU</li>
+            <li><strong>Text processing:</strong> Convert word indices into dense word embeddings for NLP tasks like sentiment analysis or text classification</li>
+            <li><strong>Categorical features:</strong> Transform high-cardinality categorical variables (like user IDs or product IDs) into learned representations</li>
+            <li><strong>Recommendation systems:</strong> Create embeddings for users and items to capture latent features and similarities</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>input_dim:</strong> Size of vocabulary</li>
-            <li><strong>output_dim:</strong> Dimension of embedding vectors</li>
+            <li><strong>input_dim:</strong> Size of the vocabulary (maximum integer index + 1)</li>
+            <li><strong>output_dim:</strong> Dimension of the dense embedding vectors</li>
+            <li><strong>input_length:</strong> Length of input sequences (can be None for variable length)</li>
+            <li><strong>mask_zero:</strong> Whether to mask zero values as padding (useful for variable-length sequences)</li>
           </ul>
-          <p><em>💡 Tip: Start with 50-300 dimensions. Can use pre-trained embeddings like Word2Vec!</em></p>
+          <p><em>💡 Tip: Start with output_dim between 50-300 for word embeddings - use higher dimensions for larger vocabularies and more complex relationships!</em></p>
         `,
         'Reshape': `
           <h2>Reshape Layer</h2>
-          <p><strong>What it does:</strong> Changes the shape of tensors without changing the data.</p>
+          <p><strong>What it does:</strong> Transforms the shape of input tensors without changing the data order, allowing you to reorganize dimensions for different network architectures.</p>
           <h3>How it works:</h3>
-          <p>Reorganizes the same data into a different shape. Total number of elements must stay the same.</p>
+          <p>The layer flattens the input into a 1D array and then reshapes it into the specified target shape, preserving the total number of elements. The reshaping follows row-major (C-style) ordering where the last axis index changes fastest.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Dimension changes:</strong> Converting between formats</li>
-            <li><strong>Before Conv layers:</strong> Preparing data for convolution</li>
-            <li><strong>Custom architectures:</strong> When you need specific shapes</li>
+            <li><strong>CNN to Dense transition:</strong> Flatten convolutional feature maps before connecting to fully connected layers</li>
+            <li><strong>Sequence preparation:</strong> Reshape data for RNN/LSTM inputs when converting between batch and time dimensions</li>
+            <li><strong>Multi-head architectures:</strong> Split or combine tensor dimensions for attention mechanisms or parallel processing paths</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>target_shape:</strong> New shape (product must equal original)</li>
+            <li><strong>target_shape:</strong> Tuple specifying the desired output shape (excluding batch dimension); use -1 for automatic dimension inference</li>
+            <li><strong>input_shape:</strong> Shape of input data (only needed for the first layer in a model)</li>
           </ul>
-          <p><em>💡 Tip: Use -1 in one dimension to auto-calculate it!</em></p>
+          <p><em>💡 Tip: Use -1 in target_shape to let Keras automatically calculate one dimension - for example, Reshape((-1, 128)) will flatten any input to have 128 features in the last dimension!</em></p>
         `,
         'Concatenate': `
           <h2>Concatenate Layer (Merge)</h2>
-          <p><strong>What it does:</strong> Joins multiple tensors along a specified axis.</p>
+          <p><strong>What it does:</strong> Joins multiple input tensors together along a specified axis to create a single combined output tensor.</p>
           <h3>How it works:</h3>
-          <p>Takes multiple inputs and stacks them together. Like putting arrays side-by-side.</p>
+          <p>The layer takes multiple inputs and concatenates them along a specified dimension, preserving all other dimensions. For example, concatenating two tensors of shape (32, 10) along axis 1 produces an output of shape (32, 20).</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Multi-input models:</strong> Combining different features</li>
-            <li><strong>Skip connections:</strong> ResNet-style architectures</li>
-            <li><strong>Feature fusion:</strong> Merging different pathways</li>
+            <li><strong>Multi-branch architectures:</strong> Combine features from parallel processing paths in models like Inception or ResNet</li>
+            <li><strong>Skip connections:</strong> Merge earlier layer outputs with deeper layers to preserve gradient flow and feature information</li>
+            <li><strong>Multi-modal fusion:</strong> Combine different types of input data (text, image, numerical) processed by separate branches</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>axis:</strong> Which dimension to concatenate along</li>
+            <li><strong>axis:</strong> The dimension along which to concatenate (default: -1, the last axis)</li>
+            <li><strong>inputs:</strong> List of input tensors to concatenate (must have same shape except for the concatenation axis)</li>
           </ul>
-          <p><em>💡 Tip: Common in advanced architectures. Enables skip connections!</em></p>
+          <p><em>💡 Tip: Always verify that your input tensors have matching dimensions except for the concatenation axis - mismatched shapes are a common source of errors!</em></p>
         `,
         'Add': `
           <h2>Add Layer (Merge)</h2>
