@@ -1085,178 +1085,188 @@ export default {
         `,
         'ConvLSTM2D': `
           <h2>ConvLSTM2D Layer</h2>
-          <p><strong>What it does:</strong> LSTM with convolutional connections instead of fully connected.</p>
+          <p><strong>What it does:</strong> Applies convolutional operations within an LSTM architecture to process sequences of images or spatial data over time.</p>
           <h3>How it works:</h3>
-          <p>Like LSTM but uses convolutions for spatial patterns. Perfect for video and spatio-temporal data!</p>
+          <p>It combines convolutional layers with LSTM cells, replacing matrix multiplications with convolution operations to capture both spatial and temporal patterns. This allows the network to learn features from video frames or other sequential spatial data while maintaining spatial structure.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Video prediction:</strong> Next frame prediction</li>
-            <li><strong>Weather forecasting:</strong> Spatial + temporal patterns</li>
-            <li><strong>Action recognition:</strong> Motion in videos</li>
+            <li><strong>Video prediction:</strong> Forecasting future frames in a video sequence or predicting next frames based on previous ones</li>
+            <li><strong>Weather forecasting:</strong> Analyzing sequences of satellite images or radar data to predict weather patterns</li>
+            <li><strong>Action recognition:</strong> Understanding and classifying actions in video sequences while preserving spatial information</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>filters:</strong> Number of convolutional filters</li>
-            <li><strong>kernel_size:</strong> Spatial filter size</li>
-            <li><strong>return_sequences:</strong> True for stacking layers</li>
+            <li><strong>filters:</strong> Number of output filters in the convolution (determines feature maps)</li>
+            <li><strong>kernel_size:</strong> Size of the convolutional window (e.g., (3, 3) for 3x3 kernels)</li>
+            <li><strong>return_sequences:</strong> Whether to return the full sequence or just the last output</li>
+            <li><strong>padding:</strong> 'same' to maintain spatial dimensions or 'valid' for no padding</li>
           </ul>
-          <p><em>💡 Tip: Powerful for video tasks. Combines CNN and RNN strengths!</em></p>
+          <p><em>💡 Tip: Start with smaller kernel sizes (3x3) and fewer filters to reduce computational cost, then increase complexity if needed. Set return_sequences=True when stacking multiple ConvLSTM2D layers!</em></p>
         `,
         'TimeDistributed': `
-          <h2>TimeDistributed Layer (Wrapper)</h2>
-          <p><strong>What it does:</strong> Applies a layer independently to each timestep in a sequence.</p>
+          <h2>TimeDistributed Layer</h2>
+          <p><strong>What it does:</strong> Applies the same layer independently to every time step of a temporal sequence in the input.</p>
           <h3>How it works:</h3>
-          <p>Wraps any layer and applies it to every timestep separately. Useful for sequence-to-sequence tasks.</p>
+          <p>The TimeDistributed wrapper takes a layer (like Dense or Conv2D) and applies it to each time slice of the input tensor separately. For example, if your input has shape (batch_size, timesteps, features), it applies the wrapped layer to each of the timesteps independently, maintaining the temporal dimension.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Dense after RNN:</strong> Apply Dense to each timestep</li>
-            <li><strong>Video frames:</strong> Process each frame independently</li>
-            <li><strong>Sequence labeling:</strong> Output for each input step</li>
+            <li><strong>Video processing:</strong> Apply convolutions frame-by-frame to extract features from each frame in a video sequence</li>
+            <li><strong>Many-to-many RNNs:</strong> Generate outputs at each time step when you need predictions for every position in a sequence</li>
+            <li><strong>Text sequence labeling:</strong> Apply dense layers to RNN outputs for tasks like named entity recognition or part-of-speech tagging</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>layer:</strong> The layer to apply at each timestep</li>
+            <li><strong>layer:</strong> The layer instance to be applied to every temporal slice (e.g., Dense, Conv2D, etc.)</li>
+            <li><strong>input_shape:</strong> Expected shape of input arrays including the time dimension</li>
           </ul>
-          <p><em>💡 Tip: Essential for sequence-to-sequence models!</em></p>
+          <p><em>💡 Tip: TimeDistributed is especially useful after LSTM/GRU layers with return_sequences=True, allowing you to apply Dense layers to all time steps for sequence-to-sequence models!</em></p>
         `,
         // Utility
         'Permute': `
           <h2>Permute Layer</h2>
-          <p><strong>What it does:</strong> Rearranges the dimensions of the input.</p>
+          <p><strong>What it does:</strong> Rearranges the dimensions of input tensors by swapping their axes according to a specified pattern.</p>
           <h3>How it works:</h3>
-          <p>Swaps axes around. Like transpose but for any number of dimensions.</p>
+          <p>The layer takes the input tensor and reorders its dimensions based on the provided permutation pattern. For example, if you have a tensor with shape (batch_size, height, width, channels), you can swap the height and width dimensions by specifying the new order.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Format conversion:</strong> Change data layout (channels first/last)</li>
-            <li><strong>Dimension reordering:</strong> Prepare for specific layers</li>
-            <li><strong>Custom architectures:</strong> When you need specific axis order</li>
+            <li><strong>Channel ordering conversion:</strong> Switch between channel-first (channels, height, width) and channel-last (height, width, channels) formats</li>
+            <li><strong>Preparing data for RNNs:</strong> Transform from (batch, features, timesteps) to (batch, timesteps, features) format</li>
+            <li><strong>Connecting incompatible layers:</strong> Reshape data to match the expected input format of the next layer in your network</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>dims:</strong> New order of dimensions (e.g., (2, 1) swaps first two)</li>
+            <li><strong>dims:</strong> Tuple of integers specifying the new order of dimensions (e.g., (2, 1) swaps the last two dimensions)</li>
+            <li><strong>input_shape:</strong> Shape of the input tensor (excluding batch dimension) - only needed for the first layer</li>
           </ul>
-          <p><em>💡 Tip: Useful for RNN input format changes!</em></p>
+          <p><em>💡 Tip: Remember that dimension indices start at 1 (not 0) and don't include the batch dimension - so (2, 1) swaps the second and third dimensions of your actual tensor!</em></p>
         `,
         'RepeatVector': `
           <h2>RepeatVector Layer</h2>
-          <p><strong>What it does:</strong> Repeats input vector n times to create a sequence.</p>
+          <p><strong>What it does:</strong> Repeats the input vector n times to create a 3D tensor output suitable for recurrent layers.</p>
           <h3>How it works:</h3>
-          <p>Takes a 1D vector and copies it to create a 2D sequence of specified length.</p>
+          <p>Takes a 2D input tensor of shape (batch_size, features) and repeats it n times along a new time axis, producing a 3D output of shape (batch_size, n, features). This effectively duplicates the same vector across multiple time steps.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Seq2Seq models:</strong> Connect encoder to decoder</li>
-            <li><strong>After Dense:</strong> Create sequence from single vector</li>
-            <li><strong>Broadcasting context:</strong> Repeat context across timesteps</li>
+            <li><strong>Encoder-Decoder architectures:</strong> Bridge between encoder output and decoder input in sequence-to-sequence models</li>
+            <li><strong>Many-to-many predictions:</strong> When you need to generate multiple outputs from a single input vector</li>
+            <li><strong>Connecting Dense to LSTM/GRU:</strong> Transform non-sequential data into a format suitable for recurrent layers</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>n:</strong> Number of times to repeat</li>
+            <li><strong>n:</strong> The number of times to repeat the input (required parameter)</li>
+            <li><strong>name:</strong> Optional string name for the layer</li>
           </ul>
-          <p><em>💡 Tip: Common in encoder-decoder architectures!</em></p>
+          <p><em>💡 Tip: RepeatVector is essential when connecting a Dense layer output to LSTM/GRU layers in autoencoders or when the encoder produces a single vector that needs to be fed to multiple decoder time steps!</em></p>
         `,
         'Lambda': `
           <h2>Lambda Layer</h2>
-          <p><strong>What it does:</strong> Applies arbitrary operations/functions to inputs.</p>
+          <p><strong>What it does:</strong> Applies a custom function or arbitrary expression to transform input data without trainable weights.</p>
           <h3>How it works:</h3>
-          <p>Wraps any custom function as a layer. Great for simple operations without creating custom layers.</p>
+          <p>Lambda layers wrap any Python function or expression and apply it to the input tensor during the forward pass. The function is executed element-wise or along specified dimensions, allowing for custom operations that aren't available as standard layers.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Custom operations:</strong> Simple math not in standard layers</li>
-            <li><strong>Preprocessing:</strong> Normalization, scaling in model</li>
-            <li><strong>Quick experiments:</strong> Test ideas without custom layer code</li>
+            <li><strong>Custom preprocessing:</strong> Apply normalization, scaling, or mathematical transformations that aren't available as built-in layers</li>
+            <li><strong>Feature engineering:</strong> Create derived features like ratios, differences, or logarithms of inputs</li>
+            <li><strong>Model architecture tricks:</strong> Implement custom activation functions, attention mechanisms, or tensor manipulations</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>function:</strong> The function to apply</li>
+            <li><strong>function:</strong> The Python function or lambda expression to apply to inputs</li>
+            <li><strong>output_shape:</strong> Expected output shape (optional, but helps with model building)</li>
+            <li><strong>arguments:</strong> Dictionary of additional keyword arguments to pass to the function</li>
           </ul>
-          <p><em>💡 Tip: Great for quick custom operations, but can't be saved in all formats!</em></p>
+          <p><em>💡 Tip: While Lambda layers are flexible, they can't be saved properly in some model formats - consider creating a custom layer class for production models that need full portability!</em></p>
         `,
         'Masking': `
           <h2>Masking Layer</h2>
-          <p><strong>What it does:</strong> Masks timesteps in sequences so they're skipped during processing.</p>
+          <p><strong>What it does:</strong> Masks timesteps in sequential data by skipping them during processing, typically used to handle variable-length sequences with padding.</p>
           <h3>How it works:</h3>
-          <p>Tells subsequent RNN layers to ignore certain timesteps (usually padding). Improves efficiency and accuracy!</p>
+          <p>The layer identifies timesteps that match a specified mask value (usually 0) and creates a mask tensor that propagates through the network. Subsequent layers that support masking will skip computations for these masked timesteps, improving efficiency and preventing padded values from affecting the model.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Variable-length sequences:</strong> With padding</li>
-            <li><strong>Before RNN layers:</strong> Skip padded timesteps</li>
-            <li><strong>Irregular time series:</strong> Ignore missing values</li>
+            <li><strong>Variable-length sequences:</strong> When processing text or time series data where sequences have different lengths and require padding to form batches</li>
+            <li><strong>Padded input handling:</strong> To prevent padded zeros from influencing model predictions in RNNs, LSTMs, or GRUs</li>
+            <li><strong>Efficiency optimization:</strong> To skip unnecessary computations on padded portions of sequences, reducing training time</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>mask_value:</strong> Value to mask (typically 0.0)</li>
+            <li><strong>mask_value:</strong> The value to be masked (default: 0.0) - timesteps with all features equal to this value will be masked</li>
+            <li><strong>input_shape:</strong> Shape of the input tensor, typically (batch_size, timesteps, features) for sequential data</li>
           </ul>
-          <p><em>💡 Tip: Essential for efficient variable-length sequence processing!</em></p>
+          <p><em>💡 Tip: Place the Masking layer immediately after your input layer and before any recurrent layers - note that not all layers support masking, so check compatibility with downstream layers!</em></p>
         `,
         'ActivityRegularization': `
           <h2>ActivityRegularization Layer</h2>
-          <p><strong>What it does:</strong> Adds regularization penalty based on layer activations.</p>
+          <p><strong>What it does:</strong> Applies L1 and/or L2 penalties to the layer's output activations during training to prevent overfitting.</p>
           <h3>How it works:</h3>
-          <p>Applies L1 and/or L2 penalties to activations during training. Encourages specific activation patterns.</p>
+          <p>This layer passes the input through unchanged but adds a regularization loss based on the magnitude of the activations. The penalties are added to the total loss function during training, encouraging the network to produce smaller activation values.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Sparse activations:</strong> L1 encourages sparsity</li>
-            <li><strong>Prevent large activations:</strong> L2 keeps activations small</li>
-            <li><strong>Autoencoders:</strong> Enforce sparse representations</li>
+            <li><strong>Preventing overfitting:</strong> When your model performs well on training data but poorly on validation data</li>
+            <li><strong>Encouraging sparsity:</strong> Use L1 regularization to push activations toward zero, creating sparse representations</li>
+            <li><strong>Controlling activation magnitudes:</strong> When you want to keep intermediate layer outputs from becoming too large</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>l1:</strong> L1 regularization factor</li>
-            <li><strong>l2:</strong> L2 regularization factor</li>
+            <li><strong>l1:</strong> L1 regularization factor (default: 0.0) - promotes sparsity by penalizing the absolute values</li>
+            <li><strong>l2:</strong> L2 regularization factor (default: 0.0) - promotes small values by penalizing squared magnitudes</li>
           </ul>
-          <p><em>💡 Tip: Different from weight regularization - this regularizes outputs!</em></p>
+          <p><em>💡 Tip: Start with small regularization values (0.001 to 0.01) and increase gradually if needed - too much regularization can prevent your model from learning!</em></p>
         `,
         // Regularization
         'GaussianNoise': `
           <h2>GaussianNoise Layer</h2>
-          <p><strong>What it does:</strong> Adds random Gaussian noise to inputs during training.</p>
+          <p><strong>What it does:</strong> Adds random noise from a Gaussian (normal) distribution to the input during training only, helping prevent overfitting.</p>
           <h3>How it works:</h3>
-          <p>Adds noise with mean 0 and specified standard deviation. Only active during training, not inference!</p>
+          <p>During training, the layer adds random values sampled from a Gaussian distribution with mean 0 and specified standard deviation to each input value. During inference (testing), the layer passes the input through unchanged without adding any noise.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Regularization:</strong> Prevent overfitting</li>
-            <li><strong>Robust models:</strong> More resilient to input variations</li>
-            <li><strong>Data augmentation:</strong> In-model augmentation</li>
+            <li><strong>Regularization:</strong> When your model is overfitting and you want to make it more robust to small variations in input data</li>
+            <li><strong>Data augmentation:</strong> When you have limited training data and want to artificially increase variation</li>
+            <li><strong>Robustness training:</strong> When you want your model to handle noisy or imperfect real-world inputs better</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>stddev:</strong> Standard deviation of noise</li>
+            <li><strong>stddev:</strong> Standard deviation of the Gaussian noise distribution (default: 1.0) - higher values add more noise</li>
+            <li><strong>seed:</strong> Random seed for reproducible noise generation (optional)</li>
           </ul>
-          <p><em>💡 Tip: Acts like data augmentation. Start with small stddev (0.1)!</em></p>
+          <p><em>💡 Tip: Start with small stddev values (0.1-0.3) and gradually increase if needed - too much noise can prevent the model from learning!</em></p>
         `,
         'GaussianDropout': `
           <h2>GaussianDropout Layer</h2>
-          <p><strong>What it does:</strong> Multiplicative Gaussian noise - like Dropout but continuous.</p>
+          <p><strong>What it does:</strong> Applies multiplicative noise sampled from a Gaussian distribution centered at 1.0 to help prevent overfitting during training.</p>
           <h3>How it works:</h3>
-          <p>Multiplies inputs by random values from Gaussian distribution. Smoother than binary Dropout.</p>
+          <p>During training, the layer multiplies inputs by random values drawn from a Gaussian distribution with mean 1.0 and a specified standard deviation. This multiplicative noise acts as a regularization technique, with the layer becoming a simple pass-through during inference.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Alternative to Dropout:</strong> More gradual regularization</li>
-            <li><strong>Continuous scaling:</strong> When binary dropout is too harsh</li>
-            <li><strong>Experimentation:</strong> See if it works better than Dropout</li>
+            <li><strong>Continuous data regularization:</strong> When working with continuous-valued inputs where standard dropout's binary masking might be too harsh</li>
+            <li><strong>Recurrent networks:</strong> As an alternative to standard dropout in RNNs where multiplicative noise can be more effective</li>
+            <li><strong>Small datasets:</strong> When you need gentler regularization than standard dropout for models trained on limited data</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>rate:</strong> Drop probability (like Dropout)</li>
+            <li><strong>rate:</strong> Float between 0 and 1 representing the standard deviation of the noise distribution (higher values = stronger regularization)</li>
+            <li><strong>seed:</strong> Integer to use as random seed for reproducible dropout patterns</li>
           </ul>
-          <p><em>💡 Tip: Less common than Dropout but worth trying!</em></p>
+          <p><em>💡 Tip: Start with a rate around 0.1-0.3 for gentle regularization - GaussianDropout is often more subtle than standard Dropout, so you may need slightly higher rates for comparable regularization strength!</em></p>
         `,
         'AlphaDropout': `
           <h2>AlphaDropout Layer</h2>
-          <p><strong>What it does:</strong> Special Dropout that maintains self-normalizing properties.</p>
+          <p><strong>What it does:</strong> Applies dropout regularization while maintaining the self-normalizing property of SELU activations, keeping mean and variance stable.</p>
           <h3>How it works:</h3>
-          <p>Designed for SELU activation. Keeps mean and variance stable unlike regular Dropout.</p>
+          <p>During training, randomly sets input units to zero with a given probability, but scales and shifts the remaining values to preserve the mean of 0 and variance of 1. This special dropout variant is designed specifically for Self-Normalizing Neural Networks (SNNs) that use SELU activation functions.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>With SELU:</strong> Specifically for self-normalizing networks</li>
-            <li><strong>Deep networks:</strong> Using SELU activations</li>
-            <li><strong>Not for ReLU:</strong> Use regular Dropout with ReLU</li>
+            <li><strong>SELU-based networks:</strong> Essential when using SELU activation functions to maintain self-normalization properties</li>
+            <li><strong>Fully connected architectures:</strong> Works best with dense/fully connected layers rather than convolutional layers</li>
+            <li><strong>Preventing overfitting in SNNs:</strong> When you need regularization but want to preserve the mathematical properties of self-normalizing networks</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>rate:</strong> Drop probability</li>
+            <li><strong>rate:</strong> Float between 0 and 1 representing the fraction of input units to drop (default: 0.1)</li>
+            <li><strong>seed:</strong> Integer to use as random seed for reproducible dropout patterns</li>
           </ul>
-          <p><em>💡 Tip: Only use with SELU activation. Use regular Dropout otherwise!</em></p>
+          <p><em>💡 Tip: Use AlphaDropout with a rate of 0.05-0.1 for SELU networks - regular Dropout would break the self-normalization, making training unstable!</em></p>
         `,
         // Spatial Dropout
         'SpatialDropout1D': `
