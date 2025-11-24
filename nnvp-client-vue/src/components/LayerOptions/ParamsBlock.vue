@@ -619,250 +619,276 @@ export default {
         `,
         'AveragePooling1D': `
           <h2>AveragePooling1D Layer</h2>
-          <p><strong>What it does:</strong> AveragePooling for 1D sequences.</p>
+          <p><strong>What it does:</strong> Performs downsampling by computing the average value within sliding windows along the temporal dimension of 1D input data.</p>
           <h3>How it works:</h3>
-          <p>Takes average value in each window. Smoother than MaxPooling1D.</p>
+          <p>The layer slides a window of specified size along the input sequence and replaces each window with its average value. This reduces the temporal resolution while preserving important features through averaging rather than selecting maximum values.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Smooth downsampling:</strong> Preserve more information</li>
-            <li><strong>After Conv1D:</strong> Alternative to MaxPooling1D</li>
-            <li><strong>Signal processing:</strong> When averaging makes sense</li>
+            <li><strong>Noise reduction:</strong> When you want to smooth out noisy sequential data like sensor readings or audio signals</li>
+            <li><strong>Computational efficiency:</strong> To reduce the sequence length and computational load in deeper layers</li>
+            <li><strong>Feature extraction:</strong> When local average trends are more important than peak values in time series analysis</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>pool_size:</strong> Window size (typically 2)</li>
+            <li><strong>pool_size:</strong> Integer specifying the size of the pooling window (default: 2)</li>
+            <li><strong>strides:</strong> Integer or None for stride length; if None, defaults to pool_size</li>
+            <li><strong>padding:</strong> Either 'valid' (no padding) or 'same' (pad input to preserve length when stride=1)</li>
           </ul>
-          <p><em>💡 Tip: Try both Max and Average pooling - depends on your data!</em></p>
+          <p><em>💡 Tip: Use AveragePooling1D instead of MaxPooling1D when dealing with smooth signals or when you want to preserve the overall magnitude of features rather than just peak values!</em></p>
         `,
         'AveragePooling3D': `
           <h2>AveragePooling3D Layer</h2>
-          <p><strong>What it does:</strong> AveragePooling for 3D data.</p>
+          <p><strong>What it does:</strong> Downsamples 3D input data (like video or volumetric data) by taking the average value within each pooling window, reducing spatial dimensions while preserving important features.</p>
           <h3>How it works:</h3>
-          <p>Takes average in 3D regions. Smoother downsampling than MaxPooling3D.</p>
+          <p>The layer slides a 3D window across the input volume and computes the average of all values within each window position. This reduces the depth, height, and width dimensions of the data while maintaining the number of channels.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>After Conv3D:</strong> Alternative to MaxPooling3D</li>
-            <li><strong>Smooth features:</strong> When you want less aggressive pooling</li>
-            <li><strong>Medical/video:</strong> Preserve subtle patterns</li>
+            <li><strong>3D Medical Imaging:</strong> Processing CT scans, MRI data, or other volumetric medical images to reduce computational load while preserving spatial relationships</li>
+            <li><strong>Video Processing:</strong> Downsampling video frames treated as 3D data (time × height × width) to extract temporal features</li>
+            <li><strong>Noise Reduction:</strong> When you want smoother feature maps compared to MaxPooling3D, as averaging helps reduce the impact of outliers</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>pool_size:</strong> 3D window (e.g., (2,2,2))</li>
+            <li><strong>pool_size:</strong> Tuple of 3 integers specifying the pooling window size (depth, height, width) - default is (2, 2, 2)</li>
+            <li><strong>strides:</strong> Tuple of 3 integers for the stride of the pooling window - defaults to pool_size if not specified</li>
+            <li><strong>padding:</strong> Either 'valid' (no padding) or 'same' (pad input so output has same dimensions when stride=1)</li>
           </ul>
-          <p><em>💡 Tip: Less common than Max but worth trying!</em></p>
+          <p><em>💡 Tip: AveragePooling3D is gentler than MaxPooling3D and better preserves smooth gradients, making it ideal for medical imaging where subtle intensity variations matter!</em></p>
         `,
         'GlobalMaxPooling1D': `
           <h2>GlobalMaxPooling1D Layer</h2>
-          <p><strong>What it does:</strong> Takes max across entire sequence, one value per channel.</p>
+          <p><strong>What it does:</strong> Reduces temporal/sequence data to a single vector by taking the maximum value across the time dimension for each feature channel.</p>
           <h3>How it works:</h3>
-          <p>For each channel, finds the single maximum value across all time steps.</p>
+          <p>For each feature in the input sequence, it finds the maximum value across all time steps. This transforms a 3D input tensor (batch_size, time_steps, features) into a 2D output tensor (batch_size, features).</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Sequence classification:</strong> Before final Dense layer</li>
-            <li><strong>Text classification:</strong> Capture most important features</li>
-            <li><strong>After Conv1D:</strong> Reduce to fixed size for variable-length sequences</li>
+            <li><strong>Text classification:</strong> Extract the most prominent features from variable-length sequences before the final classification layers</li>
+            <li><strong>Time series analysis:</strong> Capture peak values or maximum activations when the exact timing isn't critical</li>
+            <li><strong>Feature extraction:</strong> Create fixed-size representations from sequences of different lengths for downstream tasks</li>
           </ul>
           <h3>Key parameters:</h3>
-          <p>No parameters!</p>
-          <p><em>💡 Tip: Great for variable-length sequences. Position-invariant!</em></p>
+          <ul>
+            <li><strong>data_format:</strong> String, either 'channels_last' (default) or 'channels_first' to specify input dimension ordering</li>
+            <li><strong>keepdims:</strong> Boolean, whether to keep the temporal dimension with size 1 or remove it entirely (default: False)</li>
+          </ul>
+          <p><em>💡 Tip: GlobalMaxPooling1D is particularly effective after Conv1D layers in text classification tasks, as it captures the strongest feature activation regardless of where it appears in the sequence!</em></p>
         `,
         'GlobalAveragePooling1D': `
           <h2>GlobalAveragePooling1D Layer</h2>
-          <p><strong>What it does:</strong> Takes average across entire sequence, one value per channel.</p>
+          <p><strong>What it does:</strong> Computes the average of all values across the entire sequence dimension, reducing each feature's sequence to a single value.</p>
           <h3>How it works:</h3>
-          <p>For each channel, computes the average across all time steps.</p>
+          <p>For each feature channel, it calculates the mean value across all time steps in the sequence. This transforms an input of shape (batch_size, steps, features) into (batch_size, features), effectively summarizing the entire sequence.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Sequence classification:</strong> More robust to outliers than GlobalMax</li>
-            <li><strong>After Conv1D:</strong> Fixed-size output from variable sequences</li>
-            <li><strong>Smooth aggregation:</strong> When average is meaningful</li>
+            <li><strong>Text classification:</strong> To create a fixed-size representation from variable-length sequences before the final classification layers</li>
+            <li><strong>Time series analysis:</strong> When you need to aggregate temporal patterns into a single feature vector for prediction</li>
+            <li><strong>Reducing model parameters:</strong> As an alternative to Flatten() that dramatically reduces dimensions while preserving feature information</li>
           </ul>
           <h3>Key parameters:</h3>
-          <p>No parameters!</p>
-          <p><em>💡 Tip: Often works better than GlobalMax for text classification!</em></p>
+          <ul>
+            <li><strong>data_format:</strong> Either 'channels_last' (default) or 'channels_first' to specify the input format</li>
+            <li><strong>keepdims:</strong> Boolean, whether to keep the temporal dimension with size 1 (default: False)</li>
+          </ul>
+          <p><em>💡 Tip: GlobalAveragePooling1D is excellent for preventing overfitting compared to Flatten() as it reduces parameters while maintaining feature relationships - particularly useful before Dense layers in classification tasks!</em></p>
         `,
         // More Merge
         'Subtract': `
-          <h2>Subtract Layer (Merge)</h2>
-          <p><strong>What it does:</strong> Element-wise subtraction of two tensors.</p>
+          <h2>Subtract Layer</h2>
+          <p><strong>What it does:</strong> Performs element-wise subtraction between two input tensors of the same shape, computing (input1 - input2).</p>
           <h3>How it works:</h3>
-          <p>Takes two inputs of same shape and subtracts second from first: output = input1 - input2.</p>
+          <p>Takes exactly two input tensors with identical shapes and subtracts the second tensor from the first tensor element by element. The operation broadcasts the subtraction across all dimensions, producing an output tensor with the same shape as the inputs.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Difference detection:</strong> Finding changes between inputs</li>
-            <li><strong>Residual learning:</strong> Computing residuals</li>
-            <li><strong>Custom architectures:</strong> When subtraction is meaningful</li>
+            <li><strong>Residual connections:</strong> Computing the difference between feature maps in skip connections or attention mechanisms</li>
+            <li><strong>Feature comparison:</strong> Measuring differences between embeddings or feature vectors for similarity learning</li>
+            <li><strong>Noise removal:</strong> Subtracting estimated noise or background from signals in denoising networks</li>
           </ul>
           <h3>Key parameters:</h3>
-          <p>No parameters! Inputs must have same shape.</p>
-          <p><em>💡 Tip: Less common than Add but useful for specific tasks!</em></p>
+          <ul>
+            <li><strong>inputs:</strong> A list of exactly 2 input tensors with the same shape to be subtracted</li>
+            <li><strong>**kwargs:</strong> Standard layer keyword arguments like name and dtype for layer configuration</li>
+          </ul>
+          <p><em>💡 Tip: Order matters in subtraction! Make sure your inputs are in the correct order (first - second), as reversing them will flip the sign of your output values.</em></p>
         `,
         'Average': `
-          <h2>Average Layer (Merge)</h2>
-          <p><strong>What it does:</strong> Element-wise average of multiple tensors.</p>
+          <h2>Average Layer</h2>
+          <p><strong>What it does:</strong> Computes the element-wise average (mean) of multiple input tensors with the same shape.</p>
           <h3>How it works:</h3>
-          <p>Takes multiple inputs of same shape and averages them element by element.</p>
+          <p>Takes a list of tensors as inputs and returns a single tensor where each element is the arithmetic mean of the corresponding elements from all input tensors. All input tensors must have identical shapes.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Ensemble-like:</strong> Averaging multiple pathways</li>
-            <li><strong>Smoothing:</strong> Reduce variance in merged features</li>
-            <li><strong>Model averaging:</strong> Combining predictions</li>
+            <li><strong>Ensemble models:</strong> Combine predictions from multiple models by averaging their outputs for better generalization</li>
+            <li><strong>Multi-branch architectures:</strong> Merge features from parallel processing paths in networks like Inception modules</li>
+            <li><strong>Skip connections:</strong> Create averaged shortcuts between layers to improve gradient flow in deep networks</li>
           </ul>
           <h3>Key parameters:</h3>
-          <p>No parameters! All inputs must have same shape.</p>
-          <p><em>💡 Tip: Good for combining features from different pathways!</em></p>
+          <ul>
+            <li><strong>inputs:</strong> List of input tensors to be averaged (must have the same shape)</li>
+            <li><strong>**kwargs:</strong> Standard layer keyword arguments like name and dtype</li>
+          </ul>
+          <p><em>💡 Tip: Average is gentler than Add for combining features - it prevents values from growing too large and helps maintain stable activations throughout your network!</em></p>
         `,
         'Maximum': `
-          <h2>Maximum Layer (Merge)</h2>
-          <p><strong>What it does:</strong> Element-wise maximum of multiple tensors.</p>
+          <h2>Maximum Layer</h2>
+          <p><strong>What it does:</strong> Takes multiple input tensors of the same shape and computes their element-wise maximum values.</p>
           <h3>How it works:</h3>
-          <p>For each position, outputs the maximum value across all inputs.</p>
+          <p>The layer compares corresponding elements across all input tensors and outputs a tensor containing the maximum value at each position. For example, if comparing [1, 5, 3] and [2, 4, 6], it outputs [2, 5, 6].</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Maxout networks:</strong> Specific architecture style</li>
-            <li><strong>Feature competition:</strong> Let strongest feature win</li>
-            <li><strong>Custom operations:</strong> When max makes sense</li>
+            <li><strong>Feature fusion:</strong> Combine features from multiple branches by keeping the strongest activations from each branch</li>
+            <li><strong>Multi-path architectures:</strong> Merge parallel processing paths where you want to preserve the most prominent features</li>
+            <li><strong>Ensemble predictions:</strong> Combine outputs from multiple models by taking the maximum confidence scores</li>
           </ul>
           <h3>Key parameters:</h3>
-          <p>No parameters! Inputs must have same shape.</p>
-          <p><em>💡 Tip: Used in Maxout networks for regularization!</em></p>
+          <ul>
+            <li><strong>inputs:</strong> List of input tensors that must have the same shape</li>
+            <li><strong>**kwargs:</strong> Standard layer keyword arguments like name and dtype</li>
+          </ul>
+          <p><em>💡 Tip: Maximum layers work great for creating "competitive" paths in your network where only the strongest features survive - perfect for attention mechanisms or feature selection!</em></p>
         `,
         'Minimum': `
-          <h2>Minimum Layer (Merge)</h2>
-          <p><strong>What it does:</strong> Element-wise minimum of multiple tensors.</p>
+          <h2>Minimum Layer</h2>
+          <p><strong>What it does:</strong> Takes multiple input tensors and returns their element-wise minimum values.</p>
           <h3>How it works:</h3>
-          <p>For each position, outputs the minimum value across all inputs.</p>
+          <p>The layer compares corresponding elements across all input tensors and outputs a tensor containing the smallest value at each position. All inputs must have the same shape or be broadcastable to a common shape.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Rare:</strong> Not commonly used</li>
-            <li><strong>Clamping:</strong> Enforce upper bounds</li>
-            <li><strong>Custom operations:</strong> When min is meaningful</li>
+            <li><strong>Feature gating:</strong> Limit the maximum activation values by taking the minimum with a threshold tensor</li>
+            <li><strong>Multi-path architectures:</strong> Combine predictions from different branches by selecting conservative (lowest) estimates</li>
+            <li><strong>Regularization techniques:</strong> Implement custom clipping or bounding operations on intermediate features</li>
           </ul>
           <h3>Key parameters:</h3>
-          <p>No parameters! Inputs must have same shape.</p>
-          <p><em>💡 Tip: Very uncommon - use only if you have specific needs!</em></p>
+          <ul>
+            <li><strong>inputs:</strong> List of input tensors (must have the same shape or be broadcastable)</li>
+            <li><strong>**kwargs:</strong> Standard layer keyword arguments like name and dtype</li>
+          </ul>
+          <p><em>💡 Tip: Use Minimum with a constant tensor to implement upper bounds on activations - this can help prevent exploding gradients while maintaining differentiability!</em></p>
         `,
         'Dot': `
-          <h2>Dot Layer (Merge)</h2>
-          <p><strong>What it does:</strong> Computes dot product between samples in two tensors.</p>
+          <h2>Dot Layer</h2>
+          <p><strong>What it does:</strong> Computes the dot product between samples in two tensors, enabling similarity calculations and feature interactions between different inputs.</p>
           <h3>How it works:</h3>
-          <p>Performs dot product along specified axes. Can compute attention-like operations.</p>
+          <p>The layer takes two input tensors and computes their dot product along specified axes, effectively measuring how similar or aligned the inputs are. The operation can be performed element-wise or across entire dimensions depending on the axes parameter.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Attention mechanisms:</strong> Query-key similarity</li>
-            <li><strong>Similarity computation:</strong> Measure vector similarity</li>
-            <li><strong>Custom operations:</strong> When dot product is needed</li>
+            <li><strong>Similarity matching:</strong> Computing cosine similarity between embeddings in recommendation systems or text matching tasks</li>
+            <li><strong>Attention mechanisms:</strong> Calculating attention scores between query and key vectors in transformer-like architectures</li>
+            <li><strong>Feature interactions:</strong> Creating cross-features by computing interactions between different input branches in multi-input models</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>axes:</strong> Which axes to compute dot product along</li>
-            <li><strong>normalize:</strong> Whether to normalize (cosine similarity)</li>
+            <li><strong>axes:</strong> Integer or tuple of integers specifying which axes to use for the dot product (default: -1 for last axis)</li>
+            <li><strong>normalize:</strong> Whether to L2-normalize samples along the dot product axis before taking the dot product (useful for cosine similarity)</li>
           </ul>
-          <p><em>💡 Tip: Core operation for attention mechanisms!</em></p>
+          <p><em>💡 Tip: Set normalize=True when computing cosine similarity between embeddings - this converts the dot product into a similarity score between -1 and 1!</em></p>
         `,
         // Image Processing
         'UpSampling2D': `
           <h2>UpSampling2D Layer</h2>
-          <p><strong>What it does:</strong> Increases spatial dimensions by repeating rows and columns.</p>
+          <p><strong>What it does:</strong> Increases the spatial dimensions (height and width) of feature maps by repeating pixels, making the output larger than the input.</p>
           <h3>How it works:</h3>
-          <p>Repeats each row and column a specified number of times. Simple upscaling without learning.</p>
+          <p>Each pixel in the input is repeated multiple times to create a larger output image. For example, with a size factor of 2, each pixel becomes a 2x2 block of identical pixels, doubling both dimensions.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Decoder networks:</strong> Autoencoders, segmentation</li>
-            <li><strong>GANs:</strong> Generating larger images</li>
-            <li><strong>Before convolution:</strong> Increase resolution</li>
+            <li><strong>Decoder networks:</strong> In autoencoders and U-Net architectures to reconstruct images back to original size</li>
+            <li><strong>Image segmentation:</strong> To restore spatial resolution after downsampling operations in semantic segmentation models</li>
+            <li><strong>Generative models:</strong> In GANs and VAEs to progressively increase image resolution from latent representations</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>size:</strong> Upsampling factors (e.g., (2,2) doubles dimensions)</li>
-            <li><strong>interpolation:</strong> 'nearest' (default) or 'bilinear'</li>
+            <li><strong>size:</strong> Tuple of integers (height_factor, width_factor) specifying how much to repeat pixels in each dimension (default: (2, 2))</li>
+            <li><strong>interpolation:</strong> Method for upsampling - 'nearest' (default), 'bilinear', or 'bicubic' for smoother results</li>
           </ul>
-          <p><em>💡 Tip: Fast but simple. Consider Conv2DTranspose for learnable upsampling!</em></p>
+          <p><em>💡 Tip: UpSampling2D is computationally cheaper than transposed convolutions but doesn't learn parameters - consider Conv2DTranspose if you need learnable upsampling!</em></p>
         `,
         'UpSampling1D': `
           <h2>UpSampling1D Layer</h2>
-          <p><strong>What it does:</strong> Increases sequence length by repeating each timestep.</p>
+          <p><strong>What it does:</strong> Repeats each temporal step multiple times to increase the temporal resolution of 1D input data.</p>
           <h3>How it works:</h3>
-          <p>Repeats each timestep a specified number of times along the temporal dimension.</p>
+          <p>Each time step in the input sequence is duplicated a specified number of times consecutively. For example, with size=2, the sequence [1, 2, 3] becomes [1, 1, 2, 2, 3, 3].</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Sequence generation:</strong> Decoder for sequences</li>
-            <li><strong>Audio/signal:</strong> Increase sampling rate</li>
-            <li><strong>Before Conv1D:</strong> Increase temporal resolution</li>
+            <li><strong>Temporal autoencoders:</strong> To restore the original sequence length after downsampling in the decoder part</li>
+            <li><strong>Signal processing:</strong> To increase the sampling rate of time series data or audio signals</li>
+            <li><strong>Sequence-to-sequence models:</strong> To match dimensions between encoder and decoder when working with different temporal resolutions</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>size:</strong> Upsampling factor (e.g., 2 doubles length)</li>
+            <li><strong>size:</strong> Integer specifying how many times to repeat each time step (default: 2)</li>
+            <li><strong>name:</strong> Optional string to name the layer instance</li>
           </ul>
-          <p><em>💡 Tip: Simple repetition - no learning involved!</em></p>
+          <p><em>💡 Tip: UpSampling1D is often paired with Conv1D layers to learn better upsampling patterns - consider using Conv1DTranspose for learnable upsampling instead of simple repetition!</em></p>
         `,
         'UpSampling3D': `
           <h2>UpSampling3D Layer</h2>
-          <p><strong>What it does:</strong> Increases 3D dimensions by repeating along all three axes.</p>
+          <p><strong>What it does:</strong> Increases the spatial dimensions of 3D data by repeating each voxel multiple times along the depth, height, and width axes.</p>
           <h3>How it works:</h3>
-          <p>Repeats data in 3D space. Used for volumetric or video upsampling.</p>
+          <p>Each input voxel is replicated according to the specified size factors, creating a larger output volume. For example, with a size of (2,2,2), each voxel becomes 8 voxels in a 2×2×2 cube pattern.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>3D segmentation:</strong> Medical imaging</li>
-            <li><strong>Video generation:</strong> Increase resolution</li>
-            <li><strong>Volumetric data:</strong> Decoder networks</li>
+            <li><strong>3D segmentation networks:</strong> In decoder paths to progressively restore spatial resolution after downsampling operations</li>
+            <li><strong>Medical imaging:</strong> To upsample feature maps in CT/MRI scan analysis for volumetric predictions</li>
+            <li><strong>3D generative models:</strong> To expand latent representations into full-resolution 3D outputs in autoencoders or GANs</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>size:</strong> Upsampling factors for 3 dimensions</li>
+            <li><strong>size:</strong> Tuple of 3 integers specifying the upsampling factors for depth, height, and width (default: (2,2,2))</li>
+            <li><strong>data_format:</strong> Either 'channels_first' or 'channels_last' to specify the position of the channel dimension</li>
           </ul>
-          <p><em>💡 Tip: Very memory intensive - use carefully!</em></p>
+          <p><em>💡 Tip: UpSampling3D is computationally cheaper than transposed convolutions but doesn't learn upsampling patterns - pair it with Conv3D layers to add learnable refinement!</em></p>
         `,
         'ZeroPadding2D': `
           <h2>ZeroPadding2D Layer</h2>
-          <p><strong>What it does:</strong> Adds rows and columns of zeros around the input image.</p>
+          <p><strong>What it does:</strong> Adds rows and columns of zeros around the borders of 2D input data (like images) to increase spatial dimensions.</p>
           <h3>How it works:</h3>
-          <p>Pads borders with zeros. Used to control output size or prevent information loss at edges.</p>
+          <p>The layer symmetrically or asymmetrically pads the height and width dimensions of the input with zeros. This increases the spatial size without adding learnable parameters or changing the actual data values.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Before Conv2D:</strong> Control output dimensions</li>
-            <li><strong>Preserve size:</strong> Keep spatial dimensions constant</li>
-            <li><strong>Manual padding:</strong> When you need specific padding</li>
+            <li><strong>Preserving spatial dimensions:</strong> Use before convolution layers to maintain the same output size as input after convolution operations</li>
+            <li><strong>Edge feature preservation:</strong> Helps prevent information loss at image borders during repeated convolutions</li>
+            <li><strong>Architecture requirements:</strong> When implementing specific architectures (like U-Net) that require precise dimension matching between layers</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>padding:</strong> Number of rows/cols to add (e.g., (1,1) or ((1,1),(2,2)))</li>
+            <li><strong>padding:</strong> Integer or tuple of 2 integers or tuple of 2 tuples of 2 integers - specifies the number of rows/columns to add on each side</li>
+            <li><strong>data_format:</strong> Either 'channels_last' (default) or 'channels_first' - defines whether channels are in the last or first dimension</li>
           </ul>
-          <p><em>💡 Tip: Usually Conv2D's 'same' padding is enough, but this gives more control!</em></p>
+          <p><em>💡 Tip: Use padding=(1,1) with 3x3 convolutions to maintain spatial dimensions, or calculate padding as (kernel_size-1)/2 for same-size outputs!</em></p>
         `,
         'ZeroPadding1D': `
           <h2>ZeroPadding1D Layer</h2>
-          <p><strong>What it does:</strong> Adds zeros at the beginning and end of sequences.</p>
+          <p><strong>What it does:</strong> Adds zeros to the beginning and/or end of each sequence in the temporal dimension (axis 1).</p>
           <h3>How it works:</h3>
-          <p>Pads temporal dimension with zeros on both sides.</p>
+          <p>The layer pads the input sequences by inserting zeros at the specified positions, increasing the sequence length without changing the actual data values. This maintains the temporal structure while extending the sequence boundaries.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Before Conv1D:</strong> Control sequence length</li>
-            <li><strong>Causal padding:</strong> Add padding at start only</li>
-            <li><strong>Manual control:</strong> Specific padding requirements</li>
+            <li><strong>Preserving sequence length in convolutions:</strong> Prevents sequence shortening when using Conv1D layers without 'same' padding</li>
+            <li><strong>Aligning sequences of different lengths:</strong> Ensures all sequences have the same length for batch processing</li>
+            <li><strong>Creating buffer zones:</strong> Adds neutral padding to prevent edge effects in temporal convolutions</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>padding:</strong> How much to add (e.g., 1 or (1,2) for asymmetric)</li>
+            <li><strong>padding:</strong> Integer or tuple of 2 integers - how many zeros to add at the beginning and end (symmetric if single integer)</li>
           </ul>
-          <p><em>💡 Tip: Useful for causal convolutions in time series!</em></p>
+          <p><em>💡 Tip: Use symmetric padding (single integer) for most cases, but asymmetric padding (tuple) when you need to align sequences with specific requirements or preserve causal relationships!</em></p>
         `,
         'ZeroPadding3D': `
           <h2>ZeroPadding3D Layer</h2>
-          <p><strong>What it does:</strong> Adds zeros around 3D data (videos, volumes).</p>
+          <p><strong>What it does:</strong> Adds zeros to the borders of 3D data (depth, height, width) to increase the spatial dimensions without learning any parameters.</p>
           <h3>How it works:</h3>
-          <p>Pads all three spatial/temporal dimensions with zeros.</p>
+          <p>The layer symmetrically or asymmetrically pads each dimension of the input tensor with zeros. This increases the output size while preserving the original data in the center of the padded tensor.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Before Conv3D:</strong> Control output dimensions</li>
-            <li><strong>3D data processing:</strong> Medical imaging, videos</li>
-            <li><strong>Manual padding:</strong> Specific 3D padding needs</li>
+            <li><strong>Maintaining spatial dimensions:</strong> Preserve input volume size after convolution operations in 3D CNNs</li>
+            <li><strong>Medical imaging:</strong> Add padding to 3D scans (CT, MRI) to ensure edge features aren't lost during convolution</li>
+            <li><strong>Video processing:</strong> Pad temporal and spatial dimensions in video data for consistent frame sizes</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>padding:</strong> Padding for 3 dimensions</li>
+            <li><strong>padding:</strong> Integer or tuple of 3 integers or tuple of 3 tuples of 2 integers specifying padding for depth, height, and width dimensions</li>
+            <li><strong>data_format:</strong> Either 'channels_first' or 'channels_last' to specify the position of the channel dimension</li>
           </ul>
-          <p><em>💡 Tip: Rarely needed - Conv3D padding usually sufficient!</em></p>
+          <p><em>💡 Tip: Use symmetric padding (same value for all sides) to preserve spatial relationships, or asymmetric padding when you need specific output dimensions for your network architecture!</em></p>
         `,
         'Cropping2D': `
           <h2>Cropping2D Layer</h2>
