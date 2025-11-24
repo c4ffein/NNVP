@@ -240,94 +240,103 @@ export default {
           <p><em>💡 Tip: Always give meaningful names to your outputs - they'll be used as keys in the model's output dictionary during training and prediction!</em></p>
         `,
         'GRU': `
-          <h2>GRU Layer (Gated Recurrent Unit)</h2>
-          <p><strong>What it does:</strong> Like LSTM but simpler - processes sequences with fewer parameters while still capturing long-term dependencies.</p>
+          <h2>GRU Layer</h2>
+          <p><strong>What it does:</strong> Processes sequential data by learning patterns and dependencies across time steps using a gating mechanism that's simpler than LSTM.</p>
           <h3>How it works:</h3>
-          <p>Uses two gates (reset and update) instead of LSTM's three. This makes it faster to train while maintaining similar performance for many tasks.</p>
+          <p>GRU uses update and reset gates to control information flow, deciding what information to keep from previous states and what new information to add. This allows it to capture both short and long-term dependencies while using fewer parameters than LSTM.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Faster alternative to LSTM:</strong> When you want speed without sacrificing much performance</li>
-            <li><strong>Limited data:</strong> Fewer parameters mean less overfitting</li>
-            <li><strong>Sequential modeling:</strong> Time series, text, any temporal data</li>
+            <li><strong>Text processing:</strong> Sentiment analysis, text generation, or language modeling where context matters</li>
+            <li><strong>Time series prediction:</strong> Stock prices, weather forecasting, or sensor data analysis</li>
+            <li><strong>Speech recognition:</strong> Processing audio sequences where temporal patterns are crucial</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>units:</strong> Number of GRU cells</li>
-            <li><strong>return_sequences:</strong> True if feeding to another RNN layer</li>
+            <li><strong>units:</strong> Number of GRU cells (output dimensionality) - typically 32 to 512</li>
+            <li><strong>return_sequences:</strong> Whether to return full sequence (True) or just last output (False)</li>
+            <li><strong>dropout:</strong> Fraction of units to drop during training to prevent overfitting (0.0 to 0.5)</li>
+            <li><strong>activation:</strong> Activation function for the recurrent step (default: 'tanh')</li>
           </ul>
-          <p><em>💡 Tip: Try GRU before LSTM - it's often faster with similar results!</em></p>
+          <p><em>💡 Tip: GRU trains faster than LSTM and often performs just as well - try it first for sequence tasks! Use return_sequences=True when stacking multiple GRU layers.</em></p>
         `,
         'SimpleRNN': `
           <h2>SimpleRNN Layer</h2>
-          <p><strong>What it does:</strong> Basic recurrent layer that processes sequences. Simpler than LSTM/GRU but struggles with long-term dependencies.</p>
+          <p><strong>What it does:</strong> Processes sequences of data by maintaining a hidden state that gets updated at each time step, allowing the network to remember information from previous inputs.</p>
           <h3>How it works:</h3>
-          <p>Maintains a hidden state that gets updated at each time step based on the current input and previous state. No special gating mechanisms.</p>
+          <p>At each time step, the layer combines the current input with the previous hidden state through learned weights, then applies an activation function to produce the new hidden state. This creates a feedback loop that allows information to persist across the sequence.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Short sequences:</strong> When dependencies are nearby</li>
-            <li><strong>Learning/experimentation:</strong> Understanding RNN basics</li>
-            <li><strong>Simple patterns:</strong> When LSTM/GRU is overkill</li>
+            <li><strong>Short sequences:</strong> When processing sequences with relatively short-term dependencies (typically less than 10-20 steps)</li>
+            <li><strong>Simple patterns:</strong> For tasks with straightforward temporal patterns like basic time series forecasting</li>
+            <li><strong>Lightweight models:</strong> When you need a fast, memory-efficient RNN and don't require complex long-term memory</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>units:</strong> Number of RNN cells</li>
-            <li><strong>return_sequences:</strong> True if feeding to another RNN layer</li>
+            <li><strong>units:</strong> Number of hidden units/neurons in the RNN (determines the dimensionality of the output)</li>
+            <li><strong>activation:</strong> Activation function to use (default is 'tanh', can also use 'relu' for faster training)</li>
+            <li><strong>return_sequences:</strong> Whether to return the full sequence of outputs (True) or just the last output (False)</li>
+            <li><strong>dropout:</strong> Fraction of units to drop during training to prevent overfitting (0.0 to 1.0)</li>
           </ul>
-          <p><em>💡 Tip: For real applications, prefer LSTM or GRU. SimpleRNN is mainly for learning!</em></p>
+          <p><em>💡 Tip: Start with 32-128 units for most tasks, and use return_sequences=True when stacking multiple RNN layers or when you need predictions at each time step!</em></p>
         `,
         'Conv1D': `
-          <h2>Conv1D Layer (1D Convolution)</h2>
-          <p><strong>What it does:</strong> Applies sliding filters over 1D sequences to detect local patterns in sequential data.</p>
+          <h2>Conv1D Layer</h2>
+          <p><strong>What it does:</strong> Applies a sliding window (filter) across a 1D sequence to detect patterns and features in sequential data.</p>
           <h3>How it works:</h3>
-          <p>Like Conv2D but for 1D data. Slides a filter across a sequence (like text or time series) to extract features.</p>
+          <p>The layer slides filters across the input sequence, computing dot products between the filter weights and local regions of the input. Each filter learns to detect specific patterns, producing a feature map that highlights where those patterns occur in the sequence.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Text processing:</strong> Character or word-level features</li>
-            <li><strong>Time series:</strong> Sensor data, audio, signals</li>
-            <li><strong>Sequence patterns:</strong> Any 1D sequential data</li>
+            <li><strong>Text Classification:</strong> Extract features from word embeddings or character sequences for sentiment analysis or document classification</li>
+            <li><strong>Time Series Analysis:</strong> Detect patterns in sensor data, stock prices, or any temporal sequences</li>
+            <li><strong>Audio Processing:</strong> Process raw audio waveforms or spectrograms for speech recognition or music analysis</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>filters:</strong> Number of different patterns to learn</li>
-            <li><strong>kernel_size:</strong> Width of the sliding window</li>
-            <li><strong>strides:</strong> How far the filter moves each step</li>
+            <li><strong>filters:</strong> Number of output filters (feature detectors) - typically start with 32, 64, or 128</li>
+            <li><strong>kernel_size:</strong> Length of the convolution window - commonly 3, 5, or 7 for local pattern detection</li>
+            <li><strong>activation:</strong> Activation function to apply - 'relu' is most common for hidden layers</li>
+            <li><strong>padding:</strong> 'valid' (no padding) or 'same' (preserves sequence length)</li>
           </ul>
-          <p><em>💡 Tip: Great alternative to RNNs for sequence data - often faster to train!</em></p>
+          <p><em>💡 Tip: Stack multiple Conv1D layers with increasing filter counts (e.g., 32→64→128) to learn hierarchical features from simple to complex patterns!</em></p>
         `,
         'Conv3D': `
-          <h2>Conv3D Layer (3D Convolution)</h2>
-          <p><strong>What it does:</strong> Applies 3D filters for video, volumetric, or spatio-temporal data.</p>
+          <h2>Conv3D Layer</h2>
+          <p><strong>What it does:</strong> Applies 3D convolution operations to extract features from volumetric data like videos or medical scans.</p>
           <h3>How it works:</h3>
-          <p>Like Conv2D but slides in 3 dimensions. Useful for data with depth/time dimension (videos, medical scans).</p>
+          <p>Slides a 3D filter (kernel) across the height, width, and depth dimensions of the input volume, computing dot products at each position. This creates feature maps that capture spatial and temporal patterns in three-dimensional data.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Video analysis:</strong> Action recognition, video classification</li>
-            <li><strong>Medical imaging:</strong> CT scans, MRI volumes</li>
-            <li><strong>3D data:</strong> Point clouds, volumetric data</li>
+            <li><strong>Video analysis:</strong> Processing video data where temporal information across frames is important</li>
+            <li><strong>Medical imaging:</strong> Analyzing 3D medical scans like CT or MRI volumes</li>
+            <li><strong>3D object recognition:</strong> Working with volumetric representations of 3D objects</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>filters:</strong> Number of 3D patterns to learn</li>
-            <li><strong>kernel_size:</strong> 3D filter size (e.g., 3×3×3)</li>
+            <li><strong>filters:</strong> Number of output filters (feature maps) to generate</li>
+            <li><strong>kernel_size:</strong> Size of the 3D convolution window (depth, height, width)</li>
+            <li><strong>strides:</strong> Step size for moving the kernel across each dimension</li>
+            <li><strong>padding:</strong> 'valid' (no padding) or 'same' (preserve dimensions)</li>
           </ul>
-          <p><em>💡 Tip: Computationally expensive - use smaller kernel sizes!</em></p>
+          <p><em>💡 Tip: Start with smaller kernel sizes like (3,3,3) for most tasks - larger kernels dramatically increase computation and may not improve results!</em></p>
         `,
         'AveragePooling2D': `
           <h2>AveragePooling2D Layer</h2>
-          <p><strong>What it does:</strong> Like MaxPooling but takes the average instead of maximum value in each region.</p>
+          <p><strong>What it does:</strong> Downsamples feature maps by dividing them into rectangular regions and computing the average value of each region.</p>
           <h3>How it works:</h3>
-          <p>Divides input into regions and outputs the average of values in each region. Smoother downsampling than MaxPooling.</p>
+          <p>The layer slides a pooling window across the input and calculates the mean of all values within each window. This reduces the spatial dimensions while preserving important features through averaging.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Smooth features:</strong> When you want to preserve subtle information</li>
-            <li><strong>Alternative to MaxPooling:</strong> Try both and see what works better</li>
-            <li><strong>Less aggressive downsampling:</strong> Retains more information</li>
+            <li><strong>Gentle downsampling:</strong> When you want to reduce dimensions more smoothly than max pooling, preserving more information from all pixels</li>
+            <li><strong>Noise reduction:</strong> When your data is noisy and averaging can help smooth out irregularities</li>
+            <li><strong>Global context preservation:</strong> When maintaining information from all areas of the receptive field is important</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>pool_size:</strong> Size of pooling window (typically 2×2)</li>
+            <li><strong>pool_size:</strong> Size of the pooling window (e.g., (2, 2) for 2x2 pooling)</li>
+            <li><strong>strides:</strong> Step size for moving the pooling window (defaults to pool_size if not specified)</li>
+            <li><strong>padding:</strong> Either 'valid' (no padding) or 'same' (pad to keep output size similar)</li>
           </ul>
-          <p><em>💡 Tip: MaxPooling is more common, but AveragePooling can work better for some tasks!</em></p>
+          <p><em>💡 Tip: AveragePooling2D is gentler than MaxPooling2D and works better for tasks where subtle features matter - try it when max pooling loses too much detail!</em></p>
         `,
         'GlobalMaxPooling2D': `
           <h2>GlobalMaxPooling2D Layer</h2>
