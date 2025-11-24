@@ -52,60 +52,62 @@ export default {
     getLayerHelp() {
       const layerHelp = {
         'Dense': `
-          <h2>Dense Layer (Fully Connected)</h2>
-          <p><strong>What it does:</strong> A Dense layer connects every input to every output. It's the most basic and common layer type in neural networks.</p>
+          <h2>Dense Layer</h2>
+          <p><strong>What it does:</strong> Creates a fully connected neural network layer where every input neuron connects to every output neuron with learnable weights.</p>
           <h3>How it works:</h3>
-          <p>Each neuron in a Dense layer receives input from ALL neurons in the previous layer, multiplies each by a weight, adds them up, and applies an activation function.</p>
+          <p>Performs a matrix multiplication between inputs and weights, adds a bias term, then applies an activation function. This operation transforms the input data into a new representation with the specified number of output dimensions.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Classification:</strong> Final layer for predicting classes</li>
-            <li><strong>Feature learning:</strong> Hidden layers to learn patterns</li>
-            <li><strong>After flattening:</strong> To process flattened convolutional outputs</li>
+            <li><strong>Classification tasks:</strong> Use as final layers with softmax activation for multi-class or sigmoid for binary classification</li>
+            <li><strong>Feature extraction:</strong> Add between convolutional layers to learn complex patterns and reduce dimensionality</li>
+            <li><strong>Regression problems:</strong> Use as output layer with linear activation to predict continuous values</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>units:</strong> Number of neurons in the layer</li>
-            <li><strong>activation:</strong> Function applied to output (relu, sigmoid, softmax, etc.)</li>
+            <li><strong>units:</strong> Number of output neurons (required) - determines the dimensionality of the output space</li>
+            <li><strong>activation:</strong> Activation function to use (e.g., 'relu', 'sigmoid', 'softmax', 'linear')</li>
+            <li><strong>use_bias:</strong> Whether to include a bias vector (default: True) - helps the model fit data better</li>
           </ul>
-          <p><em>💡 Tip: Use 'relu' activation for hidden layers, 'softmax' for multi-class output, 'sigmoid' for binary output!</em></p>
+          <p><em>💡 Tip: Start with 'relu' activation for hidden layers and match your final layer's activation to your problem type - 'softmax' for multi-class, 'sigmoid' for binary classification, or 'linear' for regression!</em></p>
         `,
         'Conv2D': `
-          <h2>Conv2D Layer (2D Convolution)</h2>
-          <p><strong>What it does:</strong> Applies sliding filters over 2D images to detect patterns like edges, textures, and shapes.</p>
+          <h2>Conv2D Layer</h2>
+          <p><strong>What it does:</strong> Applies learnable filters to detect features like edges, textures, and patterns in 2D data (typically images).</p>
           <h3>How it works:</h3>
-          <p>A small filter (e.g., 3×3) slides across the image, computing dot products at each position. This creates a feature map highlighting where patterns appear.</p>
+          <p>Slides multiple filter kernels across the input image, computing dot products at each position to create feature maps. Each filter learns to detect specific patterns during training.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Image recognition:</strong> Detecting features in photos</li>
-            <li><strong>Computer vision:</strong> Object detection, segmentation</li>
-            <li><strong>Spatial patterns:</strong> Any grid-like data with local patterns</li>
+            <li><strong>Image classification:</strong> Extract hierarchical features from raw pixel data for recognizing objects</li>
+            <li><strong>Feature detection:</strong> Identify edges, corners, textures, or specific patterns in images</li>
+            <li><strong>Spatial data processing:</strong> Process any grid-like data where local patterns matter (e.g., game boards, heatmaps)</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>filters:</strong> Number of different patterns to learn</li>
-            <li><strong>kernel_size:</strong> Size of the sliding window (e.g., 3×3)</li>
-            <li><strong>strides:</strong> How far the filter moves each step</li>
-            <li><strong>padding:</strong> 'same' keeps size, 'valid' shrinks output</li>
+            <li><strong>filters:</strong> Number of output filters (feature maps) - typically powers of 2 like 32, 64, 128</li>
+            <li><strong>kernel_size:</strong> Size of the filter window - common values are (3,3) or (5,5)</li>
+            <li><strong>activation:</strong> Activation function applied to outputs - 'relu' is most common for hidden layers</li>
+            <li><strong>padding:</strong> 'same' preserves spatial dimensions, 'valid' reduces them</li>
           </ul>
-          <p><em>💡 Tip: Start with 32 filters and 3×3 kernels. Use 'same' padding to preserve dimensions!</em></p>
+          <p><em>💡 Tip: Start with fewer filters (32-64) in early layers and increase gradually in deeper layers - this builds from simple to complex features!</em></p>
         `,
         'MaxPooling2D': `
           <h2>MaxPooling2D Layer</h2>
-          <p><strong>What it does:</strong> Reduces the spatial size of feature maps by taking the maximum value in each region.</p>
+          <p><strong>What it does:</strong> Reduces the spatial dimensions of feature maps by selecting the maximum value from each pooling window, helping to downsample data and extract dominant features.</p>
           <h3>How it works:</h3>
-          <p>Divides the input into regions (e.g., 2×2) and outputs only the maximum value from each region. This reduces computation and helps the network focus on the strongest features.</p>
+          <p>The layer slides a window (e.g., 2x2) across the input and outputs only the maximum value from each window region. This reduces the height and width of the data while preserving the most prominent features detected by previous layers.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>After Conv layers:</strong> To reduce size and computation</li>
-            <li><strong>Translation invariance:</strong> Makes the network less sensitive to small shifts</li>
-            <li><strong>Overfitting prevention:</strong> Reduces parameters to learn</li>
+            <li><strong>Reducing computation:</strong> Decreases the number of parameters in subsequent layers by shrinking spatial dimensions</li>
+            <li><strong>Feature extraction:</strong> Helps the network focus on the most important features while becoming more invariant to small translations</li>
+            <li><strong>Preventing overfitting:</strong> Acts as a form of regularization by reducing the spatial resolution and model complexity</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>pool_size:</strong> Size of pooling window (typically 2×2)</li>
-            <li><strong>strides:</strong> How far the window moves (usually same as pool_size)</li>
+            <li><strong>pool_size:</strong> Size of the pooling window (default: (2, 2)) - determines how much downsampling occurs</li>
+            <li><strong>strides:</strong> Step size for moving the pooling window (default: None, which equals pool_size) - controls overlap between windows</li>
+            <li><strong>padding:</strong> Either 'valid' (no padding) or 'same' (pad to keep output size same as input when stride=1)</li>
           </ul>
-          <p><em>💡 Tip: 2×2 pooling is standard. Apply after 1-2 Conv layers!</em></p>
+          <p><em>💡 Tip: A 2x2 pool with stride 2 is the most common configuration, reducing each dimension by half - use this as your starting point and adjust only if needed!</em></p>
         `,
         'Flatten': `
           <h2>Flatten Layer</h2>
