@@ -892,185 +892,196 @@ export default {
         `,
         'Cropping2D': `
           <h2>Cropping2D Layer</h2>
-          <p><strong>What it does:</strong> Removes rows and columns from the edges of images.</p>
+          <p><strong>What it does:</strong> Removes rows and columns of pixels from the borders of 2D spatial data (images).</p>
           <h3>How it works:</h3>
-          <p>Crops borders to reduce spatial dimensions. Opposite of padding.</p>
+          <p>The layer crops along the spatial dimensions (height and width) by removing the specified number of rows from the top/bottom and columns from the left/right. This operation reduces the spatial dimensions of the feature maps while preserving the channel dimension.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Dimension matching:</strong> Make sizes compatible</li>
-            <li><strong>U-Net architectures:</strong> Match encoder/decoder sizes</li>
-            <li><strong>Remove borders:</strong> Eliminate edge artifacts</li>
+            <li><strong>Remove padding artifacts:</strong> Eliminate unwanted border effects or padding added by previous convolution operations</li>
+            <li><strong>Focus on central regions:</strong> When the important features are concentrated in the center of images and edges contain noise or irrelevant information</li>
+            <li><strong>Match dimensions:</strong> Align feature map sizes in skip connections or when concatenating layers in U-Net style architectures</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>cropping:</strong> How much to remove (e.g., (1,1) or ((1,2),(3,4)))</li>
+            <li><strong>cropping:</strong> Specifies pixels to crop as ((top, bottom), (left, right)) or a single integer for symmetric cropping</li>
+            <li><strong>data_format:</strong> Either "channels_last" (default) or "channels_first" to specify the position of the channel dimension</li>
           </ul>
-          <p><em>💡 Tip: Essential for U-Net style architectures!</em></p>
+          <p><em>💡 Tip: Use Cropping2D paired with ZeroPadding2D to precisely control spatial dimensions in your network - this is especially useful in encoder-decoder architectures where dimension matching is critical!</em></p>
         `,
         'Cropping1D': `
           <h2>Cropping1D Layer</h2>
-          <p><strong>What it does:</strong> Removes timesteps from beginning and/or end of sequences.</p>
+          <p><strong>What it does:</strong> Removes elements from the beginning and/or end of the temporal dimension in 1D sequences.</p>
           <h3>How it works:</h3>
-          <p>Crops temporal dimension by removing steps from edges.</p>
+          <p>The layer trims specified numbers of timesteps from the start and end of input sequences. For example, with cropping=(2, 3), it removes 2 timesteps from the beginning and 3 from the end.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Sequence alignment:</strong> Match lengths</li>
-            <li><strong>Remove padding:</strong> After processing</li>
-            <li><strong>Temporal trimming:</strong> Focus on middle portion</li>
+            <li><strong>Removing padding:</strong> Strip unnecessary padding tokens added during batch processing</li>
+            <li><strong>Focusing on central features:</strong> Remove noisy or less relevant data at sequence boundaries</li>
+            <li><strong>Sequence length adjustment:</strong> Trim sequences to match specific downstream layer requirements</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>cropping:</strong> How much to crop (e.g., (1,1))</li>
+            <li><strong>cropping:</strong> Integer or tuple of 2 integers specifying how many units to crop from the start and end (e.g., 2 or (1, 2))</li>
           </ul>
-          <p><em>💡 Tip: Opposite of ZeroPadding1D!</em></p>
+          <p><em>💡 Tip: Use Cropping1D after convolutional layers to remove edge artifacts, or pair it with ZeroPadding1D for precise sequence length control!</em></p>
         `,
         'Cropping3D': `
           <h2>Cropping3D Layer</h2>
-          <p><strong>What it does:</strong> Removes slices from 3D data edges.</p>
+          <p><strong>What it does:</strong> Removes slices from the edges of 3D data (like video frames or 3D medical scans) along the depth, height, and width dimensions.</p>
           <h3>How it works:</h3>
-          <p>Crops three dimensions to reduce volume size.</p>
+          <p>The layer crops the input tensor by removing a specified number of elements from the beginning and end of each spatial dimension. This reduces the output size while preserving the central region of the 3D data.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>3D U-Net:</strong> Match encoder/decoder dimensions</li>
-            <li><strong>Volume trimming:</strong> Remove unnecessary regions</li>
-            <li><strong>Dimension matching:</strong> Make compatible sizes</li>
+            <li><strong>Remove padding artifacts:</strong> Eliminate unwanted border regions added by convolution operations or data preprocessing</li>
+            <li><strong>Focus on regions of interest:</strong> Extract central portions of 3D medical images where the main anatomical structures are located</li>
+            <li><strong>Data augmentation:</strong> Create different views of 3D data by cropping various regions for training</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>cropping:</strong> Crop amounts for 3 dimensions</li>
+            <li><strong>cropping:</strong> Tuple of 3 tuples of 2 integers specifying (crop_start, crop_end) for each dimension</li>
+            <li><strong>data_format:</strong> Either 'channels_last' or 'channels_first' to specify the ordering of dimensions</li>
           </ul>
-          <p><em>💡 Tip: Useful in 3D segmentation architectures!</em></p>
+          <p><em>💡 Tip: Use symmetric cropping (same values for start and end) to maintain centered data, or asymmetric cropping to shift your region of interest!</em></p>
         `,
         'SeparableConv2D': `
           <h2>SeparableConv2D Layer</h2>
-          <p><strong>What it does:</strong> Efficient convolution that separates spatial and channel-wise operations.</p>
+          <p><strong>What it does:</strong> Performs a depthwise separable convolution that factorizes a standard convolution into a depthwise convolution followed by a pointwise convolution, significantly reducing computational cost.</p>
           <h3>How it works:</h3>
-          <p>Performs depthwise convolution (spatial) followed by pointwise convolution (channels). Much fewer parameters than regular Conv2D!</p>
+          <p>First applies a separate filter to each input channel (depthwise convolution), then uses 1x1 convolutions to combine the outputs (pointwise convolution). This decomposition reduces parameters from filters×input_channels×output_channels to filters×input_channels + input_channels×output_channels.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Mobile models:</strong> Reduce parameters and computation</li>
-            <li><strong>Limited resources:</strong> Faster and smaller models</li>
-            <li><strong>Similar performance:</strong> Often works as well as Conv2D</li>
+            <li><strong>Mobile and edge devices:</strong> When you need efficient CNNs with limited computational resources while maintaining good accuracy</li>
+            <li><strong>Large-scale image classification:</strong> As a drop-in replacement for Conv2D to reduce model size and training time</li>
+            <li><strong>Real-time applications:</strong> When inference speed is critical and you need faster predictions without sacrificing too much accuracy</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>filters:</strong> Number of output channels</li>
-            <li><strong>kernel_size:</strong> Spatial filter size</li>
-            <li><strong>depth_multiplier:</strong> Depthwise filter multiplier</li>
+            <li><strong>filters:</strong> Number of output filters in the pointwise convolution (determines output channels)</li>
+            <li><strong>kernel_size:</strong> Size of the convolution window (e.g., (3, 3) for a 3x3 filter)</li>
+            <li><strong>depth_multiplier:</strong> Number of depthwise convolution filters per input channel (default: 1)</li>
+            <li><strong>activation:</strong> Activation function to apply (e.g., 'relu', 'sigmoid', None for linear)</li>
           </ul>
-          <p><em>💡 Tip: Key to MobileNet efficiency. Much faster than regular Conv2D!</em></p>
+          <p><em>💡 Tip: SeparableConv2D typically uses 8-10x fewer parameters than regular Conv2D with similar accuracy - perfect for replacing Conv2D layers in the middle and later stages of your network, but keep regular Conv2D for the first layer to capture low-level features!</em></p>
         `,
         'SeparableConv1D': `
           <h2>SeparableConv1D Layer</h2>
-          <p><strong>What it does:</strong> Efficient 1D convolution with separated operations.</p>
+          <p><strong>What it does:</strong> Performs a depthwise separable convolution on 1D data, which applies spatial and channel-wise convolutions separately for more efficient feature extraction.</p>
           <h3>How it works:</h3>
-          <p>Like SeparableConv2D but for sequences. Depthwise then pointwise convolution.</p>
+          <p>It first performs a depthwise convolution (spatial filtering on each channel independently), then applies a pointwise convolution (1x1 convolution) to combine the outputs. This factorization significantly reduces the number of parameters compared to regular convolutions.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Efficient sequence models:</strong> Reduce parameters</li>
-            <li><strong>Mobile/embedded:</strong> Faster inference</li>
-            <li><strong>Time series:</strong> When efficiency matters</li>
+            <li><strong>Time series analysis:</strong> Processing sequential data like audio signals, sensor readings, or stock prices with fewer parameters</li>
+            <li><strong>Text processing:</strong> Efficient feature extraction from word embeddings or character-level representations</li>
+            <li><strong>Mobile/edge deployment:</strong> When you need convolution capabilities but have limited computational resources</li>
+            <li><strong>Reducing overfitting:</strong> When your model has too many parameters and you want to maintain performance with fewer weights</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>filters:</strong> Output channels</li>
-            <li><strong>kernel_size:</strong> Temporal filter size</li>
+            <li><strong>filters:</strong> Number of output filters (dimensionality of the output space)</li>
+            <li><strong>kernel_size:</strong> Length of the 1D convolution window</li>
+            <li><strong>strides:</strong> Stride length of the convolution (default: 1)</li>
+            <li><strong>padding:</strong> 'valid' (no padding) or 'same' (preserve input length)</li>
           </ul>
-          <p><em>💡 Tip: More efficient than Conv1D with similar performance!</em></p>
+          <p><em>💡 Tip: SeparableConv1D typically uses 2-3x fewer parameters than regular Conv1D while maintaining similar performance - try it as a drop-in replacement when your model is too large!</em></p>
         `,
         'DepthwiseConv2D': `
           <h2>DepthwiseConv2D Layer</h2>
-          <p><strong>What it does:</strong> Applies a separate filter to each input channel independently.</p>
+          <p><strong>What it does:</strong> Performs a depthwise convolution that applies a single convolutional filter to each input channel separately, significantly reducing computational cost compared to standard convolutions.</p>
           <h3>How it works:</h3>
-          <p>Unlike regular Conv2D, doesn't mix channels - each channel gets its own spatial filter.</p>
+          <p>Instead of mixing information across all input channels like regular convolution, it applies a separate filter to each channel independently. This creates the same number of output channels as input channels, using far fewer parameters than standard Conv2D.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Part of separable conv:</strong> First step before pointwise</li>
-            <li><strong>Channel independence:</strong> When channels shouldn't mix</li>
-            <li><strong>Efficient models:</strong> Fewer parameters</li>
+            <li><strong>Mobile and edge devices:</strong> When you need efficient CNNs for resource-constrained environments like smartphones or IoT devices</li>
+            <li><strong>MobileNet architectures:</strong> As a core building block in lightweight models that prioritize speed and small model size</li>
+            <li><strong>Feature extraction with channel independence:</strong> When you want to process each channel's spatial features separately before mixing them</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>kernel_size:</strong> Spatial filter size</li>
-            <li><strong>depth_multiplier:</strong> Output channels per input channel</li>
+            <li><strong>kernel_size:</strong> Size of the convolution window (e.g., (3,3) for a 3x3 filter)</li>
+            <li><strong>strides:</strong> Step size for moving the filter across the input (default: (1,1))</li>
+            <li><strong>padding:</strong> 'valid' for no padding or 'same' to maintain spatial dimensions</li>
+            <li><strong>depth_multiplier:</strong> Number of output channels per input channel (default: 1)</li>
           </ul>
-          <p><em>💡 Tip: Usually followed by pointwise (1x1) conv to mix channels!</em></p>
+          <p><em>💡 Tip: Pair DepthwiseConv2D with a 1x1 Conv2D layer (pointwise convolution) to create a "separable convolution" - this combination gives you the power of regular convolutions with 8-9x fewer parameters!</em></p>
         `,
         'Conv2DTranspose': `
-          <h2>Conv2DTranspose Layer (Deconvolution)</h2>
-          <p><strong>What it does:</strong> Learnable upsampling - opposite of Conv2D.</p>
+          <h2>Conv2DTranspose Layer</h2>
+          <p><strong>What it does:</strong> Performs transposed convolution (also called deconvolution) to upsample feature maps, typically increasing spatial dimensions while applying learnable filters.</p>
           <h3>How it works:</h3>
-          <p>Also called "deconvolution". Learns how to upsample while processing features. More powerful than UpSampling2D!</p>
+          <p>It applies a convolution operation that goes in the opposite direction of a normal convolution, inserting zeros between input values and then convolving with learnable kernels. This effectively increases the spatial dimensions of the input, making it useful for generating higher-resolution outputs from lower-resolution feature maps.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Autoencoders:</strong> Decoder that learns upsampling</li>
-            <li><strong>GANs:</strong> Generator networks</li>
-            <li><strong>Segmentation:</strong> U-Net decoder paths</li>
+            <li><strong>Image segmentation:</strong> In the decoder part of U-Net or similar architectures to upsample feature maps back to original image size</li>
+            <li><strong>Generative models:</strong> In GANs and VAEs to progressively increase resolution from latent vectors to full-size images</li>
+            <li><strong>Super-resolution:</strong> To increase the resolution of low-resolution images by learning upsampling patterns</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>filters:</strong> Number of output channels</li>
-            <li><strong>kernel_size:</strong> Filter size</li>
-            <li><strong>strides:</strong> Upsampling factor (>1 increases size)</li>
+            <li><strong>filters:</strong> Number of output channels/feature maps (integer, required)</li>
+            <li><strong>kernel_size:</strong> Size of the convolutional window (integer or tuple, e.g., 3 or (3,3))</li>
+            <li><strong>strides:</strong> Upsampling factor - stride of 2 doubles spatial dimensions (default: (1,1))</li>
+            <li><strong>padding:</strong> 'valid' for no padding, 'same' to maintain size relationship (default: 'valid')</li>
           </ul>
-          <p><em>💡 Tip: Better than UpSampling + Conv2D. Learns optimal upsampling!</em></p>
+          <p><em>💡 Tip: Use strides=(2,2) to double spatial dimensions - this is more efficient than upsampling followed by regular convolution, and helps avoid checkerboard artifacts common in image generation!</em></p>
         `,
         'Conv1DTranspose': `
           <h2>Conv1DTranspose Layer</h2>
-          <p><strong>What it does:</strong> Learnable upsampling for sequences.</p>
+          <p><strong>What it does:</strong> Performs transposed convolution (also called deconvolution) to upsample 1D sequences by learning to expand compressed representations back to higher resolutions.</p>
           <h3>How it works:</h3>
-          <p>Opposite of Conv1D. Increases sequence length while learning features.</p>
+          <p>It applies learnable filters that slide across the input sequence with configurable stride and padding, effectively reversing the downsampling effect of regular convolutions. Each input value influences multiple output positions through the transposed convolution operation, increasing the sequence length.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Sequence generation:</strong> Decoder networks</li>
-            <li><strong>Audio synthesis:</strong> Upsampling audio signals</li>
-            <li><strong>Time series:</strong> When you need learnable upsampling</li>
+            <li><strong>Sequence generation:</strong> Upsampling compressed latent representations in autoencoders or VAEs for time series reconstruction</li>
+            <li><strong>Audio synthesis:</strong> Converting compressed audio features back to higher sample rates in generative models</li>
+            <li><strong>Temporal upsampling:</strong> Increasing the temporal resolution of sensor data or signal processing applications</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>filters:</strong> Output channels</li>
-            <li><strong>kernel_size:</strong> Filter size</li>
-            <li><strong>strides:</strong> Upsampling factor</li>
+            <li><strong>filters:</strong> Number of output filters (channels) - determines the depth of the output feature maps</li>
+            <li><strong>kernel_size:</strong> Length of the 1D convolution window - controls the receptive field size</li>
+            <li><strong>strides:</strong> Upsampling factor - determines how much the input sequence length is increased (default: 1)</li>
+            <li><strong>padding:</strong> 'valid', 'same', or 'causal' - controls output size and boundary handling</li>
           </ul>
-          <p><em>💡 Tip: Used in WaveNet and other audio generation models!</em></p>
+          <p><em>💡 Tip: Use strides > 1 to increase sequence length (e.g., strides=2 roughly doubles the length), but be aware this can create checkerboard artifacts - consider using UpSampling1D followed by regular Conv1D as an alternative!</em></p>
         `,
         'Conv3DTranspose': `
           <h2>Conv3DTranspose Layer</h2>
-          <p><strong>What it does:</strong> Learnable 3D upsampling.</p>
+          <p><strong>What it does:</strong> Performs transposed convolution (also known as deconvolution) on 3D volumetric data, typically used to increase spatial dimensions of the input.</p>
           <h3>How it works:</h3>
-          <p>Opposite of Conv3D. Increases volumetric size with learned filters.</p>
+          <p>It applies learnable filters that slide through the 3D input volume in reverse, expanding the spatial dimensions by inserting zeros between input values and convolving with the kernel. This operation is the gradient of Conv3D with respect to its input, effectively learning to upsample feature maps.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>3D generation:</strong> Volumetric GANs</li>
-            <li><strong>Medical imaging:</strong> 3D segmentation decoders</li>
-            <li><strong>Video generation:</strong> Spatio-temporal upsampling</li>
+            <li><strong>3D segmentation decoders:</strong> Upsampling feature maps in U-Net architectures for medical image segmentation (CT/MRI scans)</li>
+            <li><strong>Video generation:</strong> Generating video frames in GANs or VAEs by progressively increasing spatial and temporal resolution</li>
+            <li><strong>3D reconstruction:</strong> Converting low-resolution feature representations back to high-resolution 3D volumes or voxel grids</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>filters:</strong> Output channels</li>
-            <li><strong>kernel_size:</strong> 3D filter size</li>
-            <li><strong>strides:</strong> Upsampling factors</li>
+            <li><strong>filters:</strong> Number of output filters (feature maps) - determines the depth of the output volume</li>
+            <li><strong>kernel_size:</strong> Size of the 3D convolution window (depth, height, width) - typically (3,3,3) or (5,5,5)</li>
+            <li><strong>strides:</strong> Factor by which to increase spatial dimensions - (2,2,2) doubles each dimension</li>
+            <li><strong>padding:</strong> 'valid' (no padding) or 'same' (preserves dimensions when stride=1)</li>
           </ul>
-          <p><em>💡 Tip: Very computationally expensive!</em></p>
+          <p><em>💡 Tip: Use strides=(2,2,2) instead of separate upsampling layers for more learnable upsampling, but watch out for checkerboard artifacts - consider using kernel sizes divisible by your stride values!</em></p>
         `,
         // Advanced Recurrent
         'Bidirectional': `
-          <h2>Bidirectional Layer (Wrapper)</h2>
-          <p><strong>What it does:</strong> Processes sequences in both forward and backward directions.</p>
+          <h2>Bidirectional Layer</h2>
+          <p><strong>What it does:</strong> Wraps a recurrent layer (like LSTM or GRU) to process sequences in both forward and backward directions simultaneously, capturing patterns from past and future context.</p>
           <h3>How it works:</h3>
-          <p>Wraps an RNN layer (LSTM/GRU) and runs it twice - once forward, once backward. Concatenates outputs.</p>
+          <p>The layer creates two copies of the specified RNN layer - one processes the input sequence from start to end, while the other processes it from end to start. The outputs from both directions are then combined (typically concatenated) to produce a richer representation that incorporates both past and future information.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Text classification:</strong> Context from both directions</li>
-            <li><strong>Named entity recognition:</strong> See full context</li>
-            <li><strong>Not for generation:</strong> Can't use when predicting next token</li>
+            <li><strong>Text classification:</strong> When the entire sentence/document is available and understanding context from both directions improves accuracy</li>
+            <li><strong>Named Entity Recognition:</strong> To identify entities in text where surrounding words from both sides provide crucial context</li>
+            <li><strong>Machine translation:</strong> When translating complete sentences where future words help disambiguate earlier ones</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>layer:</strong> The RNN layer to wrap (LSTM/GRU)</li>
-            <li><strong>merge_mode:</strong> How to combine directions (concat, sum, etc.)</li>
+            <li><strong>layer:</strong> The RNN layer instance to wrap (e.g., LSTM, GRU) that will be duplicated for bidirectional processing</li>
+            <li><strong>merge_mode:</strong> How to combine forward/backward outputs ('concat', 'sum', 'mul', 'ave', or None)</li>
           </ul>
-          <p><em>💡 Tip: Great for classification tasks. Doubles the number of outputs!</em></p>
+          <p><em>💡 Tip: Bidirectional layers double the number of parameters and output dimensions (when using concat mode), so adjust your next layer's input size accordingly!</em></p>
         `,
         'ConvLSTM2D': `
           <h2>ConvLSTM2D Layer</h2>
