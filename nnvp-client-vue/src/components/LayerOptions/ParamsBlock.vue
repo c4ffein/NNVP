@@ -1271,552 +1271,580 @@ export default {
         // Spatial Dropout
         'SpatialDropout1D': `
           <h2>SpatialDropout1D Layer</h2>
-          <p><strong>What it does:</strong> Drops entire 1D feature maps instead of individual elements.</p>
+          <p><strong>What it does:</strong> Drops entire 1D feature channels instead of individual elements during training to prevent overfitting in sequential data.</p>
           <h3>How it works:</h3>
-          <p>Unlike regular Dropout which drops random elements, this drops entire channels/feature maps. Promotes independence between feature maps!</p>
+          <p>Rather than randomly dropping individual values like regular Dropout, SpatialDropout1D drops entire feature maps (channels) consistently across all timesteps. This means if a feature channel is dropped, it's dropped for the entire sequence length, preserving the spatial structure of the data.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>After Conv1D:</strong> When features are spatially correlated</li>
-            <li><strong>Better for CNNs:</strong> More effective than regular Dropout for convolutional layers</li>
-            <li><strong>Sequence models:</strong> When adjacent timesteps are correlated</li>
+            <li><strong>Text processing with embeddings:</strong> When working with word embeddings where you want to drop entire word features rather than parts of word representations</li>
+            <li><strong>Time series with multiple features:</strong> When each timestep has multiple correlated features and dropping entire features makes more sense than partial dropout</li>
+            <li><strong>After Conv1D layers:</strong> To regularize convolutional features while maintaining the integrity of learned patterns across the sequence</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>rate:</strong> Fraction of feature maps to drop</li>
+            <li><strong>rate:</strong> Float between 0 and 1 representing the fraction of input channels to drop (e.g., 0.2 drops 20% of channels)</li>
+            <li><strong>seed:</strong> Optional integer to make the dropout pattern reproducible for debugging</li>
           </ul>
-          <p><em>💡 Tip: Use this instead of regular Dropout after Conv1D layers!</em></p>
+          <p><em>💡 Tip: Start with a rate between 0.1 and 0.3 for text/NLP tasks - SpatialDropout1D is often more effective than regular Dropout for embeddings because it maintains the semantic meaning of word vectors!</em></p>
         `,
         'SpatialDropout2D': `
           <h2>SpatialDropout2D Layer</h2>
-          <p><strong>What it does:</strong> Drops entire 2D feature maps instead of individual pixels.</p>
+          <p><strong>What it does:</strong> Drops entire 2D feature maps (channels) during training to prevent overfitting in convolutional neural networks.</p>
           <h3>How it works:</h3>
-          <p>Drops entire channels from Conv2D outputs. Each dropped channel is completely zeroed out, promoting feature map independence.</p>
+          <p>Instead of dropping individual pixels randomly like regular Dropout, SpatialDropout2D drops entire feature maps/channels. This preserves the spatial structure within feature maps, making it more effective for convolutional layers where adjacent pixels are highly correlated.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>After Conv2D:</strong> Standard choice for CNN regularization</li>
-            <li><strong>Better than Dropout:</strong> More effective for spatial data</li>
-            <li><strong>Image processing:</strong> When nearby pixels are strongly correlated</li>
+            <li><strong>After convolutional layers:</strong> Place between Conv2D layers to reduce overfitting while maintaining spatial patterns</li>
+            <li><strong>Early in CNN architectures:</strong> More effective in earlier layers where feature maps represent coherent spatial patterns</li>
+            <li><strong>Small datasets:</strong> When training data is limited and the model tends to memorize rather than generalize</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>rate:</strong> Fraction of feature maps to drop (0.2-0.5)</li>
+            <li><strong>rate:</strong> Float between 0 and 1 representing the fraction of feature maps to drop (e.g., 0.2 drops 20% of channels)</li>
+            <li><strong>data_format:</strong> Either 'channels_first' or 'channels_last' to specify the position of the channel dimension</li>
           </ul>
-          <p><em>💡 Tip: Standard practice for CNN regularization. Widely used in modern architectures!</em></p>
+          <p><em>💡 Tip: Start with a rate of 0.1-0.2 for SpatialDropout2D - it's more aggressive than regular dropout since it drops entire feature maps, so lower rates often work better!</em></p>
         `,
         'SpatialDropout3D': `
           <h2>SpatialDropout3D Layer</h2>
-          <p><strong>What it does:</strong> Drops entire 3D feature maps for volumetric/video data.</p>
+          <p><strong>What it does:</strong> Drops entire 3D feature maps instead of individual elements to help prevent overfitting in 3D convolutional networks.</p>
           <h3>How it works:</h3>
-          <p>Like SpatialDropout2D but for 3D convolutions. Drops entire feature volumes.</p>
+          <p>Rather than dropping random individual neurons like standard dropout, this layer drops entire 3D feature channels. When a feature map is dropped, all voxels in that feature map are set to zero, maintaining spatial correlations within each channel.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>After Conv3D:</strong> Regularization for video/volumetric CNNs</li>
-            <li><strong>Video processing:</strong> When spatio-temporal features are correlated</li>
-            <li><strong>Medical imaging:</strong> 3D scan processing</li>
+            <li><strong>3D medical imaging:</strong> When working with CT scans, MRI data, or other volumetric medical images where adjacent voxels are highly correlated</li>
+            <li><strong>Video processing:</strong> For temporal-spatial models where you want to maintain feature consistency across frames and spatial dimensions</li>
+            <li><strong>3D object recognition:</strong> When processing 3D point clouds or voxel-based representations where spatial structure is critical</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>rate:</strong> Fraction of 3D feature maps to drop</li>
+            <li><strong>rate:</strong> Float between 0 and 1 representing the fraction of feature maps to drop (e.g., 0.2 drops 20% of channels)</li>
+            <li><strong>data_format:</strong> Either 'channels_first' or 'channels_last' to specify the position of the channel dimension in your input</li>
           </ul>
-          <p><em>💡 Tip: Essential for 3D CNN regularization!</em></p>
+          <p><em>💡 Tip: Start with a lower dropout rate (0.1-0.2) for 3D data since dropping entire feature maps is more aggressive than standard dropout - you can increase it if your model still overfits!</em></p>
         `,
         // Attention
         'MultiHeadAttention': `
           <h2>MultiHeadAttention Layer</h2>
-          <p><strong>What it does:</strong> Transformer-style multi-head attention mechanism - the core of modern NLP!</p>
+          <p><strong>What it does:</strong> Applies self-attention mechanism with multiple parallel attention heads to capture different types of relationships between elements in a sequence.</p>
           <h3>How it works:</h3>
-          <p>Runs multiple attention operations in parallel (multiple "heads"), each learning different aspects. Concatenates results and projects them. Allows the model to attend to different positions simultaneously!</p>
+          <p>It splits the input into multiple heads, computes scaled dot-product attention for each head independently, then concatenates and projects the results. This allows the model to jointly attend to information from different representation subspaces at different positions.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Transformers:</strong> Core building block (BERT, GPT, etc.)</li>
-            <li><strong>Sequence-to-sequence:</strong> Modern alternative to RNNs</li>
-            <li><strong>Any attention task:</strong> Translation, summarization, vision transformers</li>
+            <li><strong>Transformer models:</strong> Core building block for transformer architectures used in NLP tasks like translation and text generation</li>
+            <li><strong>Sequence modeling:</strong> When you need to capture long-range dependencies between elements in sequences</li>
+            <li><strong>Computer vision:</strong> For vision transformers (ViT) that process images as sequences of patches</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>num_heads:</strong> Number of attention heads (typically 8 or 12)</li>
-            <li><strong>key_dim:</strong> Dimension of query/key vectors</li>
-            <li><strong>value_dim:</strong> Dimension of value vectors (optional)</li>
+            <li><strong>num_heads:</strong> Number of parallel attention heads (typical values: 8, 12, 16)</li>
+            <li><strong>key_dim:</strong> Size of each attention head for query and key (often set to model_dim/num_heads)</li>
+            <li><strong>dropout:</strong> Dropout rate applied to attention scores (typical: 0.1-0.2)</li>
+            <li><strong>use_bias:</strong> Whether to use bias in the dense layers (default: True)</li>
           </ul>
-          <p><em>💡 Tip: The secret sauce of transformers! Start with 8 heads and key_dim=64!</em></p>
+          <p><em>💡 Tip: Start with num_heads=8 and key_dim=64 for most tasks - ensure your model dimension is divisible by num_heads for optimal performance!</em></p>
         `,
         'Attention': `
           <h2>Attention Layer</h2>
-          <p><strong>What it does:</strong> Basic attention mechanism that computes weighted combinations based on similarity.</p>
+          <p><strong>What it does:</strong> Computes attention weights between query and value sequences, allowing the model to focus on relevant parts of the input when processing each element.</p>
           <h3>How it works:</h3>
-          <p>Computes attention scores between query and key sequences, then uses these to weight value sequences. Simpler than MultiHeadAttention!</p>
+          <p>The layer calculates similarity scores between queries and keys using dot product, applies softmax to get attention weights, then uses these weights to create a weighted sum of values. This mechanism enables the model to dynamically determine which parts of the input are most relevant for each output.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Seq2Seq models:</strong> Encoder-decoder attention</li>
-            <li><strong>Simpler than multi-head:</strong> When you don't need multiple heads</li>
-            <li><strong>Custom attention:</strong> Building your own attention mechanisms</li>
+            <li><strong>Sequence-to-sequence tasks:</strong> Machine translation, text summarization, or any task where different parts of the input have varying importance</li>
+            <li><strong>Document understanding:</strong> When processing long texts where the model needs to identify and focus on relevant sections</li>
+            <li><strong>Multi-modal learning:</strong> Aligning information between different data types like image captions or video descriptions</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>use_scale:</strong> Whether to scale scores by sqrt(key_dim)</li>
-            <li><strong>causal:</strong> For autoregressive models (mask future)</li>
+            <li><strong>use_scale:</strong> Whether to scale the attention scores by 1/sqrt(key_dim) for numerical stability (default: True)</li>
+            <li><strong>dropout:</strong> Dropout rate applied to attention weights (0.0 to 1.0) to prevent overfitting</li>
+            <li><strong>score_mode:</strong> How to compute attention scores - 'dot' for dot product or 'concat' for concatenation-based scoring</li>
           </ul>
-          <p><em>💡 Tip: Good starting point for learning attention. Use MultiHeadAttention for production!</em></p>
+          <p><em>💡 Tip: Start with use_scale=True for better training stability, especially with longer sequences. Add dropout (0.1-0.2) if your model shows signs of overfitting on the attention patterns!</em></p>
         `,
         'AdditiveAttention': `
-          <h2>AdditiveAttention Layer (Bahdanau Attention)</h2>
-          <p><strong>What it does:</strong> Additive/Bahdanau attention - older but still useful attention mechanism.</p>
+          <h2>AdditiveAttention Layer</h2>
+          <p><strong>What it does:</strong> Computes attention weights between query and key-value pairs using a learned additive scoring function, allowing the model to focus on relevant parts of the input.</p>
           <h3>How it works:</h3>
-          <p>Computes attention using a feedforward network instead of dot product. Can handle different dimension queries and keys!</p>
+          <p>It calculates attention scores by passing the sum of transformed queries and keys through a neural network with a tanh activation, then applies softmax to get weights. These weights are used to compute a weighted sum of the values, producing a context-aware output.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Different dimensions:</strong> When query and key have different sizes</li>
-            <li><strong>Machine translation:</strong> Original attention mechanism</li>
-            <li><strong>Alternative to dot-product:</strong> Sometimes works better</li>
+            <li><strong>Sequence-to-sequence models:</strong> When building encoders-decoders for tasks like machine translation or text summarization</li>
+            <li><strong>Variable-length inputs:</strong> When you need to handle sequences of different lengths without padding issues</li>
+            <li><strong>Interpretable attention:</strong> When you want to visualize what parts of the input the model is focusing on</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>use_scale:</strong> Whether to apply scaling</li>
-            <li><strong>causal:</strong> For autoregressive generation</li>
+            <li><strong>use_scale:</strong> Whether to scale the attention scores by the square root of the key dimension (helps with training stability)</li>
+            <li><strong>dropout:</strong> Dropout rate applied to attention weights (0.0 to 1.0) to prevent overfitting</li>
           </ul>
-          <p><em>💡 Tip: Historical importance - used in early neural translation! Dot-product attention (MultiHeadAttention) is usually better!</em></p>
+          <p><em>💡 Tip: AdditiveAttention often works better than dot-product attention when queries and keys have different dimensions, as it uses a feedforward network to compute compatibility!</em></p>
         `,
         // Normalization
         'LayerNormalization': `
           <h2>LayerNormalization Layer</h2>
-          <p><strong>What it does:</strong> Normalizes activations across features (not batch) - key component of transformers!</p>
+          <p><strong>What it does:</strong> Normalizes the activations of each sample independently by centering and scaling them across the feature dimensions.</p>
           <h3>How it works:</h3>
-          <p>Unlike BatchNorm which normalizes across batch, this normalizes across features for each sample independently. Works better for sequences and small batches!</p>
+          <p>For each sample in a batch, it computes the mean and variance across the specified axes (typically the feature dimensions), then normalizes the values to have zero mean and unit variance. Learnable scale and shift parameters allow the model to adapt the normalization as needed.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Transformers:</strong> Standard normalization for attention models</li>
-            <li><strong>RNNs:</strong> Better than BatchNorm for sequences</li>
-            <li><strong>Small batches:</strong> Works with batch size 1!</li>
-            <li><strong>Reinforcement learning:</strong> When batch size varies</li>
+            <li><strong>Transformer architectures:</strong> Essential component in attention-based models like BERT, GPT, and Vision Transformers</li>
+            <li><strong>RNN/LSTM networks:</strong> Helps stabilize training in recurrent networks by normalizing hidden states</li>
+            <li><strong>Deep networks with variable batch sizes:</strong> Unlike batch normalization, works consistently regardless of batch size</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>epsilon:</strong> Small constant for numerical stability</li>
-            <li><strong>center:</strong> Whether to add learnable bias</li>
-            <li><strong>scale:</strong> Whether to add learnable scale</li>
+            <li><strong>axis:</strong> Integer or list specifying which axes to normalize over (default: -1, the last dimension)</li>
+            <li><strong>epsilon:</strong> Small constant added for numerical stability (default: 0.001)</li>
+            <li><strong>center:</strong> Whether to learn an additive bias parameter (default: True)</li>
+            <li><strong>scale:</strong> Whether to learn a multiplicative scale parameter (default: True)</li>
           </ul>
-          <p><em>💡 Tip: Essential for transformers! Use this instead of BatchNorm for NLP tasks!</em></p>
+          <p><em>💡 Tip: Layer normalization is typically placed after the main computation (like attention or feed-forward) and before the residual connection in transformer blocks!</em></p>
         `,
         // Locally Connected
         'LocallyConnected1D': `
           <h2>LocallyConnected1D Layer</h2>
-          <p><strong>What it does:</strong> Like Conv1D but each position has its own unique filters (no weight sharing).</p>
+          <p><strong>What it does:</strong> Applies convolution-like operations where each position has its own unique set of filters, unlike standard convolutions that share weights across all positions.</p>
           <h3>How it works:</h3>
-          <p>Applies filters locally like convolution, but filters are different at each position. Much more parameters than Conv1D!</p>
+          <p>Instead of using the same filter weights across the entire input sequence, this layer learns different weights for each spatial position. This creates location-specific feature detectors that can capture position-dependent patterns in your data.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Position-specific patterns:</strong> When different positions need different filters</li>
-            <li><strong>Fixed-length sequences:</strong> Input length must be constant</li>
-            <li><strong>Rare use case:</strong> Usually Conv1D is better</li>
+            <li><strong>Position-specific patterns:</strong> When different positions in your sequence have fundamentally different meanings (e.g., analyzing fixed-format data where each position represents a different type of measurement)</li>
+            <li><strong>Non-translation invariant tasks:</strong> When the same pattern appearing at different positions should be treated differently (e.g., time series where early vs. late events have different significance)</li>
+            <li><strong>Small, fixed-size inputs:</strong> When working with short sequences where position-specific learning is computationally feasible and beneficial</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>filters:</strong> Number of filters per position</li>
-            <li><strong>kernel_size:</strong> Size of local window</li>
+            <li><strong>filters:</strong> Number of output filters (feature maps) to produce at each position</li>
+            <li><strong>kernel_size:</strong> Size of the convolution window for each filter</li>
+            <li><strong>strides:</strong> Step size for moving the convolution window (default is 1)</li>
+            <li><strong>activation:</strong> Activation function to apply to the output (e.g., 'relu', 'sigmoid')</li>
           </ul>
-          <p><em>💡 Tip: Very parameter-heavy! Use Conv1D unless you specifically need position-specific filters!</em></p>
+          <p><em>💡 Tip: LocallyConnected1D uses significantly more parameters than Conv1D since weights aren't shared - only use it when position-specific features are crucial and your input size is relatively small!</em></p>
         `,
         'LocallyConnected2D': `
           <h2>LocallyConnected2D Layer</h2>
-          <p><strong>What it does:</strong> Like Conv2D but each spatial position has unique filters.</p>
+          <p><strong>What it does:</strong> Applies a locally connected operation over a 2D input where each output position has its own unique set of weights (unlike Conv2D which shares weights across all positions).</p>
           <h3>How it works:</h3>
-          <p>No weight sharing across positions - each location learns its own filters. Useful when different image regions need different processing.</p>
+          <p>Similar to a convolution layer, but without weight sharing - each spatial location learns its own set of filters. This means the layer has significantly more parameters than a standard Conv2D layer with the same filter size.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Face recognition:</strong> Different facial regions (eyes, nose, mouth) need different filters</li>
-            <li><strong>Fixed position objects:</strong> When object position is consistent</li>
-            <li><strong>Lots of data:</strong> Needs much more data than Conv2D</li>
+            <li><strong>Face recognition tasks:</strong> Different facial regions may need specialized feature detectors (eyes, nose, mouth)</li>
+            <li><strong>Non-translation invariant patterns:</strong> When features at different spatial locations have fundamentally different characteristics</li>
+            <li><strong>Small, fixed-size inputs:</strong> Works best when input dimensions are consistent and relatively small</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>filters:</strong> Output channels</li>
-            <li><strong>kernel_size:</strong> Filter size (e.g., 3×3)</li>
+            <li><strong>filters:</strong> Number of output filters (feature maps) to produce</li>
+            <li><strong>kernel_size:</strong> Size of the local receptive field (e.g., (3, 3) for a 3x3 window)</li>
+            <li><strong>strides:</strong> Step size for moving the kernel across the input (default: (1, 1))</li>
+            <li><strong>padding:</strong> Either 'valid' (no padding) or 'same' (preserve spatial dimensions)</li>
           </ul>
-          <p><em>💡 Tip: Used in DeepFace paper for face recognition. Usually Conv2D is better!</em></p>
+          <p><em>💡 Tip: LocallyConnected2D uses much more memory than Conv2D due to unique weights per position - only use it when you specifically need location-dependent features, not for general image processing!</em></p>
         `,
         // Preprocessing
         'Rescaling': `
           <h2>Rescaling Layer</h2>
-          <p><strong>What it does:</strong> Simple linear scaling of inputs - multiply by scale factor and add offset.</p>
+          <p><strong>What it does:</strong> Linearly transforms input values by multiplying by a scale factor and optionally adding an offset to normalize or standardize data ranges.</p>
           <h3>How it works:</h3>
-          <p>Applies: output = input * scale + offset. Commonly used to normalize pixel values from [0, 255] to [0, 1].</p>
+          <p>The layer applies the transformation: output = input * scale + offset. This operation is applied element-wise to all input values, allowing you to convert pixel values from one range to another (e.g., from [0, 255] to [0, 1] or [-1, 1]).</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Image preprocessing:</strong> Scale pixels from 0-255 to 0-1</li>
-            <li><strong>Inside model:</strong> Include preprocessing in model for deployment</li>
-            <li><strong>Simple normalization:</strong> When you just need linear scaling</li>
+            <li><strong>Image preprocessing:</strong> Normalize pixel values from [0, 255] to [0, 1] or [-1, 1] for better model training stability</li>
+            <li><strong>Data standardization:</strong> Scale input features to a consistent range when working with mixed data types</li>
+            <li><strong>Transfer learning:</strong> Match the input preprocessing requirements of pretrained models that expect specific value ranges</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>scale:</strong> Multiplication factor (e.g., 1./255)</li>
-            <li><strong>offset:</strong> Addition offset (typically 0)</li>
+            <li><strong>scale:</strong> The scale factor to multiply inputs by (e.g., 1/255.0 to convert [0, 255] to [0, 1])</li>
+            <li><strong>offset:</strong> Optional value to add after scaling (default: 0.0), useful for shifting ranges like [0, 1] to [-1, 1]</li>
           </ul>
-          <p><em>💡 Tip: Use Rescaling(1./255) for image inputs! Keeps preprocessing in model!</em></p>
+          <p><em>💡 Tip: Place Rescaling as the first layer in your model to include preprocessing in the model itself - this ensures the same scaling is applied during both training and inference!</em></p>
         `,
         'Normalization': `
-          <h2>Normalization Layer (Feature Normalization)</h2>
-          <p><strong>What it does:</strong> Normalizes features to have mean 0 and variance 1 based on training data statistics.</p>
+          <h2>Normalization Layer</h2>
+          <p><strong>What it does:</strong> Normalizes input features by subtracting the mean and dividing by the standard deviation, scaling data to have zero mean and unit variance.</p>
           <h3>How it works:</h3>
-          <p>Learns mean and variance from training data during adapt() call, then normalizes inputs using these statistics. Like StandardScaler in sklearn!</p>
+          <p>The layer computes statistics (mean and variance) from your training data during an initial adapt() step, then applies these fixed statistics to normalize inputs during training and inference. This standardization transformation helps ensure all features are on the same scale.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Tabular data:</strong> Normalize numerical features</li>
-            <li><strong>Feature preprocessing:</strong> Before feeding to Dense layers</li>
-            <li><strong>Inside model:</strong> Include normalization in model for deployment</li>
+            <li><strong>Mixed-scale features:</strong> When input features have vastly different ranges (e.g., age in years vs. income in thousands)</li>
+            <li><strong>Tabular data preprocessing:</strong> As the first layer when working with structured/tabular data to standardize numerical columns</li>
+            <li><strong>Improving convergence:</strong> When you need faster and more stable training by preventing features with large values from dominating the gradient</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>axis:</strong> Which axis to normalize (typically -1 for features)</li>
-            <li><strong>mean:</strong> Optional pre-computed mean</li>
-            <li><strong>variance:</strong> Optional pre-computed variance</li>
+            <li><strong>axis:</strong> Integer or tuple specifying which axes should be normalized (default: -1 for last axis)</li>
+            <li><strong>mean:</strong> Pre-computed mean values to use instead of adapting from data (optional)</li>
+            <li><strong>variance:</strong> Pre-computed variance values to use instead of adapting from data (optional)</li>
           </ul>
-          <p><em>💡 Tip: Call adapt(training_data) before training! Great for tabular data!</em></p>
+          <p><em>💡 Tip: Always call adapt() on your training data before training, or provide pre-computed statistics - this layer needs to know your data's distribution before it can normalize properly!</em></p>
         `,
         // Data Augmentation
         'RandomFlip': `
           <h2>RandomFlip Layer</h2>
-          <p><strong>What it does:</strong> Randomly flips images horizontally and/or vertically during training.</p>
+          <p><strong>What it does:</strong> Randomly flips images horizontally and/or vertically during training to augment the dataset and improve model generalization.</p>
           <h3>How it works:</h3>
-          <p>Randomly flips images with 50% probability. Only active during training, not inference!</p>
+          <p>The layer applies random horizontal and/or vertical flipping to input images based on specified probabilities. Each flip operation mirrors the image along the respective axis, creating new variations of the original data during training.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Image classification:</strong> Standard data augmentation</li>
-            <li><strong>Object detection:</strong> When orientation doesn't matter</li>
-            <li><strong>Inside model:</strong> Include augmentation in model</li>
+            <li><strong>Data augmentation:</strong> When you have limited training images and need to artificially increase dataset variety</li>
+            <li><strong>Symmetrical objects:</strong> For classifying objects that can naturally appear flipped (faces, animals, vehicles)</li>
+            <li><strong>Reducing overfitting:</strong> To prevent the model from memorizing specific orientations and improve generalization</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>mode:</strong> 'horizontal', 'vertical', or 'horizontal_and_vertical'</li>
+            <li><strong>mode:</strong> Controls flip direction - "horizontal", "vertical", or "horizontal_and_vertical"</li>
+            <li><strong>seed:</strong> Random seed for reproducible augmentations during experiments</li>
           </ul>
-          <p><em>💡 Tip: Use 'horizontal' for most natural images. Be careful with text/numbers!</em></p>
+          <p><em>💡 Tip: Avoid RandomFlip for text recognition or medical images where orientation matters - a flipped X-ray or text would be meaningless!</em></p>
         `,
         'RandomRotation': `
           <h2>RandomRotation Layer</h2>
-          <p><strong>What it does:</strong> Randomly rotates images by a random angle during training.</p>
+          <p><strong>What it does:</strong> Randomly rotates images during training by a specified angle range to augment the dataset and improve model generalization.</p>
           <h3>How it works:</h3>
-          <p>Rotates images within specified range. Great for rotation-invariant tasks!</p>
+          <p>The layer randomly selects a rotation angle within the specified range for each image and applies the transformation. During inference, this augmentation can be disabled to ensure consistent predictions.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Image classification:</strong> When objects can appear at any angle</li>
-            <li><strong>Medical imaging:</strong> Scans can be oriented differently</li>
-            <li><strong>Satellite imagery:</strong> No canonical orientation</li>
+            <li><strong>Limited training data:</strong> When you have a small dataset and need to artificially increase variety to prevent overfitting</li>
+            <li><strong>Rotation-invariant tasks:</strong> For problems where objects can appear at any orientation (aerial imagery, medical scans, natural scenes)</li>
+            <li><strong>Improving robustness:</strong> To make your model less sensitive to the exact orientation of objects in real-world applications</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>factor:</strong> Rotation range as fraction of 2π (e.g., 0.2 = ±36°)</li>
-            <li><strong>fill_mode:</strong> How to fill empty space ('constant', 'reflect', 'wrap')</li>
+            <li><strong>factor:</strong> The rotation range as a fraction of 2π (e.g., 0.2 means ±36 degrees) or a tuple specifying min/max rotation</li>
+            <li><strong>fill_mode:</strong> How to fill pixels outside the image boundaries after rotation ('reflect', 'constant', 'wrap', or 'nearest')</li>
+            <li><strong>interpolation:</strong> Interpolation method for pixel values ('bilinear' or 'nearest')</li>
           </ul>
-          <p><em>💡 Tip: Start with small rotations (0.1-0.2). Large rotations can hurt performance!</em></p>
+          <p><em>💡 Tip: Start with small rotation ranges (0.1-0.2) for most tasks - excessive rotation can confuse the model if your objects have a natural "up" direction!</em></p>
         `,
         'RandomZoom': `
           <h2>RandomZoom Layer</h2>
-          <p><strong>What it does:</strong> Randomly zooms in or out on images during training.</p>
+          <p><strong>What it does:</strong> Randomly zooms images in or out during training to create scale variations for data augmentation.</p>
           <h3>How it works:</h3>
-          <p>Randomly scales images within specified range. Simulates different camera distances!</p>
+          <p>The layer applies random zoom transformations by scaling the image along both height and width dimensions within specified ranges. Zooming in crops the image while zooming out adds padding or interpolation to maintain the original dimensions.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Object detection:</strong> Objects at different scales</li>
-            <li><strong>Image classification:</strong> Scale invariance</li>
-            <li><strong>Real-world variance:</strong> Simulate camera zoom</li>
+            <li><strong>Object detection tasks:</strong> Helps models recognize objects at different scales and distances</li>
+            <li><strong>Limited training data:</strong> Artificially expands your dataset by creating scale variations of existing images</li>
+            <li><strong>Real-world robustness:</strong> Prepares models for images where subjects appear at varying distances from the camera</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>height_factor:</strong> Zoom range for height (e.g., 0.2 = ±20%)</li>
-            <li><strong>width_factor:</strong> Zoom range for width (optional, defaults to height)</li>
+            <li><strong>height_factor:</strong> Range for vertical zoom (e.g., 0.2 means zoom between 80% and 120%)</li>
+            <li><strong>width_factor:</strong> Range for horizontal zoom (use None to match height_factor for uniform scaling)</li>
+            <li><strong>fill_mode:</strong> How to fill empty pixels when zooming out ('reflect', 'constant', 'wrap', or 'nearest')</li>
+            <li><strong>interpolation:</strong> Resampling method ('bilinear' or 'nearest') for pixel interpolation</li>
           </ul>
-          <p><em>💡 Tip: Use 0.1-0.2 for subtle zooming. Too much can distort objects!</em></p>
+          <p><em>💡 Tip: Start with moderate zoom factors (0.1-0.2) to avoid excessive distortion, and use 'reflect' fill mode for natural-looking borders when zooming out!</em></p>
         `,
         'RandomTranslation': `
           <h2>RandomTranslation Layer</h2>
-          <p><strong>What it does:</strong> Randomly shifts images horizontally and/or vertically during training.</p>
+          <p><strong>What it does:</strong> Randomly shifts images vertically and/or horizontally by a specified fraction of the image dimensions during training for data augmentation.</p>
           <h3>How it works:</h3>
-          <p>Translates images by random amounts. Helps model learn position invariance!</p>
+          <p>The layer randomly samples translation amounts within the specified range and applies them to shift the image pixels. Empty areas created by the shift are filled according to the chosen fill mode (e.g., with zeros, nearest pixels, or reflection).</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Object detection:</strong> Objects can appear anywhere</li>
-            <li><strong>Classification:</strong> Position shouldn't matter</li>
-            <li><strong>Data augmentation:</strong> Very common technique</li>
+            <li><strong>Object detection tasks:</strong> Makes models robust to objects appearing at different positions in the frame</li>
+            <li><strong>Small dataset augmentation:</strong> Artificially increases training data variety when you have limited images</li>
+            <li><strong>Position invariance:</strong> When your model needs to recognize objects regardless of their location in the image</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>height_factor:</strong> Vertical shift as fraction of height</li>
-            <li><strong>width_factor:</strong> Horizontal shift as fraction of width</li>
-            <li><strong>fill_mode:</strong> How to fill empty regions</li>
+            <li><strong>height_factor:</strong> Float or tuple defining the vertical shift range as a fraction of image height (e.g., 0.2 = ±20%)</li>
+            <li><strong>width_factor:</strong> Float or tuple defining the horizontal shift range as a fraction of image width (e.g., 0.2 = ±20%)</li>
+            <li><strong>fill_mode:</strong> How to fill empty pixels after translation ('reflect', 'constant', 'wrap', or 'nearest')</li>
           </ul>
-          <p><em>💡 Tip: Standard augmentation! Use 0.1-0.2 for both directions!</em></p>
+          <p><em>💡 Tip: Start with small translation factors (0.1-0.2) to avoid shifting important features out of frame, and use 'reflect' fill mode for natural images to avoid black borders!</em></p>
         `,
         'RandomContrast': `
           <h2>RandomContrast Layer</h2>
-          <p><strong>What it does:</strong> Randomly adjusts image contrast during training.</p>
+          <p><strong>What it does:</strong> Randomly adjusts the contrast of images during training to make your model more robust to varying lighting conditions.</p>
           <h3>How it works:</h3>
-          <p>Randomly changes the difference between dark and light pixels. Simulates different lighting conditions!</p>
+          <p>The layer randomly selects a contrast factor within a specified range and adjusts pixel intensities by scaling them away from or towards the mean intensity. This transformation is applied independently to each image in the batch during training.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Real-world images:</strong> Variable lighting conditions</li>
-            <li><strong>Outdoor scenes:</strong> Different weather/times of day</li>
-            <li><strong>Robust models:</strong> Handle contrast variations</li>
+            <li><strong>Real-world image classification:</strong> When your model needs to handle photos taken under different lighting conditions or camera settings</li>
+            <li><strong>Object detection tasks:</strong> To improve detection accuracy when objects appear in both high and low contrast scenarios</li>
+            <li><strong>Limited training data:</strong> As a data augmentation technique to artificially expand your dataset and prevent overfitting</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>factor:</strong> Contrast range (e.g., 0.2 = ±20%)</li>
+            <li><strong>factor:</strong> A float or tuple of two floats representing the contrast range (e.g., 0.5 to 1.5 where 1.0 is no change)</li>
+            <li><strong>seed:</strong> Random seed for reproducible augmentations during experiments</li>
           </ul>
-          <p><em>💡 Tip: Combine with RandomBrightness for lighting robustness!</em></p>
+          <p><em>💡 Tip: Start with a moderate range like (0.7, 1.3) and adjust based on your dataset - too extreme values might make features unrecognizable!</em></p>
         `,
         'RandomBrightness': `
           <h2>RandomBrightness Layer</h2>
-          <p><strong>What it does:</strong> Randomly adjusts image brightness during training.</p>
+          <p><strong>What it does:</strong> Randomly adjusts the brightness of input images during training to make models more robust to lighting variations.</p>
           <h3>How it works:</h3>
-          <p>Randomly makes images lighter or darker. Simulates different exposure levels!</p>
+          <p>The layer randomly selects a brightness adjustment factor within a specified range and applies it uniformly to all pixel values in the image. This adjustment is applied differently to each image in a batch and changes with each training step.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Variable lighting:</strong> Indoor/outdoor scenes</li>
-            <li><strong>Camera variations:</strong> Different exposure settings</li>
-            <li><strong>Robust recognition:</strong> Handle lighting changes</li>
+            <li><strong>Limited training data:</strong> When you have a small dataset and need to artificially increase variety through augmentation</li>
+            <li><strong>Variable lighting conditions:</strong> When your model needs to work in environments with different lighting (indoor/outdoor, day/night)</li>
+            <li><strong>Preventing overfitting:</strong> To reduce memorization of specific brightness patterns in training images</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>factor:</strong> Brightness range (e.g., 0.2 or [-0.2, 0.3])</li>
-            <li><strong>value_range:</strong> Input value range (e.g., [0, 255] or [0, 1])</li>
+            <li><strong>factor:</strong> A float or tuple of floats defining the brightness adjustment range (e.g., 0.2 means ±20% brightness change)</li>
+            <li><strong>value_range:</strong> The range of pixel values in your images, typically [0, 255] or [0, 1]</li>
+            <li><strong>seed:</strong> Random seed for reproducible augmentation patterns during testing</li>
           </ul>
-          <p><em>💡 Tip: Essential for real-world robustness! Use 0.1-0.2!</em></p>
+          <p><em>💡 Tip: Start with a moderate factor like 0.2 - too high values (>0.5) can make images unnaturally dark or washed out, potentially hurting model performance!</em></p>
         `,
         'RandomHeight': `
           <h2>RandomHeight Layer</h2>
-          <p><strong>What it does:</strong> Randomly varies the height of images during training.</p>
+          <p><strong>What it does:</strong> Randomly adjusts the height of input images during training by stretching or compressing them vertically within a specified range.</p>
           <h3>How it works:</h3>
-          <p>Randomly resizes image height within specified range. Width stays constant or scales proportionally.</p>
+          <p>The layer randomly samples a height scaling factor from the specified range and resizes the image vertically while maintaining the original width. This transformation is applied differently to each image in a batch and changes between training epochs.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Aspect ratio changes:</strong> When height can vary</li>
-            <li><strong>Vertical stretching:</strong> Simulate perspective changes</li>
-            <li><strong>Custom augmentation:</strong> Specific to your data</li>
+            <li><strong>Data augmentation:</strong> Increase training data variety to improve model generalization and reduce overfitting</li>
+            <li><strong>Object detection tasks:</strong> Help models become invariant to different object scales and aspect ratios</li>
+            <li><strong>Limited training data:</strong> Artificially expand your dataset when you have few training images</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>factor:</strong> Height variation range</li>
+            <li><strong>factor:</strong> A float or tuple of floats representing the height scaling range (e.g., 0.2 or (-0.2, 0.2) for ±20% height change)</li>
+            <li><strong>interpolation:</strong> The interpolation method for resizing ('bilinear', 'nearest', 'bicubic', etc.)</li>
           </ul>
-          <p><em>💡 Tip: Less common than RandomZoom. Use when aspect ratio matters!</em></p>
+          <p><em>💡 Tip: Use moderate factor values (0.1-0.3) to avoid extreme distortions that might confuse your model, and always apply this layer only during training, not during inference!</em></p>
         `,
         'RandomWidth': `
           <h2>RandomWidth Layer</h2>
-          <p><strong>What it does:</strong> Randomly varies the width of images during training.</p>
+          <p><strong>What it does:</strong> Randomly adjusts the width of input images during training by horizontally stretching or compressing them within a specified range.</p>
           <h3>How it works:</h3>
-          <p>Randomly resizes image width within specified range. Height stays constant or scales proportionally.</p>
+          <p>The layer randomly scales images horizontally by a factor sampled uniformly from the specified range, while keeping the height unchanged. This transformation is applied independently to each image in the batch during training, but is disabled during inference.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Aspect ratio changes:</strong> When width can vary</li>
-            <li><strong>Horizontal stretching:</strong> Simulate perspective</li>
-            <li><strong>Custom needs:</strong> Data-specific augmentation</li>
+            <li><strong>Data augmentation:</strong> Increase training data diversity to improve model generalization and reduce overfitting</li>
+            <li><strong>Object detection tasks:</strong> Help models become robust to objects appearing at different aspect ratios</li>
+            <li><strong>Limited dataset scenarios:</strong> Artificially expand your training set when you have insufficient image samples</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>factor:</strong> Width variation range</li>
+            <li><strong>factor:</strong> A float or tuple of two floats representing the width adjustment range (e.g., 0.2 means ±20% width change)</li>
+            <li><strong>interpolation:</strong> Resampling method used when resizing ('bilinear', 'nearest', 'bicubic', etc.)</li>
+            <li><strong>seed:</strong> Random seed for reproducible augmentations during training</li>
           </ul>
-          <p><em>💡 Tip: Pair with RandomHeight for full aspect ratio variation!</em></p>
+          <p><em>💡 Tip: Use moderate factor values (0.1-0.3) to avoid excessive distortion that might confuse the model - start small and increase gradually if needed!</em></p>
         `,
         'RandomCrop': `
           <h2>RandomCrop Layer</h2>
-          <p><strong>What it does:</strong> Randomly crops a fixed-size region from images during training.</p>
+          <p><strong>What it does:</strong> Randomly crops images to a specified target size during training, extracting different regions from the input images for data augmentation.</p>
           <h3>How it works:</h3>
-          <p>Extracts random crops of specified size. Each training sample gets a different crop!</p>
+          <p>The layer randomly selects a starting position within the input image and extracts a crop of the specified height and width from that position. During inference, it performs a center crop by default unless specified otherwise.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Large images:</strong> Train on smaller crops for efficiency</li>
-            <li><strong>Data augmentation:</strong> Many crops from one image</li>
-            <li><strong>Position invariance:</strong> Focus on different regions</li>
+            <li><strong>Data augmentation:</strong> Increase dataset variety by showing the model different parts of the same image during training</li>
+            <li><strong>Reducing overfitting:</strong> Force the model to learn features from various image regions rather than memorizing specific positions</li>
+            <li><strong>Standardizing input sizes:</strong> Convert images of varying sizes to a consistent dimension required by your model</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>height:</strong> Crop height</li>
-            <li><strong>width:</strong> Crop width</li>
+            <li><strong>height:</strong> Target height for the cropped images (integer value)</li>
+            <li><strong>width:</strong> Target width for the cropped images (integer value)</li>
+            <li><strong>seed:</strong> Random seed for reproducible augmentation patterns (optional integer)</li>
           </ul>
-          <p><em>💡 Tip: Popular for large images. Use with CenterCrop for inference!</em></p>
+          <p><em>💡 Tip: Make sure your input images are larger than the crop dimensions, or use RandomZoom first to ensure sufficient image size for cropping!</em></p>
         `,
         'CenterCrop': `
           <h2>CenterCrop Layer</h2>
-          <p><strong>What it does:</strong> Crops a fixed-size region from the center of images.</p>
+          <p><strong>What it does:</strong> Crops the central region of input images to a specified target height and width.</p>
           <h3>How it works:</h3>
-          <p>Extracts center region of specified size. Deterministic, not random!</p>
+          <p>The layer calculates the center point of the input image and extracts a rectangular region of the specified dimensions around it. If the target size is larger than the input, the image is padded instead.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Inference time:</strong> After using RandomCrop in training</li>
-            <li><strong>Consistent cropping:</strong> When you want reproducible results</li>
-            <li><strong>Focus on center:</strong> Important objects usually centered</li>
+            <li><strong>Standardizing input sizes:</strong> When you need all images to have the same dimensions for batch processing</li>
+            <li><strong>Focus on central content:</strong> When the main subject is typically centered and edges contain less important information</li>
+            <li><strong>Data augmentation:</strong> As part of preprocessing to create consistent input sizes while preserving the most important image regions</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>height:</strong> Crop height</li>
-            <li><strong>width:</strong> Crop width</li>
+            <li><strong>height:</strong> Target height for the cropped image (integer)</li>
+            <li><strong>width:</strong> Target width for the cropped image (integer)</li>
           </ul>
-          <p><em>💡 Tip: Use during inference with models trained on RandomCrop!</em></p>
+          <p><em>💡 Tip: CenterCrop works best when your dataset has consistently centered subjects - for off-center subjects, consider using RandomCrop during training for better augmentation!</em></p>
         `,
         // More Preprocessing
         'CategoryEncoding': `
           <h2>CategoryEncoding Layer</h2>
-          <p><strong>What it does:</strong> Converts integer category indices to one-hot or multi-hot encodings.</p>
+          <p><strong>What it does:</strong> Converts integer categorical features into one-hot, multi-hot, or count-based dense representations.</p>
           <h3>How it works:</h3>
-          <p>Takes integer inputs (category IDs) and creates binary vectors. Each category becomes a dimension!</p>
+          <p>Takes integer inputs and creates a binary vector where each position represents a category, setting 1s for present categories and 0s elsewhere. For multi-hot encoding, multiple categories can be active simultaneously in a single sample.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Categorical features:</strong> Convert to one-hot encoding</li>
-            <li><strong>Inside model:</strong> Include encoding in model</li>
-            <li><strong>Multi-label:</strong> Multi-hot for multiple categories</li>
+            <li><strong>Categorical data preprocessing:</strong> When you need to convert integer-encoded categories into a format neural networks can process effectively</li>
+            <li><strong>Multi-label classification:</strong> When samples can belong to multiple categories simultaneously (e.g., movie genres, product tags)</li>
+            <li><strong>Text processing:</strong> For converting tokenized text into bag-of-words representations</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>num_tokens:</strong> Total number of categories</li>
-            <li><strong>output_mode:</strong> 'one_hot', 'multi_hot', or 'count'</li>
+            <li><strong>num_tokens:</strong> The total number of unique categories/tokens to encode (defines output vector size)</li>
+            <li><strong>output_mode:</strong> Choose between "one_hot", "multi_hot", or "count" encoding strategies</li>
           </ul>
-          <p><em>💡 Tip: Use one_hot for single categories, multi_hot for multiple!</em></p>
+          <p><em>💡 Tip: Set num_tokens slightly higher than your maximum category value to avoid index errors, and use "multi_hot" mode when processing variable-length sequences or multiple categories per sample!</em></p>
         `,
         'StringLookup': `
           <h2>StringLookup Layer</h2>
-          <p><strong>What it does:</strong> Converts strings to integer indices based on vocabulary.</p>
+          <p><strong>What it does:</strong> Maps strings to integer indices, creating a vocabulary-based encoding for text data.</p>
           <h3>How it works:</h3>
-          <p>Builds vocabulary from training data (via adapt()), then maps strings to integers. Like a dictionary!</p>
+          <p>The layer builds a vocabulary from training data and assigns each unique string a numerical index. During inference, it converts input strings to their corresponding integer indices based on this vocabulary.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Text processing:</strong> Convert words/tokens to integers</li>
-            <li><strong>Categorical features:</strong> String categories to numbers</li>
-            <li><strong>Inside model:</strong> Include lookup in model</li>
+            <li><strong>Text preprocessing:</strong> Converting words or tokens to numerical IDs before feeding them to embedding layers</li>
+            <li><strong>Categorical encoding:</strong> Transforming string-based categorical features into integer indices for neural network processing</li>
+            <li><strong>Vocabulary management:</strong> Creating consistent string-to-integer mappings across training and inference</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>max_tokens:</strong> Maximum vocabulary size</li>
-            <li><strong>vocabulary:</strong> Optional pre-defined vocabulary</li>
-            <li><strong>output_mode:</strong> 'int', 'one_hot', 'multi_hot', or 'count'</li>
+            <li><strong>max_tokens:</strong> Maximum size of the vocabulary (including OOV and mask tokens if used)</li>
+            <li><strong>output_mode:</strong> How to output results - 'int' for integer indices, 'multi_hot', 'count', or 'tf_idf' for vectorized outputs</li>
+            <li><strong>oov_token:</strong> Token to use for out-of-vocabulary strings (default: '[UNK]')</li>
+            <li><strong>vocabulary:</strong> Optional pre-computed vocabulary list to use instead of adapting from data</li>
           </ul>
-          <p><em>💡 Tip: Call adapt(text_data) to build vocabulary! Essential for text models!</em></p>
+          <p><em>💡 Tip: Always call adapt() on your training data before using the layer, or provide a pre-computed vocabulary to ensure consistent encoding!</em></p>
         `,
         'IntegerLookup': `
           <h2>IntegerLookup Layer</h2>
-          <p><strong>What it does:</strong> Converts integers to indices based on vocabulary (remapping).</p>
+          <p><strong>What it does:</strong> Maps integer values to contiguous integer indices, creating a vocabulary-to-index mapping for categorical integer features.</p>
           <h3>How it works:</h3>
-          <p>Maps input integers to consecutive indices. Useful when category IDs are sparse (e.g., 1, 5, 100).</p>
+          <p>The layer builds a vocabulary of unique integer values from your data and assigns each value a unique index starting from 0. Unknown integers encountered during inference are mapped to a special out-of-vocabulary (OOV) index.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Sparse IDs:</strong> Remap to dense indices for embedding</li>
-            <li><strong>Before Embedding:</strong> Convert sparse IDs to 0, 1, 2, ...</li>
-            <li><strong>Categorical integers:</strong> Non-consecutive category IDs</li>
+            <li><strong>Categorical feature encoding:</strong> Convert user IDs, product IDs, or zip codes into dense index representations for embedding layers</li>
+            <li><strong>Vocabulary management:</strong> Limit the number of unique values to handle by setting a maximum vocabulary size</li>
+            <li><strong>Preprocessing pipelines:</strong> Standardize integer inputs before feeding them to embedding or dense layers</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>max_tokens:</strong> Maximum vocabulary size</li>
-            <li><strong>vocabulary:</strong> Optional pre-defined mapping</li>
-            <li><strong>output_mode:</strong> 'int', 'one_hot', 'multi_hot', or 'count'</li>
+            <li><strong>max_tokens:</strong> Maximum number of unique integers to track (including OOV token if used)</li>
+            <li><strong>num_oov_indices:</strong> Number of out-of-vocabulary indices to reserve (default is 1)</li>
+            <li><strong>mask_token:</strong> Integer value to reserve as a mask token for padding sequences</li>
+            <li><strong>output_mode:</strong> How to output results - "int" for indices, "multi_hot", "count", or "tf_idf" for vectorized outputs</li>
           </ul>
-          <p><em>💡 Tip: Use before Embedding when IDs aren't 0, 1, 2, ...!</em></p>
+          <p><em>💡 Tip: Always call adapt() on your training data before using the layer, or provide a pre-computed vocabulary to ensure consistent indexing across training and inference!</em></p>
         `,
         'Hashing': `
           <h2>Hashing Layer</h2>
-          <p><strong>What it does:</strong> Hashes inputs to fixed range using deterministic hash function.</p>
+          <p><strong>What it does:</strong> Maps categorical input values (integers or strings) to a fixed range of integers using a hash function, enabling feature encoding without vocabulary management.</p>
           <h3>How it works:</h3>
-          <p>Applies hash function to convert arbitrary inputs (strings/integers) to fixed range. No vocabulary needed!</p>
+          <p>The layer applies a deterministic hash function to each input value, converting it to an integer between 0 and num_bins-1. This creates a consistent mapping without storing a vocabulary, though different inputs may hash to the same value (hash collisions).</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Large vocabularies:</strong> Too many categories to enumerate</li>
-            <li><strong>No vocabulary building:</strong> Works without adapt()</li>
-            <li><strong>Feature hashing:</strong> Dimensionality reduction trick</li>
+            <li><strong>Large categorical features:</strong> When you have millions of unique categories (like user IDs or product SKUs) that would be memory-intensive to one-hot encode</li>
+            <li><strong>Unknown categories:</strong> When new categories may appear in production that weren't seen during training</li>
+            <li><strong>Feature hashing:</strong> As a dimensionality reduction technique for high-cardinality text features or sparse data</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>num_bins:</strong> Number of hash buckets</li>
-            <li><strong>salt:</strong> Optional salt for hash function</li>
+            <li><strong>num_bins:</strong> Number of hash bins (output dimension) - controls the trade-off between memory usage and collision rate</li>
+            <li><strong>mask_value:</strong> Optional value to be masked/ignored in the input (useful for padding)</li>
+            <li><strong>salt:</strong> Random seed for the hash function to create different hash spaces if needed</li>
           </ul>
-          <p><em>💡 Tip: Fast but can have collisions. Use when vocabulary is huge!</em></p>
+          <p><em>💡 Tip: Set num_bins to be 2-10x the number of unique categories you expect to minimize collisions while keeping memory usage reasonable!</em></p>
         `,
         'Discretization': `
           <h2>Discretization Layer</h2>
-          <p><strong>What it does:</strong> Bins continuous numerical features into discrete categories.</p>
+          <p><strong>What it does:</strong> Converts continuous numerical features into categorical bins (buckets), transforming floating-point values into discrete integer indices.</p>
           <h3>How it works:</h3>
-          <p>Divides continuous range into bins. Each value gets assigned to a bin index. Like histogram binning!</p>
+          <p>The layer divides the continuous input range into specified bins using predefined boundaries or quantiles. Each input value is then mapped to the index of the bin it falls into, effectively converting continuous data into categorical representations.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Continuous to categorical:</strong> Convert numbers to bins</li>
-            <li><strong>Decision trees in NNs:</strong> Discretize features</li>
-            <li><strong>Embedding continuous:</strong> Bin then embed</li>
+            <li><strong>Feature engineering for tabular data:</strong> When you need to convert continuous features like age or income into categorical groups for better model interpretability</li>
+            <li><strong>Handling non-linear relationships:</strong> When the relationship between a continuous feature and target is non-linear and can be better captured through binning</li>
+            <li><strong>Reducing noise in continuous features:</strong> When precise values are less important than the range they fall into, such as grouping temperatures into "cold", "mild", "hot"</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>bin_boundaries:</strong> Edges of bins (or use adapt())</li>
-            <li><strong>num_bins:</strong> How many bins to create</li>
+            <li><strong>bin_boundaries:</strong> A list of boundary values that define the edges of each bin (e.g., [0, 10, 20, 30] creates 4 bins)</li>
+            <li><strong>num_bins:</strong> Alternative to bin_boundaries - automatically creates this many equal-width bins based on the data range</li>
+            <li><strong>output_mode:</strong> How to represent the output - "int" for integer indices, "one_hot" for one-hot encoded vectors, or "multi_hot" for multi-hot encoding</li>
           </ul>
-          <p><em>💡 Tip: Call adapt() to learn bins from data! Useful for embeddings!</em></p>
+          <p><em>💡 Tip: Use adapt() method on your training data to automatically compute optimal bin boundaries based on quantiles, ensuring balanced distribution across bins!</em></p>
         `,
         'TextVectorization': `
           <h2>TextVectorization Layer</h2>
-          <p><strong>What it does:</strong> Converts text strings to sequences of integers or bag-of-words.</p>
+          <p><strong>What it does:</strong> Converts raw text strings into integer sequences or dense token representations that neural networks can process.</p>
           <h3>How it works:</h3>
-          <p>Tokenizes text, builds vocabulary, and converts to integers. All-in-one text preprocessing!</p>
+          <p>The layer tokenizes text into words or subwords, builds a vocabulary from the training data, and maps each token to a unique integer index. It can output either integer sequences or multi-hot/count/tf-idf encoded vectors.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>NLP tasks:</strong> Text classification, sentiment analysis</li>
-            <li><strong>Complete pipeline:</strong> Raw text to model-ready format</li>
-            <li><strong>Inside model:</strong> Include text processing in model</li>
+            <li><strong>Text classification:</strong> Convert movie reviews, emails, or documents into numerical format for sentiment analysis or categorization</li>
+            <li><strong>Preprocessing for NLP models:</strong> Prepare text data as input for LSTM, GRU, or transformer-based models</li>
+            <li><strong>Feature extraction:</strong> Transform text into bag-of-words or TF-IDF representations for traditional ML algorithms</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>max_tokens:</strong> Vocabulary size</li>
-            <li><strong>output_mode:</strong> 'int' (sequences), 'multi_hot', 'count', or 'tf_idf'</li>
-            <li><strong>output_sequence_length:</strong> Pad/truncate to this length</li>
+            <li><strong>max_tokens:</strong> Maximum vocabulary size - limits the number of unique words to track (default: None)</li>
+            <li><strong>output_mode:</strong> Format of output - 'int' for integer sequences, 'multi_hot' for binary vectors, 'count' for word counts, or 'tf_idf'</li>
+            <li><strong>output_sequence_length:</strong> Fixed length for output sequences - pads or truncates to this length (only for 'int' mode)</li>
+            <li><strong>standardize:</strong> Text preprocessing function - lowercase and remove punctuation by default (can be customized or disabled)</li>
           </ul>
-          <p><em>💡 Tip: Super powerful! Call adapt(text_data) to build vocabulary. One layer does it all!</em></p>
+          <p><em>💡 Tip: Always adapt the layer to your training data using .adapt(text_data) before training - this builds the vocabulary and must be done only once on your training set!</em></p>
         `,
         // More Normalization
         'UnitNormalization': `
           <h2>UnitNormalization Layer</h2>
-          <p><strong>What it does:</strong> Normalizes vectors to have unit norm (length 1).</p>
+          <p><strong>What it does:</strong> Normalizes input vectors to have unit norm (length of 1) along a specified axis.</p>
           <h3>How it works:</h3>
-          <p>Divides each vector by its L2 norm. Makes all vectors the same length!</p>
+          <p>The layer divides each input vector by its L2 norm (Euclidean length), ensuring all output vectors have a magnitude of 1. This preserves the direction of vectors while standardizing their length.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Cosine similarity:</strong> Prepare for similarity comparisons</li>
-            <li><strong>Embeddings:</strong> Normalize embedding vectors</li>
-            <li><strong>Feature normalization:</strong> When direction matters more than magnitude</li>
+            <li><strong>Similarity learning:</strong> Essential for models that compute cosine similarity between embeddings, like face recognition or recommendation systems</li>
+            <li><strong>Feature normalization:</strong> When you want to compare features based on their direction rather than magnitude</li>
+            <li><strong>Embedding models:</strong> Commonly used as the final layer in embedding networks to create normalized representations</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>axis:</strong> Which axis to normalize (typically -1)</li>
+            <li><strong>axis:</strong> Integer or list of integers specifying which axis to normalize along (default: -1 for last axis)</li>
+            <li><strong>epsilon:</strong> Small value added to denominator to avoid division by zero (default: 1e-7)</li>
           </ul>
-          <p><em>💡 Tip: Great for metric learning and similarity tasks!</em></p>
+          <p><em>💡 Tip: Place UnitNormalization after your final embedding layer when building similarity-based models - it makes distance metrics like cosine similarity much more effective!</em></p>
         `,
         'GroupNormalization': `
           <h2>GroupNormalization Layer</h2>
-          <p><strong>What it does:</strong> Normalizes groups of channels together - middle ground between LayerNorm and BatchNorm.</p>
+          <p><strong>What it does:</strong> Normalizes the inputs by dividing channels into groups and computing mean and variance for normalization within each group.</p>
           <h3>How it works:</h3>
-          <p>Divides channels into groups and normalizes within each group. Independent of batch size!</p>
+          <p>The layer splits channels into a specified number of groups and normalizes the features within each group independently. This provides a balance between BatchNorm (which normalizes across the batch) and LayerNorm (which normalizes across all channels).</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Small batches:</strong> Works better than BatchNorm with small batches</li>
-            <li><strong>Computer vision:</strong> Increasingly popular for CNNs</li>
-            <li><strong>Alternative to BatchNorm:</strong> When batch size varies</li>
+            <li><strong>Small batch sizes:</strong> When training with small batches where BatchNorm performs poorly due to inaccurate batch statistics</li>
+            <li><strong>Vision transformers:</strong> Commonly used in transformer-based vision models as an alternative to LayerNorm</li>
+            <li><strong>Transfer learning:</strong> When fine-tuning models with different batch sizes than originally trained</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>groups:</strong> Number of groups to divide channels into</li>
-            <li><strong>axis:</strong> Channel axis (typically -1)</li>
+            <li><strong>groups:</strong> Number of groups to divide channels into (default: 32)</li>
+            <li><strong>axis:</strong> Integer, the axis along which to normalize (typically -1 for channels-last)</li>
+            <li><strong>epsilon:</strong> Small float added to variance to avoid division by zero (default: 1e-3)</li>
+            <li><strong>center:</strong> If True, add learnable beta offset (default: True)</li>
           </ul>
-          <p><em>💡 Tip: Use 32 groups as default. Works great for object detection!</em></p>
+          <p><em>💡 Tip: Start with groups=32 for most CNNs, but for models with fewer channels, ensure groups divides evenly into your channel count!</em></p>
         `,
         // Image Processing
         'Resizing': `
           <h2>Resizing Layer</h2>
-          <p><strong>What it does:</strong> Resizes images to a target size.</p>
+          <p><strong>What it does:</strong> Resizes input images to a specified target height and width using various interpolation methods.</p>
           <h3>How it works:</h3>
-          <p>Resizes all images to specified height and width. Uses interpolation for quality!</p>
+          <p>The layer scales images up or down to match the target dimensions using interpolation algorithms like bilinear or nearest neighbor. It preserves the number of channels while changing only the spatial dimensions.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Variable-size inputs:</strong> Make all images same size</li>
-            <li><strong>Inside model:</strong> Include resizing in model for deployment</li>
-            <li><strong>Preprocessing:</strong> First layer of image models</li>
+            <li><strong>Standardizing input sizes:</strong> When your dataset contains images of different sizes but your model requires fixed dimensions</li>
+            <li><strong>Data augmentation:</strong> To create multi-scale training by randomly resizing images during training</li>
+            <li><strong>Model optimization:</strong> To reduce computational cost by downscaling high-resolution images before processing</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>height:</strong> Target height</li>
-            <li><strong>width:</strong> Target width</li>
-            <li><strong>interpolation:</strong> 'bilinear' (default), 'nearest', 'bicubic', etc.</li>
+            <li><strong>height:</strong> Target height in pixels for the output image</li>
+            <li><strong>width:</strong> Target width in pixels for the output image</li>
+            <li><strong>interpolation:</strong> Resizing method ('bilinear', 'nearest', 'bicubic', 'lanczos3', or 'lanczos5')</li>
+            <li><strong>crop_to_aspect_ratio:</strong> If True, crops the image to match the target aspect ratio before resizing</li>
           </ul>
-          <p><em>💡 Tip: Put this first in your model to handle any input size!</em></p>
+          <p><em>💡 Tip: Use 'bilinear' interpolation for smooth results in most cases, but switch to 'nearest' when resizing masks or categorical labels to preserve exact values!</em></p>
         `,
       };
 
