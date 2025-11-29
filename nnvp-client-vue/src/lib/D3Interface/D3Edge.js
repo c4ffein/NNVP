@@ -2,7 +2,10 @@
 
 import * as d3 from 'd3';
 import D3GraphValidation from './D3GraphValidation';
-import jsonKeras from '../KerasInterface/generatedKerasLayers.json'
+import jsonKerasFile from '../KerasInterface/generatedKerasLayers.json'
+
+// Extract layers from the new nested format (supports both old flat and new nested)
+const jsonKeras = jsonKerasFile.layers || jsonKerasFile;
 
 /**
  * Constructor of an edge

@@ -1,3 +1,72 @@
+<!--
+  TODO: Add the following layers to generatedKerasLayers.json
+  These layers are already documented below but not yet available in the app:
+
+  RECURRENT:
+    - LSTM
+    - GRU
+    - SimpleRNN
+    - Bidirectional
+    - ConvLSTM2D
+
+  NORMALIZATION:
+    - BatchNormalization
+    - LayerNormalization
+    - GroupNormalization
+    - Normalization
+    - UnitNormalization
+
+  ATTENTION:
+    - Attention
+    - AdditiveAttention
+    - MultiHeadAttention
+
+  ACTIVATIONS:
+    - LeakyReLU
+    - PReLU
+    - ELU
+    - ThresholdedReLU
+    - Softmax
+
+  CONVOLUTION VARIANTS:
+    - DepthwiseConv2D
+    - Conv1DTranspose
+    - Conv3DTranspose
+
+  DROPOUT/REGULARIZATION:
+    - AlphaDropout
+    - GaussianDropout
+    - GaussianNoise
+    - SpatialDropout1D
+    - SpatialDropout2D
+    - SpatialDropout3D
+
+  PREPROCESSING:
+    - Rescaling
+    - Resizing
+    - Discretization
+    - TextVectorization
+    - CategoryEncoding
+    - StringLookup
+    - IntegerLookup
+    - Hashing
+
+  DATA AUGMENTATION:
+    - RandomFlip
+    - RandomRotation
+    - RandomZoom
+    - RandomTranslation
+    - RandomContrast
+    - RandomBrightness
+    - RandomHeight
+    - RandomWidth
+    - RandomCrop
+    - CenterCrop
+
+  OTHER:
+    - Embedding
+    - TimeDistributed
+-->
 <template>
   <div class="ParamsBlock">
     <div class="ParamsBlock layer-title" @click="toggleLayer()">
@@ -690,6 +759,42 @@ export default {
             <li><strong>keepdims:</strong> Boolean, whether to keep the temporal dimension with size 1 (default: False)</li>
           </ul>
           <p><em>💡 Tip: GlobalAveragePooling1D is excellent for preventing overfitting compared to Flatten() as it reduces parameters while maintaining feature relationships - particularly useful before Dense layers in classification tasks!</em></p>
+        `,
+        'GlobalMaxPooling3D': `
+          <h2>GlobalMaxPooling3D Layer</h2>
+          <p><strong>What it does:</strong> Reduces 3D spatial data (depth, height, width) to a single vector by taking the maximum value across all spatial dimensions for each feature channel.</p>
+          <h3>How it works:</h3>
+          <p>For each feature map in the input volume, it finds the maximum value across all spatial locations (depth × height × width), outputting one value per channel. This transforms a 5D tensor (batch, depth, height, width, channels) into a 2D tensor (batch, channels).</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>3D medical image classification:</strong> Extract the most prominent features from CT scans or MRI volumes before the final classification layers</li>
+            <li><strong>Video analysis:</strong> Summarize spatiotemporal features when frames are treated as depth dimension</li>
+            <li><strong>Reducing parameters before dense layers:</strong> Convert 3D feature maps to fixed-size vectors regardless of input spatial dimensions</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>data_format:</strong> Either "channels_last" (default) or "channels_first" - determines the ordering of dimensions in the input</li>
+            <li><strong>keepdims:</strong> Boolean, whether to keep spatial dimensions as size 1 or remove them entirely (default: False)</li>
+          </ul>
+          <p><em>💡 Tip: GlobalMaxPooling3D is excellent for creating translation-invariant features and works well as an alternative to Flatten() before dense layers, significantly reducing parameters while preserving the strongest activations!</em></p>
+        `,
+        'GlobalAveragePooling3D': `
+          <h2>GlobalAveragePooling3D Layer</h2>
+          <p><strong>What it does:</strong> Computes the average value across all spatial dimensions (depth, height, width) for each feature channel, converting 3D feature maps into a 1D vector.</p>
+          <h3>How it works:</h3>
+          <p>For each channel in the input volume, it calculates the mean of all values across the depth, height, and width dimensions. This reduces a 5D input tensor (batch, depth, height, width, channels) to a 2D output (batch, channels).</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>3D medical image classification:</strong> Reduces volumetric features from CT or MRI scans before the final classification layer</li>
+            <li><strong>Video understanding tasks:</strong> Aggregates spatiotemporal features when frames are treated as depth dimension</li>
+            <li><strong>Reducing parameters before dense layers:</strong> Alternative to flattening that preserves channel information while drastically reducing dimensionality</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>data_format:</strong> Either 'channels_last' (default) or 'channels_first' to specify input dimension ordering</li>
+            <li><strong>keepdims:</strong> Boolean, whether to keep the spatial dimensions as length 1 (default: False)</li>
+          </ul>
+          <p><em>💡 Tip: GlobalAveragePooling3D is excellent for reducing overfitting compared to Flatten layers, as it forces the network to be more confident about spatial feature locations throughout the entire volume!</em></p>
         `,
         // More Merge
         'Subtract': `

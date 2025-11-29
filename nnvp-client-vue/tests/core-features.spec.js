@@ -318,7 +318,7 @@ test.describe('NNVP Core Features', () => {
     // Check content against golden master
     const path = await download.path();
     const content = fs.readFileSync(path, 'utf-8');
-    const expectedPython = `from tensorflow import keras
+    const expectedPython = `import keras
 
 def build_model():
     model = keras.models.Sequential()

@@ -8,7 +8,10 @@ import D3LayerComponent from './D3LayerComponent';
 import D3LayerComposite from './D3LayerComposite';
 import D3GraphValidation from './D3GraphValidation';
 import KerasLayer from '../KerasInterface/KerasLayer';
-import jsonKeras from '../KerasInterface/generatedKerasLayers.json'
+import jsonKerasFile from '../KerasInterface/generatedKerasLayers.json'
+
+// Extract layers from the new nested format (supports both old flat and new nested)
+const jsonKeras = jsonKerasFile.layers || jsonKerasFile;
 
 // Handle radius constants
 const HANDLE_RADIUS_DEFAULT = 1.4;
@@ -607,7 +610,8 @@ D3Layer.prototype.mouseOver = function (graph) {
           let badOutput = jsonKeras[thisLayer.observers[0].source.kerasLayer.name].output.shape;
           let className = d3.select("g#"+edge.id).select("path").attr("class");
           if(className.indexOf("linkError") >= 0){
-            if (jsonKeras[thisLayer.kerasLayer.name].input.shape !== undefined && jsonKeras[thisLayer.kerasLayer.name].output.shape !== undefined) {
+            const targetLayerDef = jsonKeras[thisLayer.kerasLayer.name];
+            if (targetLayerDef && targetLayerDef.input && targetLayerDef.input.shape !== undefined && targetLayerDef.output && targetLayerDef.output.shape !== undefined) {
               // D3Layer.tip
               //   .html(function () {
               //   return "<strong> Bad Input, should be :</strong> <span style='color:red'>" + jsonKeras[thisLayer.kerasLayer.name].input.shape + "</span>"+"<br>"+

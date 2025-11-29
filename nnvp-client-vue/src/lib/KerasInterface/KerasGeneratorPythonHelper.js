@@ -143,7 +143,7 @@ export default class KerasGeneratorPythonHelper {
   }
 
   generateFunctional() {
-    let rs = 'from tensorflow import keras\n';
+    let rs = 'import keras\n';
     rs += '\n';
     rs += 'def build_model():\n';
     this.list.forEach((node) => {
@@ -158,7 +158,7 @@ export default class KerasGeneratorPythonHelper {
   }
 
   generateSequential() {
-    let rs = 'from tensorflow import keras\n';
+    let rs = 'import keras\n';
     rs += '\n';
     rs += 'def build_model():\n';
     rs += '    model = keras.models.Sequential()\n';

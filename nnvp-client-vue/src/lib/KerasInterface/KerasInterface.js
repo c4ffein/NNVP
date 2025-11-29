@@ -27,14 +27,19 @@ export default class {
   }
 
   load(json) {
-    const layerNames = Object.keys(json);
+    // Support both old flat format and new nested format {aliasToCanonical, layers}
+    const layersData = json.layers || json;
+    this.aliasToCanonical = json.aliasToCanonical || {};
+
+    const layerNames = Object.keys(layersData);
     for (let i = 0; i < layerNames.length; i += 1) {
       const layerName = layerNames[i];
-      const layerParameters = json[layerName].parameters;
-      const layer = new KerasLayer(layerName, json[layerName].category);
+      const layerData = layersData[layerName];
+      const layerParameters = layerData.parameters;
+      const layer = new KerasLayer(layerName, layerData.category);
       const layerParametersIndex = Object.keys(layerParameters);
       if (layer.category === 'Merge') {
-        layer.addParameterDef('input_order', json[layerName].input);
+        layer.addParameterDef('input_order', layerData.input);
       }
       for (let j = 0; j < layerParametersIndex.length; j += 1) {
         const layerParameterName = layerParametersIndex[j];
@@ -43,10 +48,10 @@ export default class {
       }
 
       this.layerList[layerName] = layer;
-      if (!(json[layerName].category in this.categories)) {
-        this.categories[json[layerName].category] = {};
+      if (!(layerData.category in this.categories)) {
+        this.categories[layerData.category] = {};
       }
-      this.categories[json[layerName].category][layerName] = layer;
+      this.categories[layerData.category][layerName] = layer;
     }
   }
 

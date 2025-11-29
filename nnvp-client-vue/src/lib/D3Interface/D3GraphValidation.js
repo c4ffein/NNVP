@@ -1,7 +1,10 @@
 /* eslint-disable */
 
 import * as d3 from 'd3'
-import jsonKeras from '../KerasInterface/generatedKerasLayers.json'
+import jsonKerasFile from '../KerasInterface/generatedKerasLayers.json'
+
+// Extract layers from the new nested format (supports both old flat and new nested)
+const jsonKeras = jsonKerasFile.layers || jsonKerasFile;
 
 export default function D3GraphValidation () {};
 
@@ -47,10 +50,14 @@ D3GraphValidation.kerasError = function (graph, edge) {
   if (edge.source.class !== "D3Layer" || edge.target.class !== "D3Layer" ) {
     return;
   }
-  if (!(jsonKeras[edge.source.kerasLayer.name] && jsonKeras[edge.source.kerasLayer.name].output && jsonKeras[edge.source.kerasLayer.name].output.shape))
+  const sourceLayer = jsonKeras[edge.source.kerasLayer.name];
+  const targetLayer = jsonKeras[edge.target.kerasLayer.name];
+  if (!(sourceLayer && sourceLayer.output && sourceLayer.output.shape))
     return;
-  let from = jsonKeras[edge.source.kerasLayer.name].output.shape,
-      to = jsonKeras[edge.target.kerasLayer.name].input.shape;
+  if (!(targetLayer && targetLayer.input && targetLayer.input.shape))
+    return;
+  let from = sourceLayer.output.shape,
+      to = targetLayer.input.shape;
   if((from !== undefined) && (to !== undefined) && (from !== "Arbitrary") && (to !== "Arbitrary") ){
     if(from.length === 1 && to.length === 1){
       return from !== to;
