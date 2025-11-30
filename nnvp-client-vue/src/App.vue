@@ -1,12 +1,12 @@
 <template>
   <div id="canvas-background" class="canvas-background">
-    <WhiteBoard/>
+    <WhiteBoard :isTraining="isTraining"/>
   </div>
   <div id="generalMenu" class="floating-panel general-menu"><GeneralMenu @open-trainer="openTrainer" @open-about="openAboutModal"/></div>
   <div id="layerCatalog" class="floating-panel layer-catalog"><LayerCatalog/></div>
   <div id="layerOptions" class="floating-panel layer-options"><LayerOptions msg="NNVP"/></div>
   <div id="trainingZone" class="floating-panel training-zone" v-if="trainerHeight > 0" v-bind:style="{height: trainerHeight+'vh'}">
-    <TrainingZone @close-trainer="closeTrainer" :trainingZoneSize="trainerHeight"/>
+    <TrainingZone @close-trainer="closeTrainer" :trainingZoneSize="trainerHeight" @training-started="isTraining = true" @training-stopped="isTraining = false"/>
   </div>
   <AboutModal :show="showAboutModal" @close="closeAboutModal"/>
 </template>
@@ -50,6 +50,7 @@ export default {
       trainerHeight: 0,
       trainerOpenHeight: 50,
       showAboutModal: false,
+      isTraining: false,
     };
   },
   mounted() {

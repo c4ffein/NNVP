@@ -2,6 +2,11 @@
   <div id="WhiteBoard">
     <input type="file" id="hidden-file-upload">
     <div id="svgWrapper"></div>
+    <!-- Training indicator -->
+    <div v-if="isTraining" class="training-indicator" data-testid="training-indicator">
+      <div class="spinner"></div>
+      <span>Training...</span>
+    </div>
   </div>
 </template>
 
@@ -13,6 +18,12 @@ import D3GraphEditor from "../lib/D3Interface/D3GraphEditor";
 
 export default {
   name: "WhiteBoard",
+  props: {
+    isTraining: {
+      type: Boolean,
+      default: false
+    }
+  },
   mounted() {
     let svg = d3.select("#svgWrapper").append("svg");
     let whiteboard = this.$d3Interface;
@@ -161,5 +172,38 @@ path.link.hidden {
   margin: -1px 0 0 0;
   top: 100%;
   left: 0;
+}
+
+/* Training indicator */
+.training-indicator {
+  position: absolute;
+  top: 60px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: rgba(76, 175, 80, 0.95);
+  color: white;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 50;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

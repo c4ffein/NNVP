@@ -1842,46 +1842,23 @@ def build_model():
     // Click it with force to ensure it registers
     await trainButton.click({ force: true });
     console.log('Clicked Train button');
-    // Wait for either training to start or an alert
-    await page.waitForTimeout(30);
+    // Wait for training indicator to appear
+    console.log('Waiting for training to start...');
+    await page.waitForSelector('[data-testid="training-indicator"]', { timeout: 10000 });
+    console.log('Training started (indicator visible)');
     // Check if we got any alerts
     if (alerts.length > 0) {
       console.log('Alerts received:', alerts);
     }
-    // Try to find Stop button (now says "■ Stop Training")
-    let stopButton = await page.$('.train-button.is-training');
-    console.log('Stop button found after click:', stopButton !== null);
-    if (!stopButton) {
-      // Wait a bit more in case training is slow to start
-      console.log('Waiting for training to start...');
-      await page.waitForTimeout(50);
-      stopButton = await page.$('.train-button.is-training');
-      console.log('Stop button found after wait:', stopButton !== null);
-      if (!stopButton) {
-        // Debug: Check current train button text
-        const currentTrainButton = await page.$('.train-button');
-        if (currentTrainButton) {
-          const text = await currentTrainButton.textContent();
-          console.log('Current train button text:', text);
-        }
-        // Print last 20 console messages to see what happened
-        console.log('\nLast 20 browser console messages:');
-        const lastMessages = consoleMessages.slice(-20);
-        lastMessages.forEach((msg, i) => {
-          console.log(`  ${i}: ${msg}`);
-        });
-      }
-    }
-    console.log('Training started');
     // Verify Charts tab is active (automatically switches during training)
     const chartsPanel = await page.$('#Charts');
     expect(chartsPanel).not.toBeNull();
     console.log('Charts panel is active');
-    // Wait for training to complete (button changes back to "Start Training")
+    // Wait for training to complete (indicator disappears)
     // With 2 epochs and 500 training samples, this should take ~30-60 seconds
     console.log('Waiting for training to complete...');
-    await page.waitForSelector('.train-button:not(.is-training)', { timeout: 120000 }); // 2 minute timeout
-    console.log('Training completed (Start Training button visible again)');
+    await page.waitForSelector('[data-testid="training-indicator"]', { state: 'detached', timeout: 120000 }); // 2 minute timeout
+    console.log('Training completed (indicator gone)');
     // Verify that charts are visible (using SVG-based LineChart components)
     const svgElements = await page.$$('svg.line-chart-svg');
     expect(svgElements.length).toBe(2); // Batch and Epoch charts

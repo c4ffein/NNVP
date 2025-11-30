@@ -122,9 +122,11 @@ export default {
       // Wait for Charts component to mount
       await this.$nextTick();
       this.isTraining = true;
+      this.$emit('training-started');
       await this.startTraining();
       this.cancelRequested = false;
       this.isTraining = false;
+      this.$emit('training-stopped');
     },
     changeSelectedOptimizer(value) {
       this.selectedOptimizer = value;
