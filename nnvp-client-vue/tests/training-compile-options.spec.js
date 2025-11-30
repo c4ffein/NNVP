@@ -294,7 +294,7 @@ test.describe('Training Compile Options', () => {
     });
     // Click Train button to trigger compilation AND training
     console.log('Clicking Train button to trigger training...');
-    const trainButton = await page.$('.TrainingZone.bar-button:has-text("Train")');
+    const trainButton = await page.$('.train-button');
     await trainButton.click();
     // Poll for compiled model config AND training start message (check every 0.5s, timeout after 10s)
     console.log('Polling for compiled model config and training start (checking every 0.5s, max 10s)...');

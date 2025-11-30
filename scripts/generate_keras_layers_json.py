@@ -15,7 +15,43 @@ Keras 3 is a multi-backend deep learning framework that works with
 TensorFlow, PyTorch, or JAX.
 
 Usage:
-    uv run scripts/generate_keras_layers_json.py > nnvp-client-vue/src/lib/KerasInterface/generatedKerasLayers.json
+    make generate-layers
+    # or manually:
+    uv run scripts/generate_keras_layers_json.py 2>/dev/null > nnvp-client-vue/src/lib/KerasInterface/generatedKerasLayers.json
+
+JSON Structure:
+    {
+        "aliasToCanonical": {
+            "Convolution2D": "Conv2D",    // Maps alias names to canonical names
+            ...
+        },
+        "layers": {
+            "LayerName": {
+                "category": "Core",           // UI category for grouping
+                "preferredName": "LayerName", // Name used in code generation
+                "parameters": {
+                    "param_name": {
+                        "type": "int|float|boolean|string|tuple_int|list",
+                        "default": <value>    // Optional, only if has default
+                    }
+                },
+                "input": {"shape": "Arbitrary"},
+                "output": {"shape": ["Arbitrary"]},
+                "aliases": ["AltName1", ...]  // Optional, only if has aliases
+            }
+        }
+    }
+
+Customization:
+    - LAYER_CATEGORIES: Maps layer names to UI categories. Layers not listed
+      default to "Other". Categories starting with "_" are skipped.
+    - PREFERRED_NAMES: List of canonical names to prefer over aliases when
+      the same class has multiple names (e.g., Conv2D vs Convolution2D).
+    - KNOWN_INT_PARAMS, KNOWN_FLOAT_PARAMS, KNOWN_TUPLE_PARAMS: Fallback type
+      detection for parameters without type annotations or defaults.
+
+Special layers:
+    - Input/Output: Added manually as NNVP-specific layers (not standard Keras).
 """
 
 import inspect

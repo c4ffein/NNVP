@@ -1,4 +1,4 @@
-.PHONY: help test test-e2e test-unit run-docker install dev front-lint front-lint-fix
+.PHONY: help test test-e2e test-unit run-docker install dev front-lint front-lint-fix generate-layers generate-layer-docs
 
 # Default target - show help
 help:
@@ -17,6 +17,10 @@ help:
 	@echo "  make front-lint      - Run oxlint on front-end code"
 	@echo "  make front-lint-fix  - Run oxlint and auto-fix issues"
 	@echo "  make run-docker      - Run the application using Docker Compose"
+	@echo ""
+	@echo "Scripts:"
+	@echo "  make generate-layers          - Regenerate Keras layers JSON from Python introspection"
+	@echo "  make generate-layer-docs LAYER=Dense - Generate HTML documentation for a layer (uses AI)"
 
 # Install dependencies
 install:
@@ -60,3 +64,15 @@ front-lint:
 # Run front-end linter with auto-fix
 front-lint-fix:
 	cd nnvp-client-vue && npm run lint:fix
+
+# Regenerate Keras layers JSON by introspecting the Keras library
+generate-layers:
+	uv run scripts/generate_keras_layers_json.py 2>/dev/null > nnvp-client-vue/src/lib/KerasInterface/generatedKerasLayers.json
+
+# Generate HTML documentation for a single layer using AI
+# Usage: make generate-layer-docs LAYER=Dense
+generate-layer-docs:
+ifndef LAYER
+	$(error LAYER is required. Usage: make generate-layer-docs LAYER=Dense)
+endif
+	scripts/generate_layer_documentation $(LAYER)

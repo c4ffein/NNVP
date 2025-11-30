@@ -10,9 +10,6 @@
       <div class="TrainingZone bar-button" v-on:click="chartsClicked">
         Charts
       </div>
-      <div class="TrainingZone bar-button" v-on:click="trainClicked">
-        {{isTraining ? 'Stop' : 'Train'}}
-      </div>
       <div id="button-close-trainer" v-on:click="$emit('close-trainer')">╳</div>
     </div>
     <div id="training-zone-selector">
@@ -34,6 +31,8 @@
           @changeSelectedLoss="changeSelectedLoss"
           v-bind:epochs="epochs"
           @changeEpochs="changeEpochs"
+          v-bind:isTraining="isTraining"
+          @trainClicked="trainClicked"
           v-bind:loadDataset="loadDataset"
           v-bind:getDatasets="getDatasets"
           v-bind:getWarningMessage="getWarningMessage"

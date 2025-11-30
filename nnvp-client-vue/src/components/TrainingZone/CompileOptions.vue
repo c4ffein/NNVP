@@ -99,6 +99,17 @@
 
     </div>
 
+    <!-- Train Button -->
+    <div class="train-button-container">
+      <button
+        class="train-button"
+        :class="{ 'is-training': isTraining }"
+        @click="$emit('trainClicked')"
+      >
+        {{ isTraining ? '■ Stop Training' : '▶ Start Training' }}
+      </button>
+    </div>
+
     <!-- Help Modal - Teleported to body to escape stacking context -->
     <Teleport to="body">
       <div v-if="activeModal" class="help-modal-overlay" @click="closeModal">
@@ -266,6 +277,7 @@ export default {
     'selectedLoss',
     'selectableLosses',
     'epochs',
+    'isTraining',
   ],
   data() {
     return {
@@ -637,5 +649,42 @@ export default {
 
 #CompileOptions::-webkit-scrollbar-thumb:hover {
   background: #aaa;
+}
+
+/* Train Button */
+.train-button-container {
+  padding: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+.train-button {
+  padding: 12px 32px;
+  font-size: 16px;
+  font-family: var(--font-medium);
+  font-weight: var(--font-weight-medium);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: #4CAF50;
+  color: white;
+}
+
+.train-button:hover {
+  background: #43A047;
+  transform: translateY(-1px);
+}
+
+.train-button:active {
+  transform: translateY(0);
+}
+
+.train-button.is-training {
+  background: #f44336;
+}
+
+.train-button.is-training:hover {
+  background: #e53935;
 }
 </style>
