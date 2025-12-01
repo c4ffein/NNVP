@@ -342,22 +342,22 @@ export default {
   display: table;
   table-layout: fixed;
   grid-rows: 1/2;
-  border-bottom: 1px solid rgba(100, 100, 100, 0.3);
-  background-color: rgba(100, 100, 100, 0.2);
+  border-bottom: 1px solid #000000;
+  background-color: #ffffff;
   width: 100%;
 }
 #trainer-bar > * {
-  background-color: rgba(100, 100, 100, 0);
+  background-color: transparent;
 }
 #trainer-bar > *:hover {
-  background-color: rgba(100, 100, 100, 0.1);
+  background-color: rgba(0, 0, 0, 0.1);
 }
 .TrainingZone.bar-button{
   display: table-cell;
   height: 100%;
   border-radius: 0;
   border: none;
-  border-right: 1px solid rgba(100, 100, 100, 0.3);
+  border-right: 1px solid #000000;
   line-height: 24px; /* Vertical align text*/
 }
 #button-close-trainer{
