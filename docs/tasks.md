@@ -12,6 +12,10 @@ But if you read this and you want to get involved, you can actually create one f
 - [ ] More modern / bold but still minimalistic theme
   - [x] v0 new theme
   - [x] Adapt existing tests
+  - [ ] v0.1 new theme
+    - [ ] Loading - list of blocks growing from bottom to top, starting when reached, smoother than current solution
+    - [ ] Left menu - separate blocks scrolling separately, search always present
+    - [ ] Bottom menu - redo everythin to be cleaner
   - [ ] Comprehensive manual testing to find potential regressions => add more tests + fix
   - [ ] List last small improvements
 
