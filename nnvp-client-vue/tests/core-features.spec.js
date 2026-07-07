@@ -446,6 +446,46 @@ def build_model():
     expect(consoleErrors.length).toBe(0);
   });
 
+  test('should return the right panel to empty selection when deselecting a layer', async ({ page }) => {
+    // Add a Dense layer and select it
+    const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
+    await denseLayer.click();
+    await page.waitForTimeout(50);
+    const layerOnCanvas = await page.$('.d3Layer');
+    await layerOnCanvas.click({ force: true });
+    await page.waitForTimeout(50);
+
+    // While selected: the params block is shown and the empty "Network Overview" is not
+    const selectedBefore = await layerOnCanvas.evaluate(el => el.classList.contains('selected'));
+    const blockBefore = await page.$('#layeroptions-block');
+    const overviewBefore = await page.$('.network-stats');
+    console.log('\n=== DESELECT TEST ===');
+    console.log('selected before deselect:', selectedBefore);
+    console.log('params block shown before:', blockBefore !== null);
+    console.log('overview shown before:', overviewBefore !== null);
+    expect(selectedBefore).toBe(true);
+    expect(blockBefore).not.toBeNull();
+    expect(overviewBefore).toBeNull();
+
+    // Deselect by clicking empty canvas below the node — clear of the floating
+    // side/top panels (which would otherwise intercept the click).
+    const nodeBox = await layerOnCanvas.boundingBox();
+    await page.mouse.click(nodeBox.x + nodeBox.width / 2, nodeBox.y + nodeBox.height + 200);
+    await page.waitForTimeout(50);
+
+    // The right panel must return to the empty selection state (Network Overview)
+    const selectedAfter = await layerOnCanvas.evaluate(el => el.classList.contains('selected'));
+    const blockAfter = await page.$('#layeroptions-block');
+    const overviewAfter = await page.$('.network-stats');
+    console.log('selected after deselect:', selectedAfter);
+    console.log('params block shown after:', blockAfter !== null);
+    console.log('overview shown after:', overviewAfter !== null);
+    expect(selectedAfter).toBe(false);
+    expect(blockAfter).toBeNull();
+    expect(overviewAfter).not.toBeNull();
+    expect(consoleErrors.length).toBe(0);
+  });
+
   test('should support undo operations', async ({ page }) => {
     // Add two layers
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
