@@ -2,6 +2,9 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests',
+  // Only Playwright specs are *.spec.js; the bun unit suite lives in tests/unit/*.test.js.
+  // Without this, `playwright test` (whole dir) tries to load the bun test files and crashes.
+  testMatch: '**/*.spec.js',
   fullyParallel: !process.env.CI,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
