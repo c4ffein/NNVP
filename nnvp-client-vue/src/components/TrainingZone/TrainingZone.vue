@@ -36,6 +36,8 @@
           v-bind:loadDataset="loadDataset"
           v-bind:getDatasets="getDatasets"
           v-bind:getWarningMessage="getWarningMessage"
+          v-bind:batchData="chartData0"
+          v-bind:epochData="chartData1"
         ></component>
       </keep-alive>
     </div>
@@ -81,30 +83,27 @@ export default {
         'meanAbsoluteError',
       ],
       selectedPanel: "DatasetSelector",
-      // Initialize chart data here so it's always available
-      chartData0: null,
-      chartData1: null,
+      // Chart data, owned here and passed down to Charts as props; watchTraining
+      // reassigns labels/series during a fit and reactivity re-renders the charts.
+      chartData0: {
+        labels: [],
+        series: [{ className: 'acc', name: 'acc', data: [] }, { className: 'loss', name: 'loss', data: [] }],
+      },
+      chartData1: {
+        labels: [],
+        series: [
+          { className: 'ct-series-acc', name: 'acc', data: [] },
+          { className: 'ct-series-val-acc', name: 'val-acc', data: [] },
+          { className: 'ct-series-loss', name: 'loss', data: [] },
+          { className: 'ct-series-val-loss', name: 'val-loss', data: [] },
+        ],
+      },
     };
   },
   mounted() {
     // Warm up the lazy tfjs load as soon as the Training zone opens, so it is
     // ready by the time the user selects a dataset or starts training.
     loadTf();
-    // Initialize chart data (Charts component will use these)
-    this.chartData0 = {
-      labels: [],
-      series: [{ className: 'acc', name: 'acc', data: [] }, { className: 'loss', name: 'loss', data: [] }],
-    };
-    this.chartData1 = {
-      labels: [],
-      series: [
-        { className: 'ct-series-acc', name: 'acc', data: [] },
-        { className: 'ct-series-val-acc', name: 'val-acc', data: [] },
-        { className: 'ct-series-loss', name: 'loss', data: [] },
-        { className: 'ct-series-val-loss', name: 'val-loss', data: [] },
-      ],
-    };
-    console.log('[TrainingZone] Chart data initialized');
   },
   methods: {
     datasetClicked() {
@@ -117,13 +116,10 @@ export default {
     },
     chartsClicked() {
       this.selectedPanel = "Charts";
-      this.$nextTick(() => {this.batchChart.update();this.epochChart.update();});
     },
     async trainClicked() {
       if (this.isTraining) { this.cancelRequested = true; return; }
       this.chartsClicked();
-      // Wait for Charts component to mount
-      await this.$nextTick();
       this.isTraining = true;
       this.$emit('training-started');
       await this.startTraining();
@@ -154,17 +150,22 @@ export default {
       let generatedCode;
       try {
         // NOTE: Using eval here to execute the generated JavaScript code from the visual graph editor.
-        // The graph is converted to TensorFlow.js code (as a string), then eval'd to get a runnable function.
-        // This is currently safe since the code is generated from the user's own graph structure,
-        // but could be replaced with direct model building from the graph JSON to avoid eval entirely.
+        // The graph is converted to TensorFlow.js code (as a string), then eval'd to get a runnable
+        // function. The generator escapes every graph-provided string/identifier (see
+        // lib/KerasInterface/codegenSafety.js), so a crafted .nnvp file cannot inject code here;
+        // this could still be replaced with direct model building from the graph JSON to avoid
+        // eval entirely.
         generatedCode = this.$d3Interface.generateJavascriptNoSave(this.$kerasInterface);
-        console.log('[TrainingZone] Generated JavaScript code:\n', generatedCode);
+        if (window.nnvp?.debug?.enableTraining) {
+          console.log('[TrainingZone] Generated JavaScript code:\n', generatedCode);
+        }
         createModel = eval(
           `(function() { const tf = window.tf; ${generatedCode} return createModel; })()`
         );
       }
       catch (error) {
-        alert("Incorrect network : couldn't find Inputs/Outputs, or they weren't connected.");
+        alert("Couldn't build the model from the graph — check that Inputs and Outputs exist "
+          + `and are connected. (${error.message || error})`);
         console.error('[TrainingZone] Error generating model:', error);
         console.error('[TrainingZone] Generated code that failed:\n', generatedCode);
         return;
@@ -187,7 +188,9 @@ export default {
       if (Object.keys(filteredParams).length > 0) {
         optimizerConfig = window.tf.train[optimizer](filteredParams);
       }
-      console.log('[TrainingZone] Compiling model with optimizer:', optimizer, 'params:', this.optimizerParams);
+      if (window.nnvp?.debug?.enableTraining) {
+        console.log('[TrainingZone] Compiling model with optimizer:', optimizer, 'params:', this.optimizerParams);
+      }
 
       // Expose compilation config for testing/debugging
       window.nnvp = window.nnvp || {};
@@ -204,7 +207,6 @@ export default {
         loss: this.selectedLoss,
         metrics: ['accuracy'],
       });
-      console.log('[TrainingZone] Model compiled successfully');
 
       // Expose compiled model configuration for testing
       window.nnvp.debug.compiledModel = {
@@ -251,7 +253,7 @@ export default {
       }
       try {
         await watchTraining(
-          this.batchChart, this.epochChart, this.chartData0, this.chartData1,
+          this.chartData0, this.chartData1,
           (callbacks) => train(model, data, callbacks), () => this.cancelRequested,
           'cancelRequested',
         );

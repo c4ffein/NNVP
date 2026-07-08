@@ -203,9 +203,14 @@ export default {
   },
   mounted() {
     this.newestSelected = this.value;
-    setTimeout(() => {
+    // Auto-load the default dataset after a grace period, unless the user
+    // already picked one. Kept as a timer so opening the panel stays instant.
+    this.autoLoadTimer = setTimeout(() => {
       if (this.newestSelected === this.value) this.datasetSet(this.newestSelected);
     }, 3000);
+  },
+  beforeUnmount() {
+    clearTimeout(this.autoLoadTimer);
   },
 };
 </script>

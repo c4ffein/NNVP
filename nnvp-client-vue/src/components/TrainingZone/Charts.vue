@@ -16,57 +16,17 @@
 <script>
 import LineChart from './LineChart.vue';
 
+// Purely presentational: TrainingZone owns the chart data (updated by
+// watchTraining during a fit) and passes it down; reactivity handles the rest.
 export default {
   name: 'Charts',
   components: {
     LineChart
   },
-  data() {
-    return {
-      batchData: { labels: [], series: [] },
-      epochData: { labels: [], series: [] }
-    };
+  props: {
+    batchData: { type: Object, default: () => ({ labels: [], series: [] }) },
+    epochData: { type: Object, default: () => ({ labels: [], series: [] }) },
   },
-  mounted() {
-    try {
-      // Find the TrainingZone parent (might be behind KeepAlive wrapper)
-      let parent = this.$parent;
-      while (parent && parent.$options.name !== 'TrainingZone') {
-        parent = parent.$parent;
-      }
-
-      if (!parent) {
-        console.error('[Charts] Could not find TrainingZone parent');
-        return;
-      }
-
-      // Create chart update interface for TrainingZone
-      parent.batchChart = {
-        update: () => {
-          this.batchData = { ...parent.chartData0 };
-          const debugEnabled = window.nnvp?.debug?.enableTraining;
-          if (debugEnabled) {
-            console.log('[Charts] Batch chart update:', JSON.stringify(this.batchData));
-          }
-        }
-      };
-
-      parent.epochChart = {
-        update: () => {
-          this.epochData = { ...parent.chartData1 };
-          const debugEnabled = window.nnvp?.debug?.enableTraining;
-          if (debugEnabled) {
-            console.log('[Charts] Epoch chart update:', JSON.stringify(this.epochData));
-          }
-        }
-      };
-
-      console.log('[Charts] mounted successfully with custom LineChart');
-    } catch (error) {
-      console.error('[Charts] Error in mounted():', error);
-      throw error;
-    }
-  }
 };
 </script>
 
