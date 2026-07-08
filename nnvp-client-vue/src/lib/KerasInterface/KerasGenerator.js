@@ -9,6 +9,8 @@
 
 import KerasGeneratorPythonHelper from './KerasGeneratorPythonHelper';
 import KerasGeneratorJavascriptHelper from './KerasGeneratorJavascriptHelper';
+import KerasGeneratorPyTorchHelper from './KerasGeneratorPyTorchHelper';
+import KerasGeneratorTinygradHelper from './KerasGeneratorTinygradHelper';
 
 
 export default class KerasGenerator {
@@ -88,6 +90,13 @@ export default class KerasGenerator {
     // each node is added only once, and the Keras layers will be generated in
     // the correct order.
     const addNodeToList = (node) => {
+      // Guard against cycles (and diamond/converging DAGs): never treat a node
+      // twice. Without this, a graph whose targets loop back to an already
+      // treated node would recurse infinitely / blow the stack, and a node
+      // reachable through several paths could be added more than once.
+      if (this.graph[node].treated) {
+        return false;
+      }
       for (const s of this.graph[node].sources) { // eslint-disable-line
         if (!this.graph[s].treated) {
           return false;
@@ -134,6 +143,18 @@ export default class KerasGenerator {
 
   generateJavascriptFromGraph() {
     return new KerasGeneratorJavascriptHelper(
+      this.graph, this.inputs, this.outputs, this.list, this.sequential,
+    ).generate();
+  }
+
+  generatePyTorchFromGraph() {
+    return new KerasGeneratorPyTorchHelper(
+      this.graph, this.inputs, this.outputs, this.list, this.sequential,
+    ).generate();
+  }
+
+  generateTinygradFromGraph() {
+    return new KerasGeneratorTinygradHelper(
       this.graph, this.inputs, this.outputs, this.list, this.sequential,
     ).generate();
   }

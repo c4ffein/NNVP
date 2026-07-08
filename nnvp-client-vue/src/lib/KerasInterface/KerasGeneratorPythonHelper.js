@@ -126,7 +126,7 @@ export default class KerasGeneratorPythonHelper {
       for (const input of this.inputs.slice(0, -1)) { // eslint-disable-line
         rs += `${this.nodeName(input)}, `;
       }
-      rs += `${this.nodeName(this.inputs.splice(-1)[0])}]`;
+      rs += `${this.nodeName(this.inputs.slice(-1)[0])}]`;
     }
     rs += ', outputs=';
     if (this.outputs.length === 1) {

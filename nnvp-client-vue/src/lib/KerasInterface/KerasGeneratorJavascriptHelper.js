@@ -123,7 +123,6 @@ export default class KerasGeneratorJavascriptHelper {
 
   // Generate the line responsible for the Keras Model instanciation
   generateModelFunction() {
-    console.log('[KerasGeneratorJavascriptHelper] generateModelFunction called with inputs:', this.inputs, 'outputs:', this.outputs);
     let rs = 'const model = tf.model({inputs:';
     if (this.inputs.length === 1) {
       rs += this.nodeName(this.inputs[0]);
@@ -145,7 +144,6 @@ export default class KerasGeneratorJavascriptHelper {
       rs += `${this.nodeName(this.outputs.slice(-1)[0])}]`;
     }
     rs += '});\n';
-    console.log('[KerasGeneratorJavascriptHelper] Generated model function:', rs);
     return rs;
   }
 

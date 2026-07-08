@@ -2,7 +2,9 @@ import KerasLayer from './KerasLayer';
 import KerasGenerator from './KerasGenerator';
 
 /* eslint class-methods-use-this: ["error", { "exceptMethods": ["generatePython",
-                                                                "generateJavascript"] }] */
+                                                                "generateJavascript",
+                                                                "generatePyTorch",
+                                                                "generateTinygrad"] }] */
 // class KerasInterface {
 export default class {
   constructor(json) {
@@ -67,5 +69,19 @@ export default class {
     if (typeof d3Json === 'string') graphJson = JSON.parse(d3Json);
     else graphJson = d3Json;
     return new KerasGenerator(graphJson).generateJavascriptFromGraph();
+  }
+
+  generatePyTorch(d3Json) {
+    let graphJson;
+    if (typeof d3Json === 'string') graphJson = JSON.parse(d3Json);
+    else graphJson = d3Json;
+    return new KerasGenerator(graphJson).generatePyTorchFromGraph();
+  }
+
+  generateTinygrad(d3Json) {
+    let graphJson;
+    if (typeof d3Json === 'string') graphJson = JSON.parse(d3Json);
+    else graphJson = d3Json;
+    return new KerasGenerator(graphJson).generateTinygradFromGraph();
   }
 }
