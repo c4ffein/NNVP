@@ -1,0 +1,4 @@
+[test]
+# Register happy-dom's window/document/etc. as globals before every test file.
+# The D3Interface tests exercise code that touches the DOM (d3, window.JSON, ...).
+preload = ["./tests/happydom.js"]
