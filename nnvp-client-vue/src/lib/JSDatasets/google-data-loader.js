@@ -67,26 +67,27 @@ export default class Dataset {
       if (progressionCallback) progressionCallback(loaded / total);
     };
     const datasetBytesBuffer = new ArrayBuffer(this.numDatasetElements * this.imageByteSize * 4);
-    let imgRequests = null;
     let chain = Promise.resolve(); // Needed for sequential behaviour
-    if(typeof(this.imagesSpritePath) === "string") {
-      imgRequests = this.buildImgRequest(
-        this.imagesSpritePath, 0, this.numDatasetElements, this.checksum, datasetBytesBuffer
-      ).then(incLoaded)
-      total = 1;
-    }
-    else if(Array.isArray(this.imagesSpritePath)){
-      imgRequests = this.imagesSpritePath.map(
-        ([offset, nbElem, currentSpritePath], index) => {
-          total = total + 1;
-          const buildFunc = () => this.buildImgRequest(
-            currentSpritePath, offset, nbElem, this.checksum ? this.checksum[index] : null, datasetBytesBuffer
-          )
-          if (isSequential) chain = chain.then(buildFunc).then(incLoaded);
-          else return buildFunc().then(incLoaded);
-        }
-      );
-    }
+    // Normalize the single-sprite form (a plain path string) to the multi-sprite
+    // form ([[offset, nbElem, path], ...]) so one code path handles both — and
+    // the progress total stays consistent (sprites + the labels request).
+    const singleSprite = typeof(this.imagesSpritePath) === "string";
+    const spriteEntries = singleSprite
+      ? [[0, this.numDatasetElements, this.imagesSpritePath]]
+      : this.imagesSpritePath;
+    const spriteChecksums = singleSprite
+      ? (this.checksum ? [this.checksum] : null)
+      : this.checksum;
+    const imgRequests = spriteEntries.map(
+      ([offset, nbElem, currentSpritePath], index) => {
+        total = total + 1;
+        const buildFunc = () => this.buildImgRequest(
+          currentSpritePath, offset, nbElem, spriteChecksums ? spriteChecksums[index] : null, datasetBytesBuffer
+        )
+        if (isSequential) chain = chain.then(buildFunc).then(incLoaded);
+        else return buildFunc().then(incLoaded);
+      }
+    );
     this.datasetImages = new Float32Array(datasetBytesBuffer);
     const labelsRequest = fetch(this.labelsPath, {integrity: this.labelsSha256}).then(
       async response => {this.datasetLabels = new Uint8Array(await response.arrayBuffer());}
