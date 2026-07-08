@@ -44,7 +44,7 @@
 
 <script>
 /* eslint-disable */
-import * as tf from '@tensorflow/tfjs';
+import { loadTf } from '../../lib/tf/loadTf';
 import Dataset from '../../lib/JSDatasets/google-data-loader';
 import loadableDatasets from '../../lib/JSDatasets/datasets-sources';
 import watchTraining from '../../lib/ModelTrainer/watchTraining';
@@ -87,6 +87,9 @@ export default {
     };
   },
   mounted() {
+    // Warm up the lazy tfjs load as soon as the Training zone opens, so it is
+    // ready by the time the user selects a dataset or starts training.
+    loadTf();
     // Initialize chart data (Charts component will use these)
     this.chartData0 = {
       labels: [],
@@ -141,6 +144,9 @@ export default {
     },
     changeEpochs(value) { this.epochs = value; },
     async startTraining() {
+      // tfjs is loaded lazily so it stays out of the initial bundle; make sure
+      // it is ready (and CPU backend applied if requested) before training.
+      const tf = await loadTf();
       window.tf = tf;
       const optimizer = this.selectedOptimizer;
       const epochs = this.epochs;
@@ -336,28 +342,28 @@ export default {
   font-size: 15px;
   display: grid;
   grid-template-rows: 24px 1fr;
-  color: #000000;
+  color: var(--text-primary);
 }
 #trainer-bar {
   display: table;
   table-layout: fixed;
   grid-rows: 1/2;
-  border-bottom: 1px solid #000000;
-  background-color: #ffffff;
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--bg-panel);
   width: 100%;
 }
 #trainer-bar > * {
   background-color: transparent;
 }
 #trainer-bar > *:hover {
-  background-color: rgba(0, 0, 0, 0.1);
+  background-color: var(--bg-hover);
 }
 .TrainingZone.bar-button{
   display: table-cell;
   height: 100%;
   border-radius: 0;
   border: none;
-  border-right: 1px solid #000000;
+  border-right: 1px solid var(--border-color);
   line-height: 24px; /* Vertical align text*/
 }
 #button-close-trainer{
@@ -369,11 +375,11 @@ export default {
   grid-rows: 2/2;
 }
 .TrainingZone select, .TrainingZone input {
-  border: 1px solid rgba(100, 100, 100, 0.3);
+  border: 1px solid var(--input-border);
   height: 26px;
   width: auto;
   border-radius: 0;
-  background-color: rgba(100, 100, 100, 0);
+  background-color: transparent;
   box-sizing: border-box; /* Needed so that input and select sizes are equals */
 }
 </style>

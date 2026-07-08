@@ -58,65 +58,71 @@ export default {
   position: relative; /* Needed so first layer doesn't glitch on Safari */
 }
 #backgroud {
-  fill: #f0f0f0;
+  fill: var(--canvas-bg);
 }
 #whitePage {
-  fill: white;
+  fill: var(--canvas-board);
 }
 #selectionRect {
-  fill: lightgray;
+  fill: var(--canvas-selection);
   fill-opacity: .75;
   shape-rendering: crispEdges;
 }
 .borderClass {
-  fill: #f0f0f0;
+  fill: var(--canvas-bg);
   stroke: none;
 }
 .borderClass.active {
-  fill: white;
+  fill: var(--canvas-board);
   stroke: none;
 }
 .borderListerClass{
-  fill: #f0f0f0;
-  stroke: #f0f0f0;
+  fill: var(--canvas-bg);
+  stroke: var(--canvas-bg);
   opacity: 0.1;
 }
 .d3Layer rect {
-  fill: white;
-  stroke: black;
+  fill: var(--node-fill);
+  stroke: var(--node-stroke);
   rx: 15px;
   ry: 15px;
 }
 .d3Layer rect.isolated {
-  stroke: red;
+  stroke: var(--node-isolated-stroke);
 }
 .d3Layer text {
   text-anchor: "start";
-  fill: black;
+  fill: var(--node-text);
 }
 .d3Layer.selected rect {
-  fill: rgb(250, 232, 255);
+  fill: var(--node-selected-fill);
 }
 .d3CompositeLayer rect {
-  fill: white;
-  stroke: black;
+  fill: var(--node-fill);
+  stroke: var(--node-stroke);
   rx: 15px;
   ry: 15px;
 }
 path.link {
   fill: none;
-  stroke: #333;
+  stroke: var(--edge-color);
   stroke-width: 3px;
   cursor: default;
 }
+/* Arrow heads on connections default to black; follow the edge color so they
+   stay visible on a dark board. */
+marker#end-arrow path,
+marker#mark-end-arrow path {
+  fill: var(--edge-color);
+}
 .edge.selected path{
-  stroke: green;
+  stroke: var(--edge-selected);
 }
 path.linkError {
-  stroke: red;
+  stroke: var(--edge-error);
 }
 path.linkCycle {
-  stroke: red;
+  stroke: var(--edge-error);
 }
 path.link.hidden {
     stroke-width: 0;
@@ -125,7 +131,7 @@ path.link.hidden {
   cursor: move;
 }
 .active {
-  stroke: #000;
+  stroke: var(--node-stroke);
   stroke-width: 2px;
 }
 .active-point {

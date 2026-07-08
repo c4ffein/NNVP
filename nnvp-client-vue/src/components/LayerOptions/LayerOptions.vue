@@ -217,7 +217,7 @@ export default {
   box-sizing: border-box;
   -moz-box-sizing: border-box;
   -webkit-box-sizing: border-box;
-  color: #000000;
+  color: var(--text-primary);
 }
 
 /* Network stats display when no layer is selected */
@@ -228,8 +228,8 @@ export default {
   margin: 0 0 16px 0;
   font-size: 16px;
   font-weight: var(--font-weight-medium);
-  color: #000000;
-  border-bottom: 1px solid #000000;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
   padding-bottom: 8px;
 }
 .stat-item {
@@ -237,20 +237,20 @@ export default {
   justify-content: space-between;
   align-items: center;
   padding: 12px 0;
-  border-bottom: 1px solid #000000;
+  border-bottom: 1px solid var(--panel-border);
 }
 .stat-item:last-child {
   border-bottom: none;
 }
 .stat-label {
   font-size: 14px;
-  color: #000000;
+  color: var(--text-muted);
   font-weight: var(--font-weight-regular);
 }
 .stat-value {
   font-size: 18px;
   font-weight: var(--font-weight-regular);
-  color: #000000;
+  color: var(--text-primary);
 }
 
 .layeroptions-block {

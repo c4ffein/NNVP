@@ -1,27 +1,17 @@
 import { createApp } from 'vue'
-import './style.css'
 import App from './App.vue'
 
 import KerasInterface from './lib/KerasInterface/KerasInterface';
 import D3Interface from './lib/D3Interface/D3Interface';
 import jsonLayersFile from './lib/KerasInterface/generatedKerasLayers.json';
 import KeyboardListener from './lib/KeyboardListener/KeyboardListener';
-import * as tf from '@tensorflow/tfjs';
 
-// Initialize app with optional CPU-only mode
-(async () => {
-  // Check for CPU-only mode (useful for testing and environments without WebGL)
-  const urlParams = new URLSearchParams(window.location.search);
-  const forceCPU = urlParams.get('backend') === 'cpu' || window.__FORCE_CPU_BACKEND__;
-
-  if (forceCPU) {
-    console.log('[NNVP] CPU-only mode enabled - forcing TensorFlow.js to use CPU backend');
-    // Set CPU backend immediately before anything else can initialize WebGL
-    await tf.setBackend('cpu');
-    await tf.ready();
-    console.log('[NNVP] TensorFlow.js CPU backend initialized');
-  }
-
+// TensorFlow.js is no longer imported here: it is large and only needed for the
+// Training zone, so it is loaded lazily (see src/lib/tf/loadTf.js) to keep the
+// initial graph-editor bundle small. The optional CPU-only backend override
+// (?backend=cpu / window.__FORCE_CPU_BACKEND__) is applied on first lazy load,
+// before any tf op runs.
+(() => {
   const app = createApp(App)
 
   // This file is generated from api/keras_layers.py. Temporary file for early

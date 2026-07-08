@@ -4,6 +4,7 @@
         {{name}} :
         <input
           type="text"
+          v-bind:aria-label="name"
           v-model="valueSet"
           v-bind:class="{ 'invalid-input': !isValid }"
           @input="validateInput"

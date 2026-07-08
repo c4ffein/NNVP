@@ -2,10 +2,11 @@
   <div id="parameters-block">
     <span>
         {{name}} :
-        <button @click="addElementToArray">Add</button>
-        <button @click="removeElementToArray">Delete</button>
+        <button :aria-label="'Add ' + name + ' value'" @click="addElementToArray">Add</button>
+        <button :aria-label="'Remove last ' + name + ' value'" @click="removeElementToArray">Delete</button>
         <input v-for="i of values.keys()" :key="i"
-          v-model.number="values[i]" type="number" placeholder="1">
+          v-model.number="values[i]" type="number" placeholder="1"
+          :aria-label="name + ' value ' + (i + 1)">
     </span>
   </div>
 </template>

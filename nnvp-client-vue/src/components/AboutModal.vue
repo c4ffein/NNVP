@@ -1,11 +1,19 @@
 <template>
   <Transition name="modal">
     <div v-if="show" class="modal-overlay" @click="closeModal">
-      <div class="modal-container" @click.stop>
+      <div
+        ref="container"
+        class="modal-container"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="about-modal-title"
+        tabindex="-1"
+        @click.stop
+      >
         <button class="modal-close" @click="closeModal" aria-label="Close">&times;</button>
 
         <div class="modal-content">
-          <h1>NNVP</h1>
+          <h1 id="about-modal-title">NNVP</h1>
           <p class="subtitle">Neural Network Visual Programming</p>
 
           <section>
@@ -55,21 +63,64 @@ export default {
       required: true,
     },
   },
+  watch: {
+    show(isOpen) {
+      if (isOpen) this.onOpen();
+      else this.restoreFocus();
+    },
+  },
   methods: {
     closeModal() {
       this.$emit('close');
     },
-    handleEscape(event) {
-      if (event.key === 'Escape' && this.show) {
+    onOpen() {
+      // Remember what had focus so we can return it when the dialog closes.
+      this.previouslyFocused = document.activeElement;
+      this.$nextTick(() => {
+        const container = this.$refs.container;
+        if (!container) return;
+        const focusable = container.querySelector('button, a[href]');
+        (focusable || container).focus();
+      });
+    },
+    restoreFocus() {
+      if (this.previouslyFocused && typeof this.previouslyFocused.focus === 'function') {
+        this.previouslyFocused.focus();
+      }
+      this.previouslyFocused = null;
+    },
+    handleKeydown(event) {
+      if (!this.show) return;
+      if (event.key === 'Escape') {
         this.closeModal();
+      } else if (event.key === 'Tab') {
+        this.trapFocus(event);
+      }
+    },
+    trapFocus(event) {
+      const container = this.$refs.container;
+      if (!container) return;
+      const focusable = container.querySelectorAll(
+        'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
       }
     },
   },
   mounted() {
-    document.addEventListener('keydown', this.handleEscape);
+    document.addEventListener('keydown', this.handleKeydown);
+    if (this.show) this.onOpen();
   },
   beforeUnmount() {
-    document.removeEventListener('keydown', this.handleEscape);
+    document.removeEventListener('keydown', this.handleKeydown);
   },
 };
 </script>
@@ -125,8 +176,10 @@ export default {
   opacity: 0.6;
 }
 
-.modal-close:focus {
-  outline: none;
+.modal-close:focus-visible {
+  outline: 2px solid #000000;
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 .modal-content {

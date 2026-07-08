@@ -1,11 +1,11 @@
 <template>
   <div class="LayerCatalog" :key="reloadKey">
     <div class="search-container">
-      <svg class="search-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg class="search-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
         <circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.5"/>
         <path d="M11 11L14.5 14.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
       </svg>
-      <input id="layerSearchBox" v-model="searchBox" placeholder="Search">
+      <input id="layerSearchBox" v-model="searchBox" placeholder="Search" type="search" aria-label="Search layers">
     </div>
     <div
       v-for="(layers, categoryName) in $kerasInterface.getCategories()"
@@ -15,11 +15,16 @@
     >
       <div
         class="title"
+        role="button"
+        tabindex="0"
+        :aria-label="'Toggle ' + categoryName + ' layers'"
         v-on:click="toggleCategory(divId(categoryName))"
+        v-on:keydown.enter.prevent="toggleCategory(divId(categoryName))"
+        v-on:keydown.space.prevent="toggleCategory(divId(categoryName))"
         v-if="layersNotEmptyAfterSearch(layers, categoryName)"
       >
         <div class="text">{{ categoryName }}</div>
-        <div class="arrow">▲</div>
+        <div class="arrow" aria-hidden="true">▲</div>
       </div>
       <div class="layerList">
         <LayerTemplate
@@ -107,12 +112,12 @@ export default {
   font-size: 15px;
   user-select: none;
   -webkit-user-select: none;
-  color: #000000;
+  color: var(--text-primary);
 }
 .search-container {
   position: relative;
   width: 100%;
-  background-color: #ffffff;
+  background-color: var(--bg-panel);
 }
 .search-icon {
   position: absolute;
@@ -121,7 +126,7 @@ export default {
   transform: translateY(-50%);
   width: 16px;
   height: 16px;
-  color: #000000;
+  color: var(--text-muted);
   pointer-events: none;
 }
 #layerSearchBox {
@@ -129,7 +134,7 @@ export default {
   box-sizing: border-box;
   width: 100%;
   border: none;
-  color: #000000;
+  color: var(--text-primary);
   padding: 14px 16px 14px 44px;
   font-family: var(--font-regular);
   font-weight: var(--font-weight-medium);
@@ -139,7 +144,7 @@ export default {
   outline: none;
 }
 #layerSearchBox::placeholder {
-  color: #000000;
+  color: var(--text-muted);
 }
 .LayerCatalog > .layerCategory > .title {
   background-color: transparent;
@@ -147,9 +152,9 @@ export default {
   display: grid;
   grid-template-columns: auto 1fr;
   grid-template-areas: "arrow text";
-  border-top: 1px solid #000000;
-  border-left: 1px solid #000000;
-  border-right: 1px solid #000000;
+  border-top: 1px solid var(--border-color);
+  border-left: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color);
   border-radius: 15px 15px 0 0;
   font-weight: var(--font-weight-medium);
   position: relative;
@@ -160,7 +165,7 @@ export default {
   grid-area: text;
   text-align: left;
   padding: 8px 12px;
-  color: #000000;
+  color: var(--text-primary);
   transition: transform 0.15s ease;
 }
 
@@ -168,8 +173,12 @@ export default {
   transform: translate(1px, -1px);
   cursor: pointer;
 }
+.LayerCatalog > .layerCategory > .title:focus-visible {
+  outline: 2px solid #000000;
+  outline-offset: -2px;
+}
 .LayerCatalog > .layerCategory > .title > .arrow {
-  color: #000000;
+  color: var(--text-muted);
   grid-area: arrow;
   height: 15px;
   width: 15px;
@@ -189,7 +198,7 @@ export default {
 .LayerCatalog > .layerCategory > .layerList > .layer {
   text-align: left;
   padding: 8px 12px;
-  color: #000000;
+  color: var(--text-primary);
   border-left: 3px solid transparent;
   transition: all 0.15s ease;
 }

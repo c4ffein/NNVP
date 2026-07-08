@@ -5,6 +5,7 @@
         <input
           v-if="isConditionsNotRanged()"
           type="number"
+          v-bind:aria-label="name"
           v-bind:min="minCond"
           v-bind:max="maxCond"
           v-bind:class="{ 'invalid-input': !isValid }"
@@ -16,6 +17,7 @@
         <div v-else>
           <input
             type="range"
+            v-bind:aria-label="name"
             v-bind:min="minCond"
             v-bind:max="maxCond"
             @change="updateParamFromKerasLayer"

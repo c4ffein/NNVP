@@ -1,8 +1,13 @@
 <template>
   <div class="LayerTemplate"
+    role="button"
+    tabindex="0"
+    :aria-label="'Add ' + layerName + ' layer'"
     draggable="true"
     v-on:dragstart="$event.dataTransfer.setData('text/html', '<h1>test</h1>')"
     @click="$d3Interface.addLayer(layerContent.clone())"
+    @keydown.enter.prevent="$d3Interface.addLayer(layerContent.clone())"
+    @keydown.space.prevent="$d3Interface.addLayer(layerContent.clone())"
   >
     {{ this.layerName }}
   </div>
@@ -45,5 +50,10 @@ export default {
 .LayerTemplate:hover {
   transform: translate(1px, -1px);
   cursor: pointer;
+}
+
+.LayerTemplate:focus-visible {
+  outline: 2px solid #000000;
+  outline-offset: -2px;
 }
 </style>

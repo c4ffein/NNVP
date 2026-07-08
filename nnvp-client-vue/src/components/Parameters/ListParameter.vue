@@ -2,9 +2,17 @@
   <div class="parameter-block">
     <label>
       {{name}}
-      <div class="list-parameter reset-button" v-on:click="resetParamFromKerasLayer">╳</div>
+      <div
+        class="list-parameter reset-button"
+        role="button"
+        tabindex="0"
+        :aria-label="'Reset ' + name"
+        v-on:click="resetParamFromKerasLayer"
+        v-on:keydown.enter.prevent="resetParamFromKerasLayer"
+        v-on:keydown.space.prevent="resetParamFromKerasLayer"
+      >╳</div>
       <div class="parameter-select list-parameter">
-        <select v-model="selectedParameterValue" @change="updateParamFromKerasLayer">
+        <select v-model="selectedParameterValue" @change="updateParamFromKerasLayer" :aria-label="name">
           <option v-bind:key="item" v-for="item in valueList" v-bind:value="item">{{item}}</option>
         </select>
       </div>

@@ -13,10 +13,17 @@ export default {
         const rows = Object.entries(menu).map((entry, i) => {
           const itemKey = `${level}-${i}-${entry[0]}`;
           const isDisabled = this.isItemDisabled(entry[0], entry[1]);
+          const hasSubmenu = typeof entry[1] === 'string'
+            || (typeof entry[1] === 'object' && !Array.isArray(entry[1]));
           return (
             <li key={i}
               class={`menuItem GeneralMenu ${isDisabled ? 'disabled' : ''}`}
+              role="menuitem"
+              tabindex="0"
+              aria-disabled={isDisabled ? 'true' : undefined}
+              aria-haspopup={hasSubmenu ? 'true' : undefined}
               onClick={() => this.levelNClickHandler(entry[0], entry[1])}
+              onKeydown={event => this.levelNKeyHandler(entry[0], entry[1], event)}
               onMouseover={event => this.levelNHoverHandler(entry[0], entry[1], event, level)}
             >
               <div class="GeneralMenu dropdown-item-content">
@@ -26,16 +33,20 @@ export default {
             </li>
           );
         });
-        return (<ul class="dropdown-content GeneralMenu">{rows}</ul>);
+        return (<ul class="dropdown-content GeneralMenu" role="menu">{rows}</ul>);
       }
       return undefined;
     };
     return (
-      <ul id="GeneralMenu" class="GeneralMenu">
+      <ul id="GeneralMenu" class="GeneralMenu" role="menubar" aria-label="Main menu">
         { Object.entries(this.$data.menu).map((object, i) => (
-          <li class="menu GeneralMenu" obj={object} key={i}>
+          <li class="menu GeneralMenu" obj={object} key={i} role="none">
             <div class="menuTitle GeneralMenu"
+              role="menuitem"
+              tabindex="0"
+              aria-haspopup={typeof object[1] !== 'function' ? 'true' : undefined}
               onClick={event => this.level0ClickHandler(object[0], object[1], event)}
+              onKeydown={event => this.level0KeyHandler(object[0], object[1], event)}
               onMouseover={event => this.level0HoverHandler(object[0], object[1], event)}
             >
               {object[0]}
@@ -43,6 +54,14 @@ export default {
             {generateMenu(object[1], 1)}
           </li>
         )) }
+        <li class="menu GeneralMenu theme-toggle">
+          <div class="menuTitle GeneralMenu theme-toggle-btn"
+            title="Toggle light / dark theme"
+            onClick={() => this.toggleTheme()}
+          >
+            {this.theme === 'dark' ? '☀' : '🌙'}
+          </div>
+        </li>
       </ul>
     );
   },
@@ -54,9 +73,17 @@ export default {
           Load() { this.$d3Interface.loadBoard(); },
           Templates: 'templatesMenu',
           Save() { this.$d3Interface.saveBoard(); },
+          Save_to_cloud() { this.$emit('open-account', 'save'); },
+          Open_from_cloud() { this.$emit('open-account'); },
           Generate() { this.$d3Interface.generatePythonInBrowser(this.$kerasInterface); },
           Generate_Javascript() {
             this.$d3Interface.generateJavascriptInBrowser(this.$kerasInterface);
+          },
+          Generate_PyTorch() {
+            this.$d3Interface.generatePyTorchInBrowser(this.$kerasInterface);
+          },
+          Generate_Tinygrad() {
+            this.$d3Interface.generateTinygradInBrowser(this.$kerasInterface);
           },
         },
         Edit: {
@@ -65,6 +92,8 @@ export default {
           Group() { this.$d3Interface.createGroup(); },
         },
         Training: () => { this.$emit('open-trainer'); },
+        Tutorial: () => { this.$emit('open-tutorial'); },
+        Account: () => { this.$emit('open-account'); },
         About: () => { this.$emit('open-about'); },
       },
       activatedState: false,
@@ -73,7 +102,21 @@ export default {
       redoStackContainer: this.$d3Interface.getRedoStackContainer(),
       templatesRefreshKey: 0,
       menuRefreshKey: 0,
+      theme: 'light',
     };
+  },
+  created() {
+    // Reflect the effective theme so the toggle shows the right icon. An
+    // explicit choice (data-theme) wins; otherwise fall back to the OS setting.
+    const explicit = document.documentElement.dataset.theme;
+    if (explicit === 'dark' || explicit === 'light') {
+      this.theme = explicit;
+    } else if (window.matchMedia
+        && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      this.theme = 'dark';
+    } else {
+      this.theme = 'light';
+    }
   },
   mounted() {
     // Subscribe to templates changes
@@ -146,6 +189,18 @@ export default {
         }
       }
     },
+    level0KeyHandler(menuTitle, menuContent, event) {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        this.level0ClickHandler(menuTitle, menuContent, event);
+      }
+    },
+    levelNKeyHandler(menuTitle, menuContent, event) {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        this.levelNClickHandler(menuTitle, menuContent);
+      }
+    },
     levelNClickHandler(menuTitle, menuContent) {
       if (this.isItemDisabled(menuTitle, menuContent)) {
         return;
@@ -190,6 +245,18 @@ export default {
       this.$data.activatedState = false;
       this.$data.activatedChain = [];
     },
+    toggleTheme() {
+      const root = document.documentElement;
+      const current = root.dataset.theme
+        || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+          ? 'dark' : 'light');
+      const next = current === 'dark' ? 'light' : 'dark';
+      root.dataset.theme = next;
+      this.theme = next;
+      try {
+        localStorage.setItem('nnvp-theme', next);
+      } catch { /* localStorage unavailable (private mode) */ }
+    },
     getMenuElement(element) {
       let el = element;
       while (el.classList.contains('GeneralMenu')) {
@@ -213,14 +280,21 @@ export default {
   font-size: 15px;
   box-sizing: border-box;
   overflow: visible;
-  color: #000000;
+  color: var(--text-primary);
   padding-left: 12px;  /* Add spacing for rounded corners */
 }
 .GeneralMenu {
   padding: 0;
   margin: 0;
   list-style: none;
-  color: #000000;
+  color: var(--text-primary);
+}
+.theme-toggle {
+  float: right !important;
+}
+.theme-toggle-btn {
+  font-size: 15px;
+  padding: 0 14px 0 10px;
 }
 #GeneralMenu > .menu {
   float:left;
@@ -243,10 +317,15 @@ export default {
   transform: translate(1px, -1px);
   cursor: pointer;
 }
+.menuTitle:focus-visible,
+.dropdown-content .menuItem:focus-visible {
+  outline: 2px solid #000000;
+  outline-offset: -2px;
+}
 #GeneralMenu .dropdown-content {
   display: none;
   position: absolute;
-  background-color: #f9f9f9;
+  background-color: var(--bg-elevated);
   min-width: 180px;
   box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
   z-index: 1000;
@@ -258,7 +337,7 @@ export default {
 }
 .dropdown-content .menuItem {
  position: relative;
- color: black;
+ color: var(--text-primary);
  padding: 2px 10px;
  text-decoration: none;
  display: block;
@@ -273,7 +352,7 @@ export default {
   cursor: pointer;
 }
 .dropdown-content .menuItem.disabled {
-  color: #000000;
+  color: var(--text-muted);
   text-decoration: line-through;
   cursor: default;
 }
