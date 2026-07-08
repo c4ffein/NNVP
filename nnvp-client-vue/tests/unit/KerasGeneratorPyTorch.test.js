@@ -188,10 +188,10 @@ describe('PyTorch: full generation', () => {
       + 'class Model(nn.Module):\n'
       + '  def __init__(self):\n'
       + '    super().__init__()\n'
-      + '    # TODO: unsupported layer GaussianNoise\n'
+      + '    # TODO: unsupported layer "GaussianNoise"\n'
       + '\n'
       + '  def forward(self, x):\n'
-      + '    x = x  # TODO: unsupported layer GaussianNoise\n'
+      + '    x = x  # TODO: unsupported layer "GaussianNoise"\n'
       + '    return x\n',
     );
     // The placeholder must not silently emit wrong torch code.

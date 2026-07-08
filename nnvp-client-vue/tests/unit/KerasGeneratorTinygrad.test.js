@@ -162,13 +162,13 @@ describe('Tinygrad: full generation', () => {
       + '  def __init__(self):\n'
       + '    self.layer_2 = nn.Linear(10, 4)\n'
       + '    self.layer_3 = nn.Linear(10, 4)\n'
-      + '    # TODO: unsupported layer Concatenate\n'
+      + '    # TODO: unsupported layer "Concatenate"\n'
       + '\n'
       + '  def __call__(self, x):\n'
       + '    input_1 = x\n'
       + '    layer_2 = self.layer_2(input_1)\n'
       + '    layer_3 = self.layer_3(input_1)\n'
-      + '    layer_4 = layer_2  # TODO: unsupported layer Concatenate\n'
+      + '    layer_4 = layer_2  # TODO: unsupported layer "Concatenate"\n'
       + '    return layer_4\n',
     );
   });
@@ -181,11 +181,11 @@ describe('Tinygrad: full generation', () => {
       + '\n'
       + 'class Model:\n'
       + '  def __init__(self):\n'
-      + '    # TODO: unsupported layer GaussianNoise\n'
+      + '    # TODO: unsupported layer "GaussianNoise"\n'
       + '    pass\n'
       + '\n'
       + '  def __call__(self, x):\n'
-      + '    x = x  # TODO: unsupported layer GaussianNoise\n'
+      + '    x = x  # TODO: unsupported layer "GaussianNoise"\n'
       + '    return x\n',
     );
     // The placeholder must not silently emit wrong tinygrad code.

@@ -231,7 +231,7 @@ describe('Python: generateParams', () => {
       activation: 'relu', use_bias: true, trainable: false, units: 32, kernel_size: [3, 3],
     };
     expect(helper().generateParams(params, {})).toBe(
-      "activation='relu',use_bias=True,trainable=False,units=32,kernel_size=(3,3,),",
+      'activation="relu",use_bias=True,trainable=False,units=32,kernel_size=(3,3,),',
     );
   });
 
@@ -327,7 +327,7 @@ describe('JavaScript: generateParams', () => {
   it('collapses a single-element convertToNumber array to a quoted scalar', () => {
     const params = { pool_size: [2] };
     const def = { pool_size: { convertToNumber: true, value: [2] } };
-    expect(helper().generateParams(params, def)).toBe("{poolSize:'2',}");
+    expect(helper().generateParams(params, def)).toBe('{poolSize:"2",}');
   });
 
   it('keeps a multi-element convertToNumber array as an array', () => {
@@ -376,5 +376,75 @@ describe('JavaScript: full generation', () => {
       'const model = tf.model({inputs:[input_a, input_b], outputs:output_o});\n',
     );
     expect(helper.inputs).toEqual(['a', 'b']);
+  });
+});
+
+describe('codegen safety (crafted .nnvp files must not inject code)', () => {
+  // A value that breaks out of a naive '...' string literal in both JS and Python.
+  const payload = "'});\nglobalThis.__pwned = true;(({q:'";
+
+  it('JS: a malicious string parameter value stays an inert string literal through eval', () => {
+    const json = {
+      inputs: ['1'],
+      outputs: ['4'],
+      layers: [
+        leaf('1', 'Input', { params: { shape: [4] }, outputLayers: ['2'] }),
+        leaf('2', 'Dense', { params: { activation: payload }, inputLayers: ['1'], outputLayers: ['4'] }),
+        leaf('4', 'Output', { inputLayers: ['2'] }),
+      ],
+    };
+    const code = new KerasGenerator(json, false).generateJavascriptFromGraph();
+    // Execute the generated code the same way TrainingZone does (Function ~ eval),
+    // against a stub tf that records the params each layer factory receives.
+    const captured = [];
+    const layerFactory = () => (params) => {
+      captured.push(params);
+      const out = { apply: () => out };
+      return out;
+    };
+    const tf = {
+      sequential: () => ({ add: () => {} }),
+      model: () => ({}),
+      layers: new Proxy({}, { get: layerFactory }),
+    };
+    delete globalThis.__pwned;
+    const createModel = new Function('tf', `${code}\nreturn createModel;`)(tf);
+    createModel();
+    expect(globalThis.__pwned).toBeUndefined();
+    // The payload must come through as plain data, not as executed code.
+    expect(captured.some(p => p && p.activation === payload)).toBe(true);
+  });
+
+  it('Python: a malicious string parameter value is emitted as an escaped literal', () => {
+    const generated = new KerasGeneratorPythonHelper({}, [], [], [], false)
+      .generateParams({ activation: payload }, {});
+    expect(generated).toBe(`activation=${JSON.stringify(payload)},`);
+    // No raw newline may survive: it would end the Python expression mid-string.
+    expect(generated).not.toContain('\n');
+  });
+
+  it('rejects parameter names that are not plain identifiers', () => {
+    expect(() => new KerasGeneratorPythonHelper({}, [], [], [], false)
+      .generateParams({ 'x=1); import os #': 1 }, {})).toThrow(/Unsafe parameter name/);
+    expect(() => new KerasGeneratorJavascriptHelper({}, [], [], [], false)
+      .generateParams({ 'a-b': 1 }, {})).toThrow(/Unsafe parameter name/);
+  });
+
+  it('rejects node ids that are not safe variable-name suffixes', () => {
+    const graph = { 'a b': { keras_data: { name: 'Dense' } } };
+    expect(() => new KerasGeneratorJavascriptHelper(graph, [], [], [], false)
+      .nodeName('a b')).toThrow(/Unsafe node id/);
+    expect(() => new KerasGeneratorPythonHelper(graph, [], [], [], false)
+      .nodeName('a b')).toThrow(/Unsafe node id/);
+  });
+
+  it('rejects layer type names that are not plain identifiers', () => {
+    const graph = {
+      1: { keras_data: { name: 'Dense()); evil((', parameterValues: {}, parameterDef: {} }, sources: [] },
+    };
+    expect(() => new KerasGeneratorJavascriptHelper(graph, [], [], [], false)
+      .generateJavascriptFromNode('1')).toThrow(/Unsafe layer type name/);
+    expect(() => new KerasGeneratorPythonHelper(graph, [], [], [], false)
+      .generatePythonFromNode('1')).toThrow(/Unsafe layer type name/);
   });
 });
