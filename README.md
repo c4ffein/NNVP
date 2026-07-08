@@ -35,6 +35,7 @@ make test-e2e  # Run Playwright e2e tests
 ## Documentation
 
 - [Project History](docs/history.md) - Origin story and contributors
+- [Datasets](docs/datasets.md) - Datasets wired into the app and future candidates
 - [Tasks & Roadmap](docs/tasks.md) - Current priorities and future features
 
 ## License
