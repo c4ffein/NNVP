@@ -567,48 +567,6 @@ D3GraphEditor.prototype.generatePythonInBrowser = function (kerasInterface) {
   saveAs(new Blob([generatedPython]), "myModel.py");
 }
 
-/**
- * Generates Python code from current state of the graph
- * @param backendUrl address to the backend
- * @returns a Python file
- */
-D3GraphEditor.prototype.generatePythonOnBackend = function (backendUrl) {
-  let toJSON = [];
-  this.model.d3Layers.forEach(layer => {
-    if (layer.class === "D3Layer") {
-      toJSON.push(layer.toJSON());
-    }
-    if (layer.class === "D3LayerComposite") {
-      layer.getAllContainedJSON().forEach(json => toJSON.push(json));
-    }
-  });
-  let jsonFile = window.JSON.stringify({ "layers": toJSON }, { type: "text/plain;charset=utf-8" });
-  let paramPost = {
-    method: "POST",
-    headers: {
-      'Accept': 'application/json',
-      'Content-Type': 'application/json'
-    },
-    body: jsonFile,
-    //body: this.toJSON(),
-  }
-
-  fetch(backendUrl, paramPost)
-    .then((response) => {
-      if (!response.ok) {
-        throw Error(response.statusText);
-      }
-      return response;
-    })
-    .then((response) => response.json())
-    .then((response) => {
-      if(response.file === undefined) {
-        throw Error('nofile');
-      }
-      return saveAs(new Blob([response.file]), "myModel.py");
-    });
-};
-
 D3GraphEditor.prototype.generateJavascriptInBrowser = function (kerasInterface) {
   const generatedJavascript = kerasInterface.generateJavascript(this.toJSON());
   saveAs(new Blob([generatedJavascript]), "myModel.js");
@@ -663,20 +621,32 @@ D3GraphEditor.prototype.uploadToBoard = function (uploadFileEvent) {
     var uploadFile = uploadFileEvent.files[0];
     var filereader = new window.FileReader();
     filereader.onload = () => {
+      // Validate the file BEFORE touching the board, so a bad file never
+      // leaves the user in front of a silently wiped canvas.
+      const txtRes = filereader.result;
+      const splited = txtRes.split(/\n(.+)/);
+      if(splited[0] !== "NNVP"){
+        alert("This file doesn't seem to be an NNVP file.");
+        return;
+      }
       try {
-        this.saveState();
-        this.clearBoard(true);
-        const txtRes = filereader.result;
-        const splited = txtRes.split(/\n(.+)/);
-        if(splited[0] !== "NNVP"){
-          alert("This file doesn't seem to be an NNVP file.");
-          return;
-        }
+        JSON.parse(splited[1]);
+      }
+      catch (error) {
+        alert("This NNVP file couldn't be read — it seems to be corrupted.");
+        return;
+      }
+      this.saveState();
+      this.clearBoard(true);
+      try {
         this.model.loadJSON(splited[1]);
         this.updateGraph();
       }
       catch (error) {
         console.error(error);
+        // Loading blew up halfway: restore the pre-import board and tell the user.
+        this.undo();
+        alert("This NNVP file couldn't be loaded — it seems to be corrupted.");
       }
     };
     filereader.readAsText(uploadFile);

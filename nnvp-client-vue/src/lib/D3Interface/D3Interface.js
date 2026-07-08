@@ -55,10 +55,13 @@ export default class {
     this.emit('selection-changed');
     this.emit('undo-stack-changed');
     this.emit('redo-stack-changed');
-    // Expose active graph globally for debugging and e2e testing
-    window.nnvp = window.nnvp || {};
-    window.nnvp.debug = window.nnvp.debug || {};
-    window.nnvp.debug.graphEditor = this.activeGraph;
+    // Expose the active graph for the e2e tests and manual debugging — dev
+    // builds only (import.meta.env is absent under bun/unit tests).
+    if (import.meta.env?.DEV) {
+      window.nnvp = window.nnvp || {};
+      window.nnvp.debug = window.nnvp.debug || {};
+      window.nnvp.debug.graphEditor = this.activeGraph;
+    }
   }
 
   getActiveElementsContainer() {
@@ -145,12 +148,6 @@ export default class {
   generatePythonInBrowser(kerasInterface) {
     if (this.activeGraph !== null) {
       this.activeGraph.generatePythonInBrowser(kerasInterface);
-    }
-  }
-
-  generatePythonOnBackend(backendUrl) {
-    if (this.activeGraph !== null) {
-      this.activeGraph.generatePythonOnBackend(backendUrl);
     }
   }
 

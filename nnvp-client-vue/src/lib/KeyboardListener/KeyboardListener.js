@@ -23,18 +23,6 @@ export default class {
         case 'Delete':
           d3Interface.deleteSelectedElements();
           break;
-        case 'KeyC':
-          if (modKeyPressed) {
-            console.log('Copy not implemented'); // eslint-disable-line
-            event.preventDefault();
-          }
-          break;
-        case 'KeyV':
-          if (modKeyPressed) {
-            console.log('Paste not implemented'); // eslint-disable-line
-            event.preventDefault();
-          }
-          break;
         case 'KeyZ':
           if (modKeyPressed) {
             event.preventDefault();

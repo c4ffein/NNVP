@@ -19,6 +19,7 @@
                                                                 "activationMethod"] }] */
 
 import inferFeatureDims from './KerasGeneratorDimInference';
+import { quoteString, assertSafeIdSuffix } from './codegenSafety';
 
 export default class KerasGeneratorTinygradHelper {
   constructor(graph, inputs, outputs, list, sequential) {
@@ -40,6 +41,7 @@ export default class KerasGeneratorTinygradHelper {
 
   // Returns the name given to the node in the generated tinygrad code.
   nodeName(node) {
+    assertSafeIdSuffix(node);
     if (this.graph[node].keras_data.name === 'Input') {
       return `input_${node}`;
     }
@@ -55,7 +57,7 @@ export default class KerasGeneratorTinygradHelper {
     for (let i = 0; i < param.length; i += 1) {
       const value = param[i];
       if (typeof (value) === 'string') {
-        tupleString += `'${value}',`;
+        tupleString += `${quoteString(value)},`;
       } else if (Array.isArray(value)) {
         tupleString += `${this.generateTuple(value)},`;
       } else {
@@ -68,7 +70,7 @@ export default class KerasGeneratorTinygradHelper {
 
   // Render a single scalar/array parameter value as Python source.
   renderValue(value) {
-    if (typeof value === 'string') return `'${value}'`;
+    if (typeof value === 'string') return quoteString(value);
     if (typeof value === 'boolean') return value ? 'True' : 'False';
     if (Array.isArray(value)) return this.generateTuple(value);
     return `${value}`;
@@ -184,7 +186,7 @@ export default class KerasGeneratorTinygradHelper {
         body += `    self.${this.nodeName(node)} = ${this.moduleConstructor(node)}\n`;
         hasStatement = true;
       } else if (this.isUnsupportedNode(node)) {
-        body += `    # TODO: unsupported layer ${this.graph[node].keras_data.name}\n`;
+        body += `    # TODO: unsupported layer ${quoteString(this.graph[node].keras_data.name)}\n`;
       }
     });
     if (!hasStatement) body += '    pass\n';
@@ -202,7 +204,7 @@ export default class KerasGeneratorTinygradHelper {
       } else if (this.isMethodNode(node)) {
         rs += `    x = x${this.methodCall(node)}\n`;
       } else if (this.isUnsupportedNode(node)) {
-        rs += `    x = x  # TODO: unsupported layer ${name}\n`;
+        rs += `    x = x  # TODO: unsupported layer ${quoteString(name)}\n`;
       }
     });
     rs += '    return x\n';
@@ -220,7 +222,7 @@ export default class KerasGeneratorTinygradHelper {
       return `${sources[0]}${this.methodCall(node)}`;
     }
     // Unsupported: pass the (first) input through unchanged with a TODO marker.
-    return `${sources[0]}  # TODO: unsupported layer ${name}`;
+    return `${sources[0]}  # TODO: unsupported layer ${quoteString(name)}`;
   }
 
   // Functional __call__(): one named variable per node, wired by dataflow.

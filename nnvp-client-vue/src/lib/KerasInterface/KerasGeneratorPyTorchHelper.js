@@ -16,6 +16,7 @@
                                                                 "isMerge"] }] */
 
 import inferFeatureDims from './KerasGeneratorDimInference';
+import { quoteString, assertSafeIdSuffix } from './codegenSafety';
 
 export default class KerasGeneratorPyTorchHelper {
   constructor(graph, inputs, outputs, list, sequential) {
@@ -37,6 +38,7 @@ export default class KerasGeneratorPyTorchHelper {
 
   // Returns the name given to the node in the generated PyTorch code.
   nodeName(node) {
+    assertSafeIdSuffix(node);
     if (this.graph[node].keras_data.name === 'Input') {
       return `input_${node}`;
     }
@@ -52,7 +54,7 @@ export default class KerasGeneratorPyTorchHelper {
     for (let i = 0; i < param.length; i += 1) {
       const value = param[i];
       if (typeof (value) === 'string') {
-        tupleString += `'${value}',`;
+        tupleString += `${quoteString(value)},`;
       } else if (Array.isArray(value)) {
         tupleString += `${this.generateTuple(value)},`;
       } else {
@@ -65,7 +67,7 @@ export default class KerasGeneratorPyTorchHelper {
 
   // Render a single scalar/array parameter value as Python source.
   renderValue(value) {
-    if (typeof value === 'string') return `'${value}'`;
+    if (typeof value === 'string') return quoteString(value);
     if (typeof value === 'boolean') return value ? 'True' : 'False';
     if (Array.isArray(value)) return this.generateTuple(value);
     return `${value}`;
@@ -216,7 +218,7 @@ export default class KerasGeneratorPyTorchHelper {
       if (this.isModuleNode(node)) {
         rs += `    self.${this.nodeName(node)} = ${this.moduleConstructor(node)}\n`;
       } else if (this.isUnsupportedNode(node)) {
-        rs += `    # TODO: unsupported layer ${this.graph[node].keras_data.name}\n`;
+        rs += `    # TODO: unsupported layer ${quoteString(this.graph[node].keras_data.name)}\n`;
       }
     });
     return rs;
@@ -237,7 +239,7 @@ export default class KerasGeneratorPyTorchHelper {
       } else if (this.isModuleNode(node)) {
         rs += `    x = self.${this.nodeName(node)}(x)\n`;
       } else if (this.isUnsupportedNode(node)) {
-        rs += `    x = x  # TODO: unsupported layer ${name}\n`;
+        rs += `    x = x  # TODO: unsupported layer ${quoteString(name)}\n`;
       }
     });
     rs += '    return x\n';
@@ -258,7 +260,7 @@ export default class KerasGeneratorPyTorchHelper {
       return `self.${this.nodeName(node)}(${sources.join(', ')})`;
     }
     // Unsupported: pass the (first) input through unchanged with a TODO marker.
-    return `${sources[0]}  # TODO: unsupported layer ${name}`;
+    return `${sources[0]}  # TODO: unsupported layer ${quoteString(name)}`;
   }
 
   // Functional forward(): one named variable per node, wired by dataflow.

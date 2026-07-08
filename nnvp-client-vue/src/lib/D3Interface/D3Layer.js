@@ -1,17 +1,12 @@
 /* eslint-disable */
 
 import * as d3 from 'd3';
-// import d3tip from 'd3-tip';
 import D3GraphEditor from './D3GraphEditor';
 import D3Background from './D3Background';
 import D3LayerComponent from './D3LayerComponent';
 import D3LayerComposite from './D3LayerComposite';
 import D3GraphValidation from './D3GraphValidation';
 import KerasLayer from '../KerasInterface/KerasLayer';
-import jsonKerasFile from '../KerasInterface/generatedKerasLayers.json'
-
-// Extract layers from the new nested format (supports both old flat and new nested)
-const jsonKeras = jsonKerasFile.layers || jsonKerasFile;
 
 // Handle radius constants
 const HANDLE_RADIUS_DEFAULT = 1.4;
@@ -193,9 +188,6 @@ D3Layer.prototype.setOrigin = function () {
  * Removes the Layer
  */
 D3Layer.prototype.remove = function () {
-  // if (D3Layer.tip) {
-  //   D3Layer.tip.hide();
-  // }
   d3.select("#" + this.htmlID).remove();
 };
 
@@ -320,7 +312,6 @@ D3Layer.prototype.drawLayer = function (graph) {
       })
       .on("drag", event => {
         thisLayer.dragState = "drag";
-        // if(D3Layer.tip) D3Layer.tip.hide();
         thisLayer.dragged(event.x, event.y);
         graph.dragged(thisLayer);
         thisLayer.notifyAll();
@@ -346,7 +337,6 @@ D3Layer.prototype.drawLayer = function (graph) {
     .on("mouseleave", () => {
       gElement.select("rect").classed("over-layer", false);
       graph.mouseover_node = null;
-      // if(D3Layer.tip) D3Layer.tip.hide();
       gElement.selectAll("circle")
         .attr("r", HANDLE_RADIUS_DEFAULT);
     });
@@ -458,7 +448,6 @@ D3Layer.prototype.appendText = function (gElement, graph) {
     .on("mouseleave", function () {
       d3.select(this).classed("over-layer", false);
       graph.mouseover_node = null;
-      // if(D3Layer.tip) D3Layer.tip.hide();
       gElement.selectAll("circle")
         .attr("r", HANDLE_RADIUS_DEFAULT);
     })
@@ -495,7 +484,8 @@ D3Layer.prototype.changeTextOfNode = function (gElement, graph) {
       .text(thisLayer.name)
       .on("keydown", function (event) {
         event.stopPropagation();
-        if (event.keyCode == D3GraphEditor.ENTER_KEY) {
+        if (event.key === "Enter") {
+          event.preventDefault();
           this.blur();
         }
       })
@@ -579,55 +569,11 @@ D3Layer.prototype.findLayerById = function (id) {
 
 
 /**
- * Shows the graph incoherences on Layer MouseOver if there exists
- * @param graph the graph to check incoherences
+ * Grows the connection handles on Layer MouseOver.
+ * (The incoherence tooltip that used to live here was dropped with d3-tip.)
  */
 D3Layer.prototype.mouseOver = function (graph) {
-  let thisLayer = this,
-      edges = graph.model.d3Edges;
-  let gElement = d3.select("#" + this.htmlID);
-  //d3.tip = d3tip;
-  // if(D3Layer.tip === undefined) {
-  //   D3Layer.tip = d3tip().attr('class', 'd3-tip').offset([-10, 0]);
-  //   gElement.call(D3Layer.tip);
-  // }
-  if(edges.filter(edge => d3.select("g#"+edge.htmlID).select("path").attr("class").indexOf("linkCycle") >= 0).length > 0){
-    // D3Layer.tip
-    //   .html(function() {
-    //   return "<strong>Incoherence:</strong> <span style='color:red'> Cycle </span>";
-    // });
-    // D3Layer.tip.show(gElement.select("rect").node());
-  }
-  else {
-    if(D3GraphValidation.isIsolated(graph, thisLayer)) {
-      // D3Layer.tip
-      //   .html(function() {
-      //   return "<strong>Incoherence:</strong> <span style='color:red'> is isolated </span>";
-      // });
-      // D3Layer.tip.show(gElement.select("rect").node());
-    }
-    else {
-      if ( thisLayer.observers.length && thisLayer.observers[0].class === "D3Edge" &&
-        thisLayer.observers[0].source.class === "D3Layer" && jsonKeras[thisLayer.observers[0].source.kerasLayer.name]) {
-        edges.filter(d => thisLayer === d.target).forEach(edge => {
-          let badOutput = jsonKeras[thisLayer.observers[0].source.kerasLayer.name].output.shape;
-          let className = d3.select("g#"+edge.id).select("path").attr("class");
-          if(className.indexOf("linkError") >= 0){
-            const targetLayerDef = jsonKeras[thisLayer.kerasLayer.name];
-            if (targetLayerDef && targetLayerDef.input && targetLayerDef.input.shape !== undefined && targetLayerDef.output && targetLayerDef.output.shape !== undefined) {
-              // D3Layer.tip
-              //   .html(function () {
-              //   return "<strong> Bad Input, should be :</strong> <span style='color:red'>" + jsonKeras[thisLayer.kerasLayer.name].input.shape + "</span>"+"<br>"+
-              //   "<strong> but is :</strong> <span style='color:red'>" + badOutput + "</span>";
-              // });
-              // D3Layer.tip.show(gElement.select("rect").node());
-            }
-          }
-        });
-      }
-    }
-  }
-  gElement.selectAll("circle")
+  d3.select("#" + this.htmlID).selectAll("circle")
     .attr("r", HANDLE_RADIUS_LAYER_HOVER);
 };
 

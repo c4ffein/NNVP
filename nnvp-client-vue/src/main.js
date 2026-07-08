@@ -27,13 +27,16 @@ import KeyboardListener from './lib/KeyboardListener/KeyboardListener';
   window.nnvp = window.nnvp || {};
   window.nnvp.debug = window.nnvp.debug || {};
 
-  // Expose for testing (legacy, kept for backwards compatibility)
-  window.kerasInterface = kerasInterface;
-  window.d3Interface = d3Interface;
-
-  // New structured debug namespace
-  window.nnvp.debug.kerasInterface = kerasInterface;
-  window.nnvp.debug.d3Interface = d3Interface;
+  // Expose the interfaces for the e2e tests and manual debugging — dev builds
+  // only, so production pages don't hand the full model API to any script.
+  if (import.meta.env.DEV) {
+    // Legacy globals, kept for backwards compatibility
+    window.kerasInterface = kerasInterface;
+    window.d3Interface = d3Interface;
+    // New structured debug namespace
+    window.nnvp.debug.kerasInterface = kerasInterface;
+    window.nnvp.debug.d3Interface = d3Interface;
+  }
 
   app.mount('#app')
 })();

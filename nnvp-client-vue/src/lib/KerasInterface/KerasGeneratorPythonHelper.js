@@ -6,6 +6,8 @@
 /* eslint class-methods-use-this: ["error", { "exceptMethods": ["generateTuple",
                                                                 "jsonToGraph"] }] */
 
+import { quoteString, assertSafeIdentifier, assertSafeIdSuffix } from './codegenSafety';
+
 export default class KerasGeneratorPythonHelper {
   constructor(graph, inputs, outputs, list, sequential) {
     this.graph = graph;
@@ -17,6 +19,7 @@ export default class KerasGeneratorPythonHelper {
 
   // Returns the name given to the node in the generated Python code
   nodeName(node) {
+    assertSafeIdSuffix(node);
     if (this.graph[node].keras_data.name === 'Input') {
       return `input_${node}`;
     }
@@ -31,7 +34,7 @@ export default class KerasGeneratorPythonHelper {
     for (let i = 0; i < param.length; i += 1) {
       const value = param[i];
       if (typeof (value) === 'string') {
-        tupleString += `'${value}',`;
+        tupleString += `${quoteString(value)},`;
       } else if (Array.isArray(value)) {
         tupleString += `${this.generateTuple(value)},`;
       } else {
@@ -52,8 +55,9 @@ export default class KerasGeneratorPythonHelper {
         continue; // eslint-disable-line no-continue
       }
 
+      assertSafeIdentifier(param, 'parameter name');
       if (typeof value === 'string') {
-        paramString += `${param}='${value}',`;
+        paramString += `${param}=${quoteString(value)},`;
       } else if (Array.isArray(value)) {
         paramString += `${param}=${this.generateTuple(value)},`;
       } else if (typeof value === 'boolean') {
@@ -74,7 +78,7 @@ export default class KerasGeneratorPythonHelper {
     }
 
     rs += 'keras.layers.';
-    rs += this.graph[node].keras_data.name;
+    rs += assertSafeIdentifier(this.graph[node].keras_data.name, 'layer type name');
     // Using parameterDef for filtering and special handling
     rs += `(${this.generateParams(
       this.graph[node].keras_data.parameterValues, this.graph[node].keras_data.parameterDef,
@@ -109,7 +113,8 @@ export default class KerasGeneratorPythonHelper {
           this.graph[this.inputs[0]].keras_data.parameterValues.shape || [100, 100],
         )}`}`;
 
-    return `model.add(keras.layers.${this.graph[node].keras_data.name}(${
+    return `model.add(keras.layers.${
+      assertSafeIdentifier(this.graph[node].keras_data.name, 'layer type name')}(${
       this.generateParams(
         this.graph[node].keras_data.parameterValues, this.graph[node].keras_data.parameterDef,
       ).slice(0, -1)}${

@@ -128,7 +128,7 @@ D3Model.prototype.toJSON = function () {
   this.d3Edges.forEach(edge => savedEdges.push(edge.toJSON()));
   this.modelInputs.forEach(output => savedInputs.push(output.id));
   this.modelOutputs.forEach(output => savedOutputs.push(output.id));
-  return window.JSON.stringify({ "layers": savedLayers, "edges": savedEdges, "inputs": savedInputs, "outputs": savedOutputs }, { type: "text/plain;charset=utf-8" });
+  return window.JSON.stringify({ "layers": savedLayers, "edges": savedEdges, "inputs": savedInputs, "outputs": savedOutputs });
 };
 
 /**

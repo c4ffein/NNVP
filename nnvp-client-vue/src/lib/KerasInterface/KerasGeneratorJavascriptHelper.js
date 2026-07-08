@@ -3,6 +3,8 @@
 /* eslint class-methods-use-this: ["error", { "exceptMethods": ["generateTuple",
                                                                 "jsonToGraph"] }] */
 
+import { quoteString, assertSafeIdentifier, assertSafeIdSuffix } from './codegenSafety';
+
 export default class KerasGeneratorJavascriptHelper {
   constructor(graph, inputs, outputs, list, sequential) {
     this.graph = graph;
@@ -24,6 +26,7 @@ export default class KerasGeneratorJavascriptHelper {
 
   // Returns the name given to the node in the generated Javascript code
   nodeName(node) {
+    assertSafeIdSuffix(node);
     if (this.graph[node].keras_data.name === 'Input') {
       return `input_${node}`;
     }
@@ -38,7 +41,7 @@ export default class KerasGeneratorJavascriptHelper {
     for (let i = 0; i < param.length; i += 1) {
       const value = param[i];
       if (typeof (value) === 'string') {
-        tupleString += `'${value}',`;
+        tupleString += `${quoteString(value)},`;
       } else if (Array.isArray(value)) {
         tupleString += `${this.generateTuple(value)},`;
       } else {
@@ -53,13 +56,13 @@ export default class KerasGeneratorJavascriptHelper {
     let paramString = '{';
     // eslint-disable-next-line
     for (const [param, value] of Object.entries(parameterValues)) {
-      const paramName = this.pythonToJsParamName(param);
+      const paramName = assertSafeIdentifier(this.pythonToJsParamName(param), 'parameter name');
       const paramDef = parameterDefinitions ? parameterDefinitions[param] : null;
       if (typeof value === 'string') {
-        paramString += `${paramName}:'${value}',`;
+        paramString += `${paramName}:${quoteString(value)},`;
       } else if (Array.isArray(value)) {
         if (paramDef && paramDef.convertToNumber === true && paramDef.value.length === 1) {
-          paramString += `${paramName}:'${value[0]}',`;
+          paramString += `${paramName}:${quoteString(value[0])},`;
         } else paramString += `${paramName}:${this.generateTuple(value)},`;
       } else if (typeof value === 'boolean') {
         paramString += `${paramName}:${value ? 'true' : 'false'},`;
@@ -80,7 +83,9 @@ export default class KerasGeneratorJavascriptHelper {
     }
 
     rs += 'tf.layers.';
-    rs += this.pythonToJsLayerName(this.graph[node].keras_data.name);
+    rs += assertSafeIdentifier(
+      this.pythonToJsLayerName(this.graph[node].keras_data.name), 'layer type name',
+    );
     // Using parameterDef for type conversions and special handling
     rs += `(${this.generateParams(
       this.graph[node].keras_data.parameterValues, this.graph[node].keras_data.parameterDef,
@@ -117,7 +122,9 @@ export default class KerasGeneratorJavascriptHelper {
       }
       : this.graph[node].keras_data.parameterValues;
     return `model.add(tf.layers.${
-      this.pythonToJsLayerName(this.graph[node].keras_data.name)}(${
+      assertSafeIdentifier(
+        this.pythonToJsLayerName(this.graph[node].keras_data.name), 'layer type name',
+      )}(${
       this.generateParams(params, this.graph[node].keras_data.parameterDef)}));\n`;
   }
 
