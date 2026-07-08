@@ -90,7 +90,7 @@ D3GraphValidation.kerasError = function (graph, edge) {
 D3GraphValidation.isKerasError = function (graph, edge) {
   if (d3.select("#" + edge.htmlID).node()) {
     d3.select("#" + edge.htmlID).select('path')
-      .classed('linkError', D3GraphValidation.kerasError(graph, thisEdge));
+      .classed('linkError', D3GraphValidation.kerasError(graph, edge));
   }
 };
 

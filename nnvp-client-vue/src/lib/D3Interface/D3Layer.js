@@ -139,7 +139,10 @@ D3Layer.prototype.addObserver = function (o) {
  * @param o which observer to remove
  */
 D3Layer.prototype.removeObserver = function (o) {
-  this.observers.splice(this.observers.indexOf(o), 1);
+  // Guard against splice(-1, 1) removing the last observer when o is absent
+  if (this.observers.indexOf(o) !== -1) {
+    this.observers.splice(this.observers.indexOf(o), 1);
+  }
 };
 
 /**
@@ -294,7 +297,7 @@ D3Layer.prototype.drawLayer = function (graph) {
   gElement
     .on("click", event => {
       if (event.shiftKey) {
-        graph.selectOnNode.call(graph, thisLayer);
+        graph.toggleNodeSelection.call(graph, thisLayer);
       }
       else {
         graph.singleSelection.call(graph, thisLayer);

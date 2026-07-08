@@ -19,9 +19,11 @@ export default function D3LayerComponent(id, parent, kerasLayer, x, y, name, htm
  * Clones a Layer
  */
 D3LayerComponent.prototype.clone = function () {
-  let res = new D3Layer(this.getModel().getNodeId(), this.parent, this.kerasLayer.clone(), this.x, this.y, this.name);
+  // getNodeId lives on the editor, not the model
+  let res = new D3Layer(this.getEditor().getNodeId(), this.parent, this.kerasLayer.clone(), this.x, this.y, this.name);
   this.inputLayers.forEach(inputLayer => res.inputLayers.push(inputLayer));
   this.outputLayers.forEach(outputLayer => res.outputLayers.push(outputLayer));
+  return res;
 };
 
 /**

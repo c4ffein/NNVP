@@ -227,26 +227,39 @@ D3GraphEditor.prototype.singleSelection = function (node) {
 };
 
 /**
- * Add or remove if already selected, node to selectedNodes
- * @param node which node to select or to remove selection
+ * Add node to selectedNodes, idempotently: an already-selected node
+ * stays selected, without duplicate entry or reordering
+ * @param node which node to select
  */
 D3GraphEditor.prototype.selectOnNode = function (node) {
   if(this.selectedEdge) {
     d3.select("#" + this.selectedEdge.id).classed("selected", false);
     this.selectedEdge = null;
   }
-  this.selectedNodes.forEach(selectedNode => {
-    if (selectedNode == node) {
-      // Remove the html class selected
-      d3.select("#" + node.htmlID).classed("selected", false);
-      this.selectedNodes.splice(this.selectedNodes.indexOf(selectedNode), 1);
-    }
-  });
+  if (this.selectedNodes.indexOf(node) >= 0) {
+    return;
+  }
   // Add the html class selected when selectedEdge
   // Like this CSS can identified selected node
   d3.select("#" + node.htmlID).classed("selected", true);
   this.selectedNodes.push(node);
   this.notifySelectionChanged();
+};
+
+/**
+ * Toggle node's membership in selectedNodes: select it if unselected,
+ * deselect it if already selected (used by shift-click on a layer)
+ * @param node which node to toggle
+ */
+D3GraphEditor.prototype.toggleNodeSelection = function (node) {
+  if (this.selectedNodes.indexOf(node) >= 0) {
+    // Remove the html class selected
+    d3.select("#" + node.htmlID).classed("selected", false);
+    this.selectedNodes.splice(this.selectedNodes.indexOf(node), 1);
+    this.notifySelectionChanged();
+    return;
+  }
+  this.selectOnNode(node);
 };
 
 /**
@@ -320,7 +333,7 @@ D3GraphEditor.prototype.onGraphChanged = function (callback) {
  * Calls the callback registered to the `selection changed` event
  */
 D3GraphEditor.prototype.notifySelectionChanged = function () {
-  if(this.selectionChangedCallback()) this.selectionChangedCallback();
+  if(this.selectionChangedCallback) this.selectionChangedCallback();
 };
 
 /**
@@ -601,6 +614,16 @@ D3GraphEditor.prototype.generateJavascriptInBrowser = function (kerasInterface) 
   saveAs(new Blob([generatedJavascript]), "myModel.js");
 }
 
+D3GraphEditor.prototype.generatePyTorchInBrowser = function (kerasInterface) {
+  const generatedPyTorch = kerasInterface.generatePyTorch(this.toJSON());
+  saveAs(new Blob([generatedPyTorch]), "myModel.py");
+}
+
+D3GraphEditor.prototype.generateTinygradInBrowser = function (kerasInterface) {
+  const generatedTinygrad = kerasInterface.generateTinygrad(this.toJSON());
+  saveAs(new Blob([generatedTinygrad]), "myModel.py");
+}
+
 D3GraphEditor.prototype.generateJavascriptNoSave = function (kerasInterface) {
   return kerasInterface.generateJavascript(this.toJSON());
 }
@@ -712,7 +735,7 @@ D3GraphEditor.prototype.addEventHandlerDragOnHtmlClass = function (layer, htmlEl
           .attr("height", 40)
           .attr("width", 90)
           .style("fill", "none")
-          .style("stroke", "black");
+          .style("stroke", "var(--node-stroke)");
       })
       .on("drag", event =>
         d3.select("#dragFromLeftbar").selectAll("rect")

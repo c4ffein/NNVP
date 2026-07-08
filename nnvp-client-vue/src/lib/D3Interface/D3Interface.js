@@ -160,6 +160,18 @@ export default class {
     }
   }
 
+  generatePyTorchInBrowser(kerasInterface) {
+    if (this.activeGraph !== null) {
+      this.activeGraph.generatePyTorchInBrowser(kerasInterface);
+    }
+  }
+
+  generateTinygradInBrowser(kerasInterface) {
+    if (this.activeGraph !== null) {
+      this.activeGraph.generateTinygradInBrowser(kerasInterface);
+    }
+  }
+
   generateJavascriptNoSave(kerasInterface) {
     if (this.activeGraph !== null) {
       return this.activeGraph.generateJavascriptNoSave(kerasInterface);
@@ -181,6 +193,22 @@ export default class {
     if (this.activeGraph !== null) {
       this.activeGraph.clearBoard(false);
     }
+  }
+
+  // Cloud save/load reuse the exact serialization the File > Save / Load uses:
+  // `activeGraph.toJSON()` (i.e. model.toJSON) produces the string, and
+  // `model.loadJSON` reads it back — the same pair `saveBoard`/`uploadToBoard` rely on.
+  getGraphJSON() {
+    if (this.activeGraph === null) return null;
+    return this.activeGraph.toJSON();
+  }
+
+  loadGraphFromJSON(graphJSON) {
+    if (this.activeGraph === null) return;
+    this.activeGraph.saveState();
+    this.activeGraph.clearBoard(true);
+    this.activeGraph.model.loadJSON(graphJSON);
+    this.activeGraph.updateGraph();
   }
 
   // Templates functions
@@ -207,10 +235,10 @@ export default class {
       };
     }
     return {
-      layers: this.activeGraph.model.layers.map(l => ({ id: l.id, type: l.type })),
+      layers: this.activeGraph.model.d3Layers.map(l => ({ id: l.id, type: l.type })),
       inputs: this.activeGraph.model.modelInputs,
       outputs: this.activeGraph.model.modelOutputs,
-      edges: this.activeGraph.model.edges.length,
+      edges: this.activeGraph.model.d3Edges.length,
       undoStack: this.undoStackContainer.e.length,
       redoStack: this.redoStackContainer.e.length,
     };
