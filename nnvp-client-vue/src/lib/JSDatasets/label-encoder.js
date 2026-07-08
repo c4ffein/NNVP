@@ -6,7 +6,7 @@
  * - Sparse Categorical Crossentropy → Integer encoding
  */
 
-import * as tf from '@tensorflow/tfjs';
+import { getTf } from '../tf/loadTf';
 
 export default class LabelEncoder {
   constructor(numClasses) {
@@ -38,6 +38,7 @@ export default class LabelEncoder {
    * @returns {tf.Tensor2D} One-hot encoded labels [batchSize, numClasses]
    */
   batchEncodeOneHotManual(labelInts) {
+    const tf = getTf();
     const batchSize = labelInts.length;
     const oneHotArray = new Float32Array(batchSize * this.numClasses);
 
@@ -57,6 +58,7 @@ export default class LabelEncoder {
    * @returns {tf.Tensor2D} One-hot encoded labels [batchSize, numClasses]
    */
   batchEncodeOneHotTF(labelInts) {
+    const tf = getTf();
     const labelTensor = tf.tensor1d(labelInts, 'int32');
     return tf.oneHot(labelTensor, this.numClasses);
   }
@@ -69,6 +71,7 @@ export default class LabelEncoder {
    * @returns {tf.Tensor1D} Integer labels [batchSize]
    */
   batchEncodeInteger(labelInts) {
+    const tf = getTf();
     return tf.tensor1d(labelInts, 'int32');
   }
 

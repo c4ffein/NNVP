@@ -32,7 +32,7 @@ export default (cdnDir) => {return{
   'FashionMNIST': [
     {
       imagesSpritePath: [...Array(14).keys()].map(x =>
-        [ x * 5000, 5000, cdnDir+"/fashion_mnist/fashion_mnist_"+(x > 9 ? x : "0"+x)+".png" ]
+        [ x * 5000, 5000, cdnDir+"fashion_mnist/fashion_mnist_"+(x > 9 ? x : "0"+x)+".png" ]
       ),
       imagesSpriteChecksum: [
         'sha256-dVuwptjsAJXmjU1JQj0Mzhaw2Fs8JoFw557WHpPsZts=',
@@ -53,7 +53,7 @@ export default (cdnDir) => {return{
       shape: [28, 28, 1],
       numDatasetElements: 70000,
       numTrainElements: 60000,
-      labelsPath: cdnDir+"/fashion_mnist/fashion_mnist_labels_uint8.dms",
+      labelsPath: cdnDir+"fashion_mnist/fashion_mnist_labels_uint8.dms",
       labelsChecksum: "sha256-irlApoBkDzbAvx0lScsvOz1AaMElRxFsx7EWGx0mZj0=",
       labelClassNames: [
         "T-shirt/top",
@@ -76,7 +76,7 @@ export default (cdnDir) => {return{
   'CIFAR10': [
     {
       imagesSpritePath: [...Array(30).keys()].map(x =>
-        [ x * 2000, 2000, cdnDir+"/cifar10/cifar10_"+(x > 9 ? x : "0"+x)+".png" ]
+        [ x * 2000, 2000, cdnDir+"cifar10/cifar10_"+(x > 9 ? x : "0"+x)+".png" ]
       ),
       imagesSpriteChecksum: [
         'sha256-QO0+FEL2rAzw7rOUI8WAwOivVLhHGMxom59+oJtcDag=',
@@ -113,7 +113,7 @@ export default (cdnDir) => {return{
       shape: [32, 32, 3],
       numDatasetElements: 60000,
       numTrainElements: 50000,
-      labelsPath: cdnDir+"/cifar10/cifar10_labels_uint8.dms",
+      labelsPath: cdnDir+"cifar10/cifar10_labels_uint8.dms",
       labelsChecksum: "sha256-PttFZSTVkYrv3tgfWu98Mu+rKniCEd+Zik6wyJV7qh8=",
       labelClassNames: [
         "airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"

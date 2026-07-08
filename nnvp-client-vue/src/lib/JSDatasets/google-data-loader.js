@@ -17,7 +17,7 @@
  * Heavily modified again to allow multiple sprite paths and usage of fetch to verify checksums.
  */
 
-import * as tf from '@tensorflow/tfjs';
+import { loadTf, getTf } from '../tf/loadTf';
 import LabelEncoder from './label-encoder';
 
 /**
@@ -58,6 +58,8 @@ export default class Dataset {
   }
 
   async load(progressionCallback, isSequential = true) {
+    // Ensure tfjs is loaded before we use it (tf.util below and, later, batching).
+    const tf = await loadTf();
     let total = 1; // For label request
     let loaded = 0;
     const incLoaded = () => {
@@ -164,6 +166,7 @@ export default class Dataset {
   }
 
   nextBatch(batchSize, data, index, encoding = 'one-hot-tf') {
+    const tf = getTf();
     const batchImagesArray = new Float32Array(batchSize * this.imageByteSize);
     const batchLabelsArray = new Int32Array(batchSize);
 
