@@ -1,6 +1,19 @@
 // Wire tf.js fit() callbacks to the chart data objects. chartData0/chartData1
 // are reactive (they live in TrainingZone's data), so reassigning labels/series
 // here is what re-renders the charts — no imperative chart handle is needed.
+
+// Debug trace of every chart update, kept in the historical "[Charts] ..."
+// format: the training e2e counts these messages and parses their JSON to
+// verify loss/accuracy progress (they used to be logged by Charts.vue before
+// it became purely presentational).
+const debugLogChartUpdate = (kind, chartData) => {
+  if (!(typeof window !== 'undefined' && window.nnvp?.debug?.enableTraining)) return;
+  console.log( // eslint-disable-line no-console
+    `[Charts] ${kind} chart update:`,
+    JSON.stringify({ labels: chartData.labels, series: chartData.series }),
+  );
+};
+
 export default async (
   chartData0, chartData1, train, cancelRequestedAccessor, stopError,
 ) => {
@@ -21,6 +34,7 @@ export default async (
         { className: 'ct-series-acc', name: 'acc', data: [...batchMetrics.acc] },
         { className: 'ct-series-loss', name: 'loss', data: [...batchMetrics.loss] },
       ];
+      debugLogChartUpdate('Batch', chartData0);
     },
     onEpochEnd(epochNumber, s) {
       if (cancelRequestedAccessor()) throw stopError;
@@ -36,6 +50,7 @@ export default async (
         { className: 'ct-series-loss', name: 'loss', data: [...epochMetrics.loss] },
         { className: 'ct-series-val-loss', name: 'val_loss', data: [...epochMetrics.val_loss] },
       ];
+      debugLogChartUpdate('Epoch', chartData1);
     },
   };
   return train(callbacks);

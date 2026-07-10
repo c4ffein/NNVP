@@ -1,11 +1,11 @@
-import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
+import { test, expect } from './helpers/canvas';
 
 test.describe('NNVP Core Features', () => {
   let consoleMessages = [];
   let consoleErrors = [];
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, canvas }) => {
     consoleMessages = [];
     consoleErrors = [];
     page.on('console', msg => {
@@ -19,7 +19,7 @@ test.describe('NNVP Core Features', () => {
     page.on('pageerror', error => {
       consoleErrors.push(`PAGE ERROR: ${error.message}`);
     });
-    await page.goto('/');
+    await page.goto(canvas.home);
     await page.waitForTimeout(50);
   });
   test.afterEach(async () => {
@@ -29,9 +29,9 @@ test.describe('NNVP Core Features', () => {
     }
   });
 
-  test('should add a layer to canvas by clicking template', async ({ page }) => {
+  test('should add a layer to canvas by clicking template', async ({ page, canvas }) => {
     // Get initial number of layers on canvas
-    const layersBeforeCount = await page.$$eval('.d3Layer', layers => layers.length);
+    const layersBeforeCount = await canvas.layerCount(page);
     console.log('\n=== LAYER PLACEMENT TEST ===');
     console.log('Layers on canvas before:', layersBeforeCount);
     // Find and click a Dense layer template
@@ -40,23 +40,23 @@ test.describe('NNVP Core Features', () => {
     await denseLayer.click();
     await page.waitForTimeout(50);
     // Check that a layer was added to the canvas
-    const layersAfterCount = await page.$$eval('.d3Layer', layers => layers.length);
+    const layersAfterCount = await canvas.layerCount(page);
     console.log('Layers on canvas after:', layersAfterCount);
     expect(layersAfterCount).toBe(layersBeforeCount + 1);
     expect(consoleErrors.length).toBe(0);
   });
 
-  test('should add multiple different layers sequentially', async ({ page }) => {
+  test('should add multiple different layers sequentially', async ({ page, canvas }) => {
     // Click Dense layer
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
     await page.waitForTimeout(30);
-    const afterFirstLayer = await page.$$eval('.d3Layer', layers => layers.length);
+    const afterFirstLayer = await canvas.layerCount(page);
     // Click Dropout layer (should be in a different category)
     const dropoutLayer = await page.$('.LayerTemplate:has-text("Dropout")');
     await dropoutLayer.click();
     await page.waitForTimeout(30);
-    const afterSecondLayer = await page.$$eval('.d3Layer', layers => layers.length);
+    const afterSecondLayer = await canvas.layerCount(page);
     console.log('\n=== MULTIPLE LAYERS TEST ===');
     console.log('After first layer (Dense):', afterFirstLayer);
     console.log('After second layer (Dropout):', afterSecondLayer);
@@ -65,7 +65,7 @@ test.describe('NNVP Core Features', () => {
     expect(consoleErrors.length).toBe(0);
   });
 
-  test('should load a template from File menu', async ({ page }) => {
+  test('should load a template from File menu', async ({ page, canvas }) => {
     // Open File menu
     const fileMenu = await page.$('text=File');
     await fileMenu.click();
@@ -106,16 +106,16 @@ test.describe('NNVP Core Features', () => {
         await templateToLoad.click();
         // Wait longer for template to load and render
         await page.waitForTimeout(100);
-        // Check for different possible layer selectors
-        const d3Layers = await page.$$('.d3Layer');
-        const d3CompositeLayers = await page.$$('.d3CompositeLayer');
-        const totalLayers = d3Layers.length + d3CompositeLayers.length;
-        console.log('d3Layer count:', d3Layers.length);
-        console.log('d3CompositeLayer count:', d3CompositeLayers.length);
+        // Count plain and composite layers on the board
+        const plainLayers = await canvas.layerCount(page);
+        const compositeLayers = await canvas.compositeCount(page);
+        const totalLayers = plainLayers + compositeLayers;
+        console.log('layer count:', plainLayers);
+        console.log('composite count:', compositeLayers);
         console.log('Total layers on canvas after template load:', totalLayers);
         expect(totalLayers).toBeGreaterThan(0);
         // Verify layer types in the loaded template
-        const layerTexts = await page.$$eval('.d3Layer text', texts => texts.map(t => t.textContent));
+        const layerTexts = await canvas.layerLabels(page);
         console.log('Layer types:', layerTexts);
         // Template should have Input and Output layers
         expect(layerTexts.some(text => text.includes('Input'))).toBe(true);
@@ -126,15 +126,15 @@ test.describe('NNVP Core Features', () => {
         );
         expect(hasProcessingLayer).toBe(true);
         // Verify edges/connections exist
-        const edges = await page.$$('.link');
-        console.log('Number of edges:', edges.length);
-        expect(edges.length).toBeGreaterThan(0);
+        const edges = await canvas.edgeCount(page);
+        console.log('Number of edges:', edges);
+        expect(edges).toBeGreaterThan(0);
       }
     }
     expect(consoleErrors.length).toBe(0);
   });
 
-  test('should generate JavaScript code from manually built network', async ({ page }) => {
+  test('should generate JavaScript code from manually built network', async ({ page, canvas }) => {
     console.log('\n=== MANUAL NETWORK BUILDING TEST (JS) ===');
     // Add layers by clicking (they'll be added to canvas)
     const inputLayer = await page.$('.LayerTemplate:has-text("Input")');
@@ -152,51 +152,20 @@ test.describe('NNVP Core Features', () => {
     await outputLayer.click();
     await page.waitForTimeout(50);
     console.log('5 layers added to canvas');
-    // Enable debug logging to see D3 drag events
-    await page.evaluate(() => {
-      window.nnvp.debug.graphEditor.debugEvents = true;
-    });
-    console.log('Debug logging enabled');
-    // Reposition layers vertically using transitionToXY (drag doesn't update model x/y)
+    // Reposition layers vertically so the connect drags have room
     console.log('Repositioning layers vertically...');
-    await page.evaluate(() => {
-      for (let i = 0; i < 5; i++) {
-        const layer = window.nnvp.debug.graphEditor.model.d3Layers[i];
-        const targetY = 100 + i * 120;
-        layer.transitionToXY(300, targetY);
-      }
-    });
+    for (let i = 0; i < 5; i++) {
+      await canvas.moveLayer(page, i, 300, 100 + i * 120);
+    }
     await page.waitForTimeout(100);
-    console.log('All layers repositioned using transitionToXY');
-    // Verify layers are properly positioned
-    const layerPositions = await page.evaluate(() => {
-      return Array.from({length: 5}, (_, i) => {
-        const layer = window.nnvp.debug.graphEditor.model.d3Layers[i];
-        return { id: layer.htmlID, x: layer.x, y: layer.y };
-      });
-    });
-    console.log('Layer positions:', JSON.stringify(layerPositions, null, 2));
+    console.log('All layers repositioned');
     console.log('Connecting layers using drag-and-drop on anchors...');
     await page.waitForTimeout(500);
-    // Drag from each layer's bottom anchor to the next layer's center to create connections
+    // Drag from each layer's output anchor to the next layer to create connections
     for (let i = 0; i < 4; i++) {
-      // Get target layer rect to ensure mouseover_node is set
-      const targetLayer = await page.$(`#d3-layer-${i+1} rect`);
-      const targetBox = await targetLayer.boundingBox();
-      const sourceAnchor = await page.$(`#d3-layer-${i} circle.bottom-point`);
-      const sourceBox = await sourceAnchor.boundingBox();
-      // Start drag from source anchor
-      await page.mouse.move(sourceBox.x + sourceBox.width/2, sourceBox.y + sourceBox.height/2);
-      await page.waitForTimeout(100);
-      await page.mouse.down();
-      await page.waitForTimeout(100);
-      // Move to target layer center (to set mouseover_node)
-      await page.mouse.move(targetBox.x + targetBox.width/2, targetBox.y + targetBox.height/2);
-      await page.waitForTimeout(100);
-      // Release to create connection
-      await page.mouse.up();
+      await canvas.connect(page, i, i + 1);
       await page.waitForTimeout(500);
-      const currentEdges = await page.$$eval('.link:not(.dragline)', links => links.length);
+      const currentEdges = await canvas.edgeCount(page);
       console.log(`Connected layer ${i} to layer ${i+1}, total edges: ${currentEdges}`);
     }
     console.log('Finished connecting layers');
@@ -232,7 +201,7 @@ test.describe('NNVP Core Features', () => {
     expect(consoleErrors.length).toBe(0);
   });
 
-  test('should generate Python code from manually built network', async ({ page }) => {
+  test('should generate Python code from manually built network', async ({ page, canvas }) => {
     console.log('\n=== MANUAL NETWORK BUILDING TEST (Python) ===');
     // Add layers by clicking
     const inputLayer = await page.$('.LayerTemplate:has-text("Input")');
@@ -252,48 +221,21 @@ test.describe('NNVP Core Features', () => {
     console.log('5 layers added to canvas');
     // Wait for all layers to fully initialize
     await page.waitForTimeout(500);
-    // Enable debug logging
-    await page.evaluate(() => {
-      window.nnvp.debug.graphEditor.debugEvents = true;
-    });
-    console.log('Debug logging enabled');
-    // Reposition layers vertically
+    // Reposition layers vertically so the connect drags have room
     console.log('Repositioning layers vertically...');
-    await page.evaluate(() => {
-      for (let i = 0; i < 5; i++) {
-        const layer = window.nnvp.debug.graphEditor.model.d3Layers[i];
-        const targetY = 100 + i * 120;
-        layer.transitionToXY(300, targetY);
-      }
-    });
+    for (let i = 0; i < 5; i++) {
+      await canvas.moveLayer(page, i, 300, 100 + i * 120);
+    }
     await page.waitForTimeout(100);
-    console.log('All layers repositioned using transitionToXY');
-    // Verify positions
-    const layerPositions = await page.evaluate(() => {
-      return Array.from({length: 5}, (_, i) => {
-        const layer = window.nnvp.debug.graphEditor.model.d3Layers[i];
-        return { id: layer.htmlID, x: layer.x, y: layer.y };
-      });
-    });
-    console.log('Layer positions:', JSON.stringify(layerPositions, null, 2));
+    console.log('All layers repositioned');
     console.log('Connecting layers using drag-and-drop on anchors...');
-    // Extra wait before drag-and-drop operations for D3 stabilization
+    // Extra wait before drag-and-drop operations for board stabilization
     await page.waitForTimeout(500);
     // Drag to connect layers
     for (let i = 0; i < 4; i++) {
-      const targetLayer = await page.$(`#d3-layer-${i+1} rect`);
-      const targetBox = await targetLayer.boundingBox();
-      const sourceAnchor = await page.$(`#d3-layer-${i} circle.bottom-point`);
-      const sourceBox = await sourceAnchor.boundingBox();
-      await page.mouse.move(sourceBox.x + sourceBox.width/2, sourceBox.y + sourceBox.height/2);
-      await page.waitForTimeout(50);
-      await page.mouse.down();
-      await page.waitForTimeout(50);
-      await page.mouse.move(targetBox.x + targetBox.width/2, targetBox.y + targetBox.height/2);
-      await page.waitForTimeout(50);
-      await page.mouse.up();
+      await canvas.connect(page, i, i + 1);
       await page.waitForTimeout(100);
-      const currentEdges = await page.$$eval('.link:not(.dragline)', links => links.length);
+      const currentEdges = await canvas.edgeCount(page);
       console.log(`Connected layer ${i} to layer ${i+1}, total edges: ${currentEdges}`);
     }
     console.log('Finished connecting layers');
@@ -422,13 +364,13 @@ def build_model():
     expect(consoleErrors.length).toBe(0);
   });
 
-  test('should select a layer and show parameters in LayerOptions', async ({ page }) => {
+  test('should select a layer and show parameters in LayerOptions', async ({ page, canvas }) => {
     // Add a Dense layer
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
     await page.waitForTimeout(50);
     // Click on the layer in the canvas to select it
-    const layerOnCanvas = await page.$('.d3Layer');
+    const layerOnCanvas = await page.$(canvas.layer);
     await layerOnCanvas.click({ force: true });
     await page.waitForTimeout(50);
     // Check if LayerOptions shows parameters
@@ -446,12 +388,12 @@ def build_model():
     expect(consoleErrors.length).toBe(0);
   });
 
-  test('should return the right panel to empty selection when deselecting a layer', async ({ page }) => {
+  test('should return the right panel to empty selection when deselecting a layer', async ({ page, canvas }) => {
     // Add a Dense layer and select it
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
     await page.waitForTimeout(50);
-    const layerOnCanvas = await page.$('.d3Layer');
+    const layerOnCanvas = await page.$(canvas.layer);
     await layerOnCanvas.click({ force: true });
     await page.waitForTimeout(50);
 
@@ -486,14 +428,14 @@ def build_model():
     expect(consoleErrors.length).toBe(0);
   });
 
-  test('should support undo operations', async ({ page }) => {
+  test('should support undo operations', async ({ page, canvas }) => {
     // Add two layers
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
     await page.waitForTimeout(30);
     await denseLayer.click();
     await page.waitForTimeout(30);
-    const layersAfterAdd = await page.$$eval('.d3Layer', layers => layers.length);
+    const layersAfterAdd = await canvas.layerCount(page);
     console.log('\n=== UNDO TEST ===');
     console.log('Layers after adding 2:', layersAfterAdd);
     // Click Edit menu -> Undo
@@ -503,7 +445,7 @@ def build_model():
     const undoOption = await page.$('text=Undo');
     await undoOption.click();
     await page.waitForTimeout(50);
-    const layersAfterUndo1 = await page.$$eval('.d3Layer', layers => layers.length);
+    const layersAfterUndo1 = await canvas.layerCount(page);
     console.log('Layers after first undo:', layersAfterUndo1);
     // Undo again
     await editMenu.click();
@@ -511,13 +453,13 @@ def build_model():
     const undoOption2 = await page.$('text=Undo');
     await undoOption2.click();
     await page.waitForTimeout(50);
-    const layersAfterUndo2 = await page.$$eval('.d3Layer', layers => layers.length);
+    const layersAfterUndo2 = await canvas.layerCount(page);
     console.log('Layers after second undo:', layersAfterUndo2);
     expect(layersAfterUndo2).toBeLessThan(layersAfterAdd);
     expect(consoleErrors.length).toBe(0);
   });
 
-  test('should modify int parameter and verify in generated code', async ({ page }) => {
+  test('should modify int parameter and verify in generated code', async ({ page, canvas }) => {
     console.log('\n=== INT PARAMETER MODIFICATION TEST ===');
     // Load a template to get a complete connected network
     const fileMenu = await page.$('text=File');
@@ -533,7 +475,7 @@ def build_model():
     await page.waitForTimeout(100);
     console.log('Loaded template: 2D Dense for MNIST');
     // Verify we have Dense layers
-    const allLayersText = await page.$$eval('.d3Layer text', texts => texts.map(t => t.textContent));
+    const allLayersText = await canvas.layerLabels(page);
     console.log('Layers on canvas:', allLayersText);
     const hasDenseLayer = allLayersText.some(text => text.includes('Dense'));
     expect(hasDenseLayer).toBe(true);
@@ -550,7 +492,7 @@ def build_model():
     console.log('Code before modification length:', contentBefore.length);
     console.log('Code before contains "Dense":', contentBefore.includes('Dense'));
     // Now select the Dense layer and modify its parameter
-    const layersOnCanvas = await page.$$('.d3Layer');
+    const layersOnCanvas = await page.$$(canvas.layer);
     let denseLayerFound = false;
     console.log('Attempting to find and select Dense layer...');
     for (let i = 0; i < layersOnCanvas.length; i++) {
@@ -603,13 +545,13 @@ def build_model():
     expect(consoleErrors.length).toBe(0);
   });
 
-  test('should modify boolean parameter by clicking', async ({ page }) => {
+  test('should modify boolean parameter by clicking', async ({ page, canvas }) => {
     // Add a Dense layer
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
     await page.waitForTimeout(50);
     // Click layer to select it
-    const layerOnCanvas = await page.$('.d3Layer');
+    const layerOnCanvas = await page.$(canvas.layer);
     await layerOnCanvas.click({ force: true });
     await page.waitForTimeout(100); // Wait longer for reactive update
     // Check if layeroptions-block is visible
@@ -634,7 +576,7 @@ def build_model():
     expect(consoleErrors.length).toBe(0);
   });
 
-  test('should modify float parameter and verify in generated code', async ({ page }) => {
+  test('should modify float parameter and verify in generated code', async ({ page, canvas }) => {
     console.log('\n=== FLOAT PARAMETER MODIFICATION TEST ===');
     // Load a template with Dropout layer (has float "rate" parameter)
     const fileMenu = await page.$('text=File');
@@ -659,7 +601,7 @@ def build_model():
     const contentBefore = fs.readFileSync(pathBefore, 'utf-8');
     console.log('Code before modification length:', contentBefore.length);
     // Find and select Dropout layer
-    const layersOnCanvas = await page.$$('.d3Layer');
+    const layersOnCanvas = await page.$$(canvas.layer);
     let dropoutLayerFound = false;
     for (let i = 0; i < layersOnCanvas.length; i++) {
       const layer = layersOnCanvas[i];
@@ -706,14 +648,14 @@ def build_model():
     expect(consoleErrors.length).toBe(0);
   });
 
-  test('should modify string parameter and verify in generated code', async ({ page }) => {
+  test('should modify string parameter and verify in generated code', async ({ page, canvas }) => {
     console.log('\n=== STRING PARAMETER MODIFICATION TEST ===');
     // Add an Input layer (has string "name" parameter)
     const inputLayer = await page.$('.LayerTemplate:has-text("Input")');
     await inputLayer.click();
     await page.waitForTimeout(100);
     // Click to select the Input layer
-    const layerOnCanvas = await page.$('.d3Layer');
+    const layerOnCanvas = await page.$(canvas.layer);
     const box = await layerOnCanvas.boundingBox();
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
     await page.waitForTimeout(100);
@@ -751,7 +693,7 @@ def build_model():
     expect(consoleErrors.length).toBe(0);
   });
 
-  test('should modify tuple parameter and verify in generated code', async ({ page }) => {
+  test('should modify tuple parameter and verify in generated code', async ({ page, canvas }) => {
     console.log('\n=== TUPLE PARAMETER MODIFICATION TEST ===');
     // Load template with Conv2D (has tuple "kernel_size" parameter)
     const fileMenu = await page.$('text=File');
@@ -764,7 +706,7 @@ def build_model():
     await template.click();
     await page.waitForTimeout(100);
     // Find and select Conv2D layer
-    const layersOnCanvas = await page.$$('.d3Layer');
+    const layersOnCanvas = await page.$$(canvas.layer);
     let conv2dLayerFound = false;
     for (let i = 0; i < layersOnCanvas.length; i++) {
       const layer = layersOnCanvas[i];
@@ -821,7 +763,7 @@ def build_model():
     expect(consoleErrors.length).toBe(0);
   });
 
-  test('should modify list parameter and verify in generated code', async ({ page }) => {
+  test('should modify list parameter and verify in generated code', async ({ page, canvas }) => {
     console.log('\n=== LIST PARAMETER MODIFICATION TEST ===');
     // Load template with Flatten (has list "data_format" parameter)
     const fileMenu = await page.$('text=File');
@@ -834,7 +776,7 @@ def build_model():
     await template.click();
     await page.waitForTimeout(100);
     // Find and select Flatten layer
-    const layersOnCanvas = await page.$$('.d3Layer');
+    const layersOnCanvas = await page.$$(canvas.layer);
     let flattenLayerFound = false;
     for (let i = 0; i < layersOnCanvas.length; i++) {
       const layer = layersOnCanvas[i];
@@ -878,14 +820,14 @@ def build_model():
     expect(consoleErrors.length).toBe(0);
   });
 
-  test('should delete a layer using Backspace key', async ({ page }) => {
+  test('should delete a layer using Backspace key', async ({ page, canvas }) => {
     // Add a layer
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
     await page.waitForTimeout(50);
-    const layersBeforeDelete = await page.$$eval('.d3Layer', layers => layers.length);
+    const layersBeforeDelete = await canvas.layerCount(page);
     // Click on the layer using force to bypass the text element
-    const d3LayerElement = await page.$('.d3Layer');
+    const d3LayerElement = await page.$(canvas.layer);
     const box = await d3LayerElement.boundingBox();
     // Click in the center of the layer
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
@@ -899,20 +841,20 @@ def build_model():
     // Delete with Backspace
     await page.keyboard.press('Backspace');
     await page.waitForTimeout(50);
-    const layersAfterDelete = await page.$$eval('.d3Layer', layers => layers.length);
+    const layersAfterDelete = await canvas.layerCount(page);
     console.log('Layers after Backspace:', layersAfterDelete);
     expect(layersAfterDelete).toBe(layersBeforeDelete - 1);
     expect(consoleErrors.length).toBe(0);
   });
 
-  test('should delete a layer using Delete key', async ({ page }) => {
+  test('should delete a layer using Delete key', async ({ page, canvas }) => {
     // Add a layer
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
     await page.waitForTimeout(50);
-    const layersBeforeDelete = await page.$$eval('.d3Layer', layers => layers.length);
+    const layersBeforeDelete = await canvas.layerCount(page);
     // Click on the layer using force to bypass the text element
-    const d3LayerElement = await page.$('.d3Layer');
+    const d3LayerElement = await page.$(canvas.layer);
     const box = await d3LayerElement.boundingBox();
     // Click in the center of the layer
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
@@ -926,13 +868,13 @@ def build_model():
     // Delete with Delete key
     await page.keyboard.press('Delete');
     await page.waitForTimeout(50);
-    const layersAfterDelete = await page.$$eval('.d3Layer', layers => layers.length);
+    const layersAfterDelete = await canvas.layerCount(page);
     console.log('Layers after Delete:', layersAfterDelete);
     expect(layersAfterDelete).toBe(layersBeforeDelete - 1);
     expect(consoleErrors.length).toBe(0);
   });
 
-  test('should update LayerOptions panel after deleting a layer', async ({ page }) => {
+  test('should update LayerOptions panel after deleting a layer', async ({ page, canvas }) => {
     console.log('\n=== LAYER OPTIONS UPDATE ON DELETE TEST ===');
     // Add two different layers
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
@@ -941,11 +883,11 @@ def build_model():
     const dropoutLayer = await page.$('.LayerTemplate:has-text("Dropout")');
     await dropoutLayer.click();
     await page.waitForTimeout(50);
-    const layersCount = await page.$$eval('.d3Layer', layers => layers.length);
+    const layersCount = await canvas.layerCount(page);
     console.log('Total layers:', layersCount);
     expect(layersCount).toBe(2);
     // Select the first layer
-    const firstLayer = await page.$('.d3Layer');
+    const firstLayer = await page.$(canvas.layer);
     const box = await firstLayer.boundingBox();
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
     await page.waitForTimeout(50);
@@ -965,7 +907,7 @@ def build_model():
     // Delete the layer
     await page.keyboard.press('Backspace');
     await page.waitForTimeout(50);
-    const layersAfterDelete = await page.$$eval('.d3Layer', layers => layers.length);
+    const layersAfterDelete = await canvas.layerCount(page);
     console.log('Layers after delete:', layersAfterDelete);
     expect(layersAfterDelete).toBe(1);
     // Check LayerOptions after delete - should either show "No layers selected" or the other layer
@@ -986,7 +928,7 @@ def build_model():
     expect(showsNetworkOverview || showsOtherLayer).toBe(true);
   });
 
-  test('should show correct LayerOptions info through comprehensive workflow states', async ({ page }) => {
+  test('should show correct LayerOptions info through comprehensive workflow states', async ({ page, canvas }) => {
     console.log('\n=== COMPREHENSIVE LAYER OPTIONS TEST ===');
     // 1. Empty board - should show Network Overview
     let layerOptions = await page.textContent('#layerOptions');
@@ -1001,7 +943,7 @@ def build_model():
     await denseLayer.click();
     await page.waitForTimeout(10);
     // Click on the layer to select it
-    const firstD3Layer = await page.$('.d3Layer');
+    const firstD3Layer = await page.$(canvas.layer);
     const box = await firstD3Layer.boundingBox();
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
     await page.waitForTimeout(10);
@@ -1011,9 +953,7 @@ def build_model():
     console.log('✓ Step 2: After adding layer shows Dense layer parameters');
     // 2b. Deselect the layer and verify Network Overview appears
     // Click on empty space to deselect
-    const svg = await page.$('#svgWrapper svg');
-    const svgBox = await svg.boundingBox();
-    await page.mouse.click(svgBox.x + 50, svgBox.y + 50);
+    await canvas.deselect(page);
     await page.waitForTimeout(10);
     layerOptions = await page.textContent('#layerOptions');
     expect(layerOptions).toContain('Network Overview');
@@ -1042,10 +982,10 @@ def build_model():
     await mnistTemplate.click();
     await page.waitForTimeout(10);
     // Should have loaded multiple layers
-    const layersCount = await page.$$eval('.d3Layer', layers => layers.length);
+    const layersCount = await canvas.layerCount(page);
     expect(layersCount).toBeGreaterThan(0);
     // Count edges to verify connections
-    const edgesCount = await page.$$eval('.edge', edges => edges.length);
+    const edgesCount = await canvas.edgeCount(page);
     // Get Network Overview to verify numbers
     layerOptions = await page.textContent('#layerOptions');
     expect(layerOptions).toContain('Network Overview');
@@ -1054,7 +994,7 @@ def build_model():
     console.log(`✓ Step 4: After loading template, ${layersCount} layers, ${edgesCount} connections verified`);
     // 5. After deleting a node - should update correctly
     // Click on the first layer to select it
-    const templateLayer = await page.$('.d3Layer');
+    const templateLayer = await page.$(canvas.layer);
     const templateBox = await templateLayer.boundingBox();
     await page.mouse.click(templateBox.x + templateBox.width / 2, templateBox.y + templateBox.height / 2);
     await page.waitForTimeout(10);
@@ -1066,7 +1006,7 @@ def build_model():
     // Delete the selected node
     await page.keyboard.press('Backspace');
     await page.waitForTimeout(10);
-    const layersAfterDelete = await page.$$eval('.d3Layer', layers => layers.length);
+    const layersAfterDelete = await canvas.layerCount(page);
     expect(layersAfterDelete).toBe(layersCount - 1);
     layerOptions = await page.textContent('#layerOptions');
     // Should show Network Overview since nothing is selected after deletion
@@ -1082,7 +1022,7 @@ def build_model():
     const undoOption = await page.$('text=Undo');
     await undoOption.click();
     await page.waitForTimeout(50);
-    let layersAfterUndo = await page.$$eval('.d3Layer', layers => layers.length);
+    let layersAfterUndo = await canvas.layerCount(page);
     expect(layersAfterUndo).toBe(layersCount);
     console.log('✓ Step 6: After undoing, deleted layer restored');
     // 7. After redoing - layer should be deleted again
@@ -1091,7 +1031,7 @@ def build_model():
     const redoOption = await page.$('text=Redo');
     await redoOption.click();
     await page.waitForTimeout(50);
-    const layersAfterRedo = await page.$$eval('.d3Layer', layers => layers.length);
+    const layersAfterRedo = await canvas.layerCount(page);
     expect(layersAfterRedo).toBe(layersCount - 1);
     layerOptions = await page.textContent('#layerOptions');
     expect(layerOptions).toContain('Network Overview');
@@ -1100,13 +1040,13 @@ def build_model():
     console.log(`✓ Step 7: After redoing, layer deleted again, Network Overview shows ${layersAfterRedo} layers`);
     // 8. After deleting a node again
     // Select and delete a layer (we should have layersCount-1 after the redo)
-    const layerToDelete = await page.$('.d3Layer');
+    const layerToDelete = await page.$(canvas.layer);
     const deleteBox = await layerToDelete.boundingBox();
     await page.mouse.click(deleteBox.x + deleteBox.width / 2, deleteBox.y + deleteBox.height / 2);
     await page.waitForTimeout(10);
     await page.keyboard.press('Backspace');
     await page.waitForTimeout(10);
-    const layersAfterSecondDelete = await page.$$eval('.d3Layer', layers => layers.length);
+    const layersAfterSecondDelete = await canvas.layerCount(page);
     expect(layersAfterSecondDelete).toBe(layersCount - 2);
     layerOptions = await page.textContent('#layerOptions');
     expect(layerOptions).toContain('Network Overview');
@@ -1118,7 +1058,7 @@ def build_model():
     await dropoutLayer.click();
     await page.waitForTimeout(100);  // Longer wait for layer to be added and positioned
     // Click on the newly added layer to select it
-    const newLayer = await page.$$('.d3Layer');
+    const newLayer = await page.$$(canvas.layer);
     const lastLayer = newLayer[newLayer.length - 1];
     const newBox = await lastLayer.boundingBox();
     await page.mouse.click(newBox.x + newBox.width / 2, newBox.y + newBox.height / 2);
@@ -1128,11 +1068,10 @@ def build_model():
     expect(layerOptions).toContain('rate');
     console.log('✓ Step 9: After re-adding node manually, shows Dropout layer parameters');
     // 9b. Final Network Overview verification - deselect and check all numbers
-    // Click directly on the canvas background to deselect
-    const canvasBackground = await page.$('.canvas-background');
-    await canvasBackground.click();
+    // Click an empty canvas spot to deselect
+    await canvas.deselect(page);
     await page.waitForTimeout(50);
-    const finalLayersCount = await page.$$eval('.d3Layer', layers => layers.length);
+    const finalLayersCount = await canvas.layerCount(page);
     expect(finalLayersCount).toBe(layersCount - 1); // One less than template (deleted 2, added 1 back)
     layerOptions = await page.textContent('#layerOptions');
     expect(layerOptions).toContain('Network Overview');
@@ -1144,12 +1083,12 @@ def build_model():
     console.log('=== COMPREHENSIVE LAYER OPTIONS TEST PASSED ===\n');
   });
 
-  test('should test REDO functionality', async ({ page }) => {
+  test('should test REDO functionality', async ({ page, canvas }) => {
     // Add a layer
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
     await page.waitForTimeout(50);
-    const layersAfterAdd = await page.$$eval('.d3Layer', layers => layers.length);
+    const layersAfterAdd = await canvas.layerCount(page);
     console.log('\n=== REDO TEST ===');
     console.log('Layers after adding:', layersAfterAdd);
     // Undo
@@ -1159,7 +1098,7 @@ def build_model():
     const undoOption = await page.$('text=Undo');
     await undoOption.click();
     await page.waitForTimeout(100);
-    const layersAfterUndo = await page.$$eval('.d3Layer', layers => layers.length);
+    const layersAfterUndo = await canvas.layerCount(page);
     console.log('Layers after undo:', layersAfterUndo);
     // Redo
     await editMenu.click();
@@ -1167,7 +1106,7 @@ def build_model():
     const redoOption = await page.$('text=Redo');
     await redoOption.click();
     await page.waitForTimeout(100);
-    const layersAfterRedo = await page.$$eval('.d3Layer', layers => layers.length);
+    const layersAfterRedo = await canvas.layerCount(page);
     console.log('Layers after redo:', layersAfterRedo);
     expect(layersAfterRedo).toBe(layersAfterAdd);
     expect(consoleErrors.length).toBe(0);
@@ -1530,7 +1469,7 @@ def build_model():
     expect(consoleErrors.length).toBe(0);
   });
 
-  test('should delete edge and verify layers become isolated', async ({ page }) => {
+  test('should delete edge and verify layers become isolated', async ({ page, canvas }) => {
     console.log('\n=== EDGE DELETION TEST ===');
     // Load a template with connected layers
     await page.click('text=File');
@@ -1542,38 +1481,37 @@ def build_model():
     await template.click();
     await page.waitForTimeout(100);
     // Count initial edges
-    const initialEdges = await page.$$('.edge');
-    console.log('Initial edges:', initialEdges.length);
-    expect(initialEdges.length).toBeGreaterThan(0);
-    // Count isolated layers before deletion
+    const initialEdges = await canvas.edgeCount(page);
+    console.log('Initial edges:', initialEdges);
+    expect(initialEdges).toBeGreaterThan(0);
+    // Count isolated layers before deletion (D3-only visual validation)
     const isolatedBefore = await page.$$('.d3Layer rect.isolated');
     console.log('Isolated layers before deletion:', isolatedBefore.length);
     // Click on an edge to select it (try the first edge)
-    // Edges are SVG elements, need to click on their path
-    const firstEdge = await page.$('.edge path');
-    expect(firstEdge).not.toBeNull();
-    const edgeBox = await firstEdge.boundingBox();
-    await page.mouse.click(edgeBox.x + edgeBox.width / 2, edgeBox.y + edgeBox.height / 2);
+    await canvas.selectFirstEdge(page);
     await page.waitForTimeout(50);
     // Verify edge is selected
-    const selectedEdge = await page.$('.edge.selected');
+    const selectedEdge = await page.$(canvas.selectedEdge);
     expect(selectedEdge).not.toBeNull();
     console.log('Edge selected:', await selectedEdge.evaluate(el => el.id));
     // Press Backspace key to delete the edge (alternative to Delete)
     await page.keyboard.press('Backspace');
     await page.waitForTimeout(100);
     // Count edges after deletion
-    const edgesAfter = await page.$$('.edge');
-    console.log('Edges after deletion:', edgesAfter.length);
-    expect(edgesAfter.length).toBe(initialEdges.length - 1);
-    // Check if any layers became isolated
-    const isolatedAfter = await page.$$('.d3Layer rect.isolated');
-    console.log('Isolated layers after deletion:', isolatedAfter.length);
-    expect(isolatedAfter.length).toBeGreaterThan(isolatedBefore.length);
+    const edgesAfter = await canvas.edgeCount(page);
+    console.log('Edges after deletion:', edgesAfter);
+    expect(edgesAfter).toBe(initialEdges - 1);
+    // Check if any layers became isolated (the isolated-node outline is a
+    // D3-only rendering feature; the flow board has no equivalent yet)
+    if (canvas.mode === 'd3') {
+      const isolatedAfter = await page.$$('.d3Layer rect.isolated');
+      console.log('Isolated layers after deletion:', isolatedAfter.length);
+      expect(isolatedAfter.length).toBeGreaterThan(isolatedBefore.length);
+    }
     console.log('✅ Edge deleted and layers became isolated!');
   });
 
-  test('should redraw deleted edge and verify network is valid again', async ({ page }) => {
+  test('should redraw deleted edge and verify network is valid again', async ({ page, canvas }) => {
     console.log('\n=== EDGE RECREATION TEST ===');
     // Load a template with connected layers
     await page.click('text=File');
@@ -1585,57 +1523,41 @@ def build_model():
     await template.click();
     await page.waitForTimeout(100);
     // Get all layers to identify source and target for reconnection
-    const layers = await page.$$('.d3Layer');
+    const layers = await page.$$(canvas.layer);
     console.log('Total layers:', layers.length);
     // Count initial edges
-    const initialEdges = await page.$$('.edge');
-    console.log('Initial edges:', initialEdges.length);
-    // Select and delete first edge
-    // Get edge group to get its ID, but click on the path element
-    const firstEdgeGroup = await page.$('.edge');
-    const edgeId = await firstEdgeGroup.evaluate(el => el.id);
-    console.log('Deleting edge:', edgeId);
-    const firstEdgePath = await page.$('.edge path');
-    const edgeBox = await firstEdgePath.boundingBox();
-    await page.mouse.click(edgeBox.x + edgeBox.width / 2, edgeBox.y + edgeBox.height / 2);
+    const initialEdges = await canvas.edgeCount(page);
+    console.log('Initial edges:', initialEdges);
+    // Select and delete first edge (the first edge is s0_t1: layer 0 -> layer 1)
+    await canvas.selectFirstEdge(page);
     await page.waitForTimeout(50);
     await page.keyboard.press('Backspace');
     await page.waitForTimeout(100);
     // Verify edge was deleted
-    const edgesAfterDelete = await page.$$('.edge');
-    expect(edgesAfterDelete.length).toBe(initialEdges.length - 1);
-    // Check isolated layers
+    const edgesAfterDelete = await canvas.edgeCount(page);
+    expect(edgesAfterDelete).toBe(initialEdges - 1);
+    // Check isolated layers (D3-only visual validation)
     const isolated = await page.$$('.d3Layer rect.isolated');
     console.log('Isolated layers after deletion:', isolated.length);
     const isolatedCount = isolated.length;
     // Redraw the edge by dragging from anchor to anchor
     console.log('Reconnecting layers by drag-and-drop...');
-    // The deleted edge was s0_t1 (layer-0 to layer-1), so reconnect those same layers
-    const sourceAnchor = await page.$('#d3-layer-0 circle.bottom-point');
-    const sourceBox = await sourceAnchor.boundingBox();
-    const targetLayer = await page.$('#d3-layer-1 rect');
-    const targetBox = await targetLayer.boundingBox();
-    // Drag from source anchor to target layer center
-    await page.mouse.move(sourceBox.x + sourceBox.width/2, sourceBox.y + sourceBox.height/2);
-    await page.waitForTimeout(100);
-    await page.mouse.down();
-    await page.waitForTimeout(200);
-    await page.mouse.move(targetBox.x + targetBox.width/2, targetBox.y + targetBox.height/2);
-    await page.waitForTimeout(200);
-    await page.mouse.up();
+    await canvas.connect(page, 0, 1);
     await page.waitForTimeout(300);
     // Count edges after reconnection
-    const edgesAfterReconnect = await page.$$('.edge');
-    console.log('Edges after reconnection:', edgesAfterReconnect.length);
-    expect(edgesAfterReconnect.length).toBe(initialEdges.length);
-    // Check isolated layers - should be less than before
-    const isolatedAfterReconnect = await page.$$('.d3Layer rect.isolated');
-    console.log('Isolated layers after reconnection:', isolatedAfterReconnect.length);
-    expect(isolatedAfterReconnect.length).toBeLessThan(isolatedCount);
+    const edgesAfterReconnect = await canvas.edgeCount(page);
+    console.log('Edges after reconnection:', edgesAfterReconnect);
+    expect(edgesAfterReconnect).toBe(initialEdges);
+    // Check isolated layers - should be less than before (D3-only rendering)
+    if (canvas.mode === 'd3') {
+      const isolatedAfterReconnect = await page.$$('.d3Layer rect.isolated');
+      console.log('Isolated layers after reconnection:', isolatedAfterReconnect.length);
+      expect(isolatedAfterReconnect.length).toBeLessThan(isolatedCount);
+    }
     console.log('✅ Edge recreated and network is valid again!');
   });
 
-  test('should delete node, re-add it, set parameters, and reconnect', async ({ page }) => {
+  test('should delete node, re-add it, set parameters, and reconnect', async ({ page, canvas }) => {
     console.log('\n=== NODE MANIPULATION TEST ===');
     // Load a template with multiple connected layers
     await page.click('text=File');
@@ -1647,10 +1569,10 @@ def build_model():
     await template.click();
     await page.waitForTimeout(100);
     // Get initial state
-    const initialLayers = await page.$$('.d3Layer');
-    const initialEdges = await page.$$('.edge');
+    const initialLayers = await page.$$(canvas.layer);
+    const initialEdges = await canvas.edgeCount(page);
     console.log('Initial layers:', initialLayers.length);
-    console.log('Initial edges:', initialEdges.length);
+    console.log('Initial edges:', initialEdges);
     // Select and delete the first Dense layer (layer 2) - this will isolate the second Dense
     const denseLayer = initialLayers[2];
     const denseBox = await denseLayer.boundingBox();
@@ -1664,13 +1586,13 @@ def build_model():
     await page.keyboard.press('Backspace');
     await page.waitForTimeout(100);
     // Verify layer was deleted
-    const layersAfterDelete = await page.$$('.d3Layer');
-    const edgesAfterDelete = await page.$$('.edge');
+    const layersAfterDelete = await page.$$(canvas.layer);
+    const edgesAfterDelete = await canvas.edgeCount(page);
     console.log('Layers after deletion:', layersAfterDelete.length);
-    console.log('Edges after deletion:', edgesAfterDelete.length);
+    console.log('Edges after deletion:', edgesAfterDelete);
     expect(layersAfterDelete.length).toBe(initialLayers.length - 1);
-    expect(edgesAfterDelete.length).toBeLessThan(initialEdges.length);
-    // Check for isolated layers (optional - depends on which layer was deleted)
+    expect(edgesAfterDelete).toBeLessThan(initialEdges);
+    // Check for isolated layers (D3-only visual validation)
     const isolatedAfterDelete = await page.$$('.d3Layer rect.isolated');
     console.log('Isolated layers after deletion:', isolatedAfterDelete.length);
     // Re-add a Dense layer
@@ -1678,7 +1600,7 @@ def build_model():
     await denseTemplate.click();
     await page.waitForTimeout(100);
     // Verify layer was added
-    const layersAfterAdd = await page.$$('.d3Layer');
+    const layersAfterAdd = await page.$$(canvas.layer);
     console.log('Layers after re-adding Dense:', layersAfterAdd.length);
     expect(layersAfterAdd.length).toBe(initialLayers.length);
     // Select the newly added layer (last one) and set parameters
@@ -1708,54 +1630,33 @@ def build_model():
     const newLayerId = await newDenseLayer.evaluate(el => el.id);
     console.log('New layer ID:', newLayerId);
     // First, get fresh references to all layers after adding the new one
-    const allLayersAfterAdd = await page.$$('.d3Layer');
+    const allLayersAfterAdd = await page.$$(canvas.layer);
     console.log('Total layers after adding:', allLayersAfterAdd.length);
     // Debug: print all layer types to understand the order
-    const layerTypes = await page.$$eval('.d3Layer text', texts => texts.map(t => t.textContent));
+    const layerTypes = await canvas.layerLabels(page);
     console.log('Layer order after adding:', layerTypes);
     // Connect Flatten (index 1) to new Dense (index 4)
-    const flattenLayer = allLayersAfterAdd[1];
-    const flattenAnchor = await flattenLayer.$('circle.bottom-point');
-    const flattenAnchorBox = await flattenAnchor.boundingBox();
-    const newDenseLayerFinal = allLayersAfterAdd[4];
-    const newDenseBoxFinal = await newDenseLayerFinal.boundingBox();
-    await page.mouse.move(flattenAnchorBox.x + flattenAnchorBox.width/2, flattenAnchorBox.y + flattenAnchorBox.height/2);
-    await page.waitForTimeout(20);
-    await page.mouse.down();
-    await page.waitForTimeout(200);
-    await page.mouse.move(newDenseBoxFinal.x + newDenseBoxFinal.width/2, newDenseBoxFinal.y + newDenseBoxFinal.height/2);
-    await page.waitForTimeout(30);
-    await page.mouse.up();
+    await canvas.connect(page, 1, 4);
     await page.waitForTimeout(300);
     console.log('Connected Flatten to new Dense');
-    let currentEdges = await page.$$('.edge');
-    console.log('Edges after first connection:', currentEdges.length);
+    let currentEdges = await canvas.edgeCount(page);
+    console.log('Edges after first connection:', currentEdges);
     // Connect new Dense (index 4) to old Dense (index 2)
-    const newDenseAnchor = await newDenseLayerFinal.$('circle.bottom-point');
-    const newDenseAnchorBox = await newDenseAnchor.boundingBox();
-    const oldDenseLayer = allLayersAfterAdd[2];
-    const oldDenseBox = await oldDenseLayer.boundingBox();
-    await page.mouse.move(
-      newDenseAnchorBox.x + newDenseAnchorBox.width/2, newDenseAnchorBox.y + newDenseAnchorBox.height/2
-    );
-    await page.waitForTimeout(20);
-    await page.mouse.down();
-    await page.waitForTimeout(200);
-    await page.mouse.move(oldDenseBox.x + oldDenseBox.width/2, oldDenseBox.y + oldDenseBox.height/2);
-    await page.waitForTimeout(30);
-    await page.mouse.up();
+    await canvas.connect(page, 4, 2);
     await page.waitForTimeout(300);
     console.log('Connected new Dense to old Dense');
-    currentEdges = await page.$$('.edge');
-    console.log('Edges after second connection:', currentEdges.length);
+    currentEdges = await canvas.edgeCount(page);
+    console.log('Edges after second connection:', currentEdges);
     // Verify edges were recreated
-    const edgesAfterReconnect = await page.$$('.edge');
-    console.log('Edges after reconnection:', edgesAfterReconnect.length);
-    expect(edgesAfterReconnect.length).toBeGreaterThan(edgesAfterDelete.length);
-    // Verify isolated layers decreased or stayed same
-    const isolatedAfterReconnect = await page.$$('.d3Layer rect.isolated');
-    console.log('Isolated layers after reconnection:', isolatedAfterReconnect.length);
-    expect(isolatedAfterReconnect.length).toBeLessThanOrEqual(isolatedAfterDelete.length);
+    const edgesAfterReconnect = await canvas.edgeCount(page);
+    console.log('Edges after reconnection:', edgesAfterReconnect);
+    expect(edgesAfterReconnect).toBeGreaterThan(edgesAfterDelete);
+    // Verify isolated layers decreased or stayed same (D3-only rendering)
+    if (canvas.mode === 'd3') {
+      const isolatedAfterReconnect = await page.$$('.d3Layer rect.isolated');
+      console.log('Isolated layers after reconnection:', isolatedAfterReconnect.length);
+      expect(isolatedAfterReconnect.length).toBeLessThanOrEqual(isolatedAfterDelete.length);
+    }
     // Verify the parameter was saved by generating code
     const fileMenu = await page.$('text=File');
     const downloadPromise = page.waitForEvent('download', { timeout: 10000 });
@@ -2030,7 +1931,7 @@ def build_model():
     });
   });
 
-  test('should create edge by dragging from handle to handle (verify drag still works)', async ({ page }) => {
+  test('should create edge by dragging from handle to handle (verify drag still works)', async ({ page, canvas }) => {
     console.log('\n=== DRAG-TO-CONNECT TEST (VERIFY NOT BROKEN) ===');
     // Add two layers
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
@@ -2038,42 +1939,33 @@ def build_model():
     await page.waitForTimeout(50);
     await denseLayer.click();
     await page.waitForTimeout(50);
-    const layers = await page.$$('.d3Layer');
+    const layers = await page.$$(canvas.layer);
     console.log('Added layers:', layers.length);
     expect(layers.length).toBe(2);
-    // Move second layer to avoid overlap (drag it down)
-    const layer1 = await page.$('#d3-layer-1 rect');
-    const layer1Box = await layer1.boundingBox();
+    // Move second layer to avoid overlap (drag it down with the mouse — this
+    // also verifies node dragging still works on the board)
+    const layer1Box = await page.locator(canvas.layer).nth(1).boundingBox();
     await page.mouse.move(layer1Box.x + layer1Box.width/2, layer1Box.y + layer1Box.height/2);
     await page.mouse.down();
-    await page.mouse.move(layer1Box.x + layer1Box.width/2, layer1Box.y + layer1Box.height/2 + 150);
+    await page.mouse.move(layer1Box.x + layer1Box.width/2, layer1Box.y + layer1Box.height/2 + 150, { steps: 5 });
     await page.mouse.up();
     await page.waitForTimeout(300);
     // Get initial edge count
-    const edgesBefore = await page.$$('.edge');
-    console.log('Edges before drag:', edgesBefore.length);
-    // Drag from first layer's bottom handle to second layer
-    const sourceHandle = await page.$('#d3-layer-0 circle.bottom-point');
-    const sourceBox = await sourceHandle.boundingBox();
-    const targetLayer = await page.$('#d3-layer-1 rect');
-    const targetBox = await targetLayer.boundingBox();
-    console.log('Dragging from layer 0 bottom handle to layer 1...');
-    await page.mouse.move(sourceBox.x + sourceBox.width/2, sourceBox.y + sourceBox.height/2);
-    await page.waitForTimeout(100);
-    await page.mouse.down();
-    await page.waitForTimeout(200);
-    await page.mouse.move(targetBox.x + targetBox.width/2, targetBox.y + targetBox.height/2);
-    await page.waitForTimeout(200);
-    await page.mouse.up();
+    const edgesBefore = await canvas.edgeCount(page);
+    console.log('Edges before drag:', edgesBefore);
+    // Drag from first layer's output anchor to second layer
+    console.log('Dragging from layer 0 output anchor to layer 1...');
+    await canvas.connect(page, 0, 1);
     await page.waitForTimeout(300);
     // Verify edge was created
-    const edgesAfter = await page.$$('.edge');
-    console.log('Edges after drag:', edgesAfter.length);
-    expect(edgesAfter.length).toBe(edgesBefore.length + 1);
+    const edgesAfter = await canvas.edgeCount(page);
+    console.log('Edges after drag:', edgesAfter);
+    expect(edgesAfter).toBe(edgesBefore + 1);
     console.log('✅ Drag-to-connect still works correctly!');
   });
 
-  test('should create edge by click-to-link mode (click handle, then click another handle)', async ({ page }) => {
+  test('should create edge by click-to-link mode (click handle, then click another handle)', async ({ page, canvas }) => {
+    test.skip(canvas.mode !== 'd3', 'click-to-link mode is a D3-board feature');
     console.log('\n=== CLICK-TO-LINK TEST ===');
     // Add two layers
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
@@ -2081,7 +1973,7 @@ def build_model():
     await page.waitForTimeout(50);
     await denseLayer.click();
     await page.waitForTimeout(50);
-    const layers = await page.$$('.d3Layer');
+    const layers = await page.$$(canvas.layer);
     console.log('Added layers:', layers.length);
     expect(layers.length).toBe(2);
     // Move second layer to avoid overlap (drag it down)
@@ -2120,7 +2012,8 @@ def build_model():
     console.log('✅ Click-to-link works correctly!');
   });
 
-  test('should cancel click-to-link mode by pressing ESC key', async ({ page }) => {
+  test('should cancel click-to-link mode by pressing ESC key', async ({ page, canvas }) => {
+    test.skip(canvas.mode !== 'd3', 'click-to-link mode is a D3-board feature');
     console.log('\n=== CLICK-TO-LINK CANCEL (ESC KEY) TEST ===');
     // Add one layer
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
@@ -2146,7 +2039,8 @@ def build_model():
     console.log('✅ ESC key cancels link mode correctly!');
   });
 
-  test('should cancel click-to-link mode by clicking background', async ({ page }) => {
+  test('should cancel click-to-link mode by clicking background', async ({ page, canvas }) => {
+    test.skip(canvas.mode !== 'd3', 'click-to-link mode is a D3-board feature');
     console.log('\n=== CLICK-TO-LINK CANCEL (BACKGROUND CLICK) TEST ===');
     // Add one layer
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
@@ -2177,7 +2071,8 @@ def build_model():
     console.log('✅ Background click cancels link mode correctly!');
   });
 
-  test('should cancel click-to-link mode by clicking same handle again', async ({ page }) => {
+  test('should cancel click-to-link mode by clicking same handle again', async ({ page, canvas }) => {
+    test.skip(canvas.mode !== 'd3', 'click-to-link mode is a D3-board feature');
     console.log('\n=== CLICK-TO-LINK CANCEL (SAME HANDLE) TEST ===');
     // Add one layer
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
@@ -2267,7 +2162,7 @@ def build_model():
     console.log('✅ About modal works correctly!');
   });
 
-  test('should detect cycles in the graph and mark edges with linkCycle class', async ({ page }) => {
+  test('should handle cycles in the graph (D3 marks them, flow refuses them)', async ({ page, canvas }) => {
     console.log('\n=== CYCLE DETECTION TEST ===');
     // Step 1: Create a simple valid DAG first (no cycle)
     console.log('Step 1: Creating valid DAG (A -> B -> C)');
@@ -2279,91 +2174,74 @@ def build_model():
     await page.waitForTimeout(50);
     await denseLayer.click();
     await page.waitForTimeout(50);
-    const layers = await page.$$('.d3Layer');
+    const layers = await page.$$(canvas.layer);
     expect(layers.length).toBe(3);
     console.log(`✓ Added ${layers.length} layers`);
     // Position layers in a vertical line to make connections easier
     for (let i = 0; i < layers.length; i++) {
-      const layer = await page.$(`#d3-layer-${i} rect`);
-      const box = await layer.boundingBox();
-      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-      await page.mouse.down();
-      await page.mouse.move(400, 200 + (i * 150));
-      await page.mouse.up();
+      await canvas.moveLayer(page, i, 400, 200 + (i * 150));
       await page.waitForTimeout(50);
     }
+    // moveLayer animates on the D3 board (transitionToXY) — let it settle
+    // before dragging between anchors, or the drags miss moving targets.
+    await page.waitForTimeout(400);
     console.log('✓ Positioned layers vertically');
-    // Connect layer 0 -> layer 1
-    const layer0Anchor = await page.$('#d3-layer-0 circle.bottom-point');
-    const layer0AnchorBox = await layer0Anchor.boundingBox();
-    const layer1Rect = await page.$('#d3-layer-1 rect');
-    const layer1Box = await layer1Rect.boundingBox();
-    await page.mouse.move(layer0AnchorBox.x + layer0AnchorBox.width / 2, layer0AnchorBox.y + layer0AnchorBox.height / 2);
-    await page.mouse.down();
+    // Connect layer 0 -> layer 1, then layer 1 -> layer 2
+    await canvas.connect(page, 0, 1);
     await page.waitForTimeout(100);
-    await page.mouse.move(layer1Box.x + layer1Box.width / 2, layer1Box.y + layer1Box.height / 2);
-    await page.mouse.up();
+    await canvas.connect(page, 1, 2);
     await page.waitForTimeout(100);
-    // Connect layer 1 -> layer 2
-    const layer1Anchor = await page.$('#d3-layer-1 circle.bottom-point');
-    const layer1AnchorBox = await layer1Anchor.boundingBox();
-    const layer2Rect = await page.$('#d3-layer-2 rect');
-    const layer2Box = await layer2Rect.boundingBox();
-    await page.mouse.move(layer1AnchorBox.x + layer1AnchorBox.width / 2, layer1AnchorBox.y + layer1AnchorBox.height / 2);
-    await page.mouse.down();
-    await page.waitForTimeout(100);
-    await page.mouse.move(layer2Box.x + layer2Box.width / 2, layer2Box.y + layer2Box.height / 2);
-    await page.mouse.up();
-    await page.waitForTimeout(100);
-    let edges = await page.$$('.edge');
-    expect(edges.length).toBe(2);
+    let edges = await canvas.edgeCount(page);
+    expect(edges).toBe(2);
     console.log('✓ Created 2 edges in valid DAG');
-    // Step 2: Verify no cycle is detected yet
-    const edgesWithoutCycle = await page.$$eval('.edge path', paths =>
-      paths.filter(path => path.classList.contains('linkCycle')).length
-    );
-    expect(edgesWithoutCycle).toBe(0);
-    console.log('✓ No cycles detected in valid DAG (0 edges marked)');
-    // Step 3: Create a cycle by connecting layer 2 back to layer 0
-    console.log('Step 2: Creating cycle by connecting C -> A');
-    const layer2Anchor = await page.$('#d3-layer-2 circle.bottom-point');
-    const layer2AnchorBox = await layer2Anchor.boundingBox();
-    const layer0Rect = await page.$('#d3-layer-0 rect');
-    const layer0Box = await layer0Rect.boundingBox();
-    await page.mouse.move(layer2AnchorBox.x + layer2AnchorBox.width / 2, layer2AnchorBox.y + layer2AnchorBox.height / 2);
-    await page.mouse.down();
-    await page.waitForTimeout(100);
-    await page.mouse.move(layer0Box.x + layer0Box.width / 2, layer0Box.y + layer0Box.height / 2);
-    await page.mouse.up();
+    // Step 2: Verify no cycle is flagged yet (D3 marks cycles with linkCycle)
+    if (canvas.mode === 'd3') {
+      const edgesWithoutCycle = await page.$$eval('.edge path', paths =>
+        paths.filter(path => path.classList.contains('linkCycle')).length
+      );
+      expect(edgesWithoutCycle).toBe(0);
+      console.log('✓ No cycles detected in valid DAG (0 edges marked)');
+    }
+    // Step 3: Try to close the cycle by connecting layer 2 back to layer 0.
+    // The two boards handle this differently: D3 accepts the edge and marks
+    // the cycle with the linkCycle class; the flow board's isValidConnection
+    // refuses to create the edge at all.
+    console.log('Step 2: Attempting cycle by connecting C -> A');
+    await canvas.connect(page, 2, 0);
     await page.waitForTimeout(200); // Give time for cycle detection to run
-    edges = await page.$$('.edge');
-    expect(edges.length).toBe(3);
-    console.log('✓ Created 3rd edge, completing the cycle (A -> B -> C -> A)');
-    // Step 4: Verify cycle is detected - all edges in the cycle should be marked
-    const edgesWithCycle = await page.$$eval('.edge path', paths =>
-      paths.filter(path => path.classList.contains('linkCycle')).length
-    );
-    console.log(`Edges marked with linkCycle: ${edgesWithCycle}`);
-    expect(edgesWithCycle).toBeGreaterThan(0);
-    console.log('✓ Cycle detected! Edges marked with linkCycle class');
-    // Step 5: Break the cycle by deleting one edge and verify cycle detection clears
-    console.log('Step 3: Breaking cycle by deleting edge');
-    const firstEdge = await page.$('.edge');
-    await firstEdge.click();
-    await page.waitForTimeout(50);
-    await page.keyboard.press('Delete');
-    await page.waitForTimeout(100); // Give time for cycle detection to run
-    edges = await page.$$('.edge');
-    expect(edges.length).toBe(2);
-    const edgesAfterBreak = await page.$$eval('.edge path', paths =>
-      paths.filter(path => path.classList.contains('linkCycle')).length
-    );
-    expect(edgesAfterBreak).toBe(0);
-    console.log('✓ Cycle broken! No edges marked with linkCycle (cycle detection cleared)');
+    edges = await canvas.edgeCount(page);
+    if (canvas.mode === 'd3') {
+      expect(edges).toBe(3);
+      console.log('✓ Created 3rd edge, completing the cycle (A -> B -> C -> A)');
+      // Step 4: Verify cycle is detected - all edges in the cycle should be marked
+      const edgesWithCycle = await page.$$eval('.edge path', paths =>
+        paths.filter(path => path.classList.contains('linkCycle')).length
+      );
+      console.log(`Edges marked with linkCycle: ${edgesWithCycle}`);
+      expect(edgesWithCycle).toBeGreaterThan(0);
+      console.log('✓ Cycle detected! Edges marked with linkCycle class');
+      // Step 5: Break the cycle by deleting one edge and verify cycle detection clears
+      console.log('Step 3: Breaking cycle by deleting edge');
+      await canvas.selectFirstEdge(page);
+      await page.waitForTimeout(50);
+      await page.keyboard.press('Delete');
+      await page.waitForTimeout(100); // Give time for cycle detection to run
+      edges = await canvas.edgeCount(page);
+      expect(edges).toBe(2);
+      const edgesAfterBreak = await page.$$eval('.edge path', paths =>
+        paths.filter(path => path.classList.contains('linkCycle')).length
+      );
+      expect(edgesAfterBreak).toBe(0);
+      console.log('✓ Cycle broken! No edges marked with linkCycle (cycle detection cleared)');
+    } else {
+      // Flow board: the cycle-closing edge must have been rejected outright.
+      expect(edges).toBe(2);
+      console.log('✓ Cycle-closing connection was refused (edge count still 2)');
+    }
     console.log('✅ CYCLE DETECTION TEST PASSED');
   });
 
-  test('should save graph to file, clear with NEW, and load from file', async ({ page }) => {
+  test('should save graph to file, clear with NEW, and load from file', async ({ page, canvas }) => {
     console.log('\n=== SAVE/LOAD FILE TEST ===');
     // Step 1: Load a template to get some content
     console.log('Step 1: Loading a template to get initial content...');
@@ -2384,18 +2262,13 @@ def build_model():
     await page.waitForTimeout(150);
     // Step 2: Verify graph has content
     console.log('Step 2: Verifying graph has content...');
-    const layersAfterLoad = await page.$$('.d3Layer');
-    const edgesAfterLoad = await page.$$('.link');
-    console.log(`Layers after template load: ${layersAfterLoad.length}`);
-    console.log(`Edges after template load: ${edgesAfterLoad.length}`);
-    expect(layersAfterLoad.length).toBeGreaterThan(0);
-    // Store layer count and edge count for later comparison
-    const initialLayerCount = layersAfterLoad.length;
-    const initialEdgeCount = edgesAfterLoad.length;
+    const initialLayerCount = await canvas.layerCount(page);
+    const initialEdgeCount = await canvas.edgeCount(page);
+    console.log(`Layers after template load: ${initialLayerCount}`);
+    console.log(`Edges after template load: ${initialEdgeCount}`);
+    expect(initialLayerCount).toBeGreaterThan(0);
     // Get layer names for verification
-    const initialLayerNames = await page.$$eval('.d3Layer text', texts =>
-      texts.map(t => t.textContent)
-    );
+    const initialLayerNames = await canvas.layerLabels(page);
     console.log('Initial layer types:', initialLayerNames);
     // Step 3: Save the graph to a file
     console.log('Step 3: Saving graph to file...');
@@ -2428,13 +2301,12 @@ def build_model():
     await page.waitForTimeout(150);
     // Step 5: Verify the board is empty
     console.log('Step 5: Verifying board is empty...');
-    const layersAfterNew = await page.$$('.d3Layer');
-    const edgesAfterNew = await page.$$('.link');
-    console.log(`Layers after NEW: ${layersAfterNew.length}`);
-    console.log(`Edges after NEW: ${edgesAfterNew.length}`);
-    expect(layersAfterNew.length).toBe(0);
-    // Note: 1 virtual edge remains - it's used for instant edge spawning when user creates connections
-    expect(edgesAfterNew.length).toBeLessThanOrEqual(1);
+    const layersAfterNew = await canvas.layerCount(page);
+    const edgesAfterNew = await canvas.edgeCount(page);
+    console.log(`Layers after NEW: ${layersAfterNew}`);
+    console.log(`Edges after NEW: ${edgesAfterNew}`);
+    expect(layersAfterNew).toBe(0);
+    expect(edgesAfterNew).toBe(0);
     // Step 6: Load the saved file
     console.log('Step 6: Loading saved file...');
     const fileMenu4 = await page.$('text=File');
@@ -2451,16 +2323,14 @@ def build_model():
     await page.waitForTimeout(150);
     // Step 7: Verify the graph is restored correctly
     console.log('Step 7: Verifying graph restored from file...');
-    const layersAfterReload = await page.$$('.d3Layer');
-    const edgesAfterReload = await page.$$('.link');
-    console.log(`Layers after reload: ${layersAfterReload.length}`);
-    console.log(`Edges after reload: ${edgesAfterReload.length}`);
-    expect(layersAfterReload.length).toBe(initialLayerCount);
-    expect(edgesAfterReload.length).toBe(initialEdgeCount);
+    const layersAfterReload = await canvas.layerCount(page);
+    const edgesAfterReload = await canvas.edgeCount(page);
+    console.log(`Layers after reload: ${layersAfterReload}`);
+    console.log(`Edges after reload: ${edgesAfterReload}`);
+    expect(layersAfterReload).toBe(initialLayerCount);
+    expect(edgesAfterReload).toBe(initialEdgeCount);
     // Verify layer types match
-    const reloadedLayerNames = await page.$$eval('.d3Layer text', texts =>
-      texts.map(t => t.textContent)
-    );
+    const reloadedLayerNames = await canvas.layerLabels(page);
     console.log('Reloaded layer types:', reloadedLayerNames);
     expect(reloadedLayerNames.sort()).toEqual(initialLayerNames.sort());
     console.log('✅ SAVE/LOAD FILE TEST PASSED');

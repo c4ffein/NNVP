@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './helpers/canvas';
 
 // The dataset fetch target (https://datasets.nnvp.io) is unreachable in this
 // environment, so any dataset load is guaranteed to fail. We additionally abort
@@ -6,11 +6,11 @@ import { test, expect } from '@playwright/test';
 // of waiting on a ~25s connection-reset timeout. This still exercises the real
 // error path end-to-end (the component's load .catch -> visible error state).
 test.describe('Dataset load error handling', () => {
-  test('shows a visible error message and Retry button when a dataset fails to load', async ({ page }) => {
+  test('shows a visible error message and Retry button when a dataset fails to load', async ({ page, canvas }) => {
     // Make every dataset request fail fast.
     await page.route('https://datasets.nnvp.io/**', route => route.abort());
 
-    await page.goto('/');
+    await page.goto(canvas.home);
     await page.waitForTimeout(50);
 
     // Open the Training zone from the general menu.

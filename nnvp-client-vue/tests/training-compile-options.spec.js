@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './helpers/canvas';
 
 test.describe('Training Compile Options', () => {
   let consoleMessages = [];
@@ -16,7 +16,7 @@ test.describe('Training Compile Options', () => {
     await page.waitForTimeout(50);
   }
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, canvas }) => {
     consoleMessages = [];
     consoleErrors = [];
     page.on('console', msg => {
@@ -30,7 +30,7 @@ test.describe('Training Compile Options', () => {
     page.on('pageerror', error => {
       consoleErrors.push(`PAGE ERROR: ${error.message}`);
     });
-    await page.goto('/');
+    await page.goto(canvas.home);
     await page.waitForTimeout(50);
   });
 

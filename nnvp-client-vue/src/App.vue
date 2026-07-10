@@ -1,6 +1,10 @@
 <template>
   <div id="canvas-background" class="canvas-background">
-    <WhiteBoard :isTraining="isTraining"/>
+    <!-- Vue Flow is the default canvas since the FlowGraphEditor facade reached
+         feature parity; the D3 whiteboard stays reachable via ?canvas=d3 as an
+         escape hatch until it is deleted at the end of the migration. -->
+    <FlowBoard v-if="useFlowCanvas" :isTraining="isTraining"/>
+    <WhiteBoard v-else :isTraining="isTraining"/>
   </div>
   <div id="generalMenu" class="floating-panel general-menu"><GeneralMenu @open-trainer="openTrainer" @open-about="openAboutModal" @open-tutorial="startTutorial" @open-account="openAccount"/></div>
   <div id="layerCatalog" class="floating-panel layer-catalog"><LayerCatalog/></div>
@@ -20,6 +24,7 @@ import GeneralMenu from './components/GeneralMenu.vue';
 import LayerCatalog from './components/LayerCatalog/LayerCatalog.vue';
 import LayerOptions from './components/LayerOptions/LayerOptions.vue';
 import WhiteBoard from './components/WhiteBoard.vue';
+import FlowBoard from './components/FlowBoard/FlowBoard.vue';
 import TrainingZone from './components/TrainingZone/TrainingZone.vue';
 import AboutModal from './components/AboutModal.vue';
 import AccountPanel from './components/Account/AccountPanel.vue';
@@ -33,6 +38,7 @@ export default {
     LayerCatalog,
     LayerOptions,
     WhiteBoard,
+    FlowBoard,
     TrainingZone,
     AboutModal,
     AccountPanel,
@@ -70,6 +76,7 @@ export default {
   },
   data() {
     return {
+      useFlowCanvas: new URLSearchParams(window.location.search).get('canvas') !== 'd3',
       trainerHeight: 0,
       trainerOpenHeight: 50,
       showAboutModal: false,

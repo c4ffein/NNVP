@@ -1,12 +1,12 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './helpers/canvas';
 
 test.describe('Layer Help Modals', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+  test.beforeEach(async ({ page, canvas }) => {
+    await page.goto(canvas.home);
     await page.waitForTimeout(100);
   });
 
-  test('should show help button when layer is selected', async ({ page }) => {
+  test('should show help button when layer is selected', async ({ page, canvas }) => {
     console.log('\n=== LAYER HELP BUTTON TEST ===');
     // Load a template to get some layers
     console.log('Loading template...');
@@ -21,8 +21,8 @@ test.describe('Layer Help Modals', () => {
     await page.waitForTimeout(200);
     // Click on a Dense layer in the canvas to select it
     console.log('Selecting a layer...');
-    // Find a layer node (they have class 'd3Layer')
-    const layerNode = await page.$('.d3Layer');
+    // Find a layer node on the board (selector depends on the canvas mode)
+    const layerNode = await page.$(canvas.layer);
     expect(layerNode).not.toBeNull();
     // Click center of the layer
     const box = await layerNode.boundingBox();
@@ -39,7 +39,7 @@ test.describe('Layer Help Modals', () => {
     console.log('✓ Help button found');
   });
 
-  test('should open and close help modal when clicking help button', async ({ page }) => {
+  test('should open and close help modal when clicking help button', async ({ page, canvas }) => {
     console.log('\n=== HELP MODAL OPEN/CLOSE TEST ===');
     // Load template
     const fileMenu = await page.$('#GeneralMenu .menuTitle:has-text("File")');
@@ -52,7 +52,7 @@ test.describe('Layer Help Modals', () => {
     await template.click();
     await page.waitForTimeout(200);
     // Select a layer
-    const layerNode = await page.$('.d3Layer');
+    const layerNode = await page.$(canvas.layer);
     const box = await layerNode.boundingBox();
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
     await page.waitForTimeout(100);
@@ -85,7 +85,7 @@ test.describe('Layer Help Modals', () => {
     console.log('✓ Modal closed');
   });
 
-  test('should show Dense layer help content', async ({ page }) => {
+  test('should show Dense layer help content', async ({ page, canvas }) => {
     console.log('\n=== DENSE LAYER HELP CONTENT TEST ===');
     // Load template
     const fileMenu = await page.$('#GeneralMenu .menuTitle:has-text("File")');
@@ -98,7 +98,7 @@ test.describe('Layer Help Modals', () => {
     await template.click();
     await page.waitForTimeout(200);
     // Select a Dense layer
-    const layerNode = await page.$('.d3Layer');
+    const layerNode = await page.$(canvas.layer);
     const box = await layerNode.boundingBox();
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
     await page.waitForTimeout(100);
@@ -127,7 +127,7 @@ test.describe('Layer Help Modals', () => {
     await page.waitForTimeout(50);
   });
 
-  test('should close modal when clicking overlay', async ({ page }) => {
+  test('should close modal when clicking overlay', async ({ page, canvas }) => {
     console.log('\n=== MODAL OVERLAY CLOSE TEST ===');
     // Load template and select layer
     const fileMenu = await page.$('#GeneralMenu .menuTitle:has-text("File")');
@@ -139,7 +139,7 @@ test.describe('Layer Help Modals', () => {
     const template = await page.$('text=2D Dense for MNIST');
     await template.click();
     await page.waitForTimeout(200);
-    const layerNode = await page.$('.d3Layer');
+    const layerNode = await page.$(canvas.layer);
     const box = await layerNode.boundingBox();
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
     await page.waitForTimeout(100);

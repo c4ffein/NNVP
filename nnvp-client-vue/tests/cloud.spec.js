@@ -1,10 +1,10 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './helpers/canvas';
 
 // End-to-end for the optional cloud layer. The real Django Ninja backend is
 // never involved: every `**/api/**` call is intercepted with page.route and
 // answered from an in-memory fake, so this exercises the SPA's client + UI only.
 test.describe('Cloud accounts & projects', () => {
-  test('login -> save project -> see it listed -> open it', async ({ page }) => {
+  test('login -> save project -> see it listed -> open it', async ({ page, canvas }) => {
     // Point the app at a backend URL before any script runs, so the panel
     // starts in the "sign in" state rather than "no backend configured".
     await page.addInitScript(() => {
@@ -68,13 +68,13 @@ test.describe('Cloud accounts & projects', () => {
       else dialog.accept();
     });
 
-    await page.goto('/');
+    await page.goto(canvas.home);
     await page.waitForTimeout(150);
 
     // --- build a board we can round-trip ------------------------------------
     await page.click('.LayerTemplate:has-text("Dense")');
     await page.waitForTimeout(50);
-    await expect(page.locator('.d3Layer')).toHaveCount(1);
+    await expect(page.locator(canvas.layer)).toHaveCount(1);
 
     // --- sign in ------------------------------------------------------------
     await page.click('#GeneralMenu .menuTitle:has-text("Account")');
@@ -99,14 +99,14 @@ test.describe('Cloud accounts & projects', () => {
       window.d3Interface.activeGraph.clearBoard(true);
       window.d3Interface.activeGraph.updateGraph();
     });
-    await expect(page.locator('.d3Layer')).toHaveCount(0);
+    await expect(page.locator(canvas.layer)).toHaveCount(0);
 
     await page.click('#GeneralMenu .menuTitle:has-text("Account")');
     await expect(page.locator('.project-name:has-text("Cloud Model")')).toBeVisible();
     await page.click('.project-open:has-text("Cloud Model")');
 
     // Opening a project loads its graph back onto the board (UI updates).
-    await expect(page.locator('.d3Layer')).toHaveCount(1);
+    await expect(page.locator(canvas.layer)).toHaveCount(1);
 
     await page.screenshot({ path: '/tmp/h1-cloud.png', fullPage: true });
   });

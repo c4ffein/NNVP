@@ -1,8 +1,8 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './helpers/canvas';
 
 test.describe('MNIST Tutorial mode', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+  test.beforeEach(async ({ page, canvas }) => {
+    await page.goto(canvas.home);
     await page.waitForTimeout(50);
   });
 

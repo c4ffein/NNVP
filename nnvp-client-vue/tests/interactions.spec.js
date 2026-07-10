@@ -1,10 +1,10 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './helpers/canvas';
 
 test.describe('NNVP Interactions', () => {
   let consoleMessages = [];
   let consoleErrors = [];
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, canvas }) => {
     consoleMessages = [];
     consoleErrors = [];
     page.on('console', msg => {
@@ -18,7 +18,7 @@ test.describe('NNVP Interactions', () => {
     page.on('pageerror', error => {
       consoleErrors.push(`PAGE ERROR: ${error.message}`);
     });
-    await page.goto('/');
+    await page.goto(canvas.home);
     await page.waitForTimeout(50);
   });
 
@@ -111,17 +111,17 @@ test.describe('NNVP Interactions', () => {
     expect(consoleErrors.length).toBe(0);
   });
 
-  test('should have SVG canvas in whiteboard', async ({ page }) => {
-    const svg = await page.$('#svgWrapper svg');
-    expect(svg).not.toBeNull();
-    const svgBBox = await svg.boundingBox();
-    console.log('\n=== WHITEBOARD TEST ===');
-    console.log('SVG canvas found');
-    console.log('SVG dimensions:', svgBBox);
-    console.log('SVG has width:', svgBBox.width > 0);
-    console.log('SVG has height:', svgBBox.height > 0);
-    expect(svgBBox.width).toBeGreaterThan(0);
-    expect(svgBBox.height).toBeGreaterThan(0);
+  test('should have a canvas surface in the board', async ({ page, canvas }) => {
+    const pane = await page.$(canvas.pane);
+    expect(pane).not.toBeNull();
+    const paneBBox = await pane.boundingBox();
+    console.log('\n=== BOARD SURFACE TEST ===');
+    console.log('Canvas surface found');
+    console.log('Surface dimensions:', paneBBox);
+    console.log('Surface has width:', paneBBox.width > 0);
+    console.log('Surface has height:', paneBBox.height > 0);
+    expect(paneBBox.width).toBeGreaterThan(0);
+    expect(paneBBox.height).toBeGreaterThan(0);
     expect(consoleErrors.length).toBe(0);
   });
 
@@ -234,7 +234,7 @@ test.describe('NNVP Interactions', () => {
     expect(consoleErrors.length).toBe(0);
   });
 
-  test('should show beforeunload warning when graph has layers', async ({ page }) => {
+  test('should show beforeunload warning when graph has layers', async ({ page, canvas }) => {
     console.log('\n=== BEFOREUNLOAD WARNING TEST (GRAPH WITH LAYERS) ===');
     // Add a layer to the graph
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
@@ -242,9 +242,9 @@ test.describe('NNVP Interactions', () => {
     await denseLayer.click();
     await page.waitForTimeout(50);
     // Verify layer was added
-    const layers = await page.$$('.d3Layer');
-    console.log('Layers on canvas:', layers.length);
-    expect(layers.length).toBeGreaterThan(0);
+    const layersCount = await canvas.layerCount(page);
+    console.log('Layers on canvas:', layersCount);
+    expect(layersCount).toBeGreaterThan(0);
     // Now beforeunload should return a warning message
     const beforeunloadResult = await page.evaluate(() => {
       const event = new Event('beforeunload');

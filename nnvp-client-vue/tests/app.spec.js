@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './helpers/canvas';
 
 test.describe('NNVP App', () => {
   let consoleMessages = [];
@@ -39,8 +39,8 @@ test.describe('NNVP App', () => {
     }
   });
 
-  test('should load the app without console errors', async ({ page }) => {
-    await page.goto('/');
+  test('should load the app without console errors', async ({ page, canvas }) => {
+    await page.goto(canvas.home);
     // Wait a bit for the app to initialize
     await page.waitForTimeout(100);
     // Check if there are any errors
@@ -53,8 +53,8 @@ test.describe('NNVP App', () => {
     expect(consoleErrors.length).toBe(0);
   });
 
-  test('should render the main components', async ({ page }) => {
-    await page.goto('/');
+  test('should render the main components', async ({ page, canvas }) => {
+    await page.goto(canvas.home);
     await page.waitForTimeout(100);
     // Check for basic app structure
     const body = await page.textContent('body');
@@ -64,24 +64,24 @@ test.describe('NNVP App', () => {
     const generalMenu = await page.$('#generalMenu');
     const layerCatalog = await page.$('#layerCatalog');
     const layerOptions = await page.$('#layerOptions');
-    const whiteBoard = await page.$('#WhiteBoard');
+    const board = await page.$(canvas.board);
     console.log('\n=== COMPONENT CHECK ===');
     console.log('GeneralMenu rendered:', generalMenu !== null);
     console.log('LayerCatalog rendered:', layerCatalog !== null);
     console.log('LayerOptions rendered:', layerOptions !== null);
-    console.log('WhiteBoard rendered:', whiteBoard !== null);
+    console.log('Board rendered:', board !== null);
     expect(generalMenu).not.toBeNull();
     expect(layerCatalog).not.toBeNull();
     expect(layerOptions).not.toBeNull();
-    expect(whiteBoard).not.toBeNull();
+    expect(board).not.toBeNull();
     // TrainingZone should NOT be rendered initially (v-if="trainerHeight > 0")
     const trainingZone = await page.$('#trainingZone');
     console.log('TrainingZone rendered on load:', trainingZone !== null);
     expect(trainingZone).toBeNull();
   });
 
-  test('should display layer templates in layer catalog', async ({ page }) => {
-    await page.goto('/');
+  test('should display layer templates in layer catalog', async ({ page, canvas }) => {
+    await page.goto(canvas.home);
     await page.waitForTimeout(100);
     // Check if LayerCatalog has layer templates
     const layerCatalogContent = await page.textContent('#layerCatalog');
@@ -91,8 +91,8 @@ test.describe('NNVP App', () => {
     expect(layerCatalogContent.length).toBeGreaterThan(0);
   });
 
-  test('should position whiteboard canvas below GeneralMenu and right of LayerCatalog', async ({ page }) => {
-    await page.goto('/');
+  test('should position new layers below GeneralMenu and right of LayerCatalog', async ({ page, canvas }) => {
+    await page.goto(canvas.home);
     await page.waitForTimeout(100);
     // Get panel positions
     const generalMenu = await page.$('#generalMenu');
@@ -104,7 +104,7 @@ test.describe('NNVP App', () => {
     await denseLayer.click();
     await page.waitForTimeout(50);
     // Get the layer position
-    const canvasLayer = await page.$('.d3Layer');
+    const canvasLayer = await page.$(canvas.layer);
     const layerBox = await canvasLayer.boundingBox();
     console.log('\n=== WHITEBOARD POSITIONING TEST ===');
     console.log('GeneralMenu bottom:', menuBox.y + menuBox.height);
@@ -121,58 +121,46 @@ test.describe('NNVP App', () => {
     expect(clearOfCatalog).toBe(true);
   });
 
-  test('should pan the board correctly without resetting to 0,0', async ({ page }) => {
-    await page.goto('/');
+  test('should pan the board correctly without resetting to 0,0', async ({ page, canvas }) => {
+    await page.goto(canvas.home);
     await page.waitForTimeout(100);
     console.log('\n=== BOARD PANNING TEST ===');
-    // Get initial SVG transform
-    const svg = await page.$('#svgWrapper svg');
-    const svgBox = await svg.boundingBox();
-    const initialTransform = await page.evaluate(() => {
-      const svg = document.querySelector('#svgWrapper svg');
-      const g = svg.querySelector('g');
-      const transform = g.getAttribute('transform');
-      console.log('Initial transform:', transform);
-      return transform;
-    });
+    // Get initial viewport transform
+    const pane = await page.$(canvas.pane);
+    const paneBox = await pane.boundingBox();
+    const initialTransform = await canvas.viewportTransform(page);
     console.log('Initial transform:', initialTransform);
     // Add a layer to have a reference point
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
     await denseLayer.click();
     await page.waitForTimeout(50);
     // Get initial layer position
-    const initialLayerPos = await page.evaluate(() => {
-      const layer = document.querySelector('.d3Layer');
+    const initialLayerPos = await page.evaluate((layerSelector) => {
+      const layer = document.querySelector(layerSelector);
       const rect = layer.getBoundingClientRect();
       return { x: rect.x, y: rect.y };
-    });
+    }, canvas.layer);
     console.log('Initial layer position:', initialLayerPos);
     // Perform a pan by dragging on empty space
-    // Click and drag from center of SVG to pan it
-    const startX = svgBox.x + 400;
-    const startY = svgBox.y + 300;
+    // Click and drag from a point on the canvas clear of the new layer
+    const startX = paneBox.x + 400;
+    const startY = paneBox.y + 300;
     const endX = startX + 100; // Pan 100px to the right
     const endY = startY + 50;  // Pan 50px down
     console.log(`Panning from (${startX}, ${startY}) to (${endX}, ${endY})`);
     await page.mouse.move(startX, startY);
     await page.mouse.down();
     await page.waitForTimeout(100); // Small delay to ensure drag is recognized
-    await page.mouse.move(endX, endY);
+    await page.mouse.move(endX, endY, { steps: 5 });
     await page.mouse.up();
     await page.waitForTimeout(50);
     // Get final transform and layer position
-    const finalTransform = await page.evaluate(() => {
-      const svg = document.querySelector('#svgWrapper svg');
-      const g = svg.querySelector('g');
-      const transform = g.getAttribute('transform');
-      console.log('Final transform:', transform);
-      return transform;
-    });
-    const finalLayerPos = await page.evaluate(() => {
-      const layer = document.querySelector('.d3Layer');
+    const finalTransform = await canvas.viewportTransform(page);
+    const finalLayerPos = await page.evaluate((layerSelector) => {
+      const layer = document.querySelector(layerSelector);
       const rect = layer.getBoundingClientRect();
       return { x: rect.x, y: rect.y };
-    });
+    }, canvas.layer);
     console.log('Final transform:', finalTransform);
     console.log('Final layer position:', finalLayerPos);
     // Calculate how much the layer moved

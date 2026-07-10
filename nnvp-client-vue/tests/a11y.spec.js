@@ -1,10 +1,10 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './helpers/canvas';
 
 // Accessibility pass over the core UI chrome (menus, catalog, panels, dialogs).
 // Uses Playwright's native role/name queries rather than any heavy a11y dep.
 test.describe('Accessibility', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+  test.beforeEach(async ({ page, canvas }) => {
+    await page.goto(canvas.home);
     await page.waitForTimeout(100);
   });
 
@@ -33,14 +33,14 @@ test.describe('Accessibility', () => {
     await expect(page.getByRole('button', { name: 'Add Dense layer' })).toBeVisible();
   });
 
-  test('a layer can be added through keyboard activation of its catalog item', async ({ page }) => {
-    const before = await page.$$eval('.d3Layer', els => els.length);
+  test('a layer can be added through keyboard activation of its catalog item', async ({ page, canvas }) => {
+    const before = await canvas.layerCount(page);
     const denseButton = page.getByRole('button', { name: 'Add Dense layer' });
     await denseButton.focus();
     await expect(denseButton).toBeFocused();
     await page.keyboard.press('Enter');
     await page.waitForTimeout(50);
-    const after = await page.$$eval('.d3Layer', els => els.length);
+    const after = await canvas.layerCount(page);
     expect(after).toBe(before + 1);
   });
 
