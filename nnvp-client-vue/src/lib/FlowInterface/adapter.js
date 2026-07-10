@@ -168,6 +168,25 @@ export function flowToNnvp(nodes, edges) {
 
 // --- Editing helpers ---------------------------------------------------------
 
+/** True if `to` is reachable from `from` by following edges forward. */
+function reaches(edges, from, to) {
+  const outgoing = new Map();
+  edges.forEach((edge) => {
+    if (!outgoing.has(edge.source)) outgoing.set(edge.source, []);
+    outgoing.get(edge.source).push(edge.target);
+  });
+  const stack = [from];
+  const seen = new Set();
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (current === to) return true;
+    if (seen.has(current)) continue; // eslint-disable-line no-continue
+    seen.add(current);
+    (outgoing.get(current) || []).forEach(next => stack.push(next));
+  }
+  return false;
+}
+
 /**
  * True if adding source -> target would close a directed cycle (i.e. source is
  * already reachable FROM target), or if it duplicates an existing edge, or
@@ -176,21 +195,18 @@ export function flowToNnvp(nodes, edges) {
 export function isInvalidConnection(edges, source, target) {
   if (source === target) return true;
   if (edges.some(edge => edge.source === source && edge.target === target)) return true;
-  const outgoing = new Map();
-  edges.forEach((edge) => {
-    if (!outgoing.has(edge.source)) outgoing.set(edge.source, []);
-    outgoing.get(edge.source).push(edge.target);
-  });
-  const stack = [target];
-  const seen = new Set();
-  while (stack.length > 0) {
-    const current = stack.pop();
-    if (current === source) return true;
-    if (seen.has(current)) continue; // eslint-disable-line no-continue
-    seen.add(current);
-    (outgoing.get(current) || []).forEach(next => stack.push(next));
-  }
-  return false;
+  return reaches(edges, target, source);
+}
+
+/**
+ * True if an EXISTING edge lies on a directed cycle: its target reaches back
+ * to its source (that path plus the edge itself closes the loop). Interactive
+ * connections can't create cycles (isInvalidConnection refuses them), but
+ * cyclic graphs saved on the D3 board still load — the flow board marks such
+ * edges with the same error color as D3's linkCycle.
+ */
+export function edgeInCycle(edges, edge) {
+  return reaches(edges, edge.target, edge.source);
 }
 
 /** Next free numeric layer id, so board-created nodes never collide. */

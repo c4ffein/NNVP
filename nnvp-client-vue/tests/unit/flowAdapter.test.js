@@ -2,8 +2,8 @@ import { describe, it, expect } from 'bun:test';
 import D3Templates from '../../src/lib/D3Interface/D3Templates';
 import KerasGenerator from '../../src/lib/KerasInterface/KerasGenerator';
 import {
-  nnvpToFlow, flowToNnvp, isInvalidConnection, nextLayerId, newLayerNode, groupSelected,
-  LAYER_NODE, COMPOSITE_NODE,
+  nnvpToFlow, flowToNnvp, isInvalidConnection, edgeInCycle, nextLayerId, newLayerNode,
+  groupSelected, LAYER_NODE, COMPOSITE_NODE,
 } from '../../src/lib/FlowInterface/adapter';
 
 // KerasGenerator mutates the graph it is given, so always feed it a fresh parse.
@@ -141,6 +141,31 @@ describe('isInvalidConnection', () => {
   it('accepts a new forward or branching connection', () => {
     expect(isInvalidConnection(edges, '0', '2')).toBe(false);
     expect(isInvalidConnection(edges, '2', '3')).toBe(false);
+  });
+});
+
+describe('edgeInCycle', () => {
+  it('flags every edge of a loaded cycle, but not branches off it', () => {
+    // 0 -> 1 -> 2 -> 0 (cycle, as a D3-made file could contain), 2 -> 3 (branch)
+    const edges = [
+      { source: '0', target: '1' },
+      { source: '1', target: '2' },
+      { source: '2', target: '0' },
+      { source: '2', target: '3' },
+    ];
+    expect(edgeInCycle(edges, edges[0])).toBe(true);
+    expect(edgeInCycle(edges, edges[1])).toBe(true);
+    expect(edgeInCycle(edges, edges[2])).toBe(true);
+    expect(edgeInCycle(edges, edges[3])).toBe(false);
+  });
+
+  it('flags nothing in a DAG', () => {
+    const edges = [
+      { source: '0', target: '1' },
+      { source: '0', target: '2' },
+      { source: '1', target: '2' },
+    ];
+    edges.forEach(edge => expect(edgeInCycle(edges, edge)).toBe(false));
   });
 });
 

@@ -10,6 +10,7 @@
     </div>
     <VueFlow
       :node-types="nodeTypes"
+      :edge-types="edgeTypes"
       :is-valid-connection="validConnection"
       :delete-key-code="null"
       :min-zoom="0.2"
@@ -19,7 +20,11 @@
       @node-drag-stop="commit"
       @nodes-delete="commit"
       @edges-delete="commit"
-    />
+    >
+      <template #connection-line="connectionLineProps">
+        <FloatingConnectionLine v-bind="connectionLineProps" />
+      </template>
+    </VueFlow>
   </div>
 </template>
 
@@ -34,6 +39,8 @@ import {
 import FlowGraphEditor from '../../lib/FlowInterface/FlowGraphEditor';
 import LayerNode from './LayerNode.vue';
 import CompositeNode from './CompositeNode.vue';
+import FloatingEdge from './FloatingEdge.vue';
+import FloatingConnectionLine from './FloatingConnectionLine.vue';
 
 defineProps({
   isTraining: { type: Boolean, default: false },
@@ -42,6 +49,13 @@ defineProps({
 const nodeTypes = {
   [LAYER_NODE]: markRaw(LayerNode),
   [COMPOSITE_NODE]: markRaw(CompositeNode),
+};
+
+// Overriding the 'default' edge type makes every edge floating (they attach
+// to the nearest border point instead of fixed handles) without the adapter
+// or the model ever storing an edge type.
+const edgeTypes = {
+  default: markRaw(FloatingEdge),
 };
 
 const {
@@ -154,8 +168,23 @@ function onFileChosen(event) {
     transform: rotate(360deg);
   }
 }
+/* Edges are drawn source -> target (see FloatingEdge.vue), so a forward
+   dash-offset animation makes the dashes travel in the data-flow direction. */
 .flow-board .vue-flow__edge-path {
   stroke: var(--edge-color);
+  stroke-dasharray: 5 3;
+  animation: flow-edge-dash 0.6s linear infinite;
+}
+@keyframes flow-edge-dash {
+  from {
+    stroke-dashoffset: 8;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.flow-board .vue-flow__edge-path.flow-edge-cycle {
+  stroke: var(--edge-error);
 }
 .flow-board .vue-flow__edge.selected .vue-flow__edge-path {
   stroke: var(--edge-selected);

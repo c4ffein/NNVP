@@ -70,12 +70,12 @@ function makeDriver(mode) {
     sourceAnchorOf(page, index) {
       return d3
         ? page.locator(driver.layer).nth(index).locator('circle.bottom-point')
-        : page.locator(driver.layer).nth(index).locator('.vue-flow__handle[data-handleid="s-bottom"]');
+        : page.locator(driver.layer).nth(index).locator('.vue-flow__handle[data-handleid="s-right"]');
     },
     targetDropOf(page, index) {
       return d3
         ? page.locator(driver.layer).nth(index).locator('rect').first()
-        : page.locator(driver.layer).nth(index).locator('.vue-flow__handle[data-handleid="t-top"]');
+        : page.locator(driver.layer).nth(index).locator('.vue-flow__handle[data-handleid="t-left"]');
     },
 
     // Drag a connection from the nth layer's output anchor to the mth layer.
