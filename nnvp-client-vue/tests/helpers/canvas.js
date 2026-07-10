@@ -1,35 +1,32 @@
 import { test as base } from '@playwright/test';
 
-// Canvas driver: hides the DOM differences between the two boards so the same
-// specs run against both. The Playwright project picks the mode via the
-// `canvasMode` option (see playwright.config.js): `flow` (the default canvas,
-// Vue Flow) or `d3` (the legacy whiteboard, reached with ?canvas=d3).
+// Canvas driver for the Vue Flow board. Historically this hid the DOM
+// differences between the D3 whiteboard and the flow board so every spec ran
+// against both; the D3 board is gone, but specs keep addressing the canvas
+// through this driver.
 //
-// Layer ids are the same in both modes: creation order 0..n (D3's getNodeId
-// and the adapter's nextLayerId both hand out the first free integer), so
-// specs can address nodes by id through the driver.
+// Layer ids are creation order 0..n (the adapter's nextLayerId hands out the
+// first free integer), so specs can address nodes by id through the driver.
 
-function makeDriver(mode) {
-  const d3 = mode === 'd3';
+function makeDriver() {
   const driver = {
-    mode,
-    // Where beforeEach should navigate: the flow board is the default canvas,
-    // the D3 whiteboard stays reachable behind ?canvas=d3.
-    home: d3 ? '/?canvas=d3' : '/',
+    mode: 'flow',
+    // Where beforeEach should navigate.
+    home: '/',
     // Selector for layer nodes on the board (NOT composites).
-    layer: d3 ? '.d3Layer' : '.vue-flow__node-layer',
+    layer: '.vue-flow__node-layer',
     // Selector for composite (grouped) nodes.
-    composite: d3 ? '.d3CompositeLayer' : '.vue-flow__node-composite',
+    composite: '.vue-flow__node-composite',
     // Selector matching one element per layer whose textContent is its label.
-    label: d3 ? '.d3Layer text' : '.vue-flow__node-layer .flow-layer-label',
+    label: '.vue-flow__node-layer .flow-layer-label',
     // Selector for connections between layers.
-    edge: d3 ? '.link:not(.dragline)' : '.vue-flow__edge',
+    edge: '.vue-flow__edge',
     // The board component's root element.
-    board: d3 ? '#WhiteBoard' : '#FlowBoard',
+    board: '#FlowBoard',
     // The empty canvas surface (click it to deselect).
-    pane: d3 ? '#svgWrapper svg' : '.vue-flow__pane',
-    // A specific layer, by the integer id both editors assign in creation order.
-    layerById: id => (d3 ? `#d3-layer-${id}` : `.vue-flow__node[data-id="${id}"]`),
+    pane: '.vue-flow__pane',
+    // A specific layer, by the integer id the editor assigns in creation order.
+    layerById: id => `.vue-flow__node[data-id="${id}"]`,
 
     async layerCount(page) {
       return page.locator(driver.layer).count();
@@ -45,37 +42,26 @@ function makeDriver(mode) {
     },
 
     // The current pan/zoom transform of the board, as an opaque string that
-    // changes when the viewport moves (D3: <g transform>, flow: CSS transform).
+    // changes when the viewport moves.
     async viewportTransform(page) {
-      if (d3) {
-        return page.$eval('#svgWrapper svg g', g => g.getAttribute('transform'));
-      }
       return page.$eval('.vue-flow__transformationpane', el => el.style.transform);
     },
 
     // Move a layer to absolute board coordinates through the debug editor
-    // handle (both editors are exposed as window.nnvp.debug.graphEditor).
+    // handle (the editor is exposed as window.nnvp.debug.graphEditor).
     async moveLayer(page, id, x, y) {
-      await page.evaluate(([layerId, posX, posY, isD3]) => {
-        const editor = window.nnvp.debug.graphEditor;
-        if (isD3) editor.findLayerById(layerId).transitionToXY(posX, posY);
-        else editor.moveLayerTo(layerId, posX, posY);
-      }, [id, x, y, d3]);
+      await page.evaluate(([layerId, posX, posY]) => {
+        window.nnvp.debug.graphEditor.moveLayerTo(layerId, posX, posY);
+      }, [id, x, y]);
     },
 
-    // The output anchor / target drop area of the nth layer on the board.
-    // Index-based on purpose: after delete + re-add the two editors hand out
-    // DIFFERENT ids (D3 refills gaps, flow always uses max+1), but the nth
-    // layer element is the nth-created in both.
+    // The output anchor / target drop handle of the nth layer on the board.
+    // Index-based on purpose so specs survive delete + re-add id renumbering.
     sourceAnchorOf(page, index) {
-      return d3
-        ? page.locator(driver.layer).nth(index).locator('circle.bottom-point')
-        : page.locator(driver.layer).nth(index).locator('.vue-flow__handle[data-handleid="s-right"]');
+      return page.locator(driver.layer).nth(index).locator('.vue-flow__handle[data-handleid="s-right"]');
     },
     targetDropOf(page, index) {
-      return d3
-        ? page.locator(driver.layer).nth(index).locator('rect').first()
-        : page.locator(driver.layer).nth(index).locator('.vue-flow__handle[data-handleid="t-left"]');
+      return page.locator(driver.layer).nth(index).locator('.vue-flow__handle[data-handleid="t-left"]');
     },
 
     // Drag a connection from the nth layer's output anchor to the mth layer.
@@ -97,17 +83,14 @@ function makeDriver(mode) {
       await page.mouse.up();
     },
 
-    // Click the first edge to select it. Both boards mark the selection with
-    // a `selected` class on the edge root element. Curved edges can run under
-    // the nodes they connect, so walk the path geometry and click the first
+    // Click the first edge to select it. The selection is marked with a
+    // `selected` class on the edge root element. Edges can run under the
+    // nodes they connect, so walk the path geometry and click the first
     // point where the edge itself is the hit target.
     async selectFirstEdge(page) {
-      const [pathSelector, edgeSelector] = d3
-        ? ['.edge path', '.edge']
-        : ['.vue-flow__edge path', '.vue-flow__edge'];
-      const point = await page.evaluate(([pathSel, edgeSel]) => {
-        const path = document.querySelector(pathSel);
-        const edge = path.closest(edgeSel);
+      const point = await page.evaluate(() => {
+        const path = document.querySelector('.vue-flow__edge path');
+        const edge = path.closest('.vue-flow__edge');
         const total = path.getTotalLength();
         const ctm = path.getScreenCTM();
         const toScreen = (p) => ({
@@ -117,16 +100,16 @@ function makeDriver(mode) {
         for (const t of [0.5, 0.4, 0.6, 0.3, 0.7, 0.2, 0.8, 0.1, 0.9]) {
           const screen = toScreen(path.getPointAtLength(total * t));
           const hit = document.elementFromPoint(screen.x, screen.y);
-          if (hit && hit.closest(edgeSel) === edge) return screen;
+          if (hit && hit.closest('.vue-flow__edge') === edge) return screen;
         }
         return toScreen(path.getPointAtLength(total / 2));
-      }, [pathSelector, edgeSelector]);
+      });
       await page.mouse.click(point.x, point.y);
     },
-    selectedEdge: d3 ? '.edge.selected' : '.vue-flow__edge.selected',
+    selectedEdge: '.vue-flow__edge.selected',
 
     // Click an empty spot on the canvas to clear the selection: right of the
-    // catalog, near the bottom, where neither board places nodes by default.
+    // catalog, near the bottom, where the board places no nodes by default.
     async deselect(page) {
       const box = await page.locator(driver.pane).boundingBox();
       await page.mouse.click(box.x + 260, box.y + box.height - 40);
@@ -152,10 +135,8 @@ function makeDriver(mode) {
 }
 
 export const test = base.extend({
-  // Overridden per Playwright project in playwright.config.js.
-  canvasMode: ['flow', { option: true }],
-  canvas: async ({ canvasMode }, use) => {
-    await use(makeDriver(canvasMode));
+  canvas: async ({}, use) => { // eslint-disable-line no-empty-pattern
+    await use(makeDriver());
   },
 });
 

@@ -47,31 +47,55 @@
              default so the assistant cannot mutate the model without opt-in. -->
         <div class="chat-mode-row">
           <span class="chat-mode-label">Mode</span>
-          <div class="chat-mode-toggle" role="group" aria-label="Assistant mode">
+          <div class="chat-mode-controls">
             <button
               type="button"
-              :class="['chat-mode-btn', { active: !allowEdits }]"
-              :aria-pressed="!allowEdits"
-              @click="setMode(false)"
-            >
-              Read-only
-            </button>
-            <button
-              type="button"
-              :class="['chat-mode-btn', { active: allowEdits }]"
-              :aria-pressed="allowEdits"
-              @click="setMode(true)"
-            >
-              Allow edits
-            </button>
+              class="help-icon"
+              aria-label="About assistant modes"
+              @click="showModeHelp = true"
+            >?</button>
+            <div class="chat-mode-toggle" role="group" aria-label="Assistant mode">
+              <button
+                type="button"
+                :class="['chat-mode-btn', { active: !allowEdits }]"
+                :aria-pressed="!allowEdits"
+                @click="setMode(false)"
+              >
+                Read-only
+              </button>
+              <button
+                type="button"
+                :class="['chat-mode-btn', 'chat-mode-btn-edits', { active: allowEdits }]"
+                :aria-pressed="allowEdits"
+                @click="setMode(true)"
+              >
+                Allow edits
+              </button>
+            </div>
           </div>
         </div>
-        <div v-if="allowEdits" class="chat-mode-hint chat-mode-hint-warn">
-          The assistant can modify your model (add/delete layers, change parameters).
-        </div>
-        <div v-else class="chat-mode-hint">
-          Read-only: the assistant can inspect and generate code, but not change the model.
-        </div>
+
+        <!-- Mode help modal (reuses the app-wide help modal styling) -->
+        <Teleport to="body">
+          <Transition name="modal">
+          <div v-if="showModeHelp" class="layer-help-modal-overlay" @click="showModeHelp = false">
+            <div
+              class="layer-help-modal-container"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Assistant modes help"
+              @click.stop
+            >
+              <button class="layer-help-modal-close" aria-label="Close" @click="showModeHelp = false">&times;</button>
+              <div class="layer-help-modal-body">
+                <h2>Assistant modes</h2>
+                <p><strong>Read-only:</strong> the assistant can inspect your model and generate code, but cannot change anything.</p>
+                <p><strong>Allow edits:</strong> the assistant can modify your model — add or delete layers, change parameters, undo and redo.</p>
+              </div>
+            </div>
+          </div>
+          </Transition>
+        </Teleport>
 
         <div class="chat-messages" ref="messagesEl">
           <div v-if="!hasKey" class="chat-empty">
@@ -152,6 +176,7 @@ export default {
     return {
       open: false,
       settingsOpen: false,
+      showModeHelp: false,
       draft: '',
       sending: false,
       messages: [],
@@ -317,6 +342,7 @@ export default {
   display: flex;
   flex-direction: column;
   overflow: visible;
+  color: var(--text-primary);
 }
 
 .chat-header {
@@ -391,13 +417,19 @@ export default {
 
 .chat-mode-label {
   font-size: 12px;
-  color: #666666;
+  color: var(--text-muted);
   font-weight: var(--font-weight-medium);
+}
+
+.chat-mode-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .chat-mode-toggle {
   display: inline-flex;
-  border: 1px solid #cccccc;
+  border: 1px solid var(--input-border);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -412,20 +444,15 @@ export default {
 }
 
 .chat-mode-btn.active {
-  background-color: #000000;
-  color: #ffffff;
+  background-color: var(--fill-strong);
+  color: var(--fill-strong-text);
 }
 
-.chat-mode-hint {
-  padding: 6px 14px;
-  font-size: 11px;
-  color: #666666;
-  border-bottom: 1px solid var(--panel-border);
-}
-
-.chat-mode-hint-warn {
-  color: #92400e;
-  background-color: #fef3c7;
+/* "Allow edits" active = same color as a selected layer on the board: the
+   assistant being able to touch the model reads like a selection. */
+.chat-mode-btn-edits.active {
+  background-color: var(--node-selected-fill);
+  color: var(--node-text);
 }
 
 .chat-btn {

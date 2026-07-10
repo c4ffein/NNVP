@@ -28,6 +28,7 @@
 
     <!-- Help Modal -->
     <Teleport to="body">
+      <Transition name="modal">
       <div v-if="showModal" class="layer-help-modal-overlay" @click="closeModal">
         <div
           class="layer-help-modal-container"
@@ -42,6 +43,7 @@
           </div>
         </div>
       </div>
+      </Transition>
     </Teleport>
   </div>
 </template>
@@ -110,16 +112,16 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border: 1px solid #000000;
+  border: 1px solid var(--border-color);
   border-radius: 15px;
   cursor: pointer;
   padding: 10px 12px;
   font-weight: var(--font-weight-semibold);
-  color: #000000;
+  color: var(--text-primary);
   transition: all 0.15s ease;
 }
 .ParamsBlock > .layer-title > .arrow {
-  color: #000000;
+  color: var(--text-primary);
   height: 15px;
   width: 15px;
   transform: rotate(180deg);
@@ -133,7 +135,7 @@ export default {
 }
 .ParamsBlock.params-list {
   padding: 12px 4px;
-  color: #000000;
+  color: var(--text-primary);
 }
 .ParamsBlock.params-list.closed {
   height: 0;
@@ -154,8 +156,8 @@ export default {
   padding: 0;
   border: none;
   border-radius: 50%;
-  background: #000000;
-  color: #ffffff;
+  background: var(--fill-strong);
+  color: var(--fill-strong-text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -167,17 +169,17 @@ export default {
 }
 
 .help-icon:hover {
-  background: #333333;
+  opacity: 0.85;
   transform: scale(1.1);
 }
 
 .help-icon:focus-visible {
-  outline: 2px solid #000000;
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
 .ParamsBlock.layer-title:focus-visible {
-  outline: 2px solid #000000;
+  outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
 
@@ -188,7 +190,7 @@ export default {
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: transparent;
+  background-color: var(--modal-scrim);
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -197,9 +199,9 @@ export default {
 }
 
 .layer-help-modal-container {
-  background: #ffffff;
+  background: var(--bg-panel);
   border-radius: 15px;
-  border: 1px solid #000000;
+  border: 1px solid var(--border-color);
   max-width: 600px;
   width: 90%;
   max-height: 85vh;
@@ -209,7 +211,7 @@ export default {
   padding: 32px;
   font-family: var(--font-regular);
   font-weight: var(--font-weight-regular);
-  color: #000000;
+  color: var(--text-primary);
   line-height: 1.6;
   text-align: left;
 }
@@ -222,7 +224,7 @@ export default {
   border: none;
   font-size: 32px;
   line-height: 1;
-  color: #000000;
+  color: var(--text-primary);
   cursor: pointer;
   padding: 0;
   width: 32px;
@@ -242,7 +244,7 @@ export default {
   margin-bottom: 16px;
   font-size: 24px;
   font-weight: var(--font-weight-semibold);
-  color: #000000;
+  color: var(--text-primary);
 }
 
 .layer-help-modal-body h3 {
@@ -250,7 +252,7 @@ export default {
   margin-bottom: 12px;
   font-size: 18px;
   font-weight: var(--font-weight-semibold);
-  color: #000000;
+  color: var(--text-primary);
 }
 
 .layer-help-modal-body p {
@@ -271,15 +273,15 @@ export default {
   display: block;
   margin-top: 16px;
   font-style: italic;
-  color: #666666;
+  color: var(--text-muted);
 }
 
 .layer-help-modal-body a {
-  color: #0066cc;
+  color: var(--accent);
   text-decoration: underline;
 }
 
 .layer-help-modal-body a:hover {
-  color: #0052a3;
+  color: var(--accent-hover);
 }
 </style>

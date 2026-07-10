@@ -25,6 +25,18 @@
           </section>
 
           <section>
+            <h2>Tutorials</h2>
+            <p>
+              New here? Guided tutorials walk you through the editor hands-on —
+              from placing your first layer to training a network. Track your
+              progress from the tutorial menu.
+            </p>
+            <button type="button" class="about-tutorials-button" @click="openTutorials">
+              Open the tutorial menu
+            </button>
+          </section>
+
+          <section>
             <h2>Open Source</h2>
             <p>
               NNVP is <strong>open source</strong> under the MIT License.
@@ -43,9 +55,6 @@
             <p>
               NNVP is in active development. While most features work well,
               not all Keras layer parameters are implemented yet, and you may experience occasional glitches.
-            </p>
-            <p class="note">
-              Future improvements include refactoring, additional features, and enhanced educational capabilities.
             </p>
           </section>
         </div>
@@ -72,6 +81,9 @@ export default {
   methods: {
     closeModal() {
       this.$emit('close');
+    },
+    openTutorials() {
+      this.$emit('open-tutorials');
     },
     onOpen() {
       // Remember what had focus so we can return it when the dialog closes.
@@ -132,7 +144,7 @@ export default {
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: transparent;
+  background-color: var(--modal-scrim);
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -141,9 +153,9 @@ export default {
 }
 
 .modal-container {
-  background: #ffffff;
+  background: var(--bg-panel);
   border-radius: 15px;
-  border: 1px solid #000000;
+  border: 1px solid var(--border-color);
   max-width: 480px;
   width: 90%;
   max-height: 85vh;
@@ -161,7 +173,7 @@ export default {
   border: none;
   font-size: 32px;
   line-height: 1;
-  color: #000000;
+  color: var(--text-primary);
   cursor: pointer;
   padding: 0;
   width: 32px;
@@ -177,7 +189,7 @@ export default {
 }
 
 .modal-close:focus-visible {
-  outline: 2px solid #000000;
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -185,7 +197,7 @@ export default {
 .modal-content {
   font-family: var(--font-regular);
   font-weight: var(--font-weight-regular);
-  color: #000000;
+  color: var(--text-primary);
   line-height: 1.6;
   text-align: left;
 }
@@ -195,7 +207,7 @@ export default {
   font-weight: var(--font-weight-semibold);
   font-size: 2em;
   margin: 0 0 6px 0;
-  color: #000000;
+  color: var(--text-primary);
   text-align: left;
 }
 
@@ -203,7 +215,7 @@ export default {
   font-family: var(--font-regular);
   font-weight: var(--font-weight-regular);
   font-size: 1em;
-  color: #000000;
+  color: var(--text-primary);
   margin: 0 0 24px 0;
   text-align: left;
 }
@@ -213,8 +225,8 @@ export default {
   font-weight: var(--font-weight-medium);
   font-size: 1.2em;
   margin: 24px 0 12px 0;
-  color: #000000;
-  border-bottom: 1px solid #000000;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
   padding-bottom: 6px;
 }
 
@@ -228,7 +240,7 @@ export default {
 }
 
 .modal-content a {
-  color: #000000;
+  color: var(--text-primary);
   text-decoration: none;
   font-weight: var(--font-weight-medium);
   display: inline-block;
@@ -248,7 +260,7 @@ export default {
 
 .tech-stack li {
   padding: 8px 0;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--panel-border);
 }
 
 .tech-stack li:last-child {
@@ -258,33 +270,31 @@ export default {
 .tech-stack strong {
   font-family: var(--font-medium);
   font-weight: var(--font-weight-medium);
-  color: #000000;
+  color: var(--text-primary);
 }
 
-.note {
-  font-size: 0.95em;
-  color: #000000;
-  font-style: italic;
+.about-tutorials-button {
+  margin-top: 4px;
+  padding: 8px 16px;
+  font-family: var(--font-regular);
+  font-size: 14px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-text);
+  cursor: pointer;
+  transition: transform 0.15s ease;
 }
 
-/* Transition animations */
-.modal-enter-active,
-.modal-leave-active {
-  transition: all 0.4s ease-out;
+.about-tutorials-button:hover {
+  transform: translate(1px, -1px);
 }
 
-.modal-enter-active .modal-container,
-.modal-leave-active .modal-container {
-  transition: transform 0.4s ease-out;
+.about-tutorials-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
-.modal-enter-from .modal-container {
-  transform: translateY(-100vh);
-}
-
-.modal-leave-to .modal-container {
-  transform: translateY(-100vh);
-}
 
 /* Scrollbar styling */
 .modal-container::-webkit-scrollbar {
@@ -292,12 +302,12 @@ export default {
 }
 
 .modal-container::-webkit-scrollbar-track {
-  background: #f5f5f5;
+  background: var(--bg-elevated);
   border-radius: 4px;
 }
 
 .modal-container::-webkit-scrollbar-thumb {
-  background: #000000;
+  background: var(--input-border);
   border-radius: 4px;
 }
 

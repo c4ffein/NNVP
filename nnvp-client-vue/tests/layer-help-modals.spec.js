@@ -21,7 +21,7 @@ test.describe('Layer Help Modals', () => {
     await page.waitForTimeout(200);
     // Click on a Dense layer in the canvas to select it
     console.log('Selecting a layer...');
-    // Find a layer node on the board (selector depends on the canvas mode)
+    // Find a layer node on the board
     const layerNode = await page.$(canvas.layer);
     expect(layerNode).not.toBeNull();
     // Click center of the layer
@@ -34,7 +34,7 @@ test.describe('Layer Help Modals', () => {
     expect(layerTitle).not.toBeNull();
     // Check for help button (? icon)
     console.log('Checking for help button...');
-    const helpButton = await page.$('.help-icon');
+    const helpButton = await page.$('#layerOptions .help-icon');
     expect(helpButton).not.toBeNull();
     console.log('✓ Help button found');
   });
@@ -58,7 +58,7 @@ test.describe('Layer Help Modals', () => {
     await page.waitForTimeout(100);
     // Click help button
     console.log('Clicking help button...');
-    const helpButton = await page.$('.help-icon');
+    const helpButton = await page.$('#layerOptions .help-icon');
     await helpButton.click();
     await page.waitForTimeout(100);
     // Check modal appeared
@@ -80,8 +80,8 @@ test.describe('Layer Help Modals', () => {
     await closeButton.click();
     await page.waitForTimeout(100);
     // Check modal disappeared
-    const modalAfterClose = await page.$('.layer-help-modal-overlay');
-    expect(modalAfterClose).toBeNull();
+    // Auto-retrying: the modal fades/slides out over ~350ms before unmounting.
+    await expect(page.locator('.layer-help-modal-overlay')).toHaveCount(0);
     console.log('✓ Modal closed');
   });
 
@@ -107,7 +107,7 @@ test.describe('Layer Help Modals', () => {
     const titleText = await layerTitle.textContent();
     console.log('Selected layer:', titleText.trim());
     // Click help button
-    const helpButton = await page.$('.help-icon');
+    const helpButton = await page.$('#layerOptions .help-icon');
     await helpButton.click();
     await page.waitForTimeout(100);
     // Check modal content for Dense layer
@@ -127,6 +127,25 @@ test.describe('Layer Help Modals', () => {
     await page.waitForTimeout(50);
   });
 
+  test('should open layer help from the catalog hover ? button', async ({ page }) => {
+    console.log('\n=== CATALOG HELP BUTTON TEST ===');
+    const row = page.locator('#layer-template-Dense');
+    await row.hover();
+    const help = row.locator('.layer-template-help');
+    await expect(help).toBeVisible();
+    await help.click();
+    await page.waitForTimeout(100);
+    const modalBody = page.locator('.layer-help-modal-body');
+    await expect(modalBody).toBeVisible();
+    await expect(modalBody).toContainText('Dense Layer');
+    // The help click must NOT have added a layer to the board.
+    await expect(page.locator('.vue-flow__node-layer')).toHaveCount(0);
+    // Close with the X.
+    await page.click('.layer-help-modal-close');
+    await expect(page.locator('.layer-help-modal-overlay')).toHaveCount(0);
+    console.log('✓ Catalog help works');
+  });
+
   test('should close modal when clicking overlay', async ({ page, canvas }) => {
     console.log('\n=== MODAL OVERLAY CLOSE TEST ===');
     // Load template and select layer
@@ -144,7 +163,7 @@ test.describe('Layer Help Modals', () => {
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
     await page.waitForTimeout(100);
     // Open modal
-    const helpButton = await page.$('.help-icon');
+    const helpButton = await page.$('#layerOptions .help-icon');
     await helpButton.click();
     await page.waitForTimeout(100);
     // Click overlay (not the modal content)
@@ -155,8 +174,8 @@ test.describe('Layer Help Modals', () => {
     await page.mouse.click(overlayBox.x + 10, overlayBox.y + 10);
     await page.waitForTimeout(100);
     // Check modal closed
-    const modalAfterClick = await page.$('.layer-help-modal-overlay');
-    expect(modalAfterClick).toBeNull();
+    // Auto-retrying: the modal fades/slides out over ~350ms before unmounting.
+    await expect(page.locator('.layer-help-modal-overlay')).toHaveCount(0);
     console.log('✓ Modal closed by clicking overlay');
   });
 });

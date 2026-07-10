@@ -1,21 +1,18 @@
 <template>
   <div id="canvas-background" class="canvas-background">
-    <!-- Vue Flow is the default canvas since the FlowGraphEditor facade reached
-         feature parity; the D3 whiteboard stays reachable via ?canvas=d3 as an
-         escape hatch until it is deleted at the end of the migration. -->
-    <FlowBoard v-if="useFlowCanvas" :isTraining="isTraining"/>
-    <WhiteBoard v-else :isTraining="isTraining"/>
+    <FlowBoard :isTraining="isTraining"/>
   </div>
-  <div id="generalMenu" class="floating-panel general-menu"><GeneralMenu @open-trainer="openTrainer" @open-about="openAboutModal" @open-tutorial="startTutorial" @open-account="openAccount"/></div>
+  <div id="generalMenu" class="floating-panel general-menu"><GeneralMenu @open-trainer="openTrainer" @open-about="openAboutModal" @open-tutorial="openTutorialMenu" @open-account="openAccount"/></div>
   <div id="layerCatalog" class="floating-panel layer-catalog"><LayerCatalog/></div>
   <div id="layerOptions" class="floating-panel layer-options"><LayerOptions msg="NNVP"/></div>
   <div id="trainingZone" class="floating-panel training-zone" v-if="trainerHeight > 0" v-bind:style="{height: trainerHeight+'vh'}">
     <TrainingZone @close-trainer="closeTrainer" :trainingZoneSize="trainerHeight" @training-started="isTraining = true" @training-stopped="isTraining = false"/>
   </div>
-  <AboutModal :show="showAboutModal" @close="closeAboutModal"/>
+  <AboutModal :show="showAboutModal" @close="closeAboutModal" @open-tutorials="openTutorialsFromAbout"/>
+  <TutorialMenu :show="showTutorialMenu" @close="showTutorialMenu = false" @start="startTutorial"/>
   <AccountPanel :show="showAccount" :intent="accountIntent" @close="closeAccount"/>
   <ChatBubble/>
-  <TutorialOverlay :active="tutorialActive" @exit="stopTutorial"/>
+  <TutorialOverlay :active="tutorialActive" :tutorial="activeTutorial" @exit="stopTutorial" @open-menu="openMenuFromTutorial"/>
 </template>
 
 
@@ -23,13 +20,14 @@
 import GeneralMenu from './components/GeneralMenu.vue';
 import LayerCatalog from './components/LayerCatalog/LayerCatalog.vue';
 import LayerOptions from './components/LayerOptions/LayerOptions.vue';
-import WhiteBoard from './components/WhiteBoard.vue';
 import FlowBoard from './components/FlowBoard/FlowBoard.vue';
 import TrainingZone from './components/TrainingZone/TrainingZone.vue';
 import AboutModal from './components/AboutModal.vue';
 import AccountPanel from './components/Account/AccountPanel.vue';
 import ChatBubble from './components/Assistant/ChatBubble.vue';
 import TutorialOverlay from './components/Tutorial/TutorialOverlay.vue';
+import TutorialMenu from './components/Tutorial/TutorialMenu.vue';
+import { getTutorial } from './lib/Tutorial/tutorials';
 
 export default {
   name: 'app',
@@ -37,13 +35,13 @@ export default {
     GeneralMenu,
     LayerCatalog,
     LayerOptions,
-    WhiteBoard,
     FlowBoard,
     TrainingZone,
     AboutModal,
     AccountPanel,
     ChatBubble,
     TutorialOverlay,
+    TutorialMenu,
   },
   methods: {
     openAccount(intent) {
@@ -54,11 +52,25 @@ export default {
       this.showAccount = false;
       this.accountIntent = '';
     },
-    startTutorial() {
-      this.tutorialActive = true;
+    openTutorialMenu() {
+      this.showTutorialMenu = true;
+    },
+    openTutorialsFromAbout() {
+      this.showAboutModal = false;
+      this.showTutorialMenu = true;
+    },
+    openMenuFromTutorial() {
+      this.stopTutorial();
+      this.showTutorialMenu = true;
+    },
+    startTutorial(tutorialId) {
+      this.activeTutorial = getTutorial(tutorialId) || null;
+      this.showTutorialMenu = false;
+      this.tutorialActive = this.activeTutorial !== null;
     },
     stopTutorial() {
       this.tutorialActive = false;
+      this.activeTutorial = null;
     },
     openTrainer() {
       this.trainerOpenHeight = this.trainerOpenHeight > 25 ? this.trainerOpenHeight : 25;
@@ -76,7 +88,6 @@ export default {
   },
   data() {
     return {
-      useFlowCanvas: new URLSearchParams(window.location.search).get('canvas') !== 'd3',
       trainerHeight: 0,
       trainerOpenHeight: 50,
       showAboutModal: false,
@@ -84,6 +95,8 @@ export default {
       accountIntent: '',
       isTraining: false,
       tutorialActive: false,
+      activeTutorial: null,
+      showTutorialMenu: false,
     };
   },
   created() {
@@ -144,6 +157,7 @@ export default {
      pure-black hairline, for a lighter, more modern feel. */
   --panel-border: #e5e7eb;
   --panel-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  --modal-scrim: rgba(17, 24, 39, 0.4);   /* dimmer behind blocker modals */
 
   /* Semantic tokens (v0.1) - themeable surfaces, text, inputs and accents.
      Components reference these instead of hardcoded #000/#fff/#ccc so the
@@ -167,17 +181,14 @@ export default {
   --fill-strong: #111827;
   --fill-strong-text: #ffffff;
 
-  /* D3 editing canvas (whiteboard) tokens. The SVG board, grid/borders,
-     nodes and edges reference these so the theme toggle re-skins the canvas
-     from one place. Light values reproduce the historical hardcoded look. */
-  --canvas-bg: #f0f0f0;                  /* area around the board + borders */
-  --canvas-board: #ffffff;               /* the whiteboard sheet itself */
-  --canvas-selection: lightgray;         /* rubber-band selection rect */
+  /* Editing canvas (FlowBoard) tokens. The board, nodes and edges reference
+     these so the theme toggle re-skins the canvas from one place. Light
+     values reproduce the historical hardcoded look. */
+  --canvas-board: #ffffff;               /* the board sheet itself */
   --node-fill: #ffffff;                  /* layer node background */
   --node-stroke: #000000;                /* layer node / anchor outline */
   --node-text: #000000;                  /* layer node label */
   --node-selected-fill: rgb(250, 232, 255); /* selected layer background */
-  --node-isolated-stroke: red;           /* isolated / invalid layer outline */
   --edge-color: #333333;                 /* connections + arrow heads */
   --edge-selected: green;                /* selected connection */
   --edge-error: red;                     /* error / cycle connection */
@@ -192,6 +203,7 @@ export default {
     --border-color: #3a3f4b;
     --panel-border: #2a2f3a;
     --panel-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    --modal-scrim: rgba(0, 0, 0, 0.6);
 
     --bg-elevated: #22262f;
     --bg-input: #12151b;
@@ -211,14 +223,11 @@ export default {
     --fill-strong: #e5e7eb;
     --fill-strong-text: #0f1115;
 
-    --canvas-bg: #0f1115;
     --canvas-board: #181b22;
-    --canvas-selection: rgba(148, 163, 184, 0.35);
     --node-fill: #22262f;
     --node-stroke: #9aa4b2;
     --node-text: #e5e7eb;
     --node-selected-fill: #3b2b4d;
-    --node-isolated-stroke: #f87171;
     --edge-color: #cbd5e1;
     --edge-selected: #4ade80;
     --edge-error: #f87171;
@@ -233,6 +242,7 @@ export default {
   --border-color: #000000;
   --panel-border: #e5e7eb;
   --panel-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  --modal-scrim: rgba(17, 24, 39, 0.4);   /* dimmer behind blocker modals */
 
   --bg-elevated: #f9f9f9;
   --bg-input: #ffffff;
@@ -252,14 +262,11 @@ export default {
   --fill-strong: #111827;
   --fill-strong-text: #ffffff;
 
-  --canvas-bg: #f0f0f0;
   --canvas-board: #ffffff;
-  --canvas-selection: lightgray;
   --node-fill: #ffffff;
   --node-stroke: #000000;
   --node-text: #000000;
   --node-selected-fill: rgb(250, 232, 255);
-  --node-isolated-stroke: red;
   --edge-color: #333333;
   --edge-selected: green;
   --edge-error: red;
@@ -271,6 +278,7 @@ export default {
   --border-color: #3a3f4b;
   --panel-border: #2a2f3a;
   --panel-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  --modal-scrim: rgba(0, 0, 0, 0.6);
 
   --bg-elevated: #22262f;
   --bg-input: #12151b;
@@ -290,14 +298,11 @@ export default {
   --fill-strong: #e5e7eb;
   --fill-strong-text: #0f1115;
 
-  --canvas-bg: #0f1115;
   --canvas-board: #181b22;
-  --canvas-selection: rgba(148, 163, 184, 0.35);
   --node-fill: #22262f;
   --node-stroke: #9aa4b2;
   --node-text: #e5e7eb;
   --node-selected-fill: #3b2b4d;
-  --node-isolated-stroke: #f87171;
   --edge-color: #cbd5e1;
   --edge-selected: #4ade80;
   --edge-error: #f87171;
@@ -420,5 +425,25 @@ select:-moz-focusring {
 
 option:not(:checked) {
   color: var(--text-primary);
+}
+
+/* Whole-screen blocker modals: the scrim fades in while the card slides down
+   from the top. Shared by every <Transition name="modal"> (About, Account,
+   tutorial menu, help modals) — components must not redefine these classes. */
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 0.35s ease-out;
+}
+.modal-enter-active > *,
+.modal-leave-active > * {
+  transition: transform 0.35s ease-out;
+}
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+.modal-enter-from > *,
+.modal-leave-to > * {
+  transform: translateY(-100vh);
 }
 </style>

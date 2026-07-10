@@ -1,9 +1,9 @@
 <template>
   <div id="FlowBoard" class="flow-board" @dragover.prevent @drop="onDrop">
     <!-- GeneralMenu's Load / ctrl+O go through D3Interface.loadBoard(), which
-         clicks this input by id (same contract as WhiteBoard). -->
+         clicks this input by id. -->
     <input type="file" id="hidden-file-upload" accept=".nnvp" @change="onFileChosen" />
-    <!-- Training indicator (same markup/testid as WhiteBoard's) -->
+    <!-- Training indicator -->
     <div v-if="isTraining" class="training-indicator" data-testid="training-indicator">
       <div class="training-spinner"></div>
       <span>Training...</span>
@@ -82,8 +82,8 @@ const editor = new FlowGraphEditor({
   screenToFlowCoordinate,
 });
 
-// WhiteBoard doesn't mount in flow mode, so this editor registers first and
-// becomes the active graph — no D3Interface changes needed.
+// This is the only board, so this editor registers first and becomes the
+// active graph — no D3Interface changes needed.
 const d3Interface = getCurrentInstance().appContext.config.globalProperties.$d3Interface;
 onMounted(() => d3Interface.addGraphEditor(editor));
 

@@ -1,17 +1,24 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
-import * as d3 from 'd3';
 import D3Interface from '../../src/lib/D3Interface/D3Interface';
-import D3GraphEditor from '../../src/lib/D3Interface/D3GraphEditor';
+import FlowGraphEditor from '../../src/lib/FlowInterface/FlowGraphEditor';
 import KerasLayer from '../../src/lib/KerasInterface/KerasLayer';
 
-// Real graph editor, with the SVG geometry shim d3-zoom needs under happy-dom.
+// Real graph editor over the small store adapter FlowBoard injects (see
+// flowGraphEditor.test.js) — no Vue needed.
 function makeEditor() {
-  document.body.innerHTML = '<div id="svgWrapper"><svg id="svg"></svg></div>';
-  const node = document.getElementById('svg');
-  const dim = value => ({ baseVal: { value } });
-  Object.defineProperty(node, 'width', { value: dim(960), configurable: true });
-  Object.defineProperty(node, 'height', { value: dim(500), configurable: true });
-  return new D3GraphEditor(d3.select(node));
+  const state = { nodes: [], edges: [], selectedNodes: [], selectedEdges: [] };
+  const store = {
+    state,
+    getNodes: () => state.nodes,
+    getEdges: () => state.edges,
+    setGraph: (nodes, edges) => {
+      state.nodes = nodes;
+      state.edges = edges;
+    },
+    getSelectedNodes: () => state.selectedNodes,
+    getSelectedEdges: () => state.selectedEdges,
+  };
+  return { store, editor: new FlowGraphEditor(store) };
 }
 
 describe('D3Interface event bus', () => {
@@ -64,7 +71,7 @@ describe('D3Interface active-graph delegation', () => {
   });
 
   it('addGraphEditor activates the first editor and exposes its selection', () => {
-    const editor = makeEditor();
+    const { editor } = makeEditor();
     iface.addGraphEditor(editor);
     expect(iface.graphEditors).toContain(editor);
     expect(iface.activeGraph).toBe(editor);
@@ -75,8 +82,8 @@ describe('D3Interface active-graph delegation', () => {
   });
 
   it('addGraphEditor does not re-activate once an active graph exists', () => {
-    const first = makeEditor();
-    const second = makeEditor();
+    const first = makeEditor().editor;
+    const second = makeEditor().editor;
     iface.addGraphEditor(first);
     iface.addGraphEditor(second);
     expect(iface.activeGraph).toBe(first);
@@ -89,7 +96,7 @@ describe('D3Interface active-graph delegation', () => {
     iface.on('selection-changed', () => { selectionEvents += 1; });
     iface.on('graph-changed', () => { graphEvents += 1; });
 
-    const editor = makeEditor();
+    const { store, editor } = makeEditor();
     iface.addGraphEditor(editor);
     // setActiveGraphEditor emits one selection-changed during activation.
     const baseline = selectionEvents;
@@ -97,12 +104,13 @@ describe('D3Interface active-graph delegation', () => {
     editor.addLayer(new KerasLayer('Dense', 'Core'));
     expect(graphEvents).toBe(1);
 
-    editor.singleSelection(editor.model.d3Layers[0]);
+    store.state.selectedNodes = [store.state.nodes[0]];
+    editor.syncSelection();
     expect(selectionEvents).toBeGreaterThan(baseline);
   });
 
   it('setActiveGraphEditor emits the reactive refresh events', () => {
-    const editor = makeEditor();
+    const { editor } = makeEditor();
     const emitted = [];
     ['templates-changed', 'selection-changed', 'undo-stack-changed', 'redo-stack-changed']
       .forEach(name => iface.on(name, () => emitted.push(name)));
@@ -113,7 +121,7 @@ describe('D3Interface active-graph delegation', () => {
   });
 
   it('findLayerById delegates to the active graph', () => {
-    const editor = makeEditor();
+    const { editor } = makeEditor();
     iface.addGraphEditor(editor);
     editor.addLayer(new KerasLayer('Dense', 'Core'));
     const layer = editor.model.d3Layers[0];
@@ -122,13 +130,14 @@ describe('D3Interface active-graph delegation', () => {
   });
 
   it('addLayer / deleteSelectedElements / undo delegate to the active graph', () => {
-    const editor = makeEditor();
+    const { store, editor } = makeEditor();
     iface.addGraphEditor(editor);
 
     iface.addLayer(new KerasLayer('Dense', 'Core'));
     expect(editor.model.d3Layers).toHaveLength(1);
 
-    editor.singleSelection(editor.model.d3Layers[0]);
+    store.state.selectedNodes = [store.state.nodes[0]];
+    editor.syncSelection();
     iface.deleteSelectedElements();
     expect(editor.model.d3Layers).toHaveLength(0);
 
@@ -146,21 +155,18 @@ describe('D3Interface.debugGetBoardState', () => {
     });
   });
 
-  // Regression: debugGetBoardState read model.layers / model.edges, but D3Model
-  // exposes those as d3Layers / d3Edges. With a populated graph the getter threw
-  // "Cannot read properties of undefined (reading 'map')". It must report state.
+  // Regression: debugGetBoardState read model.layers / model.edges, but the
+  // model shim exposes those as d3Layers / d3Edges. With a populated graph the
+  // getter threw "Cannot read properties of undefined (reading 'map')".
   it('reports the real board state for a populated graph', () => {
     const iface = new D3Interface();
-    const editor = makeEditor();
+    const { editor } = makeEditor();
     iface.addGraphEditor(editor);
-    editor.addLayer(new KerasLayer('Input', 'Core'), 0, 0);
-    editor.addLayer(new KerasLayer('Dense', 'Core'), 300, 0);
-    editor.layerMouseDown(editor.model.d3Layers[0]);
-    editor.layerMouseUp(editor.model.d3Layers[1]);
+    editor.loadTemplate('2D Dense for MNIST');
 
     const state = iface.debugGetBoardState();
     expect(state.layers.map(l => l.id)).toEqual(editor.model.d3Layers.map(l => l.id));
-    expect(state.edges).toBe(1);
+    expect(state.edges).toBe(4);
     expect(state.inputs).toBe(editor.model.modelInputs);
     expect(state.outputs).toBe(editor.model.modelOutputs);
   });

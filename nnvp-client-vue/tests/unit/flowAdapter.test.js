@@ -65,7 +65,7 @@ describe('nnvpToFlow', () => {
     const input = nodes[0];
     expect(input.id).toBe('0');
     expect(input.type).toBe(LAYER_NODE);
-    expect(input.position).toEqual({ x: 60, y: 60 });
+    expect(input.position).toEqual({ x: 84, y: 60 });
     expect(input.data.label).toBe('Input');
     expect(input.data.nnvp.kerasLayer.name).toBe('Input');
     expect(input.parentNode).toBeUndefined();
@@ -172,13 +172,13 @@ describe('edgeInCycle', () => {
 describe('groupSelected', () => {
   it('wraps the selection in a composite at the selection bbox, children relative', () => {
     const { nodes } = nnvpToFlow(templates['2D Dense for MNIST']);
-    // Group Flatten (id 1, x 187) and the first Dense (id 2, x 328, w 80).
+    // Group Flatten (id 1, x 262) and the first Dense (id 2, x 459, w 80).
     const grouped = groupSelected(nodes, ['1', '2']);
     const composite = grouped.find(n => n.type === COMPOSITE_NODE);
     expect(composite.id).toBe('5'); // next free numeric id
-    expect(composite.position).toEqual({ x: 187, y: 60 });
-    // Right edge 328 + 80 + 20 padding - 187, bottom 60 + 40 + 10 - 60.
-    expect(composite.data.nnvp.width).toBe(241);
+    expect(composite.position).toEqual({ x: 262, y: 60 });
+    // Right edge 459 + 80 + 20 padding - 262, bottom 60 + 40 + 10 - 60.
+    expect(composite.data.nnvp.width).toBe(297);
     expect(composite.data.nnvp.height).toBe(50);
     const flatten = grouped.find(n => n.id === '1');
     expect(flatten.parentNode).toBe('5');
@@ -197,7 +197,7 @@ describe('groupSelected', () => {
     const composite = model.layers.find(l => l.id === 5);
     expect(composite.class).toBe('D3LayerComposite');
     expect(composite.children.map(c => c.id).sort()).toEqual([1, 2]);
-    expect(composite.children.find(c => c.id === 1)).toMatchObject({ x: 187, y: 60, parentID: 5 });
+    expect(composite.children.find(c => c.id === 1)).toMatchObject({ x: 262, y: 60, parentID: 5 });
     // Wiring through the group is untouched.
     expect(model.edges.length).toBe(4);
     // Top level shrank: 5 layers - 2 grouped + 1 composite.

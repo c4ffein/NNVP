@@ -59,7 +59,22 @@ export default {
             title="Toggle light / dark theme"
             onClick={() => this.toggleTheme()}
           >
-            {this.theme === 'dark' ? '☀' : '🌙'}
+            {this.theme === 'dark'
+              ? <svg class="theme-icon" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+                  <circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2"/>
+                  <g stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                    <line x1="12" y1="2" x2="12" y2="4.5"/><line x1="12" y1="19.5" x2="12" y2="22"/>
+                    <line x1="2" y1="12" x2="4.5" y2="12"/><line x1="19.5" y1="12" x2="22" y2="12"/>
+                    <line x1="4.6" y1="4.6" x2="6.4" y2="6.4"/><line x1="17.6" y1="17.6" x2="19.4" y2="19.4"/>
+                    <line x1="4.6" y1="19.4" x2="6.4" y2="17.6"/><line x1="17.6" y1="6.4" x2="19.4" y2="4.6"/>
+                  </g>
+                </svg>
+              : <svg class="theme-icon" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+                  <path
+                    d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"
+                    fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"
+                  />
+                </svg>}
           </div>
         </li>
       </ul>
@@ -127,7 +142,7 @@ export default {
     this.$d3Interface.on('templates-changed', this.templatesChangeHandler);
 
     // Trigger initial refresh in case templates were loaded before this component mounted
-    // (WhiteBoard mounts before GeneralMenu, so the templates-changed event fires before we subscribe)
+    // (the board mounts before GeneralMenu, so the templates-changed event fires before we subscribe)
     this.templatesRefreshKey++;
     this.menuRefreshKey++;
   },
@@ -296,6 +311,9 @@ export default {
   font-size: 15px;
   padding: 0 14px 0 10px;
 }
+.theme-icon {
+  display: block;
+}
 #GeneralMenu > .menu {
   float:left;
   height: 100%;
@@ -353,7 +371,7 @@ export default {
 }
 .dropdown-content .menuItem.disabled {
   color: var(--text-muted);
-  text-decoration: line-through;
+  opacity: 0.45;
   cursor: default;
 }
 .dropdown-item-content {

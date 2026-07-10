@@ -348,7 +348,7 @@ export default {
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.25);
+  background-color: var(--modal-scrim);
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -567,11 +567,4 @@ export default {
   background-color: rgba(22, 163, 74, 0.12);
 }
 
-/* Transition animations (match AboutModal) */
-.modal-enter-active,
-.modal-leave-active { transition: all 0.3s ease-out; }
-.modal-enter-active .account-container,
-.modal-leave-active .account-container { transition: transform 0.3s ease-out; }
-.modal-enter-from .account-container,
-.modal-leave-to .account-container { transform: translateY(-100vh); }
 </style>

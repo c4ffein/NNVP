@@ -827,13 +827,13 @@ def build_model():
     await page.waitForTimeout(50);
     const layersBeforeDelete = await canvas.layerCount(page);
     // Click on the layer using force to bypass the text element
-    const d3LayerElement = await page.$(canvas.layer);
-    const box = await d3LayerElement.boundingBox();
+    const layerElement = await page.$(canvas.layer);
+    const box = await layerElement.boundingBox();
     // Click in the center of the layer
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
     await page.waitForTimeout(50);
     // Check if layer is selected (has 'selected' class)
-    const isSelected = await d3LayerElement.evaluate(el => el.classList.contains('selected'));
+    const isSelected = await layerElement.evaluate(el => el.classList.contains('selected'));
     console.log('\n=== LAYER DELETION TEST (BACKSPACE) ===');
     console.log('Layers before delete:', layersBeforeDelete);
     console.log('Layer is selected:', isSelected);
@@ -854,13 +854,13 @@ def build_model():
     await page.waitForTimeout(50);
     const layersBeforeDelete = await canvas.layerCount(page);
     // Click on the layer using force to bypass the text element
-    const d3LayerElement = await page.$(canvas.layer);
-    const box = await d3LayerElement.boundingBox();
+    const layerElement = await page.$(canvas.layer);
+    const box = await layerElement.boundingBox();
     // Click in the center of the layer
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
     await page.waitForTimeout(50);
     // Check if layer is selected (has 'selected' class)
-    const isSelected = await d3LayerElement.evaluate(el => el.classList.contains('selected'));
+    const isSelected = await layerElement.evaluate(el => el.classList.contains('selected'));
     console.log('\n=== LAYER DELETION TEST (DELETE) ===');
     console.log('Layers before delete:', layersBeforeDelete);
     console.log('Layer is selected:', isSelected);
@@ -1484,9 +1484,6 @@ def build_model():
     const initialEdges = await canvas.edgeCount(page);
     console.log('Initial edges:', initialEdges);
     expect(initialEdges).toBeGreaterThan(0);
-    // Count isolated layers before deletion (D3-only visual validation)
-    const isolatedBefore = await page.$$('.d3Layer rect.isolated');
-    console.log('Isolated layers before deletion:', isolatedBefore.length);
     // Click on an edge to select it (try the first edge)
     await canvas.selectFirstEdge(page);
     await page.waitForTimeout(50);
@@ -1501,14 +1498,7 @@ def build_model():
     const edgesAfter = await canvas.edgeCount(page);
     console.log('Edges after deletion:', edgesAfter);
     expect(edgesAfter).toBe(initialEdges - 1);
-    // Check if any layers became isolated (the isolated-node outline is a
-    // D3-only rendering feature; the flow board has no equivalent yet)
-    if (canvas.mode === 'd3') {
-      const isolatedAfter = await page.$$('.d3Layer rect.isolated');
-      console.log('Isolated layers after deletion:', isolatedAfter.length);
-      expect(isolatedAfter.length).toBeGreaterThan(isolatedBefore.length);
-    }
-    console.log('✅ Edge deleted and layers became isolated!');
+    console.log('✅ Edge deleted!');
   });
 
   test('should redraw deleted edge and verify network is valid again', async ({ page, canvas }) => {
@@ -1536,10 +1526,6 @@ def build_model():
     // Verify edge was deleted
     const edgesAfterDelete = await canvas.edgeCount(page);
     expect(edgesAfterDelete).toBe(initialEdges - 1);
-    // Check isolated layers (D3-only visual validation)
-    const isolated = await page.$$('.d3Layer rect.isolated');
-    console.log('Isolated layers after deletion:', isolated.length);
-    const isolatedCount = isolated.length;
     // Redraw the edge by dragging from anchor to anchor
     console.log('Reconnecting layers by drag-and-drop...');
     await canvas.connect(page, 0, 1);
@@ -1548,12 +1534,6 @@ def build_model():
     const edgesAfterReconnect = await canvas.edgeCount(page);
     console.log('Edges after reconnection:', edgesAfterReconnect);
     expect(edgesAfterReconnect).toBe(initialEdges);
-    // Check isolated layers - should be less than before (D3-only rendering)
-    if (canvas.mode === 'd3') {
-      const isolatedAfterReconnect = await page.$$('.d3Layer rect.isolated');
-      console.log('Isolated layers after reconnection:', isolatedAfterReconnect.length);
-      expect(isolatedAfterReconnect.length).toBeLessThan(isolatedCount);
-    }
     console.log('✅ Edge recreated and network is valid again!');
   });
 
@@ -1592,9 +1572,6 @@ def build_model():
     console.log('Edges after deletion:', edgesAfterDelete);
     expect(layersAfterDelete.length).toBe(initialLayers.length - 1);
     expect(edgesAfterDelete).toBeLessThan(initialEdges);
-    // Check for isolated layers (D3-only visual validation)
-    const isolatedAfterDelete = await page.$$('.d3Layer rect.isolated');
-    console.log('Isolated layers after deletion:', isolatedAfterDelete.length);
     // Re-add a Dense layer
     const denseTemplate = await page.$('.LayerTemplate:has-text("Dense")');
     await denseTemplate.click();
@@ -1651,12 +1628,6 @@ def build_model():
     const edgesAfterReconnect = await canvas.edgeCount(page);
     console.log('Edges after reconnection:', edgesAfterReconnect);
     expect(edgesAfterReconnect).toBeGreaterThan(edgesAfterDelete);
-    // Verify isolated layers decreased or stayed same (D3-only rendering)
-    if (canvas.mode === 'd3') {
-      const isolatedAfterReconnect = await page.$$('.d3Layer rect.isolated');
-      console.log('Isolated layers after reconnection:', isolatedAfterReconnect.length);
-      expect(isolatedAfterReconnect.length).toBeLessThanOrEqual(isolatedAfterDelete.length);
-    }
     // Verify the parameter was saved by generating code
     const fileMenu = await page.$('text=File');
     const downloadPromise = page.waitForEvent('download', { timeout: 10000 });
@@ -1964,140 +1935,6 @@ def build_model():
     console.log('✅ Drag-to-connect still works correctly!');
   });
 
-  test('should create edge by click-to-link mode (click handle, then click another handle)', async ({ page, canvas }) => {
-    test.skip(canvas.mode !== 'd3', 'click-to-link mode is a D3-board feature');
-    console.log('\n=== CLICK-TO-LINK TEST ===');
-    // Add two layers
-    const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
-    await denseLayer.click();
-    await page.waitForTimeout(50);
-    await denseLayer.click();
-    await page.waitForTimeout(50);
-    const layers = await page.$$(canvas.layer);
-    console.log('Added layers:', layers.length);
-    expect(layers.length).toBe(2);
-    // Move second layer to avoid overlap (drag it down)
-    const layer1 = await page.$('#d3-layer-1 rect');
-    const layer1Box = await layer1.boundingBox();
-    await page.mouse.move(layer1Box.x + layer1Box.width/2, layer1Box.y + layer1Box.height/2);
-    await page.mouse.down();
-    await page.mouse.move(layer1Box.x + layer1Box.width/2, layer1Box.y + layer1Box.height/2 + 150);
-    await page.mouse.up();
-    await page.waitForTimeout(300);
-    // Get initial edge count
-    const edgesBefore = await page.$$('.edge');
-    console.log('Edges before click-to-link:', edgesBefore.length);
-    // Click first layer's bottom handle to enter link mode
-    const sourceHandle = await page.$('#d3-layer-0 circle.bottom-point');
-    console.log('Clicking source handle to enter link mode...');
-    await sourceHandle.click();
-    await page.waitForTimeout(30);
-    // Verify link mode active by checking if handle has link-source-active class
-    const hasActiveClass = await sourceHandle.evaluate(el => el.classList.contains('link-source-active'));
-    console.log('Source handle has link-source-active class:', hasActiveClass);
-    expect(hasActiveClass).toBe(true);
-    // Click second layer's top handle to complete the link
-    const targetHandle = await page.$('#d3-layer-1 circle.top-point');
-    console.log('Clicking target handle to create edge...');
-    await targetHandle.click();
-    await page.waitForTimeout(50);
-    // Verify edge was created
-    const edgesAfter = await page.$$('.edge');
-    console.log('Edges after click-to-link:', edgesAfter.length);
-    expect(edgesAfter.length).toBe(edgesBefore.length + 1);
-    // Verify link mode exited (class removed)
-    const stillActive = await sourceHandle.evaluate(el => el.classList.contains('link-source-active'));
-    console.log('Link mode exited (class removed):', !stillActive);
-    expect(stillActive).toBe(false);
-    console.log('✅ Click-to-link works correctly!');
-  });
-
-  test('should cancel click-to-link mode by pressing ESC key', async ({ page, canvas }) => {
-    test.skip(canvas.mode !== 'd3', 'click-to-link mode is a D3-board feature');
-    console.log('\n=== CLICK-TO-LINK CANCEL (ESC KEY) TEST ===');
-    // Add one layer
-    const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
-    await denseLayer.click();
-    await page.waitForTimeout(50);
-    // Click handle to enter link mode
-    const sourceHandle = await page.$('#d3-layer-0 circle.bottom-point');
-    console.log('Entering link mode...');
-    await sourceHandle.click();
-    await page.waitForTimeout(30);
-    // Verify link mode active
-    const hasActiveClass = await sourceHandle.evaluate(el => el.classList.contains('link-source-active'));
-    console.log('Link mode active:', hasActiveClass);
-    expect(hasActiveClass).toBe(true);
-    // Press ESC to cancel
-    console.log('Pressing ESC to cancel...');
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(30);
-    // Verify link mode exited
-    const stillActive = await sourceHandle.evaluate(el => el.classList.contains('link-source-active'));
-    console.log('Link mode cancelled (class removed):', !stillActive);
-    expect(stillActive).toBe(false);
-    console.log('✅ ESC key cancels link mode correctly!');
-  });
-
-  test('should cancel click-to-link mode by clicking background', async ({ page, canvas }) => {
-    test.skip(canvas.mode !== 'd3', 'click-to-link mode is a D3-board feature');
-    console.log('\n=== CLICK-TO-LINK CANCEL (BACKGROUND CLICK) TEST ===');
-    // Add one layer
-    const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
-    await denseLayer.click();
-    await page.waitForTimeout(50);
-    // Click handle to enter link mode
-    const sourceHandle = await page.$('#d3-layer-0 circle.bottom-point');
-    console.log('Entering link mode...');
-    await sourceHandle.click();
-    await page.waitForTimeout(30);
-    // Verify link mode active
-    const hasActiveClass = await sourceHandle.evaluate(el => el.classList.contains('link-source-active'));
-    console.log('Link mode active:', hasActiveClass);
-    expect(hasActiveClass).toBe(true);
-    // Click on empty background area to cancel
-    console.log('Clicking background to cancel...');
-    const svg = await page.$('#svgWrapper svg');
-    const svgBox = await svg.boundingBox();
-    // Click on an empty area in the center-left (avoiding floating panels)
-    // The LayerCatalog is on the left (~234px), GeneralMenu on top (~46px)
-    // So click at around x=400, y=300 which should be clear
-    await page.mouse.click(svgBox.x + 400, svgBox.y + 300);
-    await page.waitForTimeout(30);
-    // Verify link mode exited
-    const stillActive = await sourceHandle.evaluate(el => el.classList.contains('link-source-active'));
-    console.log('Link mode cancelled (class removed):', !stillActive);
-    expect(stillActive).toBe(false);
-    console.log('✅ Background click cancels link mode correctly!');
-  });
-
-  test('should cancel click-to-link mode by clicking same handle again', async ({ page, canvas }) => {
-    test.skip(canvas.mode !== 'd3', 'click-to-link mode is a D3-board feature');
-    console.log('\n=== CLICK-TO-LINK CANCEL (SAME HANDLE) TEST ===');
-    // Add one layer
-    const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
-    await denseLayer.click();
-    await page.waitForTimeout(50);
-    // Click handle to enter link mode
-    const sourceHandle = await page.$('#d3-layer-0 circle.bottom-point');
-    console.log('Entering link mode...');
-    await sourceHandle.click();
-    await page.waitForTimeout(30);
-    // Verify link mode active
-    const hasActiveClass = await sourceHandle.evaluate(el => el.classList.contains('link-source-active'));
-    console.log('Link mode active:', hasActiveClass);
-    expect(hasActiveClass).toBe(true);
-    // Click same handle again to cancel
-    console.log('Clicking same handle to cancel...');
-    await sourceHandle.click();
-    await page.waitForTimeout(30);
-    // Verify link mode exited
-    const stillActive = await sourceHandle.evaluate(el => el.classList.contains('link-source-active'));
-    console.log('Link mode cancelled (class removed):', !stillActive);
-    expect(stillActive).toBe(false);
-    console.log('✅ Clicking same handle cancels link mode correctly!');
-  });
-
   test('should open About modal and display content', async ({ page }) => {
     console.log('\n=== ABOUT MODAL TEST ===');
     // Click About in the menu
@@ -2162,7 +1999,7 @@ def build_model():
     console.log('✅ About modal works correctly!');
   });
 
-  test('should handle cycles in the graph (D3 marks them, flow refuses them)', async ({ page, canvas }) => {
+  test('should refuse connections that would close a cycle', async ({ page, canvas }) => {
     console.log('\n=== CYCLE DETECTION TEST ===');
     // Step 1: Create a simple valid DAG first (no cycle)
     console.log('Step 1: Creating valid DAG (A -> B -> C)');
@@ -2182,8 +2019,6 @@ def build_model():
       await canvas.moveLayer(page, i, 400, 200 + (i * 150));
       await page.waitForTimeout(50);
     }
-    // moveLayer animates on the D3 board (transitionToXY) — let it settle
-    // before dragging between anchors, or the drags miss moving targets.
     await page.waitForTimeout(400);
     console.log('✓ Positioned layers vertically');
     // Connect layer 0 -> layer 1, then layer 1 -> layer 2
@@ -2194,50 +2029,16 @@ def build_model():
     let edges = await canvas.edgeCount(page);
     expect(edges).toBe(2);
     console.log('✓ Created 2 edges in valid DAG');
-    // Step 2: Verify no cycle is flagged yet (D3 marks cycles with linkCycle)
-    if (canvas.mode === 'd3') {
-      const edgesWithoutCycle = await page.$$eval('.edge path', paths =>
-        paths.filter(path => path.classList.contains('linkCycle')).length
-      );
-      expect(edgesWithoutCycle).toBe(0);
-      console.log('✓ No cycles detected in valid DAG (0 edges marked)');
-    }
-    // Step 3: Try to close the cycle by connecting layer 2 back to layer 0.
-    // The two boards handle this differently: D3 accepts the edge and marks
-    // the cycle with the linkCycle class; the flow board's isValidConnection
-    // refuses to create the edge at all.
+    // Step 2: Try to close the cycle by connecting layer 2 back to layer 0.
+    // The board's isValidConnection refuses to create the edge at all.
+    // (Cyclic graphs loaded from old D3-made files render their cycle edges
+    // in red instead — see FloatingEdge.vue / edgeInCycle.)
     console.log('Step 2: Attempting cycle by connecting C -> A');
     await canvas.connect(page, 2, 0);
-    await page.waitForTimeout(200); // Give time for cycle detection to run
+    await page.waitForTimeout(200);
     edges = await canvas.edgeCount(page);
-    if (canvas.mode === 'd3') {
-      expect(edges).toBe(3);
-      console.log('✓ Created 3rd edge, completing the cycle (A -> B -> C -> A)');
-      // Step 4: Verify cycle is detected - all edges in the cycle should be marked
-      const edgesWithCycle = await page.$$eval('.edge path', paths =>
-        paths.filter(path => path.classList.contains('linkCycle')).length
-      );
-      console.log(`Edges marked with linkCycle: ${edgesWithCycle}`);
-      expect(edgesWithCycle).toBeGreaterThan(0);
-      console.log('✓ Cycle detected! Edges marked with linkCycle class');
-      // Step 5: Break the cycle by deleting one edge and verify cycle detection clears
-      console.log('Step 3: Breaking cycle by deleting edge');
-      await canvas.selectFirstEdge(page);
-      await page.waitForTimeout(50);
-      await page.keyboard.press('Delete');
-      await page.waitForTimeout(100); // Give time for cycle detection to run
-      edges = await canvas.edgeCount(page);
-      expect(edges).toBe(2);
-      const edgesAfterBreak = await page.$$eval('.edge path', paths =>
-        paths.filter(path => path.classList.contains('linkCycle')).length
-      );
-      expect(edgesAfterBreak).toBe(0);
-      console.log('✓ Cycle broken! No edges marked with linkCycle (cycle detection cleared)');
-    } else {
-      // Flow board: the cycle-closing edge must have been rejected outright.
-      expect(edges).toBe(2);
-      console.log('✓ Cycle-closing connection was refused (edge count still 2)');
-    }
+    expect(edges).toBe(2);
+    console.log('✓ Cycle-closing connection was refused (edge count still 2)');
     console.log('✅ CYCLE DETECTION TEST PASSED');
   });
 

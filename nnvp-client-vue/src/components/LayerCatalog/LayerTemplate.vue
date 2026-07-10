@@ -9,7 +9,15 @@
     @keydown.enter.prevent="$d3Interface.addLayer(layerContent.clone())"
     @keydown.space.prevent="$d3Interface.addLayer(layerContent.clone())"
   >
-    {{ this.layerName }}
+    <span class="layer-template-name">{{ this.layerName }}</span>
+    <button
+      type="button"
+      class="help-icon layer-template-help"
+      :aria-label="'Learn about the ' + layerName + ' layer'"
+      @click.stop="$emit('show-help', layerName)"
+      @keydown.enter.stop
+      @keydown.space.stop
+    >?</button>
   </div>
 </template>
 
@@ -18,6 +26,7 @@ export default {
   name: 'LayerTemplate',
   components: {
   },
+  emits: ['show-help'],
   data() {
     return {
     };
@@ -41,8 +50,12 @@ export default {
 
 <style>
 .LayerTemplate {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
   text-align: left;
-  padding: 4px 4px 4px 12px;
+  padding: 4px 8px 4px 12px;
   position: relative;
   transition: transform 0.15s ease;
 }
@@ -53,7 +66,29 @@ export default {
 }
 
 .LayerTemplate:focus-visible {
-  outline: 2px solid #000000;
+  outline: 2px solid var(--accent);
   outline-offset: -2px;
+}
+
+.layer-template-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The help dot only shows while the row is hovered or focused, like the
+   connection grips on canvas nodes — and stays click-transparent otherwise
+   so it never steals an "add layer" click. */
+.layer-template-help {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+.LayerTemplate:hover .layer-template-help,
+.LayerTemplate:focus-visible .layer-template-help,
+.layer-template-help:focus-visible {
+  opacity: 1;
+  pointer-events: all;
 }
 </style>

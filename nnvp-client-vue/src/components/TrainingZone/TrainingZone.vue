@@ -350,7 +350,7 @@ export default {
   display: table;
   table-layout: fixed;
   grid-rows: 1/2;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--panel-border);
   background-color: var(--bg-panel);
   width: 100%;
 }
@@ -365,13 +365,16 @@ export default {
   height: 100%;
   border-radius: 0;
   border: none;
-  border-right: 1px solid var(--border-color);
+  border-right: 1px solid var(--panel-border);
   line-height: 24px; /* Vertical align text*/
+  padding: 0 14px;
 }
 #button-close-trainer{
   display: table-cell;
   border: none;
   width: 30px;
+  text-align: center;
+  line-height: 24px;
 }
 #training-zone-selector {
   grid-rows: 2/2;

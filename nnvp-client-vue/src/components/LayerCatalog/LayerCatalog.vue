@@ -31,19 +31,52 @@
           v-for="(layerContent, layerName) in filteredSearchList(layers)"
           v-bind:layerName="layerName" v-bind:layerContent="layerContent"
           :key="layerName.id" :id="'layer-template-' + layerName"
+          @show-help="helpLayerType = $event"
         />
       </div>
     </div>
+
+    <!-- One shared help modal for the whole catalog (same styling/content as
+         the right panel's layer help in ParamsBlock). -->
+    <Teleport to="body">
+      <Transition name="modal">
+      <div v-if="helpLayerType" class="layer-help-modal-overlay" @click="helpLayerType = null">
+        <div
+          class="layer-help-modal-container"
+          role="dialog"
+          aria-modal="true"
+          :aria-label="helpLayerType + ' layer help'"
+          @click.stop
+        >
+          <button class="layer-help-modal-close" aria-label="Close" @click="helpLayerType = null">&times;</button>
+          <div class="layer-help-modal-body">
+            <div v-html="layerHelpHtml"></div>
+          </div>
+        </div>
+      </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
 <script>
 import LayerTemplate from './LayerTemplate.vue';
+import layerHelp from '../../lib/KerasInterface/layerHelp';
 
 export default {
   name: 'LayerCatalog',
   components: {
     LayerTemplate,
+  },
+  computed: {
+    layerHelpHtml() {
+      if (!this.helpLayerType) return '';
+      return layerHelp[this.helpLayerType] || `
+        <h2>${this.helpLayerType}</h2>
+        <p>This is a ${this.helpLayerType} layer. Documentation coming soon!</p>
+        <p>Check the <a href="https://keras.io/api/layers/" target="_blank">Keras documentation</a> for more details.</p>
+      `;
+    },
   },
   methods: {
     toggleCategory: categoryDiv => document.getElementById(categoryDiv).classList.toggle('closed'),
@@ -91,9 +124,17 @@ export default {
   data: () => ({
     searchBox: '',
     reloadKey: 0,
+    helpLayerType: null,
   }),
   mounted() {
     this.$d3Interface.setLeftBarRemountCallback(this.remount);
+    this.handleEscape = (event) => {
+      if (event.key === 'Escape' && this.helpLayerType) this.helpLayerType = null;
+    };
+    document.addEventListener('keydown', this.handleEscape);
+  },
+  beforeUnmount() {
+    document.removeEventListener('keydown', this.handleEscape);
   },
 };
 </script>
@@ -152,9 +193,9 @@ export default {
   display: grid;
   grid-template-columns: auto 1fr;
   grid-template-areas: "arrow text";
-  border-top: 1px solid var(--border-color);
-  border-left: 1px solid var(--border-color);
-  border-right: 1px solid var(--border-color);
+  border-top: 1px solid var(--panel-border);
+  border-left: 1px solid var(--panel-border);
+  border-right: 1px solid var(--panel-border);
   border-radius: 15px 15px 0 0;
   font-weight: var(--font-weight-medium);
   position: relative;
@@ -174,7 +215,7 @@ export default {
   cursor: pointer;
 }
 .LayerCatalog > .layerCategory > .title:focus-visible {
-  outline: 2px solid #000000;
+  outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
 .LayerCatalog > .layerCategory > .title > .arrow {

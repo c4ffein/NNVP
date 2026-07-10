@@ -1,0 +1,26 @@
+{
+  // Gradual TypeScript adoption (docs/tasks.md § 6): .ts files are strictly
+  // checked, .js files ride along unchecked (allowJs + checkJs:false) and
+  // convert opportunistically. `bun run typecheck` runs this; note that
+  // neither bun nor vite type-check anything on their own.
+  //
+  // Scope is src/ EXCEPT .vue SFCs: checking those needs vue-tsc, which
+  // requires node (it does not type-check SFC contents under bun) and breaks
+  // with typescript@7 — keep typescript pinned to 5.x if vue-tsc is ever added.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true
+  },
+  "include": ["src/**/*.ts", "src/**/*.js"]
+}

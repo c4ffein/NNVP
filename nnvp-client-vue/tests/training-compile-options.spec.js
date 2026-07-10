@@ -76,10 +76,10 @@ test.describe('Training Compile Options', () => {
     // Open Training panel and CompileOptions
     await openCompileOptions(page);
     // Check optimizer selector exists (first section)
-    const optimizerSelector = await page.$('.option-section:first-child select');
+    const optimizerSelector = await page.$('.optimizer-section select');
     expect(optimizerSelector).not.toBeNull();
     // Get all optimizer options
-    const optimizers = await page.$$eval('.option-section:first-child select option',
+    const optimizers = await page.$$eval('.optimizer-section select option',
       options => options.map(opt => opt.value)
     );
     console.log('Available optimizers:', optimizers);
@@ -108,7 +108,7 @@ test.describe('Training Compile Options', () => {
     expect(initialParams.some(p => p.includes('Decay'))).toBe(true);
     expect(initialParams.some(p => p.includes('Epsilon'))).toBe(true);
     // Switch to SGD
-    await page.selectOption('.option-section:first-child select', 'sgd');
+    await page.selectOption('.optimizer-section select', 'sgd');
     await page.waitForTimeout(50);
     const sgdParams = await page.$$eval('.optimizer-param label',
       labels => labels.map(label => label.textContent.trim())
@@ -120,7 +120,7 @@ test.describe('Training Compile Options', () => {
     expect(sgdParams.some(p => p.includes('Decay'))).toBe(false); // SGD doesn't have decay
     expect(sgdParams.some(p => p.includes('Epsilon'))).toBe(false); // SGD doesn't have epsilon
     // Switch to Adam
-    await page.selectOption('.option-section:first-child select', 'adam');
+    await page.selectOption('.optimizer-section select', 'adam');
     await page.waitForTimeout(50);
     const adamParams = await page.$$eval('.optimizer-param label',
       labels => labels.map(label => label.textContent.trim())
@@ -139,10 +139,10 @@ test.describe('Training Compile Options', () => {
     // Open Training panel and CompileOptions
     await openCompileOptions(page);
     // Check loss selector exists (second section)
-    const lossSelector = await page.$('.option-section:nth-child(2) select');
+    const lossSelector = await page.$('.loss-section select');
     expect(lossSelector).not.toBeNull();
     // Get all loss options
-    const losses = await page.$$eval('.option-section:nth-child(2) select option',
+    const losses = await page.$$eval('.loss-section select option',
       options => options.map(opt => opt.value)
     );
     console.log('Available loss functions:', losses);
@@ -154,7 +154,7 @@ test.describe('Training Compile Options', () => {
     expect(losses).toContain('meanAbsoluteError');
     expect(losses.length).toBe(5);
     // Default should be categoricalCrossentropy
-    const selectedLoss = await page.$eval('.option-section:nth-child(2) select', select => select.value);
+    const selectedLoss = await page.$eval('.loss-section select', select => select.value);
     console.log('Default loss:', selectedLoss);
     expect(selectedLoss).toBe('categoricalCrossentropy');
 
@@ -166,15 +166,15 @@ test.describe('Training Compile Options', () => {
     // Open Training panel and CompileOptions
     await openCompileOptions(page);
     // Change loss to binaryCrossentropy
-    await page.selectOption('.option-section:nth-child(2) select', 'binaryCrossentropy');
+    await page.selectOption('.loss-section select', 'binaryCrossentropy');
     await page.waitForTimeout(50);
-    const newLoss = await page.$eval('.option-section:nth-child(2) select', select => select.value);
+    const newLoss = await page.$eval('.loss-section select', select => select.value);
     console.log('Changed loss to:', newLoss);
     expect(newLoss).toBe('binaryCrossentropy');
     // Change to meanSquaredError
-    await page.selectOption('.option-section:nth-child(2) select', 'meanSquaredError');
+    await page.selectOption('.loss-section select', 'meanSquaredError');
     await page.waitForTimeout(50);
-    const finalLoss = await page.$eval('.option-section:nth-child(2) select', select => select.value);
+    const finalLoss = await page.$eval('.loss-section select', select => select.value);
     console.log('Changed loss to:', finalLoss);
     expect(finalLoss).toBe('meanSquaredError');
     expect(consoleErrors.length).toBe(0);
@@ -216,7 +216,7 @@ test.describe('Training Compile Options', () => {
     console.log('Learning rate changed to:', newValue);
     expect(newValue).toBe('0.01');
     // Switch to SGD and check Nesterov checkbox
-    await page.selectOption('.option-section:first-child select', 'sgd');
+    await page.selectOption('.optimizer-section select', 'sgd');
     await page.waitForTimeout(50);
     const nesterovCheckbox = await page.$('.optimizer-param:has-text("Nesterov") input[type="checkbox"]');
     expect(nesterovCheckbox).not.toBeNull();
@@ -267,7 +267,7 @@ test.describe('Training Compile Options', () => {
     await page.waitForTimeout(100);
     // Set custom optimizer parameters
     console.log('Setting custom optimizer parameters for Adam...');
-    await page.selectOption('.option-section:first-child select', 'adam');
+    await page.selectOption('.optimizer-section select', 'adam');
     await page.waitForTimeout(100);
     // Set learning rate
     const learningRateInput = await page.$('.optimizer-param:has-text("Learning Rate") input[type="number"]');
@@ -279,11 +279,11 @@ test.describe('Training Compile Options', () => {
     await page.waitForTimeout(50);
     // Set loss function
     console.log('Setting loss function to meanSquaredError...');
-    await page.selectOption('.option-section:nth-child(2) select', 'meanSquaredError');
+    await page.selectOption('.loss-section select', 'meanSquaredError');
     await page.waitForTimeout(50);
     // Set epochs to 1 for fast test
     console.log('Setting epochs to 1...');
-    const epochsInput = await page.$('.option-section:nth-child(3) input[type="number"]');
+    const epochsInput = await page.$('.training-params-section input[type="number"]');
     await epochsInput.fill('1');
     await page.waitForTimeout(50);
     // Enable debug logging to see TensorFlow.js training config

@@ -53,65 +53,69 @@
         </div>
       </div>
 
-      <!-- Loss Function Section -->
-      <div class="option-section loss-section">
-        <div class="section-header">
-          <span class="section-title">Loss Function</span>
-          <span class="help-icon" @click="openModal('loss')">?</span>
-        </div>
-        <div class="section-content">
-          <div class="option-row">
-            <label>Function</label>
-            <select
-              v-bind:value="selectedLoss"
-              v-on:change="$emit('changeSelectedLoss', $event.target.value)"
-            >
-              <option
-                v-bind:key="loss"
-                v-for="loss in selectableLosses"
-                v-bind:value="loss"
+      <!-- Loss + Training Parameters column -->
+      <div class="option-section-column">
+        <!-- Loss Function Section -->
+        <div class="option-section loss-section">
+          <div class="section-header">
+            <span class="section-title">Loss Function</span>
+            <span class="help-icon" @click="openModal('loss')">?</span>
+          </div>
+          <div class="section-content">
+            <div class="option-row">
+              <label>Function</label>
+              <select
+                v-bind:value="selectedLoss"
+                v-on:change="$emit('changeSelectedLoss', $event.target.value)"
               >
-                {{loss}}
-              </option>
-            </select>
+                <option
+                  v-bind:key="loss"
+                  v-for="loss in selectableLosses"
+                  v-bind:value="loss"
+                >
+                  {{loss}}
+                </option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Training Parameters Section -->
+        <div class="option-section training-params-section">
+          <div class="section-header">
+            <span class="section-title">Training Parameters</span>
+            <span class="help-icon" @click="openModal('training-params')">?</span>
+          </div>
+          <div class="section-content">
+            <div class="option-row">
+              <label>Epochs</label>
+              <input
+                type="number"
+                v-bind:value="epochs"
+                v-on:input="$emit('changeEpochs', Number($event.target.value))"
+              />
+              <span class="help-icon" @click="openModal('epochs')">?</span>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- Training Parameters Section -->
-      <div class="option-section training-params-section">
-        <div class="section-header">
-          <span class="section-title">Training Parameters</span>
-          <span class="help-icon" @click="openModal('training-params')">?</span>
-        </div>
-        <div class="section-content">
-          <div class="option-row">
-            <label>Epochs</label>
-            <input
-              type="number"
-              v-bind:value="epochs"
-              v-on:input="$emit('changeEpochs', Number($event.target.value))"
-            />
-            <span class="help-icon" @click="openModal('epochs')">?</span>
-          </div>
-        </div>
+      <!-- Train Button column -->
+      <div class="train-button-container">
+        <button
+          class="train-button"
+          :class="{ 'is-training': isTraining }"
+          @click="$emit('trainClicked')"
+        >
+          {{ isTraining ? '■ Stop Training' : '▶ Start Training' }}
+        </button>
       </div>
 
-    </div>
-
-    <!-- Train Button -->
-    <div class="train-button-container">
-      <button
-        class="train-button"
-        :class="{ 'is-training': isTraining }"
-        @click="$emit('trainClicked')"
-      >
-        {{ isTraining ? '■ Stop Training' : '▶ Start Training' }}
-      </button>
     </div>
 
     <!-- Help Modal - Teleported to body to escape stacking context -->
     <Teleport to="body">
+      <Transition name="modal">
       <div v-if="activeModal" class="help-modal-overlay" @click="closeModal">
         <div class="help-modal-container" @click.stop>
           <button class="help-modal-close" @click="closeModal">&times;</button>
@@ -263,6 +267,7 @@
         </div>
       </div>
     </div>
+      </Transition>
     </Teleport>
   </div>
 </template>
@@ -370,8 +375,8 @@ export default {
 
 /* Section Boxes */
 .option-section {
-  background: #fafafa;
-  border: 1px solid #e0e0e0;
+  background: var(--bg-elevated);
+  border: 1px solid var(--panel-border);
   border-radius: 8px;
   padding: 0;
   overflow: hidden;
@@ -379,10 +384,26 @@ export default {
   min-width: 280px;
 }
 
+/* Middle column: Loss + Training Parameters stacked */
+.option-section-column {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-self: stretch;
+  gap: 16px;
+  flex: 1;
+  min-width: 280px;
+}
+
+.option-section-column .option-section {
+  flex: none;
+  min-width: 0;
+}
+
 /* Section Headers */
 .section-header {
-  background: #f5f5f5;
-  border-bottom: 1px solid #e0e0e0;
+  background: var(--bg-hover);
+  border-bottom: 1px solid var(--panel-border);
   padding: 10px 16px;
   display: flex;
   align-items: center;
@@ -393,7 +414,7 @@ export default {
   font-family: var(--font-medium);
   font-weight: var(--font-weight-medium);
   font-size: 14px;
-  color: #333;
+  color: var(--text-primary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -416,7 +437,7 @@ export default {
 
 .option-row label {
   text-align: left;
-  color: #555;
+  color: var(--text-muted);
   font-size: 14px;
 }
 
@@ -427,12 +448,13 @@ export default {
   min-height: 36px;
   height: 36px;
   padding: 7px 10px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--input-border);
   border-radius: 4px;
   font-family: var(--font-regular);
   font-size: 14px;
   line-height: 20px;
-  background: #fff;
+  background: var(--bg-input);
+  color: var(--text-primary);
   transition: border-color 0.2s ease;
   box-sizing: border-box;
   vertical-align: middle;
@@ -447,18 +469,29 @@ export default {
   background-repeat: no-repeat;
   background-position: right 10px center;
   padding-right: 32px;
-  background-color: #fff;
+  background-color: var(--bg-input);
+}
+
+/* Dark theme needs a light dropdown arrow (the token pattern can't recolor a
+   data-URI, so mirror App.vue's media-query + explicit-override scheme). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .option-row select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23bbb' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  }
+}
+:root[data-theme="dark"] .option-row select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23bbb' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
 }
 
 .option-row select:focus,
 .option-row input[type="number"]:focus {
   outline: none;
-  border-color: #666;
+  border-color: var(--accent);
 }
 
 .option-row select:hover,
 .option-row input[type="number"]:hover {
-  border-color: #999;
+  border-color: var(--text-muted);
 }
 
 /* Parameter Labels with Hints */
@@ -470,7 +503,7 @@ export default {
 
 .param-hint {
   font-size: 11px;
-  color: #999;
+  color: var(--text-muted);
   font-style: italic;
 }
 
@@ -479,7 +512,7 @@ export default {
   width: 20px;
   height: 20px;
   cursor: pointer;
-  accent-color: #333;
+  accent-color: var(--fill-strong);
 }
 
 /* Help Icon */
@@ -489,8 +522,8 @@ export default {
   justify-content: center;
   width: 18px;
   height: 18px;
-  background: #ddd;
-  color: #666;
+  background: var(--bg-hover);
+  color: var(--text-muted);
   border-radius: 50%;
   font-size: 12px;
   font-weight: bold;
@@ -501,8 +534,8 @@ export default {
 }
 
 .help-icon:hover {
-  background: #666;
-  color: #fff;
+  background: var(--fill-strong);
+  color: var(--fill-strong-text);
 }
 
 /* Help Modal Styles - Matching AboutModal */
@@ -512,7 +545,7 @@ export default {
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: transparent;
+  background-color: var(--modal-scrim);
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -521,9 +554,9 @@ export default {
 }
 
 .help-modal-container {
-  background: #ffffff;
+  background: var(--bg-panel);
   border-radius: 15px;
-  border: 1px solid #000000;
+  border: 1px solid var(--border-color);
   max-width: 600px;
   width: 90%;
   max-height: 85vh;
@@ -533,7 +566,7 @@ export default {
   padding: 32px;
   font-family: var(--font-regular);
   font-weight: var(--font-weight-regular);
-  color: #000000;
+  color: var(--text-primary);
   line-height: 1.6;
   text-align: left;
 }
@@ -546,7 +579,7 @@ export default {
   border: none;
   font-size: 32px;
   line-height: 1;
-  color: #000000;
+  color: var(--text-primary);
   cursor: pointer;
   padding: 0;
   width: 32px;
@@ -570,8 +603,8 @@ export default {
   font-weight: var(--font-weight-medium);
   font-size: 1.4em;
   margin: 0 0 12px 0;
-  color: #000000;
-  border-bottom: 1px solid #000000;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
   padding-bottom: 6px;
 }
 
@@ -580,20 +613,20 @@ export default {
   font-weight: var(--font-weight-medium);
   font-size: 1.1em;
   margin: 20px 0 12px 0;
-  color: #000000;
+  color: var(--text-primary);
 }
 
 .help-modal-body p {
   margin: 0 0 12px 0;
   font-size: 0.95em;
-  color: #000000;
+  color: var(--text-primary);
 }
 
 .help-modal-body ul,
 .help-modal-body ol {
   margin: 0 0 12px 0;
   padding-left: 24px;
-  color: #000000;
+  color: var(--text-primary);
   line-height: 1.6;
   font-size: 0.95em;
 }
@@ -605,11 +638,11 @@ export default {
 .help-modal-body strong {
   font-family: var(--font-medium);
   font-weight: var(--font-weight-medium);
-  color: #000000;
+  color: var(--text-primary);
 }
 
 .help-modal-body em {
-  color: #000000;
+  color: var(--text-primary);
   font-style: italic;
   font-size: 0.95em;
 }
@@ -620,12 +653,12 @@ export default {
 }
 
 .help-modal-container::-webkit-scrollbar-track {
-  background: #f5f5f5;
+  background: var(--bg-elevated);
   border-radius: 4px;
 }
 
 .help-modal-container::-webkit-scrollbar-thumb {
-  background: #000000;
+  background: var(--input-border);
   border-radius: 4px;
 }
 
@@ -639,23 +672,25 @@ export default {
 }
 
 #CompileOptions::-webkit-scrollbar-track {
-  background: #f0f0f0;
+  background: var(--bg-elevated);
 }
 
 #CompileOptions::-webkit-scrollbar-thumb {
-  background: #ccc;
+  background: var(--input-border);
   border-radius: 4px;
 }
 
 #CompileOptions::-webkit-scrollbar-thumb:hover {
-  background: #aaa;
+  background: var(--text-muted);
 }
 
 /* Train Button */
 .train-button-container {
-  padding: 16px;
+  flex: 0 0 auto;
+  align-self: center;
   display: flex;
   justify-content: center;
+  padding: 8px;
 }
 
 .train-button {

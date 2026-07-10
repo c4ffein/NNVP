@@ -1,5 +1,5 @@
 <template>
-  <div v-if="active" class="tutorial-overlay">
+  <div v-if="active && tutorial" class="tutorial-overlay">
     <!-- Coachmark ring highlighting the current step's target element -->
     <div
       v-if="highlight"
@@ -16,7 +16,10 @@
     <div ref="card" class="tutorial-card" role="dialog" aria-label="Tutorial step" tabindex="-1">
       <div class="tutorial-card-header">
         <span class="tutorial-progress">Step {{ currentStep + 1 }} / {{ totalSteps }}</span>
-        <button class="tutorial-exit" type="button" @click="exit">Exit</button>
+        <span class="tutorial-card-actions">
+          <button class="tutorial-menu-link" type="button" @click="openMenu">All tutorials</button>
+          <button class="tutorial-exit" type="button" @click="exit">Exit</button>
+        </span>
       </div>
       <h3 class="tutorial-title">{{ step.title }}</h3>
       <p class="tutorial-instruction">{{ step.instruction }}</p>
@@ -38,7 +41,7 @@
           v-else
           class="tutorial-btn tutorial-btn-primary"
           type="button"
-          @click="exit"
+          @click="finish"
         >Finish</button>
       </div>
     </div>
@@ -46,7 +49,7 @@
 </template>
 
 <script>
-import { steps, totalSteps } from '../../lib/Tutorial/mnistTutorial';
+import { markStepReached, markCompleted } from '../../lib/Tutorial/tutorials';
 
 export default {
   name: 'TutorialOverlay',
@@ -55,17 +58,27 @@ export default {
       type: Boolean,
       default: false,
     },
+    // The tutorial definition to play ({ id, title, steps }); the overlay is a
+    // generic engine, the definitions live in lib/Tutorial/tutorials.js.
+    tutorial: {
+      type: Object,
+      default: null,
+    },
   },
   data() {
     return {
-      steps,
-      totalSteps,
       currentStep: 0,
       stepComplete: false,
       highlight: null,
     };
   },
   computed: {
+    steps() {
+      return this.tutorial ? this.tutorial.steps : [];
+    },
+    totalSteps() {
+      return this.steps.length;
+    },
     step() {
       return this.steps[this.currentStep];
     },
@@ -78,7 +91,8 @@ export default {
         this.teardown();
       }
     },
-    currentStep() {
+    currentStep(step) {
+      if (this.tutorial) markStepReached(this.tutorial.id, step);
       this.refreshState();
     },
   },
@@ -139,6 +153,9 @@ export default {
       // Auto-advance when the current step becomes complete.
       if (complete && this.currentStep < this.totalSteps - 1) {
         this.currentStep += 1;
+      } else if (complete && this.tutorial) {
+        // Last step done by actually performing it (not just Finish-clicked).
+        markCompleted(this.tutorial.id);
       }
     },
     resolveTarget() {
@@ -169,6 +186,10 @@ export default {
         this.exit();
       }
     },
+    finish() {
+      if (this.tutorial) markCompleted(this.tutorial.id);
+      this.exit();
+    },
     back() {
       if (this.currentStep > 0) {
         this.currentStep -= 1;
@@ -176,6 +197,11 @@ export default {
     },
     exit() {
       this.$emit('exit');
+    },
+    openMenu() {
+      // Leave the running tutorial (progress is already recorded per step)
+      // and hand over to the tutorial menu.
+      this.$emit('open-menu');
     },
   },
 };
@@ -229,7 +255,13 @@ export default {
   color: var(--accent);
 }
 
-.tutorial-exit {
+.tutorial-card-actions {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.tutorial-exit,
+.tutorial-menu-link {
   background: transparent;
   border: none;
   color: var(--text-muted);
@@ -238,7 +270,8 @@ export default {
   padding: 2px 6px;
 }
 
-.tutorial-exit:hover {
+.tutorial-exit:hover,
+.tutorial-menu-link:hover {
   color: var(--text-primary);
 }
 

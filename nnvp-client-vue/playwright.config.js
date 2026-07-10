@@ -37,17 +37,10 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
-  // Every spec runs against both canvases through the driver in
-  // tests/helpers/canvas.js: `flow` is the app default (Vue Flow), `d3` is
-  // the legacy whiteboard kept reachable via ?canvas=d3.
   projects: [
     {
       name: 'flow',
-      use: { ...chromium, canvasMode: 'flow' },
-    },
-    {
-      name: 'd3',
-      use: { ...chromium, canvasMode: 'd3' },
+      use: { ...chromium },
     },
   ],
   webServer: {
