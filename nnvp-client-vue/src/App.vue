@@ -2,16 +2,31 @@
   <div id="canvas-background" class="canvas-background">
     <FlowBoard :isTraining="isTraining"/>
   </div>
-  <div id="generalMenu" class="floating-panel general-menu"><GeneralMenu @open-trainer="openTrainer" @open-about="openAboutModal" @open-tutorial="openTutorialMenu" @open-account="openAccount"/></div>
-  <div id="layerCatalog" class="floating-panel layer-catalog"><LayerCatalog/></div>
-  <div id="layerOptions" class="floating-panel layer-options"><LayerOptions msg="NNVP"/></div>
+  <div id="generalMenu" class="floating-panel general-menu"><GeneralMenu @open-trainer="openTrainer" @open-about="openAboutModal" @open-tutorial="openTutorialMenu" @open-account="openAccount" @open-save-load="openSaveLoad" :views="{ left: showLeftPanel, right: showRightPanel, training: trainerHeight > 0, chat: backendEnabled && showChat, chatAvailable: backendEnabled }" @toggle-view="togglePanel"/><CornerControls @open-account="openAccount()"/></div>
+  <div id="layerCatalog" class="floating-panel layer-catalog" v-show="showLeftPanel"><LayerCatalog/></div>
+  <div id="layerOptions" class="floating-panel layer-options" v-show="showRightPanel"><LayerOptions msg="NNVP"/></div>
+  <button
+    class="panel-toggle panel-toggle-left"
+    :class="{ collapsed: !showLeftPanel }"
+    :title="(showLeftPanel ? 'Hide' : 'Show') + ' the layer catalog'"
+    :aria-label="(showLeftPanel ? 'Hide' : 'Show') + ' the layer catalog'"
+    @click="togglePanel('showLeftPanel')"
+  >{{ showLeftPanel ? '‹' : '›' }}</button>
+  <button
+    class="panel-toggle panel-toggle-right"
+    :class="{ collapsed: !showRightPanel }"
+    :title="(showRightPanel ? 'Hide' : 'Show') + ' the layer options'"
+    :aria-label="(showRightPanel ? 'Hide' : 'Show') + ' the layer options'"
+    @click="togglePanel('showRightPanel')"
+  >{{ showRightPanel ? '›' : '‹' }}</button>
   <div id="trainingZone" class="floating-panel training-zone" v-if="trainerHeight > 0" v-bind:style="{height: trainerHeight+'vh'}">
     <TrainingZone @close-trainer="closeTrainer" :trainingZoneSize="trainerHeight" @training-started="isTraining = true" @training-stopped="isTraining = false"/>
   </div>
   <AboutModal :show="showAboutModal" @close="closeAboutModal" @open-tutorials="openTutorialsFromAbout"/>
   <TutorialMenu :show="showTutorialMenu" @close="showTutorialMenu = false" @start="startTutorial"/>
-  <AccountPanel :show="showAccount" :intent="accountIntent" @close="closeAccount"/>
-  <ChatBubble/>
+  <AccountPanel v-if="backendEnabled" :show="showAccount" :intent="accountIntent" @close="closeAccount" @pending-login="openAccount()"/>
+  <SaveLoadModal v-if="backendEnabled" :show="showSaveLoad" :mode="saveLoadMode" @close="showSaveLoad = false" @open-account="openAccount()"/>
+  <ChatBubble v-if="backendEnabled && showChat" @open-account="openAccount()"/>
   <TutorialOverlay :active="tutorialActive" :tutorial="activeTutorial" @exit="stopTutorial" @open-menu="openMenuFromTutorial"/>
 </template>
 
@@ -24,10 +39,21 @@ import FlowBoard from './components/FlowBoard/FlowBoard.vue';
 import TrainingZone from './components/TrainingZone/TrainingZone.vue';
 import AboutModal from './components/AboutModal.vue';
 import AccountPanel from './components/Account/AccountPanel.vue';
+import SaveLoadModal from './components/SaveLoad/SaveLoadModal.vue';
+import CornerControls from './components/CornerControls.vue';
 import ChatBubble from './components/Assistant/ChatBubble.vue';
 import TutorialOverlay from './components/Tutorial/TutorialOverlay.vue';
 import TutorialMenu from './components/Tutorial/TutorialMenu.vue';
 import { getTutorial } from './lib/Tutorial/tutorials';
+
+// Panel visibility survives reloads. Anything but an explicit '0' means shown.
+function readPanelPref(side) {
+  try {
+    return localStorage.getItem(`nnvp-panel-${side}`) !== '0';
+  } catch {
+    return true;
+  }
+}
 
 export default {
   name: 'app',
@@ -39,6 +65,8 @@ export default {
     TrainingZone,
     AboutModal,
     AccountPanel,
+    SaveLoadModal,
+    CornerControls,
     ChatBubble,
     TutorialOverlay,
     TutorialMenu,
@@ -51,6 +79,10 @@ export default {
     closeAccount() {
       this.showAccount = false;
       this.accountIntent = '';
+    },
+    openSaveLoad(mode) {
+      this.saveLoadMode = mode === 'save' ? 'save' : 'load';
+      this.showSaveLoad = true;
     },
     openTutorialMenu() {
       this.showTutorialMenu = true;
@@ -85,14 +117,37 @@ export default {
     closeAboutModal() {
       this.showAboutModal = false;
     },
+    togglePanel(key) {
+      // The training zone is not a boolean flag but a height; toggling it
+      // from the View menu maps onto the existing open/close methods.
+      if (key === 'training') {
+        if (this.trainerHeight > 0) this.closeTrainer();
+        else this.openTrainer();
+        return;
+      }
+      this[key] = !this[key];
+      try {
+        const side = { showLeftPanel: 'left', showRightPanel: 'right', showChat: 'chat' }[key];
+        localStorage.setItem(`nnvp-panel-${side}`, this[key] ? '1' : '0');
+      } catch { /* localStorage unavailable */ }
+    },
   },
   data() {
     return {
+      // Cloud accounts are disabled in builds without VITE_ENABLE_BACKEND
+      // (a static-only deploy has no /api to talk to). GeneralMenu hides the
+      // matching menu entries.
+      backendEnabled: !!import.meta.env.VITE_ENABLE_BACKEND,
+      showLeftPanel: readPanelPref('left'),
+      showRightPanel: readPanelPref('right'),
+      showChat: readPanelPref('chat'),
       trainerHeight: 0,
       trainerOpenHeight: 50,
       showAboutModal: false,
       showAccount: false,
       accountIntent: '',
+      showSaveLoad: false,
+      saveLoadMode: 'load',
       isTraining: false,
       tutorialActive: false,
       activeTutorial: null,
@@ -114,6 +169,11 @@ export default {
       // eslint-disable-next-line no-alert
       alert('Mobile browser detected. This site is still not fully compatible with touchscreens.\n'
           + 'We recommend to use a desktop browser.');
+    }
+    // A magic sign-in link landed here (/?magic=<token>): the account panel
+    // verifies it and strips the token from the URL.
+    if (this.backendEnabled && new URLSearchParams(window.location.search).get('magic')) {
+      this.openAccount('magic');
     }
   },
 };
@@ -172,8 +232,8 @@ export default {
 
   --input-border: #cccccc;               /* form control hairline */
 
-  --accent: #2563eb;                     /* primary / focus color */
-  --accent-hover: #1d4ed8;
+  --accent: #5566ee;                     /* primary / focus color */
+  --accent-hover: #4152d9;
   --accent-text: #ffffff;                /* text over --accent */
   --success: #16a34a;
 
@@ -215,9 +275,9 @@ export default {
 
     --input-border: #3a3f4b;
 
-    --accent: #3b82f6;
-    --accent-hover: #60a5fa;
-    --accent-text: #0b1120;
+    --accent: #5566ee;
+    --accent-hover: #7280f2;
+    --accent-text: #ffffff;
     --success: #22c55e;
 
     --fill-strong: #e5e7eb;
@@ -254,8 +314,8 @@ export default {
 
   --input-border: #cccccc;
 
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
+  --accent: #5566ee;
+  --accent-hover: #4152d9;
   --accent-text: #ffffff;
   --success: #16a34a;
 
@@ -290,9 +350,9 @@ export default {
 
   --input-border: #3a3f4b;
 
-  --accent: #3b82f6;
-  --accent-hover: #60a5fa;
-  --accent-text: #0b1120;
+  --accent: #5566ee;
+  --accent-hover: #7280f2;
+  --accent-text: #ffffff;
   --success: #22c55e;
 
   --fill-strong: #e5e7eb;
@@ -343,6 +403,62 @@ body,html {
 }
 
 /* Floating panels - common styling */
+/* Shared modal chrome. Every dialog (About, Cloud/Account, Tutorial menu, …)
+   uses these three classes for its overlay / surface / close button, so the
+   theme skins all of them from this one place; components keep only their own
+   sizing and content styles (and their legacy class names for the tests). */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: var(--modal-scrim);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  z-index: 9999;
+  padding-top: 40px;
+}
+.modal-surface {
+  background-color: var(--bg-panel);
+  border-radius: var(--border-radius);
+  border: 1px solid var(--panel-border);
+  box-shadow: var(--panel-shadow);
+  width: 90%;
+  max-height: 85vh;
+  overflow-y: auto;
+  position: relative;
+  color: var(--text-primary);
+  font-family: var(--font-regular);
+  font-weight: var(--font-weight-regular);
+  text-align: left;
+}
+.modal-close {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  background: none;
+  border: none;
+  font-size: 30px;
+  line-height: 1;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s;
+}
+.modal-close:hover { opacity: 0.6; }
+.modal-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 .floating-panel {
   position: absolute;
   background-color: var(--bg-panel);
@@ -354,12 +470,17 @@ body,html {
   pointer-events: auto;  /* Allow the panel background to receive clicks */
 }
 
-/* GeneralMenu - top panel */
+/* GeneralMenu - top bar: a centered pill sized to its content (menu entries
+   + the theme/account icons at its right end). */
 .general-menu {
   top: var(--panel-margin);
-  left: var(--panel-margin);
-  right: var(--panel-margin);
+  left: 50%;
+  transform: translateX(-50%);
+  width: fit-content;
+  max-width: calc(100% - var(--panel-margin) * 2);
   height: 32px;
+  display: flex;
+  align-items: stretch;
   overflow: visible;  /* Allow dropdown menus to show outside the panel */
   z-index: 100;  /* Ensure dropdowns appear above other panels */
 }
@@ -381,6 +502,38 @@ body,html {
   width: 240px;
   overflow-y: auto;
 }
+
+/* Slim edge chevrons to hide/show the side panels, aligned with the top of
+   the panels. When a panel is hidden its chevron slides to the screen edge. */
+.panel-toggle {
+  position: absolute;
+  top: calc(32px + var(--panel-margin) * 2 + 6px);
+  z-index: 11;
+  width: 18px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--panel-border);
+  background-color: var(--bg-panel);
+  color: var(--text-muted);
+  box-shadow: var(--panel-shadow);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+.panel-toggle:hover { color: var(--text-primary); }
+.panel-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.panel-toggle-left {
+  left: calc(220px + var(--panel-margin));
+  border-radius: 0 8px 8px 0;
+  border-left: none;
+}
+.panel-toggle-left.collapsed { left: 0; }
+.panel-toggle-right {
+  right: calc(240px + var(--panel-margin));
+  border-radius: 8px 0 0 8px;
+  border-right: none;
+}
+.panel-toggle-right.collapsed { right: 0; }
 
 /* TrainingZone - bottom panel */
 .training-zone {

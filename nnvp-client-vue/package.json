@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev-host": "vite --host",
-    "build": "vite build",
+    "build": "NODE_ENV=production vite build",
     "preview": "vite preview",
     "test:e2e": "playwright test",
     "test:e2e:bun": "PW_DISABLE_TS_ESM=1 playwright test",

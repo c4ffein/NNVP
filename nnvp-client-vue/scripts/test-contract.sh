@@ -8,12 +8,12 @@
 #   5. kill the server, delete the temp DB
 #
 # Overrides:
-#   NNVP_BACKEND_DIR   path to the Django backend checkout (default: ../../nnvp-backend-i1)
+#   NNVP_BACKEND_DIR   path to the Django backend checkout (default: ../../nnvp-backend)
 #   NNVP_BACKEND_PORT  port to serve on (default: 8123)
 set -euo pipefail
 
 SPA_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BACKEND_DIR="${NNVP_BACKEND_DIR:-$(cd "$SPA_DIR/../.." && pwd)/nnvp-backend-i1}"
+BACKEND_DIR="${NNVP_BACKEND_DIR:-$(cd "$SPA_DIR/../.." && pwd)/nnvp-backend}"
 PORT="${NNVP_BACKEND_PORT:-8123}"
 BASE_URL="http://127.0.0.1:${PORT}"
 
@@ -22,19 +22,21 @@ if [ ! -f "$BACKEND_DIR/manage.py" ]; then
   exit 1
 fi
 
-# --- backend python: use the venv; recreate it if it's broken (moved venv) ---
+# --- backend python: reuse the venv the backend Makefile builds (via uv) ---
 PYTHON="$BACKEND_DIR/.venv/bin/python"
 # Note: `import ninja` needs DJANGO_SETTINGS_MODULE, so only check it's findable.
-if ! "$PYTHON" -c 'import sys, importlib.util as u, django, jwt; sys.exit(0 if u.find_spec("ninja") else 1)' >/dev/null 2>&1; then
-  echo "backend venv unusable; recreating from requirements.txt ..."
-  rm -rf "$BACKEND_DIR/.venv"
-  python3 -m venv "$BACKEND_DIR/.venv"
-  "$BACKEND_DIR/.venv/bin/pip" install -q -r "$BACKEND_DIR/requirements.txt"
+if ! "$PYTHON" -c 'import sys, importlib.util as u, django; sys.exit(0 if u.find_spec("ninja") else 1)' >/dev/null 2>&1; then
+  echo "backend venv unusable; rebuilding via the backend Makefile ..."
+  make -C "$BACKEND_DIR" install
 fi
 
-# --- throwaway database in a fresh temp dir ---
+# --- throwaway database + mailbox in a fresh temp dir ---
 TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/nnvp-contract.XXXXXX")"
 export DJANGO_DB_PATH="$TMP_DIR/db.sqlite3"
+# Magic-link emails land as files here; the contract suite reads the links out.
+export EMAIL_BACKEND="django.core.mail.backends.filebased.EmailBackend"
+export EMAIL_FILE_PATH="$TMP_DIR/mail"
+mkdir -p "$EMAIL_FILE_PATH"
 
 SERVER_PID=""
 cleanup() {
@@ -77,6 +79,6 @@ fi
 
 echo "==> running contract suite"
 status=0
-(cd "$SPA_DIR" && NNVP_BACKEND_URL="$BASE_URL" bun run test:contract) || status=$?
+(cd "$SPA_DIR" && NNVP_BACKEND_URL="$BASE_URL" NNVP_MAIL_DIR="$EMAIL_FILE_PATH" bun run test:contract) || status=$?
 
 exit "$status"
