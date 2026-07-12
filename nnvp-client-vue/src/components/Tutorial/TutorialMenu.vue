@@ -1,14 +1,14 @@
 <template>
   <Transition name="modal">
-    <div v-if="show" class="tutorial-menu-overlay" @click="$emit('close')">
+    <div v-if="show" class="modal-overlay" @click="$emit('close')">
       <div
-        class="tutorial-menu-container"
+        class="modal-surface tutorial-menu-container"
         role="dialog"
         aria-modal="true"
         aria-label="Tutorials"
         @click.stop
       >
-        <button class="tutorial-menu-close" @click="$emit('close')" aria-label="Close">&times;</button>
+        <button class="modal-close" @click="$emit('close')" aria-label="Close">&times;</button>
         <div class="tutorial-menu-content">
           <h1>Tutorials</h1>
           <p class="subtitle">Guided, hands-on tours of the editor</p>
@@ -90,55 +90,11 @@ export default {
 </script>
 
 <style>
-/* Same modal look as AboutModal (its styles are scoped, so the base rules are
-   duplicated here under tutorial-menu-* class names). */
-.tutorial-menu-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: var(--modal-scrim);
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  z-index: 9999;
-  padding-top: 40px;
-}
-
+/* Chrome (overlay / surface / close) comes from the global modal skin in
+   App.vue; only sizing and content styles live here. */
 .tutorial-menu-container {
-  background: var(--bg-panel);
-  border-radius: 15px;
-  border: 1px solid var(--border-color);
   max-width: 480px;
-  width: 90%;
-  max-height: 85vh;
-  overflow-y: auto;
-  position: relative;
   padding: 32px;
-}
-
-.tutorial-menu-close {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  background: none;
-  border: none;
-  font-size: 32px;
-  line-height: 1;
-  color: var(--text-primary);
-  cursor: pointer;
-  padding: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: opacity 0.2s;
-}
-
-.tutorial-menu-close:hover {
-  opacity: 0.6;
 }
 
 .tutorial-menu-content {
@@ -158,6 +114,7 @@ export default {
 
 .tutorial-menu-content .subtitle {
   font-size: 1em;
+  color: var(--text-muted);
   margin: 0 0 24px 0;
 }
 

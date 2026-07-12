@@ -18,25 +18,15 @@
           </div>
         </div>
 
-        <!-- Settings popover -->
+        <!-- Settings popover. The assistant runs through the NNVP backend
+             (server-side key) — there is nothing key-related to configure. -->
         <div v-if="settingsOpen" class="chat-settings">
-          <label class="chat-field">
-            <span>Anthropic API key</span>
-            <input
-              type="password"
-              v-model="apiKey"
-              placeholder="sk-ant-..."
-              autocomplete="off"
-            >
-            <span v-if="apiKeyWarning" class="chat-field-warning">{{ apiKeyWarning }}</span>
-          </label>
+          <div v-if="proxyActive" class="chat-proxy-hint">
+            Using your NNVP account.
+          </div>
           <label class="chat-field">
             <span>Model</span>
             <input type="text" v-model="model" :placeholder="defaultModel">
-          </label>
-          <label class="chat-field">
-            <span>Base URL (optional proxy)</span>
-            <input type="text" v-model="baseUrl" :placeholder="defaultBaseUrl">
           </label>
           <div class="chat-settings-actions">
             <button class="chat-btn" @click="saveSettings">Save</button>
@@ -98,8 +88,12 @@
         </Teleport>
 
         <div class="chat-messages" ref="messagesEl">
-          <div v-if="!hasKey" class="chat-empty">
-            Add your Anthropic API key in settings (⚙) to start chatting.
+          <div v-if="!hasKey" class="chat-empty chat-connect">
+            <p>Sign in to talk to the assistant — it can inspect and build
+            your model for you. No API key needed.</p>
+            <button type="button" class="chat-btn" @click="$emit('open-account')">
+              Sign in
+            </button>
           </div>
           <div v-else-if="messages.length === 0" class="chat-empty">
             Ask me to inspect or build your Keras model.
@@ -111,6 +105,9 @@
           >
             <div v-if="message.role === 'tool'" class="chat-tool">
               <span class="chat-tool-name">{{ message.text }}</span>
+            </div>
+            <div v-else-if="message.role === 'notice'" class="chat-notice">
+              {{ message.text }}
             </div>
             <div v-else :class="['chat-bubble-text', { 'chat-bubble-error': message.isError }]">
               {{ message.text }}
@@ -165,13 +162,13 @@ import AnthropicClient, {
   STORAGE_ALLOW_EDITS,
   DEFAULT_MODEL,
   DEFAULT_BASE_URL,
-  isPlausibleApiKey,
   readStoredConfig,
   usesBackendProxy,
 } from '../../lib/Assistant/anthropicClient';
 
 export default {
   name: 'ChatBubble',
+  emits: ['open-account'],
   data() {
     return {
       open: false,
@@ -187,15 +184,11 @@ export default {
       defaultModel: DEFAULT_MODEL,
       defaultBaseUrl: DEFAULT_BASE_URL,
       hasKey: false,
+      // True when requests will go through the NNVP backend proxy (signed in,
+      // no user key / custom base URL) — drives the settings hint.
+      proxyActive: false,
       allowEdits: false,
     };
-  },
-  computed: {
-    // Warn (but do not block) when the pasted key does not look like a key.
-    apiKeyWarning() {
-      if (this.apiKey === '') return '';
-      return isPlausibleApiKey(this.apiKey) ? '' : 'This does not look like a valid API key.';
-    },
   },
   created() {
     if (typeof localStorage !== 'undefined') {
@@ -210,10 +203,22 @@ export default {
     this.actions = new AssistantActions(this.$d3Interface, this.$kerasInterface);
     this.client = new AnthropicClient(this.actions, { allowEdits: this.allowEdits });
   },
+  mounted() {
+    // Sign-in / sign-out elsewhere in the app flips the chat between its two
+    // states live (apiClient dispatches this on every token change).
+    this.onAuthChanged = () => this.refreshHasKey();
+    window.addEventListener('nnvp:auth-changed', this.onAuthChanged);
+  },
+  beforeUnmount() {
+    window.removeEventListener('nnvp:auth-changed', this.onAuthChanged);
+  },
   methods: {
     toggleOpen() {
       this.open = !this.open;
       if (this.open) {
+        // The user may have signed in (or out) since the component mounted;
+        // re-resolve the config so the keyless proxy default kicks in live.
+        this.refreshHasKey();
         // Move focus into the panel: the message field when it is enabled,
         // otherwise the first available control (e.g. Settings).
         this.$nextTick(() => {
@@ -250,18 +255,31 @@ export default {
       this.refreshHasKey();
       this.settingsOpen = false;
     },
-    // "Ready to chat" means either a user-provided Anthropic key, or the base
-    // URL pointing at the NNVP backend proxy while signed in (JWT present).
+    // "Ready to chat" means either a user-provided Anthropic key, or the
+    // resolved base URL pointing at the NNVP backend proxy while signed in
+    // (which readStoredConfig now defaults to for keyless signed-in users).
     refreshHasKey() {
       const config = readStoredConfig();
-      this.hasKey = Boolean(this.apiKey)
-        || (usesBackendProxy(config) && Boolean(config.backendToken));
+      this.proxyActive = usesBackendProxy(config) && Boolean(config.backendToken);
+      this.hasKey = Boolean(config.apiKey) || this.proxyActive;
     },
     scrollToBottom() {
       this.$nextTick(() => {
         const el = this.$refs.messagesEl;
         if (el) el.scrollTop = el.scrollHeight;
       });
+    },
+    // One short human line instead of the technical error: only the two
+    // actionable cases keep their meaning, everything else is "difficulties".
+    shortErrorText(error) {
+      const detail = String((error && error.message) || error || '').toLowerCase();
+      if (detail.includes('sign in') || detail.includes('401')) {
+        return 'Session expired — please sign in again.';
+      }
+      if (detail.includes('rate limit') || detail.includes('429')) {
+        return 'Rate limited — try again in a moment.';
+      }
+      return 'Currently experiencing technical difficulties — please try again soon.';
     },
     pushMessage(role, text, isError = false) {
       this.messages.push({ role, text, isError });
@@ -283,7 +301,10 @@ export default {
         const reply = await this.client.send(this.history, onActivity);
         if (reply) this.pushMessage('assistant', reply);
       } catch (error) {
-        this.pushMessage('assistant', `Error: ${(error && error.message) || error}`, true);
+        // Full detail goes to the console for debugging; the chat shows a
+        // short centered notice instead of a technical error bubble.
+        console.warn('[assistant] request failed:', error); // eslint-disable-line no-console
+        this.pushMessage('notice', this.shortErrorText(error), true);
       } finally {
         this.sending = false;
         this.scrollToBottom();
@@ -386,6 +407,11 @@ export default {
   background-color: var(--bg-elevated);
 }
 
+.chat-proxy-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 .chat-field {
   display: flex;
   flex-direction: column;
@@ -473,6 +499,24 @@ export default {
   font-size: 13px;
   text-align: center;
   margin: auto 0;
+}
+.chat-connect {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.chat-connect p { margin: 0; }
+
+/* Short centered notice (errors and the like) instead of a message bubble. */
+.chat-message.chat-notice {
+  justify-content: center;
+}
+.chat-notice {
+  color: #b91c1c;
+  font-size: 12px;
+  text-align: center;
+  padding: 4px 8px;
 }
 
 .chat-message {

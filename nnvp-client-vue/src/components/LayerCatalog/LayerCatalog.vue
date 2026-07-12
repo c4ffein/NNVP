@@ -1,11 +1,20 @@
 <template>
   <div class="LayerCatalog" :key="reloadKey">
+    <!-- Sticky toolbar: search + collapse-all stay visible while the list
+         scrolls underneath. -->
     <div class="search-container">
       <svg class="search-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
         <circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.5"/>
         <path d="M11 11L14.5 14.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
       </svg>
       <input id="layerSearchBox" v-model="searchBox" placeholder="Search" type="search" aria-label="Search layers">
+      <button
+        type="button"
+        class="collapse-all-button"
+        :aria-label="allCollapsed ? 'Expand all categories' : 'Collapse all categories'"
+        :title="allCollapsed ? 'Expand all categories' : 'Collapse all categories'"
+        @click="toggleAllCategories"
+      ><span class="collapse-all-arrow" :class="{ collapsed: allCollapsed }" aria-hidden="true">▲</span></button>
     </div>
     <div
       v-for="(layers, categoryName) in $kerasInterface.getCategories()"
@@ -24,6 +33,15 @@
         v-if="layersNotEmptyAfterSearch(layers, categoryName)"
       >
         <div class="text">{{ categoryName }}</div>
+        <button
+          v-if="categoryHelpHtmlFor(categoryName)"
+          type="button"
+          class="help-icon category-help"
+          :aria-label="'Learn about the ' + categoryName + ' category'"
+          @click.stop="helpCategory = categoryName"
+          @keydown.enter.stop
+          @keydown.space.stop
+        >?</button>
         <div class="arrow" aria-hidden="true">▲</div>
       </div>
       <div class="layerList">
@@ -36,21 +54,21 @@
       </div>
     </div>
 
-    <!-- One shared help modal for the whole catalog (same styling/content as
-         the right panel's layer help in ParamsBlock). -->
+    <!-- One shared help modal for the whole catalog (layers AND categories;
+         same styling/content family as the right panel's help in ParamsBlock). -->
     <Teleport to="body">
       <Transition name="modal">
-      <div v-if="helpLayerType" class="layer-help-modal-overlay" @click="helpLayerType = null">
+      <div v-if="helpLayerType || helpCategory" class="layer-help-modal-overlay" @click="closeHelp">
         <div
           class="layer-help-modal-container"
           role="dialog"
           aria-modal="true"
-          :aria-label="helpLayerType + ' layer help'"
+          :aria-label="(helpLayerType || helpCategory) + ' help'"
           @click.stop
         >
-          <button class="layer-help-modal-close" aria-label="Close" @click="helpLayerType = null">&times;</button>
+          <button class="layer-help-modal-close" aria-label="Close" @click="closeHelp">&times;</button>
           <div class="layer-help-modal-body">
-            <div v-html="layerHelpHtml"></div>
+            <div v-html="helpHtml"></div>
           </div>
         </div>
       </div>
@@ -62,6 +80,7 @@
 <script>
 import LayerTemplate from './LayerTemplate.vue';
 import layerHelp from '../../lib/KerasInterface/layerHelp';
+import categoryHelp from '../../lib/KerasInterface/categoryHelp';
 
 export default {
   name: 'LayerCatalog',
@@ -69,7 +88,8 @@ export default {
     LayerTemplate,
   },
   computed: {
-    layerHelpHtml() {
+    helpHtml() {
+      if (this.helpCategory) return categoryHelp[this.helpCategory] || '';
       if (!this.helpLayerType) return '';
       return layerHelp[this.helpLayerType] || `
         <h2>${this.helpLayerType}</h2>
@@ -81,6 +101,20 @@ export default {
   methods: {
     toggleCategory: categoryDiv => document.getElementById(categoryDiv).classList.toggle('closed'),
     divId: categoryName => `category_${categoryName.replace(' ', '_')}`,
+    categoryHelpHtmlFor: categoryName => categoryHelp[categoryName] || '',
+    closeHelp() {
+      this.helpLayerType = null;
+      this.helpCategory = null;
+    },
+    // The open/closed state lives in the DOM (classList), so the bulk toggle
+    // does too; `allCollapsed` only drives the button label.
+    toggleAllCategories() {
+      const collapse = !this.allCollapsed;
+      this.$el.querySelectorAll('.layerCategory').forEach((el) => {
+        el.classList.toggle('closed', collapse);
+      });
+      this.allCollapsed = collapse;
+    },
     inSearch(layer) {
       if (this.$data.searchBox === '') {
         return true;
@@ -125,11 +159,13 @@ export default {
     searchBox: '',
     reloadKey: 0,
     helpLayerType: null,
+    helpCategory: null,
+    allCollapsed: false,
   }),
   mounted() {
     this.$d3Interface.setLeftBarRemountCallback(this.remount);
     this.handleEscape = (event) => {
-      if (event.key === 'Escape' && this.helpLayerType) this.helpLayerType = null;
+      if (event.key === 'Escape' && (this.helpLayerType || this.helpCategory)) this.closeHelp();
     };
     document.addEventListener('keydown', this.handleEscape);
   },
@@ -156,9 +192,40 @@ export default {
   color: var(--text-primary);
 }
 .search-container {
-  position: relative;
+  /* Stays pinned while the layer list scrolls under it. */
+  position: sticky;
+  top: 0;
+  z-index: 2;
   width: 100%;
   background-color: var(--bg-panel);
+  display: flex;
+  align-items: center;
+}
+.collapse-all-button {
+  flex: none;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1;
+  padding: 8px 12px 8px 4px;
+  cursor: pointer;
+}
+.collapse-all-button:hover { color: var(--text-primary); }
+.collapse-all-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+/* Same triangle glyph as the category rows: pointing down while expanded
+   (click to collapse), left once collapsed. */
+.collapse-all-arrow {
+  display: inline-block;
+  transform: rotate(180deg);
+  transition: transform 0.15s ease;
+}
+.collapse-all-arrow.collapsed {
+  transform: rotate(-90deg);
 }
 .search-icon {
   position: absolute;
@@ -173,7 +240,8 @@ export default {
 #layerSearchBox {
   background-color: transparent;
   box-sizing: border-box;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   border: none;
   color: var(--text-primary);
   padding: 14px 16px 14px 44px;
@@ -191,8 +259,9 @@ export default {
   background-color: transparent;
   overflow: hidden;
   display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-areas: "arrow text";
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas: "arrow text help";
+  align-items: center;
   border-top: 1px solid var(--panel-border);
   border-left: 1px solid var(--panel-border);
   border-right: 1px solid var(--panel-border);
@@ -231,6 +300,19 @@ export default {
 }
 .LayerCatalog > .layerCategory.closed > .title > .arrow {
   transform: rotate(90deg) translateY(-10%);
+}
+/* The category (?) sits at the right end of the title row, visible on hover
+   or focus (same behavior as the per-layer help dots). */
+.LayerCatalog > .layerCategory > .title > .category-help {
+  grid-area: help;
+  margin-right: 8px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.LayerCatalog > .layerCategory > .title:hover > .category-help,
+.LayerCatalog > .layerCategory > .title:focus-visible > .category-help,
+.LayerCatalog > .layerCategory > .title > .category-help:focus-visible {
+  opacity: 1;
 }
 .LayerCatalog > .layerCategory.closed > .layerList {
   height: 0;

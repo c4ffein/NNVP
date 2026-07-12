@@ -3,7 +3,7 @@
     <div v-if="show" class="modal-overlay" @click="closeModal">
       <div
         ref="container"
-        class="modal-container"
+        class="modal-surface modal-container"
         role="dialog"
         aria-modal="true"
         aria-labelledby="about-modal-title"
@@ -47,14 +47,6 @@
               <a href="https://github.com/c4ffein/NNVP" target="_blank" rel="noopener noreferrer">
                 GitHub
               </a>
-            </p>
-          </section>
-
-          <section>
-            <h2>Status</h2>
-            <p>
-              NNVP is in active development. While most features work well,
-              not all Keras layer parameters are implemented yet, and you may experience occasional glitches.
             </p>
           </section>
         </div>
@@ -138,68 +130,15 @@ export default {
 </script>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: var(--modal-scrim);
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  z-index: 9999;
-  padding-top: 40px;
-}
-
+/* Chrome (overlay / surface / close) comes from the global modal skin in
+   App.vue; only sizing and content styles live here. */
 .modal-container {
-  background: var(--bg-panel);
-  border-radius: 15px;
-  border: 1px solid var(--border-color);
   max-width: 480px;
-  width: 90%;
-  max-height: 85vh;
-  overflow-y: auto;
-  box-shadow: none;
-  position: relative;
   padding: 32px;
 }
 
-.modal-close {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  background: none;
-  border: none;
-  font-size: 32px;
-  line-height: 1;
-  color: var(--text-primary);
-  cursor: pointer;
-  padding: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: opacity 0.2s;
-}
-
-.modal-close:hover {
-  opacity: 0.6;
-}
-
-.modal-close:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  border-radius: 4px;
-}
-
 .modal-content {
-  font-family: var(--font-regular);
-  font-weight: var(--font-weight-regular);
-  color: var(--text-primary);
   line-height: 1.6;
-  text-align: left;
 }
 
 .modal-content h1 {
@@ -215,7 +154,7 @@ export default {
   font-family: var(--font-regular);
   font-weight: var(--font-weight-regular);
   font-size: 1em;
-  color: var(--text-primary);
+  color: var(--text-muted);
   margin: 0 0 24px 0;
   text-align: left;
 }
@@ -226,7 +165,7 @@ export default {
   font-size: 1.2em;
   margin: 24px 0 12px 0;
   color: var(--text-primary);
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--panel-border);
   padding-bottom: 6px;
 }
 
@@ -240,7 +179,7 @@ export default {
 }
 
 .modal-content a {
-  color: var(--text-primary);
+  color: var(--accent);
   text-decoration: none;
   font-weight: var(--font-weight-medium);
   display: inline-block;

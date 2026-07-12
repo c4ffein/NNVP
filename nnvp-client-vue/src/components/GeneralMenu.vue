@@ -1,4 +1,6 @@
 <script lang="jsx">
+import { clearCurrentProject } from '../lib/Backend/currentProject';
+
 export default {
   name: 'GeneralMenu',
   components: {
@@ -27,7 +29,7 @@ export default {
               onMouseover={event => this.levelNHoverHandler(entry[0], entry[1], event, level)}
             >
               <div class="GeneralMenu dropdown-item-content">
-                {entry[0].replace('_', ' ')}
+                {entry[0].replaceAll('_', ' ')}
               </div>
               {generateMenu(entry[1], level + 1)}
             </li>
@@ -39,7 +41,7 @@ export default {
     };
     return (
       <ul id="GeneralMenu" class="GeneralMenu" role="menubar" aria-label="Main menu">
-        { Object.entries(this.$data.menu).map((object, i) => (
+        { Object.entries(this.menuTree).map((object, i) => (
           <li class="menu GeneralMenu" obj={object} key={i} role="none">
             <div class="menuTitle GeneralMenu"
               role="menuitem"
@@ -54,84 +56,32 @@ export default {
             {generateMenu(object[1], 1)}
           </li>
         )) }
-        <li class="menu GeneralMenu theme-toggle">
-          <div class="menuTitle GeneralMenu theme-toggle-btn"
-            title="Toggle light / dark theme"
-            onClick={() => this.toggleTheme()}
-          >
-            {this.theme === 'dark'
-              ? <svg class="theme-icon" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
-                  <circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2"/>
-                  <g stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                    <line x1="12" y1="2" x2="12" y2="4.5"/><line x1="12" y1="19.5" x2="12" y2="22"/>
-                    <line x1="2" y1="12" x2="4.5" y2="12"/><line x1="19.5" y1="12" x2="22" y2="12"/>
-                    <line x1="4.6" y1="4.6" x2="6.4" y2="6.4"/><line x1="17.6" y1="17.6" x2="19.4" y2="19.4"/>
-                    <line x1="4.6" y1="19.4" x2="6.4" y2="17.6"/><line x1="17.6" y1="6.4" x2="19.4" y2="4.6"/>
-                  </g>
-                </svg>
-              : <svg class="theme-icon" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
-                  <path
-                    d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"
-                    fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"
-                  />
-                </svg>}
-          </div>
-        </li>
       </ul>
     );
   },
+  props: {
+    // Visibility of the toggleable views, owned by App.vue: { left, right,
+    // chat, chatAvailable }. Drives the ticks in the View menu.
+    views: {
+      type: Object,
+      default: () => ({
+        left: true, right: true, chat: false, chatAvailable: false,
+      }),
+    },
+  },
   data() {
+    // Cloud accounts need a deployed backend at same-origin /api; builds
+    // without VITE_ENABLE_BACKEND (e.g. a static-only deploy) hide every
+    // account entry point (see also App.vue).
     return {
-      menu: {
-        File: {
-          New() { this.$d3Interface.clearBoard(); },
-          Load() { this.$d3Interface.loadBoard(); },
-          Templates: 'templatesMenu',
-          Save() { this.$d3Interface.saveBoard(); },
-          Save_to_cloud() { this.$emit('open-account', 'save'); },
-          Open_from_cloud() { this.$emit('open-account'); },
-          Generate() { this.$d3Interface.generatePythonInBrowser(this.$kerasInterface); },
-          Generate_Javascript() {
-            this.$d3Interface.generateJavascriptInBrowser(this.$kerasInterface);
-          },
-          Generate_PyTorch() {
-            this.$d3Interface.generatePyTorchInBrowser(this.$kerasInterface);
-          },
-          Generate_Tinygrad() {
-            this.$d3Interface.generateTinygradInBrowser(this.$kerasInterface);
-          },
-        },
-        Edit: {
-          Undo: [() => this.$d3Interface.undo(), () => (this.$d3Interface.getUndoStackContainer().e.length === 0)],
-          Redo: [() => this.$d3Interface.redo(), () => (this.$d3Interface.getRedoStackContainer().e.length === 0)],
-          Group() { this.$d3Interface.createGroup(); },
-        },
-        Training: () => { this.$emit('open-trainer'); },
-        Tutorial: () => { this.$emit('open-tutorial'); },
-        Account: () => { this.$emit('open-account'); },
-        About: () => { this.$emit('open-about'); },
-      },
+      backendEnabled: !!import.meta.env.VITE_ENABLE_BACKEND,
       activatedState: false,
       activatedChain: [],
       undoStackContainer: this.$d3Interface.getUndoStackContainer(),
       redoStackContainer: this.$d3Interface.getRedoStackContainer(),
       templatesRefreshKey: 0,
       menuRefreshKey: 0,
-      theme: 'light',
     };
-  },
-  created() {
-    // Reflect the effective theme so the toggle shows the right icon. An
-    // explicit choice (data-theme) wins; otherwise fall back to the OS setting.
-    const explicit = document.documentElement.dataset.theme;
-    if (explicit === 'dark' || explicit === 'light') {
-      this.theme = explicit;
-    } else if (window.matchMedia
-        && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      this.theme = 'dark';
-    } else {
-      this.theme = 'light';
-    }
   },
   mounted() {
     // Subscribe to templates changes
@@ -153,6 +103,60 @@ export default {
     }
   },
   computed: {
+    // The menu is computed (not data) so the View ticks re-render when App's
+    // visibility state changes. Handlers run with the component as `this`
+    // (levelNClickHandler applies them), so shorthand methods work as before.
+    menuTree() {
+      const { backendEnabled } = this;
+      const tick = shown => (shown ? '✓' : ' '); // figure space aligns labels
+      return {
+        File: {
+          New() {
+            clearCurrentProject(); // a fresh board starts a new save history
+            this.$d3Interface.clearBoard();
+          },
+          // With a backend build, Load/Save open the cloud-aware modal (which
+          // still offers plain device files); without one they go straight to
+          // the device dialogs.
+          Load() {
+            if (backendEnabled) this.$emit('open-save-load', 'load');
+            else this.$d3Interface.loadBoard();
+          },
+          Templates: 'templatesMenu',
+          Save() {
+            if (backendEnabled) this.$emit('open-save-load', 'save');
+            else this.$d3Interface.saveBoard();
+          },
+          'Generate TF - Python': function generateTfPython() {
+            this.$d3Interface.generatePythonInBrowser(this.$kerasInterface);
+          },
+          'Generate TF - JavaScript': function generateTfJavascript() {
+            this.$d3Interface.generateJavascriptInBrowser(this.$kerasInterface);
+          },
+          Generate_PyTorch() {
+            this.$d3Interface.generatePyTorchInBrowser(this.$kerasInterface);
+          },
+          Generate_Tinygrad() {
+            this.$d3Interface.generateTinygradInBrowser(this.$kerasInterface);
+          },
+        },
+        Edit: {
+          Undo: [() => this.$d3Interface.undo(), () => (this.$d3Interface.getUndoStackContainer().e.length === 0)],
+          Redo: [() => this.$d3Interface.redo(), () => (this.$d3Interface.getRedoStackContainer().e.length === 0)],
+          Group() { this.$d3Interface.createGroup(); },
+        },
+        View: {
+          [`${tick(this.views.left)} Layer Catalog`]: () => this.$emit('toggle-view', 'showLeftPanel'),
+          [`${tick(this.views.right)} Layer Options`]: () => this.$emit('toggle-view', 'showRightPanel'),
+          [`${tick(this.views.training)} Training`]: () => this.$emit('toggle-view', 'training'),
+          ...(this.views.chatAvailable ? {
+            [`${tick(this.views.chat)} Chat`]: () => this.$emit('toggle-view', 'showChat'),
+          } : {}),
+        },
+        Tutorial: () => { this.$emit('open-tutorial'); },
+        About: () => { this.$emit('open-about'); },
+      };
+    },
     templatesMenu() {
       // Access refreshKey to trigger reactivity
       this.templatesRefreshKey; // eslint-disable-line
@@ -260,18 +264,6 @@ export default {
       this.$data.activatedState = false;
       this.$data.activatedChain = [];
     },
-    toggleTheme() {
-      const root = document.documentElement;
-      const current = root.dataset.theme
-        || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
-          ? 'dark' : 'light');
-      const next = current === 'dark' ? 'light' : 'dark';
-      root.dataset.theme = next;
-      this.theme = next;
-      try {
-        localStorage.setItem('nnvp-theme', next);
-      } catch { /* localStorage unavailable (private mode) */ }
-    },
     getMenuElement(element) {
       let el = element;
       while (el.classList.contains('GeneralMenu')) {
@@ -304,12 +296,13 @@ export default {
   list-style: none;
   color: var(--text-primary);
 }
-.theme-toggle {
-  float: right !important;
-}
-.theme-toggle-btn {
-  font-size: 15px;
-  padding: 0 14px 0 10px;
+/* The bar is a centered fit-content pill (see App.vue .general-menu): flex
+   sizes it to its items and neutralizes the legacy floats. */
+#GeneralMenu {
+  display: flex;
+  align-items: stretch;
+  height: 100%;
+  white-space: nowrap;
 }
 .theme-icon {
   display: block;
