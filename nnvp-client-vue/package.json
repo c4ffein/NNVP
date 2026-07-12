@@ -17,7 +17,7 @@
     "test:contract": "bun test tests/contract --timeout 15000",
     "lint": "oxlint src tests",
     "typecheck": "tsc",
-    "test:fast": "bun test tests/fast",
+    "test:fast": "bun test tests/harness/bun.test.js tests/harness/vueLoader.test.js",
     "lint:fix": "oxlint src tests --fix"
   },
   "dependencies": {
