@@ -88,7 +88,9 @@ function makeFakeD3Interface() {
   };
   return {
     activeGraph,
-    calls: { deleteSelected: 0, undo: 0, redo: 0 },
+    calls: {
+      deleteSelected: 0, undo: 0, redo: 0, loadedTemplates: [],
+    },
     addLayer(kerasLayer) {
       const id = nextId;
       nextId += 1;
@@ -105,6 +107,14 @@ function makeFakeD3Interface() {
     },
     redo() {
       this.calls.redo += 1;
+    },
+    getTemplatesContainer() {
+      return { e: ['2D Dense for MNIST', 'Tiny CNN'] };
+    },
+    loadTemplate(name) {
+      this.calls.loadedTemplates.push(name);
+      model.d3Layers.push({ id: nextId, name: 'FromTemplate', kerasLayer: null });
+      nextId += 1;
     },
   };
 }
@@ -203,7 +213,9 @@ logicTest('assistantActions: delegates delete/undo/redo to the d3 interface', ({
   actions.deleteSelected();
   actions.undo();
   actions.redo();
-  expect(d3.calls).toEqual({ deleteSelected: 1, undo: 1, redo: 1 });
+  expect(d3.calls).toEqual({
+    deleteSelected: 1, undo: 1, redo: 1, loadedTemplates: [],
+  });
 });
 
 logicTest('assistantActions: reports a friendly error when no graph is active', ({ expect }) => {
@@ -227,6 +239,10 @@ logicTest('anthropicClient: builds a valid tools array from the actions', ({ exp
     'delete_selected',
     'undo',
     'redo',
+    'list_templates',
+    'load_template',
+    'list_tutorials',
+    'get_layer_help',
   ]);
   tools.forEach((tool) => {
     expect(typeof tool.name).toBe('string');
@@ -288,8 +304,12 @@ logicTest('assistantActions: reports a missing layer id distinctly from a bad pa
 
 logicTest('anthropicClient: marks exactly the mutating tools', ({ expect }) => {
   expect([...MUTATING_TOOLS].sort()).toEqual(
-    ['add_layer', 'delete_selected', 'redo', 'set_param', 'undo'],
+    ['add_layer', 'delete_selected', 'load_template', 'redo', 'set_param', 'undo'],
   );
+  expect(isMutatingTool('load_template')).toBe(true); // replaces the board
+  expect(isMutatingTool('list_templates')).toBe(false);
+  expect(isMutatingTool('list_tutorials')).toBe(false);
+  expect(isMutatingTool('get_layer_help')).toBe(false);
   expect(isMutatingTool('add_layer')).toBe(true);
   expect(isMutatingTool('list_layers')).toBe(false);
 });
@@ -621,4 +641,48 @@ logicTest('anthropicClient: suggests signing in when there is no key and no toke
   await expect(client.send([{ role: 'user', content: 'hi' }]))
     .rejects.toThrow(/No Anthropic API key set.*sign in \(Account menu\)/);
   expect(fetchImpl.calls).toHaveLength(0);
+});
+
+// --- Tests: templates / tutorials / in-app docs tools -------------------------
+
+logicTest('assistantActions: lists the available templates', ({ expect }) => {
+  const { actions } = setup();
+  expect(actions.listTemplates()).toEqual(['2D Dense for MNIST', 'Tiny CNN']);
+});
+
+logicTest('assistantActions: loads a known template and reports the result', ({ expect }) => {
+  const { d3, actions } = setup();
+  const result = actions.loadTemplate('Tiny CNN');
+  expect(d3.calls.loadedTemplates).toEqual(['Tiny CNN']);
+  expect(result.loaded).toBe('Tiny CNN');
+  expect(result.layerCount).toBe(1);
+});
+
+logicTest('assistantActions: refuses unknown templates with the available list', ({ expect }) => {
+  const { d3, actions } = setup();
+  expect(() => actions.loadTemplate('Nope')).toThrow(/Unknown template "Nope".*2D Dense for MNIST/);
+  expect(d3.calls.loadedTemplates).toEqual([]);
+});
+
+logicTest('assistantActions: lists the real tutorials with their step titles', ({ expect }) => {
+  const { actions } = setup();
+  const listed = actions.listTutorials();
+  expect(listed.length).toBeGreaterThan(0);
+  for (const tutorial of listed) {
+    expect(typeof tutorial.id).toBe('string');
+    expect(typeof tutorial.title).toBe('string');
+    expect(typeof tutorial.description).toBe('string');
+    expect(Array.isArray(tutorial.steps)).toBe(true);
+    expect(tutorial.steps.length).toBeGreaterThan(0);
+  }
+});
+
+logicTest('assistantActions: serves layer and category help as plain text', ({ expect }) => {
+  const { actions } = setup();
+  const dense = actions.getLayerHelp('Dense');
+  expect(dense.length).toBeGreaterThan(50);
+  expect(dense).not.toContain('<'); // HTML stripped
+  const category = actions.getLayerHelp('Convolution');
+  expect(category).toContain('Conv2D');
+  expect(() => actions.getLayerHelp('NotAThing')).toThrow(/No help entry/);
 });

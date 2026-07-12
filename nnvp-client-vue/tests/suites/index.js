@@ -9,6 +9,7 @@ import './chat';
 import './floatingEdge';
 import './interactions';
 import './layerHelpModals';
+import './markdown';
 import './tutorial';
 import './a11y';
 import './datasetError';

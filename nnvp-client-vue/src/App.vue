@@ -175,6 +175,15 @@ export default {
     if (this.backendEnabled && new URLSearchParams(window.location.search).get('magic')) {
       this.openAccount('magic');
     }
+    // The assistant starts/switches tutorials through this event
+    // (assistantActions.startTutorial) — same bridge pattern as auth changes.
+    this.onStartTutorial = (event) => {
+      if (event.detail && event.detail.id) this.startTutorial(event.detail.id);
+    };
+    window.addEventListener('nnvp:start-tutorial', this.onStartTutorial);
+  },
+  beforeUnmount() {
+    window.removeEventListener('nnvp:start-tutorial', this.onStartTutorial);
   },
 };
 </script>

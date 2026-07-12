@@ -101,7 +101,7 @@
           <div
             v-for="(message, index) in messages"
             :key="index"
-            :class="['chat-message', 'chat-' + message.role]"
+            :class="['chat-message', 'chat-msg-' + message.role]"
           >
             <div v-if="message.role === 'tool'" class="chat-tool">
               <span class="chat-tool-name">{{ message.text }}</span>
@@ -109,12 +109,19 @@
             <div v-else-if="message.role === 'notice'" class="chat-notice">
               {{ message.text }}
             </div>
+            <div
+              v-else-if="message.role === 'assistant'"
+              :class="['chat-bubble-text', 'chat-bubble-md', { 'chat-bubble-error': message.isError }]"
+              v-html="renderMarkdown(message.text)"
+            ></div>
             <div v-else :class="['chat-bubble-text', { 'chat-bubble-error': message.isError }]">
               {{ message.text }}
             </div>
           </div>
-          <div v-if="sending" class="chat-message chat-assistant-msg">
-            <div class="chat-bubble-text chat-typing">…</div>
+          <div v-if="sending" class="chat-message chat-msg-assistant">
+            <div class="chat-bubble-text chat-typing" aria-label="Assistant is thinking">
+              <span class="chat-typing-dot"></span><span class="chat-typing-dot"></span><span class="chat-typing-dot"></span>
+            </div>
           </div>
         </div>
 
@@ -155,6 +162,7 @@
 
 <script>
 import AssistantActions from '../../lib/Assistant/assistantActions';
+import renderMarkdown from '../../lib/Assistant/markdown';
 import AnthropicClient, {
   STORAGE_KEY,
   STORAGE_BASE_URL,
@@ -213,6 +221,7 @@ export default {
     window.removeEventListener('nnvp:auth-changed', this.onAuthChanged);
   },
   methods: {
+    renderMarkdown,
     toggleOpen() {
       this.open = !this.open;
       if (this.open) {
@@ -487,7 +496,12 @@ export default {
 
 .chat-messages {
   flex: 1;
+  /* Without min-height:0 a flex child never shrinks below its content, so a
+     long conversation grows past the panel and paints over the input row
+     instead of scrolling. */
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
@@ -509,7 +523,7 @@ export default {
 .chat-connect p { margin: 0; }
 
 /* Short centered notice (errors and the like) instead of a message bubble. */
-.chat-message.chat-notice {
+.chat-message.chat-msg-notice {
   justify-content: center;
 }
 .chat-notice {
@@ -523,7 +537,7 @@ export default {
   display: flex;
 }
 
-.chat-user {
+.chat-msg-user {
   justify-content: flex-end;
 }
 
@@ -536,13 +550,12 @@ export default {
   word-break: break-word;
 }
 
-.chat-user .chat-bubble-text {
+.chat-msg-user .chat-bubble-text {
   background-color: var(--fill-strong);
   color: var(--fill-strong-text);
 }
 
-.chat-assistant .chat-bubble-text,
-.chat-assistant-msg .chat-bubble-text {
+.chat-msg-assistant .chat-bubble-text {
   background-color: var(--bg-hover);
   color: var(--text-primary);
 }
@@ -563,8 +576,47 @@ export default {
 }
 
 .chat-typing {
-  letter-spacing: 2px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 18px;
 }
+.chat-typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  animation: chat-typing-pulse 1.2s ease-in-out infinite;
+}
+.chat-typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.chat-typing-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes chat-typing-pulse {
+  0%, 60%, 100% { opacity: 0.35; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-3px); }
+}
+
+/* Markdown inside assistant bubbles (see lib/Assistant/markdown.js). */
+.chat-bubble-md p { margin: 0 0 6px 0; }
+.chat-bubble-md p:last-child { margin-bottom: 0; }
+.chat-bubble-md ul,
+.chat-bubble-md ol { margin: 0 0 6px 0; padding-left: 18px; }
+.chat-bubble-md li { margin: 2px 0; }
+.chat-bubble-md code {
+  font-family: monospace;
+  font-size: 12px;
+  background: rgba(127, 127, 127, 0.15);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+.chat-bubble-md pre {
+  margin: 0 0 6px 0;
+  padding: 8px;
+  background: rgba(127, 127, 127, 0.12);
+  border-radius: 6px;
+  overflow-x: auto;
+}
+.chat-bubble-md pre code { background: none; padding: 0; }
+.chat-bubble-md a { color: var(--accent); }
 
 .chat-input-row {
   display: flex;

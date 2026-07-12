@@ -28,6 +28,7 @@ export const MUTATING_TOOLS = new Set([
   'delete_selected',
   'undo',
   'redo',
+  'load_template', // replaces the whole board
 ]);
 
 export function isMutatingTool(name) {
@@ -50,6 +51,9 @@ export const SYSTEM_PROMPT = [
   'explain what you would change and suggest the user enable "Allow edits".',
   'Prefer calling a tool over guessing. When you add layers or change parameters,',
   'briefly confirm what you did. Keep answers concise.',
+  'The app ships ready-made templates (list_templates / load_template) and guided',
+  'tutorials (list_tutorials) — suggest them before building common networks from',
+  'scratch, and use get_layer_help to explain layers with the app\'s own docs.',
 ].join(' ');
 
 // Tool surface: one entry per AssistantActions method the model may call.
@@ -122,6 +126,49 @@ export function buildTools() {
       description: '[Modifies the model] Redo the last undone graph change.',
       input_schema: { type: 'object', properties: {} },
     },
+    {
+      name: 'list_templates',
+      description: 'List the ready-made example networks (templates) that can be loaded.',
+      input_schema: { type: 'object', properties: {} },
+    },
+    {
+      name: 'load_template',
+      description: '[Modifies the model] Load a template onto the board, REPLACING the current graph. Prefer suggesting this over building common networks layer by layer.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'A template name from list_templates.' },
+        },
+        required: ['name'],
+      },
+    },
+    {
+      name: 'list_tutorials',
+      description: "List the app's guided tutorials (id, title, description, step titles). Start or switch to one with start_tutorial.",
+      input_schema: { type: 'object', properties: {} },
+    },
+    {
+      name: 'start_tutorial',
+      description: 'Start (or switch to) a guided tutorial: opens the step-by-step overlay in the app. Navigation only — works in read-only mode.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          tutorial_id: { type: 'string', description: 'A tutorial id from list_tutorials.' },
+        },
+        required: ['tutorial_id'],
+      },
+    },
+    {
+      name: 'get_layer_help',
+      description: "The app's own documentation for a layer type or catalog category, as plain text (the same content the (?) buttons show). Prefer this over memory when explaining layers.",
+      input_schema: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'A layer type from list_layer_types, or a catalog category name.' },
+        },
+        required: ['name'],
+      },
+    },
   ];
 }
 
@@ -135,6 +182,11 @@ const TOOL_DISPATCH = {
   delete_selected: (actions) => actions.deleteSelected(),
   undo: (actions) => actions.undo(),
   redo: (actions) => actions.redo(),
+  list_templates: (actions) => actions.listTemplates(),
+  load_template: (actions, input) => actions.loadTemplate(input.name),
+  list_tutorials: (actions) => actions.listTutorials(),
+  start_tutorial: (actions, input) => actions.startTutorial(input.tutorial_id),
+  get_layer_help: (actions, input) => actions.getLayerHelp(input.name),
 };
 
 // The NNVP backend is same-origin at /api (never user-configured; see

@@ -6,6 +6,19 @@
 // being empty (activeGraph === null) and about unknown layer types / ids so the
 // tool-use loop can surface friendly errors instead of throwing opaquely.
 
+import { tutorials } from '../Tutorial/tutorials';
+import layerHelp from '../KerasInterface/layerHelp';
+import categoryHelp from '../KerasInterface/categoryHelp';
+
+// The help entries are HTML written for the in-app modal; the assistant wants
+// readable text.
+function htmlToText(html) {
+  return String(html)
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export default class AssistantActions {
   constructor(d3Interface, kerasInterface) {
     this.d3Interface = d3Interface;
@@ -144,5 +157,62 @@ export default class AssistantActions {
   redo() {
     this.d3Interface.redo();
     return { ok: true };
+  }
+
+  // Ready-made example networks (the File > Templates menu).
+  listTemplates() {
+    const container = this.d3Interface.getTemplatesContainer();
+    if (!container || !Array.isArray(container.e)) return [];
+    return [...container.e];
+  }
+
+  // Load a template onto the board — REPLACES the current graph (mutating).
+  loadTemplate(name) {
+    const available = this.listTemplates();
+    if (!available.includes(name)) {
+      throw new Error(`Unknown template "${name}". Available templates: ${available.join(', ')}.`);
+    }
+    this.d3Interface.loadTemplate(name);
+    const model = this.requireModel();
+    return { loaded: name, layerCount: model.d3Layers.length };
+  }
+
+  // The app's guided tutorials: what exists and what each walks through. The
+  // assistant cannot START one (that is a UI action in the Tutorial menu),
+  // but it can point users there and explain the steps.
+  listTutorials() {
+    return tutorials.map(tutorial => ({
+      id: tutorial.id,
+      title: tutorial.title,
+      description: tutorial.description,
+      steps: tutorial.steps.map(step => step.title),
+    }));
+  }
+
+  // Start (or switch to) a guided tutorial. Tutorial state lives in App.vue,
+  // so this bridges over a window event (same pattern as nnvp:auth-changed);
+  // App listens and drives the overlay. Navigation, not a graph mutation —
+  // available even in read-only mode.
+  startTutorial(tutorialId) {
+    const known = tutorials.find(tutorial => tutorial.id === tutorialId);
+    if (!known) {
+      const available = tutorials.map(tutorial => tutorial.id).join(', ');
+      throw new Error(`Unknown tutorial "${tutorialId}". Available ids: ${available}.`);
+    }
+    window.dispatchEvent(new CustomEvent('nnvp:start-tutorial', { detail: { id: tutorialId } }));
+    return { started: tutorialId, title: known.title };
+  }
+
+  // The in-app documentation for a layer type (or a catalog category), as
+  // plain text — the same content the (?) buttons show.
+  getLayerHelp(name) {
+    const entry = layerHelp[name] || categoryHelp[name];
+    if (entry === undefined) {
+      throw new Error(
+        `No help entry for "${name}". Use a layer type from list_layer_types `
+        + 'or a catalog category name.',
+      );
+    }
+    return htmlToText(entry);
   }
 }
