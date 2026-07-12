@@ -1,11 +1,15 @@
-import { test, expect } from './helpers/canvas';
+/**
+ * Migrated from tests/saveload.spec.js. File > Load / Save open the
+ * cloud-aware modal (backend mocked with page.route). Device-file paths and
+ * the signed-out pitch are covered too. Both tests drive the modal as UI
+ * with page.route / addInitScript, so they are e2eOnly mechanical wraps.
+ */
+import { e2eOnly } from '../define';
 
-// File > Load / Save open the cloud-aware modal (backend mocked with
-// page.route). Device-file paths and the signed-out pitch are covered too.
-test.describe('Save / Load modal', () => {
-  test('signed out: both modals lead with the device option and pitch the cloud', async ({ page, canvas }) => {
-    await page.goto(canvas.home);
-
+e2eOnly(
+  'saveload: signed out: both modals lead with the device option and pitch the cloud',
+  'Walks the Save/Load modal chrome while signed out — device-first buttons, the cloud pitch heading, and the hand-off to the account modal — all rendered modal UI only a browser shows.',
+  async ({ page, expect }) => {
     await page.click('text=File');
     await page.click('text=Save');
     await expect(page.locator('#saveload-title')).toHaveText('Save model');
@@ -22,9 +26,13 @@ test.describe('Save / Load modal', () => {
     await page.click('#GeneralMenu .dropdown-item-content:text-is("Load")');
     await expect(page.locator('#saveload-title')).toHaveText('Load model');
     await expect(page.locator('button:has-text("Load from this device")')).toBeVisible();
-  });
+  },
+);
 
-  test('signed in: save records lineage, load lists/searches and shows the local graph', async ({ page, canvas }) => {
+e2eOnly(
+  'saveload: signed in: save records lineage, load lists/searches and shows the local graph',
+  'page.route-mocked backend plus addInitScript-seeded localStorage session, then drives the full modal UI: cloud save with lineage hint, project list/search rows, the rendered lineage graph, and open-selected updating localStorage — interception, init scripts and storage are browser-only.',
+  async ({ page, canvas, expect }) => {
     // --- mock backend: verified session + a small saved-model family --------
     const state = {
       projects: [
@@ -86,6 +94,8 @@ test.describe('Save / Load modal', () => {
       return json(route, 404, { detail: 'Unhandled' });
     });
 
+    // Reload so the init script (localStorage session) and route mocks apply
+    // from app start — the runner's initial navigation predates them.
     await page.goto(canvas.home);
     await page.waitForTimeout(150);
 
@@ -120,5 +130,5 @@ test.describe('Save / Load modal', () => {
     // The opened project became the new continuation anchor.
     const current = await page.evaluate(() => JSON.parse(window.localStorage.getItem('nnvp_current_project')));
     expect(current.id).toBe(2);
-  });
-});
+  },
+);

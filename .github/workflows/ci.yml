@@ -53,6 +53,9 @@ jobs:
       - name: Run tsc
         run: bun run typecheck
 
+      - name: Run the dual-mode suite (bun runner)
+        run: bun run test:fast
+
   test:
     name: E2E Tests
     runs-on: ubuntu-latest

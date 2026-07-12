@@ -15,8 +15,12 @@ But if you read this and you want to get involved, you can actually create one f
   - [ ] Have all menus as minifiable windows, magnetized, can show/hide
 - [ ] reorder categories
 - [ ] help through categories
-- [ ] fast version of e2e tests: everything also exposed as a method, and not only through a click
-  - [ ] executable in a very efficient way, but have both helpers in the tests: browser vs mocked + method version
+- [x] fast version of e2e tests: everything also exposed as a method, and not only through a click
+  - [x] executable in a very efficient way, but have both helpers in the tests: browser vs mocked + method version
+        => `tests/scenarios/` (one scenario, two drivers): `bun run test:fast` runs them
+        headless on FlowGraphEditor in <1s; `tests/scenarios.spec.js` runs the SAME
+        scenarios click-by-click under Playwright
+  - [ ] port more specs into scenarios (grouping needs browser multi-select first)
 - [x] account: don't let the user pick a backend => same-origin `/api` (vite proxies to
       the Django server in dev, `make backend` runs it), magic-link only login,
       account created on first login

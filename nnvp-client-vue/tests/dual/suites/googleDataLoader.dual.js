@@ -1,5 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import Dataset from '../../src/lib/JSDatasets/google-data-loader';
+/**
+ * Dataset.load orchestration (stubbed sprite decoding + fetch). Migrated from
+ * tests/unit/googleDataLoader.test.js into the dual registry as logicTest. The
+ * beforeEach/afterEach fetch swap became withFakeFetch(), restoring the real
+ * fetch in a finally.
+ */
+import { logicTest } from '../define';
+import Dataset from '../../../src/lib/JSDatasets/google-data-loader';
 
 // load() orchestration tests: sprite-request fan-out and progress accounting for
 // both constructor forms (single sprite path string / array of sprite chunks).
@@ -25,12 +31,11 @@ const makeDataset = (spritePath, checksum) => new StubDataset(
   spritePath, checksum, SHAPE, 'labels.bin', null, 2, N_ELEMENTS, N_TRAIN,
 );
 
-let realFetch;
-let fetchedLabelPaths;
-
-beforeEach(() => {
-  realFetch = globalThis.fetch;
-  fetchedLabelPaths = [];
+// Former beforeEach/afterEach: swap globalThis.fetch for a label-serving stub
+// for the duration of the test, recording the requested label paths.
+async function withFakeFetch(fn) {
+  const realFetch = globalThis.fetch;
+  const fetchedLabelPaths = [];
   globalThis.fetch = (path) => {
     fetchedLabelPaths.push(path);
     return Promise.resolve({
@@ -38,14 +43,15 @@ beforeEach(() => {
       arrayBuffer: async () => new Uint8Array(N_ELEMENTS).buffer,
     });
   };
-});
+  try {
+    await fn(fetchedLabelPaths);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+}
 
-afterEach(() => {
-  globalThis.fetch = realFetch;
-});
-
-describe('Dataset.load progress accounting', () => {
-  it('loads a single-string sprite path and never reports progress above 1', async () => {
+logicTest('googleDataLoader: loads a single-string sprite path and never reports progress above 1', async ({ expect }) => {
+  await withFakeFetch(async (fetchedLabelPaths) => {
     const dataset = makeDataset('sprite.png', 'sha-single');
     const progress = [];
     await dataset.load(p => progress.push(p));
@@ -59,8 +65,10 @@ describe('Dataset.load progress accounting', () => {
     expect(progress[progress.length - 1]).toBe(1);
     expect(fetchedLabelPaths).toEqual(['labels.bin']);
   });
+});
 
-  it('loads the multi-sprite array form with per-chunk checksums', async () => {
+logicTest('googleDataLoader: loads the multi-sprite array form with per-chunk checksums', async ({ expect }) => {
+  await withFakeFetch(async () => {
     const dataset = makeDataset(
       [[0, 6, 'part1.png'], [6, 4, 'part2.png']],
       ['sha-1', 'sha-2'],
@@ -76,8 +84,10 @@ describe('Dataset.load progress accounting', () => {
     expect(progress.every(p => p <= 1)).toBe(true);
     expect(progress[progress.length - 1]).toBe(1);
   });
+});
 
-  it('splits train/test images and labels after loading', async () => {
+logicTest('googleDataLoader: splits train/test images and labels after loading', async ({ expect }) => {
+  await withFakeFetch(async () => {
     const dataset = makeDataset('sprite.png', null);
     await dataset.load();
 

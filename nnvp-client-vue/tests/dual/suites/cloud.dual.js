@@ -1,13 +1,19 @@
-import { test, expect } from './helpers/canvas';
+/**
+ * Migrated from tests/cloud.spec.js. End-to-end for the optional cloud layer.
+ * The real Django Ninja backend is never involved: every same-origin
+ * `/api/**` call is intercepted with page.route and answered from an
+ * in-memory fake, so this exercises the SPA's client + UI only — including
+ * the whole magic-link dance: request a link (pending bearer + match code,
+ * polling starts), then land on /?magic=<token> as the emailed link would and
+ * click the deliberate Approve button. page.route interception is
+ * browser-runner-only, so every test is an e2eOnly mechanical wrap.
+ */
+import { e2eOnly } from '../define';
 
-// End-to-end for the optional cloud layer. The real Django Ninja backend is
-// never involved: every same-origin `/api/**` call is intercepted with
-// page.route and answered from an in-memory fake, so this exercises the SPA's
-// client + UI only — including the whole magic-link dance: request a link
-// (pending bearer + match code, polling starts), then land on /?magic=<token>
-// as the emailed link would and click the deliberate Approve button.
-test.describe('Cloud accounts & projects', () => {
-  test('magic-link login (same browser) -> save project -> reopen it', async ({ page, canvas }) => {
+e2eOnly(
+  'cloud: magic-link login (same browser) -> save project -> reopen it',
+  'Mocks the backend with page.route and walks the account-modal UI end to end: magic-link request, /?magic= navigation, deliberate approve click, project save through a window prompt dialog, and a board round-trip — HTTP interception, navigation and dialogs are browser-only.',
+  async ({ page, canvas, expect }) => {
     // --- mock backend -------------------------------------------------------
     const state = {
       projects: [],
@@ -90,12 +96,17 @@ test.describe('Cloud accounts & projects', () => {
       return json(route, 404, { detail: 'Unhandled' });
     });
 
+    // The runner installed a generic accept-all dialog handler; replace it so
+    // the save prompt is answered with the project name (a second handler
+    // would double-handle and throw).
+    page.removeAllListeners('dialog');
     // Auto-accept the name prompt (save) and any confirm dialogs.
     page.on('dialog', (dialog) => {
       if (dialog.type() === 'prompt') dialog.accept('Cloud Model');
       else dialog.accept();
     });
 
+    // Reload so every /api call from app start goes through the mock.
     await page.goto(canvas.home);
     await page.waitForTimeout(150);
 
@@ -147,9 +158,13 @@ test.describe('Cloud accounts & projects', () => {
 
     // Opening a project loads its graph back onto the board (UI updates).
     await expect(page.locator(canvas.layer)).toHaveCount(1);
-  });
+  },
+);
 
-  test('cross-device approval: the clicking browser approves but stays signed out', async ({ page }) => {
+e2eOnly(
+  'cloud: cross-device approval: the clicking browser approves but stays signed out',
+  'page.route-mocked approval flow on a bearer-less browser (like a phone opening the email): asserts the rendered hint UI, that approve fired, no projects view appears, and localStorage holds no token — interception, navigation and storage are browser-only.',
+  async ({ page, expect }) => {
     // This browser holds NO pending bearer, like a phone opening the email.
     let approved = false;
     await page.route('**/api/auth/magic/info', route => route.fulfill({
@@ -183,9 +198,13 @@ test.describe('Cloud accounts & projects', () => {
     await expect(page.locator('h2:has-text("My Projects")')).not.toBeVisible();
     const token = await page.evaluate(() => window.localStorage.getItem('nnvp_backend_token'));
     expect(token).toBeNull();
-  });
+  },
+);
 
-  test('a pending login blocks the app across refreshes; closing the modal cancels it', async ({ page, canvas }) => {
+e2eOnly(
+  'cloud: a pending login blocks the app across refreshes; closing the modal cancels it',
+  'Exercises real page.reload cycles against a page.route-mocked pending session: the forced modal must survive refreshes, and closing it must revoke server-side and clear localStorage — reloads, interception and storage need a browser.',
+  async ({ page, canvas, expect }) => {
     const state = { revoked: false };
     const json = (route, status, body) => route.fulfill({
       status,
@@ -208,6 +227,7 @@ test.describe('Cloud accounts & projects', () => {
       return json(route, 404, { detail: 'Unhandled' });
     });
 
+    // Reload so every /api call from app start goes through the mock.
     await page.goto(canvas.home);
     await page.click('#generalMenu .account-btn');
     await page.fill('input[type="email"]', 'tester@example.com');
@@ -229,9 +249,13 @@ test.describe('Cloud accounts & projects', () => {
     await page.reload();
     await page.waitForSelector('.vue-flow__pane');
     await expect(page.locator('#account-modal-title')).not.toBeVisible();
-  });
+  },
+);
 
-  test('an invalid magic link shows an error and stays signed out', async ({ page }) => {
+e2eOnly(
+  'cloud: an invalid magic link shows an error and stays signed out',
+  'Navigates to /?magic= with a page.route-mocked 401 and asserts the rendered error message, the sign-in view, and the stripped URL parameter — interception and real URL handling are browser-only.',
+  async ({ page, expect }) => {
     await page.route('**/api/auth/magic/info', route => route.fulfill({
       status: 401,
       contentType: 'application/json',
@@ -243,5 +267,5 @@ test.describe('Cloud accounts & projects', () => {
     await expect(page.locator('.msg-error')).toContainText('invalid or has expired');
     await expect(page.locator('h2:has-text("Sign in")')).toBeVisible();
     expect(new URL(page.url()).searchParams.get('magic')).toBeNull();
-  });
-});
+  },
+);

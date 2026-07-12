@@ -1,12 +1,14 @@
-import { test, expect } from './helpers/canvas';
+/**
+ * Migrated from tests/tutorial.spec.js. Tutorial mode is coachmark/overlay
+ * chrome layered over the app — menus, cards, highlight rings, persistence
+ * read back through the menu UI — so every test is an e2eOnly mechanical wrap.
+ */
+import { e2eOnly } from '../define';
 
-test.describe('Tutorial mode', () => {
-  test.beforeEach(async ({ page, canvas }) => {
-    await page.goto(canvas.home);
-    await page.waitForTimeout(50);
-  });
-
-  test('the Tutorial menu lists the tutorials with completion bars', async ({ page }) => {
+e2eOnly(
+  'tutorial: the Tutorial menu lists the tutorials with completion bars',
+  'Asserts the tutorial menu modal UI: rendered item and progress-bar element counts plus status text, via auto-retrying DOM matchers on the live page.',
+  async ({ page, expect }) => {
     await page.click('text=Tutorial');
     await page.waitForTimeout(100);
     await expect(page.locator('.tutorial-menu-container')).toBeVisible();
@@ -14,9 +16,13 @@ test.describe('Tutorial mode', () => {
     await expect(page.locator('.tutorial-menu-progress')).toHaveCount(3);
     // Fresh profile: nothing started yet.
     await expect(page.locator('.tutorial-menu-item-status').first()).toHaveText('Not started');
-  });
+  },
+);
 
-  test('starts a tutorial from the menu and advances after the first step action', async ({ page }) => {
+e2eOnly(
+  'tutorial: starts a tutorial from the menu and advances after the first step action',
+  'Runs the tutorial overlay as UI: card visibility, the coachmark highlight ring positioned over the catalog, a deliverable page.screenshot, and auto-advance after a real catalog click.',
+  async ({ page, expect }) => {
     await page.click('text=Tutorial');
     await page.waitForTimeout(100);
     await page.click('.tutorial-menu-item:has-text("Build an MNIST CNN")');
@@ -42,9 +48,13 @@ test.describe('Tutorial mode', () => {
     // The tutorial should auto-advance to step 2 (set the input shape).
     await expect(page.locator('.tutorial-progress')).toHaveText('Step 2 / 8');
     await expect(card).toContainText('Set the input shape');
-  });
+  },
+);
 
-  test('progress is persisted and shown back in the menu', async ({ page }) => {
+e2eOnly(
+  'tutorial: progress is persisted and shown back in the menu',
+  'Exercises tutorial persistence through the real UI loop: perform a step, exit the overlay, reopen the menu and read the rendered completion percentage from the DOM.',
+  async ({ page, expect }) => {
     await page.click('text=Tutorial');
     await page.waitForTimeout(100);
     await page.click('.tutorial-menu-item:has-text("Connect layers")');
@@ -60,9 +70,13 @@ test.describe('Tutorial mode', () => {
     await page.waitForTimeout(100);
     const status = page.locator('.tutorial-menu-item:has-text("Connect layers") .tutorial-menu-item-status');
     await expect(status).toHaveText('33%');
-  });
+  },
+);
 
-  test('can be exited', async ({ page }) => {
+e2eOnly(
+  'tutorial: can be exited',
+  'Asserts the overlay card unmounts from the DOM after clicking the exit control — overlay chrome lifecycle in the real UI.',
+  async ({ page, expect }) => {
     await page.click('text=Tutorial');
     await page.waitForTimeout(100);
     await page.click('.tutorial-menu-item:has-text("Build an MNIST CNN")');
@@ -71,9 +85,13 @@ test.describe('Tutorial mode', () => {
     await page.click('.tutorial-exit');
     await page.waitForTimeout(50);
     await expect(page.locator('.tutorial-card')).toHaveCount(0);
-  });
+  },
+);
 
-  test('the running tutorial links back to the tutorial menu', async ({ page }) => {
+e2eOnly(
+  'tutorial: the running tutorial links back to the tutorial menu',
+  'Navigates from the running overlay card back to the menu modal via UI clicks and asserts the DOM handover (card unmounts, menu container appears).',
+  async ({ page, expect }) => {
     await page.click('text=Tutorial');
     await page.waitForTimeout(100);
     await page.click('.tutorial-menu-item:has-text("Build an MNIST CNN")');
@@ -84,9 +102,13 @@ test.describe('Tutorial mode', () => {
     // The tutorial closes and the menu takes over.
     await expect(page.locator('.tutorial-card')).toHaveCount(0);
     await expect(page.locator('.tutorial-menu-container')).toBeVisible();
-  });
+  },
+);
 
-  test('the About modal links to the tutorial menu', async ({ page }) => {
+e2eOnly(
+  'tutorial: the About modal links to the tutorial menu',
+  'Drives the About modal UI into the tutorial menu and asserts one modal replaces the other in the rendered DOM (shared .modal-overlay chrome disambiguated by content).',
+  async ({ page, expect }) => {
     await page.click('text=About');
     await page.waitForTimeout(300);
     await expect(page.locator('.modal-container')).toContainText('Tutorials');
@@ -96,5 +118,5 @@ test.describe('Tutorial mode', () => {
     // .modal-overlay chrome now, so identify the About modal by its content.)
     await expect(page.locator('.modal-container')).toHaveCount(0);
     await expect(page.locator('.tutorial-menu-container')).toBeVisible();
-  });
-});
+  },
+);

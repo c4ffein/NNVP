@@ -1,54 +1,51 @@
-import { test, expect } from './helpers/canvas';
+/**
+ * Migrated from tests/training-compile-options.spec.js. The CompileOptions
+ * panel is exercised as rendered form UI (selects, number inputs,
+ * placeholders), the last test runs REAL TensorFlow.js training in the page,
+ * and every test asserts a clean browser console — so all are e2eOnly
+ * mechanical wraps.
+ */
+import { e2eOnly } from '../define';
 
-test.describe('Training Compile Options', () => {
-  let consoleMessages = [];
-  let consoleErrors = [];
-
-  // Helper function to open Training panel and CompileOptions
-  async function openCompileOptions(page) {
-    // Click on Training menu (direct function, not dropdown)
-    await page.click('#GeneralMenu .menuTitle:has-text("View")');
-    await page.click('#GeneralMenu .menuItem:has-text("Training")');
-    await page.waitForTimeout(100);
-    // Click on Options tab
-    const optionsTab = await page.$('.TrainingZone.bar-button:has-text("Options")');
-    await optionsTab.click();
-    await page.waitForTimeout(50);
-  }
-
-  test.beforeEach(async ({ page, canvas }) => {
-    consoleMessages = [];
-    consoleErrors = [];
-    page.on('console', msg => {
-      const text = msg.text();
-      const type = msg.type();
-      consoleMessages.push({ type, text });
-      if (type === 'error') {
-        consoleErrors.push(text);
-      }
-    });
-    page.on('pageerror', error => {
-      consoleErrors.push(`PAGE ERROR: ${error.message}`);
-    });
-    await page.goto(canvas.home);
-    await page.waitForTimeout(50);
-  });
-
-  test.afterEach(async () => {
-    // Filter out SVG rendering errors (Expected length/number for attributes)
-    const filteredErrors = consoleErrors.filter(error => {
-      const isSvgAttributeError = error.includes('attribute') &&
-                                   (error.includes('Expected length') || error.includes('Expected number'));
-      return !isSvgAttributeError;
-    });
-
-    if (filteredErrors.length > 0) {
-      console.log('\n=== CONSOLE ERRORS ===');
-      filteredErrors.forEach(error => console.log(`❌ ${error}`));
+// Replicates the original spec's beforeEach: attach console/pageerror
+// collectors, then (re)load the app so load-time errors are captured too —
+// the dual runner has already navigated once before the body runs.
+async function startErrorTracking(page, canvas) {
+  const consoleMessages = [];
+  const consoleErrors = [];
+  page.on('console', (msg) => {
+    const text = msg.text();
+    const type = msg.type();
+    consoleMessages.push({ type, text });
+    if (type === 'error') {
+      consoleErrors.push(text);
     }
   });
+  page.on('pageerror', (error) => {
+    consoleErrors.push(`PAGE ERROR: ${error.message}`);
+  });
+  await page.goto(canvas.home);
+  await page.waitForTimeout(50);
+  return { consoleMessages, consoleErrors };
+}
 
-  test('should open Training panel and show CompileOptions', async ({ page }) => {
+// Helper function to open Training panel and CompileOptions
+async function openCompileOptions(page) {
+  // Click on Training menu (direct function, not dropdown)
+  await page.click('#GeneralMenu .menuTitle:has-text("View")');
+  await page.click('#GeneralMenu .menuItem:has-text("Training")');
+  await page.waitForTimeout(100);
+  // Click on Options tab
+  const optionsTab = await page.$('.TrainingZone.bar-button:has-text("Options")');
+  await optionsTab.click();
+  await page.waitForTimeout(50);
+}
+
+e2eOnly(
+  'compile: should open Training panel and show CompileOptions',
+  'Opens the Training zone through the View menu and asserts the #TrainingZone / #CompileOptions panels mount in the DOM — panel chrome as UI, plus a clean browser-console assertion.',
+  async ({ page, canvas, expect }) => {
+    const { consoleErrors } = await startErrorTracking(page, canvas);
     console.log('\n=== TRAINING PANEL TEST ===');
     // Click on Training menu (it's a direct function call, not a dropdown)
     await page.click('#GeneralMenu .menuTitle:has-text("View")');
@@ -68,9 +65,14 @@ test.describe('Training Compile Options', () => {
     expect(compileOptions).not.toBeNull();
     console.log('CompileOptions panel visible');
     expect(consoleErrors.length).toBe(0);
-  });
+  },
+);
 
-  test('should show optimizer selector with all available optimizers', async ({ page }) => {
+e2eOnly(
+  'compile: should show optimizer selector with all available optimizers',
+  'Reads the rendered <option> values of the optimizer <select> from the panel DOM and asserts a clean browser console — form chrome only a browser renders.',
+  async ({ page, canvas, expect }) => {
+    const { consoleErrors } = await startErrorTracking(page, canvas);
     console.log('\n=== OPTIMIZER SELECTOR TEST ===');
     // Open Training panel and CompileOptions
     await openCompileOptions(page);
@@ -91,9 +93,14 @@ test.describe('Training Compile Options', () => {
     expect(optimizers).toContain('rmsprop');
     expect(optimizers.length).toBe(6);
     expect(consoleErrors.length).toBe(0);
-  });
+  },
+);
 
-  test('should show different parameters when switching optimizers', async ({ page }) => {
+e2eOnly(
+  'compile: should show different parameters when switching optimizers',
+  'Asserts the parameter form re-renders different labels as the optimizer <select> changes (selectOption + DOM label reads) — reactive form UI observable only in the rendered page.',
+  async ({ page, canvas, expect }) => {
+    const { consoleErrors } = await startErrorTracking(page, canvas);
     console.log('\n=== DYNAMIC OPTIMIZER PARAMETERS TEST ===');
     // Open Training panel and CompileOptions
     await openCompileOptions(page);
@@ -131,9 +138,14 @@ test.describe('Training Compile Options', () => {
     expect(adamParams.some(p => p.includes('Epsilon'))).toBe(true);
     expect(adamParams.some(p => p.includes('Momentum'))).toBe(false); // Adam doesn't have momentum
     expect(consoleErrors.length).toBe(0);
-  });
+  },
+);
 
-  test('should show loss function selector with all available losses', async ({ page }) => {
+e2eOnly(
+  'compile: should show loss function selector with all available losses',
+  'Reads the rendered loss <select> options and its default value from the panel DOM, plus a clean browser-console assertion.',
+  async ({ page, canvas, expect }) => {
+    const { consoleErrors } = await startErrorTracking(page, canvas);
     console.log('\n=== LOSS FUNCTION SELECTOR TEST ===');
     // Open Training panel and CompileOptions
     await openCompileOptions(page);
@@ -158,9 +170,14 @@ test.describe('Training Compile Options', () => {
     expect(selectedLoss).toBe('categoricalCrossentropy');
 
     expect(consoleErrors.length).toBe(0);
-  });
+  },
+);
 
-  test('should allow changing loss function', async ({ page }) => {
+e2eOnly(
+  'compile: should allow changing loss function',
+  'Drives the loss <select> via selectOption and reads the value back from the live DOM after each change, plus a clean browser-console assertion.',
+  async ({ page, canvas, expect }) => {
+    const { consoleErrors } = await startErrorTracking(page, canvas);
     console.log('\n=== LOSS FUNCTION CHANGE TEST ===');
     // Open Training panel and CompileOptions
     await openCompileOptions(page);
@@ -177,9 +194,14 @@ test.describe('Training Compile Options', () => {
     console.log('Changed loss to:', finalLoss);
     expect(finalLoss).toBe('meanSquaredError');
     expect(consoleErrors.length).toBe(0);
-  });
+  },
+);
 
-  test('should show parameter hints with default values', async ({ page }) => {
+e2eOnly(
+  'compile: should show parameter hints with default values',
+  'Reads placeholder attributes off the rendered number inputs of the parameter form (including a :has-text scoped input) — rendered form chrome, plus a clean-console assertion.',
+  async ({ page, canvas, expect }) => {
+    const { consoleErrors } = await startErrorTracking(page, canvas);
     console.log('\n=== PARAMETER HINTS TEST ===');
     // Open Training panel and CompileOptions
     await openCompileOptions(page);
@@ -199,9 +221,14 @@ test.describe('Training Compile Options', () => {
     console.log('Learning Rate placeholder:', learningRatePlaceholder);
     expect(learningRatePlaceholder).toContain('default:');
     expect(consoleErrors.length).toBe(0);
-  });
+  },
+);
 
-  test('should allow modifying optimizer parameters', async ({ page }) => {
+e2eOnly(
+  'compile: should allow modifying optimizer parameters',
+  'Fills a number input and checks a real checkbox in the rendered parameter form, reading the values back from the DOM — form interaction as UI, plus a clean-console assertion.',
+  async ({ page, canvas, expect }) => {
+    const { consoleErrors } = await startErrorTracking(page, canvas);
     console.log('\n=== PARAMETER MODIFICATION TEST ===');
     // Open Training panel and CompileOptions
     await openCompileOptions(page);
@@ -226,9 +253,14 @@ test.describe('Training Compile Options', () => {
     console.log('Nesterov checkbox checked:', isChecked);
     expect(isChecked).toBe(true);
     expect(consoleErrors.length).toBe(0);
-  });
+  },
+);
 
-  test('should expose actual training configuration that matches UI settings', async ({ page }) => {
+e2eOnly(
+  'compile: should expose actual training configuration that matches UI settings',
+  'Runs REAL TensorFlow.js training in the page after configuring the form, polling window.nnvp.debug for the compiled model and matching [TrainingZone] runtime console logs — live tfjs execution and console capture are browser-only.',
+  async ({ page, canvas, expect }) => {
+    const { consoleMessages } = await startErrorTracking(page, canvas);
     console.log('\n=== TRAINING CONFIGURATION VERIFICATION TEST ===');
     // Load a template to get a valid model
     console.log('Loading a valid model template...');
@@ -387,5 +419,5 @@ test.describe('Training Compile Options', () => {
     console.log('✓ Runtime log confirms Epochs: 1');
     console.log('✅ VERIFIED: TensorFlow.js is ACTUALLY using our configuration during training!');
     // Note: Chart rendering errors are expected with only 1 epoch (not enough data points)
-  });
-});
+  },
+);

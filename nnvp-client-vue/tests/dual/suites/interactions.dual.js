@@ -1,35 +1,39 @@
-import { test, expect } from './helpers/canvas';
+/**
+ * Migrated from tests/interactions.spec.js. Every test here carried the
+ * original spec's beforeEach console/pageerror tracking and asserted a clean
+ * console at the end — an assertion only a real browser can evaluate — so
+ * they are e2eOnly mechanical wraps. The graph-substance parts (adding
+ * layers, undo/redo) are covered mode-agnostically by board.dual.js.
+ */
+import { e2eOnly } from '../define';
 
-test.describe('NNVP Interactions', () => {
-  let consoleMessages = [];
-  let consoleErrors = [];
-
-  test.beforeEach(async ({ page, canvas }) => {
-    consoleMessages = [];
-    consoleErrors = [];
-    page.on('console', msg => {
-      const text = msg.text();
-      const type = msg.type();
-      consoleMessages.push({ type, text });
-      if (type === 'error') {
-        consoleErrors.push(text);
-      }
-    });
-    page.on('pageerror', error => {
-      consoleErrors.push(`PAGE ERROR: ${error.message}`);
-    });
-    await page.goto(canvas.home);
-    await page.waitForTimeout(50);
-  });
-
-  test.afterEach(async () => {
-    if (consoleErrors.length > 0) {
-      console.log('\n=== CONSOLE ERRORS ===');
-      consoleErrors.forEach(error => console.log(`❌ ${error}`));
+// Replicates the original spec's beforeEach: attach console/pageerror
+// collectors, then (re)load the app so load-time errors are captured too —
+// the dual runner has already navigated once before the body runs.
+async function startErrorTracking(page, canvas) {
+  const consoleMessages = [];
+  const consoleErrors = [];
+  page.on('console', (msg) => {
+    const text = msg.text();
+    const type = msg.type();
+    consoleMessages.push({ type, text });
+    if (type === 'error') {
+      consoleErrors.push(text);
     }
   });
+  page.on('pageerror', (error) => {
+    consoleErrors.push(`PAGE ERROR: ${error.message}`);
+  });
+  await page.goto(canvas.home);
+  await page.waitForTimeout(50);
+  return { consoleMessages, consoleErrors };
+}
 
-  test('should be able to search for layers', async ({ page }) => {
+e2eOnly(
+  'interactions: should be able to search for layers',
+  'Types into the real search box and counts rendered .LayerTemplate DOM elements to assert catalog filtering, and asserts the browser console/pageerror streams stayed clean — both only observable in a live page.',
+  async ({ page, canvas, expect }) => {
+    const { consoleErrors } = await startErrorTracking(page, canvas);
     const searchBox = await page.$('#layerSearchBox');
     expect(searchBox).not.toBeNull();
     // Get content before search
@@ -51,9 +55,14 @@ test.describe('NNVP Interactions', () => {
     expect(visibleLayersAfter.length).toBeGreaterThan(0); // Should still show some results
     expect(leftBarTextAfter.length).toBeGreaterThan(0);
     expect(consoleErrors.length).toBe(0);
-  });
+  },
+);
 
-  test('should have working top menu', async ({ page }) => {
+e2eOnly(
+  'interactions: should have working top menu',
+  'Reads the rendered #GeneralMenu DOM for the menu titles and asserts a clean browser console/pageerror stream — menu chrome rendering and console capture require a live browser.',
+  async ({ page, canvas, expect }) => {
+    const { consoleErrors } = await startErrorTracking(page, canvas);
     // Try clicking File menu
     const fileMenuItems = await page.$$eval('#GeneralMenu .menuTitle',
       elements => elements.map(el => el.textContent)
@@ -66,9 +75,14 @@ test.describe('NNVP Interactions', () => {
     expect(fileMenuItems).toContain('View'); // Training lives under View now
     expect(fileMenuItems).toContain('About');
     expect(consoleErrors.length).toBe(0);
-  });
+  },
+);
 
-  test('should open File menu and show options', async ({ page }) => {
+e2eOnly(
+  'interactions: should open File menu and show options',
+  'Asserts the dropdown becomes VISIBLE after the click via page.isVisible / computed styles — element visibility is a layout+CSS question only a real browser can evaluate.',
+  async ({ page, canvas, expect }) => {
+    const { consoleErrors } = await startErrorTracking(page, canvas);
     console.log('\n=== FILE MENU TEST ===');
     // Find the File menu item in GeneralMenu
     const fileMenu = await page.$('#GeneralMenu .menuTitle:has-text("File")');
@@ -109,9 +123,14 @@ test.describe('NNVP Interactions', () => {
     expect(hasSave).toBe(true);
     expect(hasLoad).toBe(true);
     expect(consoleErrors.length).toBe(0);
-  });
+  },
+);
 
-  test('should have a canvas surface in the board', async ({ page, canvas }) => {
+e2eOnly(
+  'interactions: should have a canvas surface in the board',
+  'Measures the pane element boundingBox and asserts nonzero width/height — real layout geometry that only a browser layout engine produces.',
+  async ({ page, canvas, expect }) => {
+    const { consoleErrors } = await startErrorTracking(page, canvas);
     const pane = await page.$(canvas.pane);
     expect(pane).not.toBeNull();
     const paneBBox = await pane.boundingBox();
@@ -123,9 +142,14 @@ test.describe('NNVP Interactions', () => {
     expect(paneBBox.width).toBeGreaterThan(0);
     expect(paneBBox.height).toBeGreaterThan(0);
     expect(consoleErrors.length).toBe(0);
-  });
+  },
+);
 
-  test('should be able to check layer categories', async ({ page }) => {
+e2eOnly(
+  'interactions: should be able to check layer categories',
+  'Counts the rendered .layerCategory entries of the catalog UI in the DOM and asserts a clean browser console/pageerror stream.',
+  async ({ page, canvas, expect }) => {
+    const { consoleErrors } = await startErrorTracking(page, canvas);
     // Find all layer categories
     const categories = await page.$$('.layerCategory .title .text');
     const categoryNames = await Promise.all(
@@ -137,9 +161,14 @@ test.describe('NNVP Interactions', () => {
     // Should have at least several major categories (Core, Convolutional, Pooling, etc)
     expect(categoryNames.length).toBeGreaterThan(4);
     expect(consoleErrors.length).toBe(0);
-  });
+  },
+);
 
-  test('should not have any runtime errors after 3 seconds', async ({ page }) => {
+e2eOnly(
+  'interactions: should not have any runtime errors after 3 seconds',
+  'The assertion IS the browser console: it verifies no console errors or pageerrors are emitted after the app loads, which only a real browser can produce.',
+  async ({ page, canvas, expect }) => {
+    const { consoleMessages, consoleErrors } = await startErrorTracking(page, canvas);
     // Wait a bit to let any async operations complete
     await page.waitForTimeout(100);
     console.log('\n=== RUNTIME STABILITY TEST ===');
@@ -150,9 +179,14 @@ test.describe('NNVP Interactions', () => {
       consoleErrors.forEach(err => console.log(`  - ${err}`));
     }
     expect(consoleErrors.length).toBe(0);
-  });
+  },
+);
 
-  test('should handle undo/redo state correctly', async ({ page }) => {
+e2eOnly(
+  'interactions: should handle undo/redo state correctly',
+  "Asserts the Edit menu's Undo/Redo items toggle their 'disabled' CSS class through real menu open/close cycles — menu chrome state as UI, plus a clean-console assertion.",
+  async ({ page, canvas, expect }) => {
+    const { consoleErrors } = await startErrorTracking(page, canvas);
     console.log('\n=== UNDO/REDO STATE TEST ===');
     // Helper to check if menu item is disabled
     const isMenuItemDisabled = async (itemText) => {
@@ -218,9 +252,14 @@ test.describe('NNVP Interactions', () => {
     expect(undoDisabledAfterRedo).toBe(false);
     expect(redoDisabledAfterRedo).toBe(true);
     expect(consoleErrors.length).toBe(0);
-  });
+  },
+);
 
-  test('should NOT show beforeunload warning when graph is empty', async ({ page }) => {
+e2eOnly(
+  'interactions: should NOT show beforeunload warning when graph is empty',
+  'Invokes window.onbeforeunload on the real window object to assert no unsaved-work warning fires for an empty graph — that handler only exists in a live page.',
+  async ({ page, canvas, expect }) => {
+    const { consoleErrors } = await startErrorTracking(page, canvas);
     console.log('\n=== BEFOREUNLOAD WARNING TEST (EMPTY GRAPH) ===');
 
     // Graph starts empty, so beforeunload should return undefined
@@ -232,9 +271,14 @@ test.describe('NNVP Interactions', () => {
     console.log('Beforeunload result on empty graph:', beforeunloadResult);
     expect(beforeunloadResult).toBeUndefined();
     expect(consoleErrors.length).toBe(0);
-  });
+  },
+);
 
-  test('should show beforeunload warning when graph has layers', async ({ page, canvas }) => {
+e2eOnly(
+  'interactions: should show beforeunload warning when graph has layers',
+  'Invokes window.onbeforeunload on the real window object to assert the unsaved-work warning message once the graph has layers — browser-only navigation hook.',
+  async ({ page, canvas, expect }) => {
+    const { consoleErrors } = await startErrorTracking(page, canvas);
     console.log('\n=== BEFOREUNLOAD WARNING TEST (GRAPH WITH LAYERS) ===');
     // Add a layer to the graph
     const denseLayer = await page.$('.LayerTemplate:has-text("Dense")');
@@ -253,5 +297,5 @@ test.describe('NNVP Interactions', () => {
     console.log('Beforeunload result with layers:', beforeunloadResult);
     expect(beforeunloadResult).toBe('Warning : all unsaved data will be lost');
     expect(consoleErrors.length).toBe(0);
-  });
-});
+  },
+);

@@ -76,9 +76,10 @@ test-e2e-debug:
 test-e2e-fast:
 	cd nnvp-client-vue && npm run test:e2e:fast
 
-# Run unit tests (if available)
+# Run the dual-mode suite headlessly (bun runner; the same tests also run
+# in the browser via `make test-e2e`)
 test-unit:
-	@echo "Unit tests not yet implemented"
+	cd nnvp-client-vue && bun run test:fast
 
 # Run with Docker
 run-docker:

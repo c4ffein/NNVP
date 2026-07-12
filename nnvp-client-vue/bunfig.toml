@@ -1,4 +1,5 @@
 [test]
-# Register happy-dom's window/document/etc. as globals before every test file.
-# The D3Interface tests exercise code that touches the DOM (d3, window.JSON, ...).
-preload = ["./tests/happydom.js"]
+# Register happy-dom's window/document/etc. as globals before every test file,
+# and teach bun to import .vue single-file components (tests/vue-loader.js) so
+# dual-mode tests can mount real components without a browser or vite.
+preload = ["./tests/happydom.js", "./tests/vue-loader.js"]

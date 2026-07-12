@@ -1,12 +1,14 @@
-import { test, expect } from './helpers/canvas';
+/**
+ * Migrated from tests/layer-help-modals.spec.js. The help modal is exercised
+ * AS UI (hover affordances, overlay hit-testing, fade-out animations), so
+ * every test is an e2eOnly mechanical wrap.
+ */
+import { e2eOnly } from '../define';
 
-test.describe('Layer Help Modals', () => {
-  test.beforeEach(async ({ page, canvas }) => {
-    await page.goto(canvas.home);
-    await page.waitForTimeout(100);
-  });
-
-  test('should show help button when layer is selected', async ({ page, canvas }) => {
+e2eOnly(
+  'help: should show help button when layer is selected',
+  'Selects a node with a real mouse click at its boundingBox center and asserts the right-panel DOM (.ParamsBlock, #layerOptions .help-icon) renders the help affordance — layout hit-testing and panel chrome.',
+  async ({ page, canvas, expect }) => {
     console.log('\n=== LAYER HELP BUTTON TEST ===');
     // Load a template to get some layers
     console.log('Loading template...');
@@ -37,9 +39,13 @@ test.describe('Layer Help Modals', () => {
     const helpButton = await page.$('#layerOptions .help-icon');
     expect(helpButton).not.toBeNull();
     console.log('✓ Help button found');
-  });
+  },
+);
 
-  test('should open and close help modal when clicking help button', async ({ page, canvas }) => {
+e2eOnly(
+  'help: should open and close help modal when clicking help button',
+  'Exercises the help modal as UI: opens it from the panel button, asserts overlay/container/body DOM, then closes with the X and waits out the ~350ms fade-out before the overlay unmounts — modal lifecycle only a browser renders.',
+  async ({ page, canvas, expect }) => {
     console.log('\n=== HELP MODAL OPEN/CLOSE TEST ===');
     // Load template
     const fileMenu = await page.$('#GeneralMenu .menuTitle:has-text("File")');
@@ -83,9 +89,13 @@ test.describe('Layer Help Modals', () => {
     // Auto-retrying: the modal fades/slides out over ~350ms before unmounting.
     await expect(page.locator('.layer-help-modal-overlay')).toHaveCount(0);
     console.log('✓ Modal closed');
-  });
+  },
+);
 
-  test('should show Dense layer help content', async ({ page, canvas }) => {
+e2eOnly(
+  'help: should show Dense layer help content',
+  'Reads the rendered modal body text for Dense-specific help copy after selecting the node via boundingBox mouse hit-testing — modal DOM content in the real UI.',
+  async ({ page, canvas, expect }) => {
     console.log('\n=== DENSE LAYER HELP CONTENT TEST ===');
     // Load template
     const fileMenu = await page.$('#GeneralMenu .menuTitle:has-text("File")');
@@ -125,9 +135,13 @@ test.describe('Layer Help Modals', () => {
     const closeButton = await page.$('.layer-help-modal-close');
     await closeButton.click();
     await page.waitForTimeout(50);
-  });
+  },
+);
 
-  test('should open layer help from the catalog hover ? button', async ({ page }) => {
+e2eOnly(
+  'help: should open layer help from the catalog hover ? button',
+  'Depends on hover pointer-events to reveal the catalog row\'s hidden ? affordance before clicking it, and asserts the click did NOT add a node — hover semantics only exist in a real browser.',
+  async ({ page, expect }) => {
     console.log('\n=== CATALOG HELP BUTTON TEST ===');
     const row = page.locator('#layer-template-Dense');
     await row.hover();
@@ -144,9 +158,13 @@ test.describe('Layer Help Modals', () => {
     await page.click('.layer-help-modal-close');
     await expect(page.locator('.layer-help-modal-overlay')).toHaveCount(0);
     console.log('✓ Catalog help works');
-  });
+  },
+);
 
-  test('should close modal when clicking overlay', async ({ page, canvas }) => {
+e2eOnly(
+  'help: should close modal when clicking overlay',
+  'Closes the modal by clicking overlay coordinates outside the content box (boundingBox hit-testing) and waits for the fade-out unmount — overlay geometry needs a real layout engine.',
+  async ({ page, canvas, expect }) => {
     console.log('\n=== MODAL OVERLAY CLOSE TEST ===');
     // Load template and select layer
     const fileMenu = await page.$('#GeneralMenu .menuTitle:has-text("File")');
@@ -177,5 +195,5 @@ test.describe('Layer Help Modals', () => {
     // Auto-retrying: the modal fades/slides out over ~350ms before unmounting.
     await expect(page.locator('.layer-help-modal-overlay')).toHaveCount(0);
     console.log('✓ Modal closed by clicking overlay');
-  });
-});
+  },
+);

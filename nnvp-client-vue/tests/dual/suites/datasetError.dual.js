@@ -1,15 +1,22 @@
-import { test, expect } from './helpers/canvas';
+/**
+ * Migrated from tests/dataset-error.spec.js. The dataset fetch target
+ * (https://datasets.nnvp.io) is unreachable in this environment, so any
+ * dataset load is guaranteed to fail. We additionally abort those requests up
+ * front so the failure is immediate and deterministic instead of waiting on a
+ * ~25s connection-reset timeout. This still exercises the real error path
+ * end-to-end (the component's load .catch -> visible error state).
+ */
+import { e2eOnly } from '../define';
 
-// The dataset fetch target (https://datasets.nnvp.io) is unreachable in this
-// environment, so any dataset load is guaranteed to fail. We additionally abort
-// those requests up front so the failure is immediate and deterministic instead
-// of waiting on a ~25s connection-reset timeout. This still exercises the real
-// error path end-to-end (the component's load .catch -> visible error state).
-test.describe('Dataset load error handling', () => {
-  test('shows a visible error message and Retry button when a dataset fails to load', async ({ page, canvas }) => {
+e2eOnly(
+  'dataset: shows a visible error message and Retry button when a dataset fails to load',
+  'Uses page.route to abort the dataset CDN requests and asserts the rendered error UI (auto-retrying toBeVisible/toContainText), the absent loading bar, a screenshot, and the Retry flow — HTTP interception and visible error state exist only in a browser.',
+  async ({ page, canvas, expect }) => {
     // Make every dataset request fail fast.
     await page.route('https://datasets.nnvp.io/**', route => route.abort());
 
+    // Reload so the route is active from app start (the runner navigated
+    // before this body ran, without the interception in place).
     await page.goto(canvas.home);
     await page.waitForTimeout(50);
 
@@ -47,5 +54,5 @@ test.describe('Dataset load error handling', () => {
     await retryButton.click();
     await expect(errorBox).toBeVisible({ timeout: 10000 });
     await expect(errorBox).toContainText("Couldn't load FashionMNIST");
-  });
-});
+  },
+);
