@@ -72,8 +72,7 @@ const layerHelp = {
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>data_format:</strong> Specifies whether channels are first or last in the input ('channels_last' by default)</li>
-            <li><strong>Input shape:</strong> Accepts any tensor shape; automatically calculates the flattened output dimension</li>
+            <li><strong>data_format:</strong> Specifies whether channels are first or last in the input ('channels_last' by default) - Flatten accepts any input shape and calculates the flattened size automatically</li>
           </ul>
           <p><em>💡 Tip: Flatten preserves the total number of elements - use it right before Dense layers but avoid it if you need to maintain spatial relationships for later convolutional operations!</em></p>
         `,
@@ -81,7 +80,7 @@ const layerHelp = {
           <h2>Dropout Layer</h2>
           <p><strong>What it does:</strong> Randomly deactivates a percentage of neurons during training to prevent overfitting and improve model generalization.</p>
           <h3>How it works:</h3>
-          <p>During each training step, Dropout randomly sets a fraction of input units to 0, forcing the network to learn redundant representations. During inference (testing), all neurons are active but their outputs are scaled by the dropout rate to maintain consistency.</p>
+          <p>During each training step, Dropout randomly sets a fraction of input units to 0, forcing the network to learn redundant representations. The surviving values are scaled up by 1/(1 - rate) during training so their expected sum is unchanged, which means inference is a simple pass-through with no rescaling.</p>
           <h3>When to use:</h3>
           <ul>
             <li><strong>Overfitting prevention:</strong> When your model performs well on training data but poorly on validation data</li>
@@ -91,6 +90,7 @@ const layerHelp = {
           <h3>Key parameters:</h3>
           <ul>
             <li><strong>rate:</strong> Fraction of input units to drop (0.2-0.5 typical, where 0.2 means 20% dropout)</li>
+            <li><strong>noise_shape:</strong> Optional shape of the binary dropout mask, letting you share one mask across dimensions (e.g., across timesteps)</li>
             <li><strong>seed:</strong> Random seed for reproducible dropout patterns during training</li>
           </ul>
           <p><em>💡 Tip: Start with dropout rates of 0.2-0.3 for input layers and 0.5 for hidden layers. Remember that Dropout is automatically disabled during model evaluation!</em></p>
@@ -173,21 +173,20 @@ const layerHelp = {
         `,
   'Output': `
           <h2>Output Layer</h2>
-          <p><strong>What it does:</strong> Creates a named output tensor that defines an endpoint for your model, allowing you to specify multiple outputs in complex architectures.</p>
+          <p><strong>What it does:</strong> Marks a tensor as an endpoint of your model, defining where predictions come out of the network.</p>
           <h3>How it works:</h3>
-          <p>The Output layer wraps an existing tensor and assigns it a name, marking it as an output of the model. This is particularly useful in functional API models where you need to explicitly define which tensors should be returned as outputs.</p>
+          <p>The Output node doesn't compute anything itself - it tags the tensor connected to it as one of the model's outputs. When the model code is generated, every tensor flowing into an Output node becomes a return value of the model, in functional API style.</p>
           <h3>When to use:</h3>
           <ul>
-            <li><strong>Multi-output models:</strong> When your model needs to produce multiple predictions simultaneously (e.g., classification and regression together)</li>
-            <li><strong>Intermediate outputs:</strong> To extract features from middle layers for visualization or transfer learning</li>
-            <li><strong>Custom loss per output:</strong> When different outputs need different loss functions or metrics</li>
+            <li><strong>Every model:</strong> Each network needs at least one Output node so the generated model knows what to return</li>
+            <li><strong>Multi-output models:</strong> Add several Output nodes when your model produces multiple predictions simultaneously (e.g., classification and regression together)</li>
+            <li><strong>Custom loss per output:</strong> When different outputs need different loss functions or metrics during compilation</li>
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>name:</strong> String identifier for this output (required) - used to reference this output in training and prediction</li>
-            <li><strong>dtype:</strong> Data type of the output tensor (optional) - defaults to the input tensor's dtype</li>
+            <li><strong>None:</strong> This node has no configurable parameters - it simply exposes whatever tensor is connected to it as a model output</li>
           </ul>
-          <p><em>💡 Tip: Always give meaningful names to your outputs - they'll be used as keys in the model's output dictionary during training and prediction!</em></p>
+          <p><em>💡 Tip: Make sure the layer feeding into your Output produces the shape and activation your task needs - e.g., a Dense layer with softmax for multi-class classification!</em></p>
         `,
   'GRU': `
           <h2>GRU Layer</h2>
@@ -205,7 +204,7 @@ const layerHelp = {
             <li><strong>units:</strong> Number of GRU cells (output dimensionality) - typically 32 to 512</li>
             <li><strong>return_sequences:</strong> Whether to return full sequence (True) or just last output (False)</li>
             <li><strong>dropout:</strong> Fraction of units to drop during training to prevent overfitting (0.0 to 0.5)</li>
-            <li><strong>activation:</strong> Activation function for the recurrent step (default: 'tanh')</li>
+            <li><strong>activation:</strong> Activation for the candidate/output state (default: 'tanh'); the gates use recurrent_activation (default: 'sigmoid')</li>
           </ul>
           <p><em>💡 Tip: GRU trains faster than LSTM and often performs just as well - try it first for sequence tasks! Use return_sequences=True when stacking multiple GRU layers.</em></p>
         `,
@@ -245,7 +244,7 @@ const layerHelp = {
             <li><strong>filters:</strong> Number of output filters (feature detectors) - typically start with 32, 64, or 128</li>
             <li><strong>kernel_size:</strong> Length of the convolution window - commonly 3, 5, or 7 for local pattern detection</li>
             <li><strong>activation:</strong> Activation function to apply - 'relu' is most common for hidden layers</li>
-            <li><strong>padding:</strong> 'valid' (no padding) or 'same' (preserves sequence length)</li>
+            <li><strong>padding:</strong> 'valid' (no padding), 'same' (preserves sequence length), or 'causal' (only looks at past timesteps, for autoregressive models)</li>
           </ul>
           <p><em>💡 Tip: Stack multiple Conv1D layers with increasing filter counts (e.g., 32→64→128) to learn hierarchical features from simple to complex patterns!</em></p>
         `,
@@ -339,8 +338,8 @@ const layerHelp = {
           <ul>
             <li><strong>input_dim:</strong> Size of the vocabulary (maximum integer index + 1)</li>
             <li><strong>output_dim:</strong> Dimension of the dense embedding vectors</li>
-            <li><strong>input_length:</strong> Length of input sequences (can be None for variable length)</li>
-            <li><strong>mask_zero:</strong> Whether to mask zero values as padding (useful for variable-length sequences)</li>
+            <li><strong>embeddings_initializer:</strong> How the lookup table is initialized (default: 'uniform')</li>
+            <li><strong>mask_zero:</strong> Whether to treat index 0 as padding and mask it out (useful for variable-length sequences)</li>
           </ul>
           <p><em>💡 Tip: Start with output_dim between 50-300 for word embeddings - use higher dimensions for larger vocabularies and more complex relationships!</em></p>
         `,
@@ -358,7 +357,6 @@ const layerHelp = {
           <h3>Key parameters:</h3>
           <ul>
             <li><strong>target_shape:</strong> Tuple specifying the desired output shape (excluding batch dimension); use -1 for automatic dimension inference</li>
-            <li><strong>input_shape:</strong> Shape of input data (only needed for the first layer in a model)</li>
           </ul>
           <p><em>💡 Tip: Use -1 in target_shape to let Keras automatically calculate one dimension - for example, Reshape((-1, 128)) will flatten any input to have 128 features in the last dimension!</em></p>
         `,
@@ -375,8 +373,7 @@ const layerHelp = {
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>axis:</strong> The dimension along which to concatenate (default: -1, the last axis)</li>
-            <li><strong>inputs:</strong> List of input tensors to concatenate (must have same shape except for the concatenation axis)</li>
+            <li><strong>axis:</strong> The dimension along which to concatenate (default: -1, the last axis) - all inputs must have the same shape except along this axis</li>
           </ul>
           <p><em>💡 Tip: Always verify that your input tensors have matching dimensions except for the concatenation axis - mismatched shapes are a common source of errors!</em></p>
         `,
@@ -393,8 +390,7 @@ const layerHelp = {
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>inputs:</strong> A list of input tensors (minimum 2) that must all have the same shape</li>
-            <li><strong>**kwargs:</strong> Standard layer keyword arguments like name and trainable (the Add layer itself has no weights)</li>
+            <li><strong>None:</strong> Add has no configurable parameters and no weights - just connect two or more layers with the same output shape into it</li>
           </ul>
           <p><em>💡 Tip: Add layers are essential for residual blocks - always ensure your tensors have matching dimensions by using padding='same' in convolutions or adding projection layers when needed!</em></p>
         `,
@@ -411,8 +407,7 @@ const layerHelp = {
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>inputs:</strong> List of input tensors to be multiplied (minimum 2 tensors required)</li>
-            <li><strong>**kwargs:</strong> Standard layer keyword arguments like name and dtype</li>
+            <li><strong>None:</strong> Multiply has no configurable parameters - just connect two or more layers with the same output shape into it</li>
           </ul>
           <p><em>💡 Tip: Multiply layers are perfect for creating attention gates - try multiplying your features with a sigmoid-activated attention map to highlight important regions!</em></p>
         `,
@@ -421,7 +416,7 @@ const layerHelp = {
           <h2>LeakyReLU Layer</h2>
           <p><strong>What it does:</strong> Applies a leaky rectified linear unit activation function that allows small negative values to pass through instead of zeroing them out completely.</p>
           <h3>How it works:</h3>
-          <p>For positive inputs, it returns the input unchanged; for negative inputs, it returns the input multiplied by a small slope coefficient (alpha). This prevents "dying neurons" by maintaining a small gradient even for negative values.</p>
+          <p>For positive inputs, it returns the input unchanged; for negative inputs, it returns the input multiplied by a small slope coefficient (negative_slope). This prevents "dying neurons" by maintaining a small gradient even for negative values.</p>
           <h3>When to use:</h3>
           <ul>
             <li><strong>Preventing dead neurons:</strong> When standard ReLU causes too many neurons to become inactive during training</li>
@@ -430,10 +425,9 @@ const layerHelp = {
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>alpha:</strong> The slope for negative inputs (default: 0.3, typically between 0.01 and 0.3)</li>
-            <li><strong>negative_slope:</strong> Alternative name for alpha in some implementations</li>
+            <li><strong>negative_slope:</strong> The slope for negative inputs (default: 0.3, typically between 0.01 and 0.3) - called alpha in older Keras versions</li>
           </ul>
-          <p><em>💡 Tip: Start with the default alpha value of 0.3, but if you see many dead neurons, try increasing it; if your model isn't learning well, try decreasing it to 0.01!</em></p>
+          <p><em>💡 Tip: Start with the default negative_slope of 0.3; many architectures also work well with smaller values like 0.01 or 0.1 - treat it as a hyperparameter worth tuning if ReLU gives you dead neurons!</em></p>
         `,
   'PReLU': `
           <h2>PReLU Layer</h2>
@@ -468,27 +462,8 @@ const layerHelp = {
           <h3>Key parameters:</h3>
           <ul>
             <li><strong>alpha:</strong> Scale factor for negative inputs (default: 1.0) - controls how negative the output can be</li>
-            <li><strong>input_shape:</strong> Shape of input data (only needed for first layer in a model)</li>
           </ul>
           <p><em>💡 Tip: ELU often works better than ReLU in hidden layers but is computationally more expensive due to the exponential calculation - use it when accuracy matters more than training speed!</em></p>
-        `,
-  'ThresholdedReLU': `
-          <h2>ThresholdedReLU Layer</h2>
-          <p><strong>What it does:</strong> Applies a thresholded version of ReLU activation where values below a specified threshold are set to zero, while values above it remain unchanged.</p>
-          <h3>How it works:</h3>
-          <p>The layer outputs the input value if it's greater than the threshold, otherwise outputs zero. This creates a "dead zone" below the threshold, helping to filter out small, potentially noisy activations.</p>
-          <h3>When to use:</h3>
-          <ul>
-            <li><strong>Noise reduction:</strong> When you want to suppress small activation values that might represent noise in your data</li>
-            <li><strong>Sparse representations:</strong> To encourage sparsity in neural networks by zeroing out weak activations</li>
-            <li><strong>Feature selection:</strong> When you want only strong features to pass through, filtering out weak signals</li>
-          </ul>
-          <h3>Key parameters:</h3>
-          <ul>
-            <li><strong>theta:</strong> The threshold value (default: 1.0) - activations below this are set to zero</li>
-            <li><strong>name:</strong> Optional name for the layer to identify it in the model</li>
-          </ul>
-          <p><em>💡 Tip: Start with theta=1.0 and adjust based on your activation value ranges - too high and you'll kill too many neurons, too low and it behaves like regular ReLU!</em></p>
         `,
   'ReLU': `
           <h2>ReLU Layer</h2>
@@ -691,8 +666,7 @@ const layerHelp = {
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>inputs:</strong> A list of exactly 2 input tensors with the same shape to be subtracted</li>
-            <li><strong>**kwargs:</strong> Standard layer keyword arguments like name and dtype for layer configuration</li>
+            <li><strong>None:</strong> Subtract has no configurable parameters - it takes exactly two inputs with the same shape and computes (first - second)</li>
           </ul>
           <p><em>💡 Tip: Order matters in subtraction! Make sure your inputs are in the correct order (first - second), as reversing them will flip the sign of your output values.</em></p>
         `,
@@ -709,8 +683,7 @@ const layerHelp = {
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>inputs:</strong> List of input tensors to be averaged (must have the same shape)</li>
-            <li><strong>**kwargs:</strong> Standard layer keyword arguments like name and dtype</li>
+            <li><strong>None:</strong> Average has no configurable parameters - just connect two or more layers with the same output shape into it</li>
           </ul>
           <p><em>💡 Tip: Average is gentler than Add for combining features - it prevents values from growing too large and helps maintain stable activations throughout your network!</em></p>
         `,
@@ -727,8 +700,7 @@ const layerHelp = {
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>inputs:</strong> List of input tensors that must have the same shape</li>
-            <li><strong>**kwargs:</strong> Standard layer keyword arguments like name and dtype</li>
+            <li><strong>None:</strong> Maximum has no configurable parameters - just connect two or more layers with the same output shape into it</li>
           </ul>
           <p><em>💡 Tip: Maximum layers work great for creating "competitive" paths in your network where only the strongest features survive - perfect for attention mechanisms or feature selection!</em></p>
         `,
@@ -745,8 +717,7 @@ const layerHelp = {
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>inputs:</strong> List of input tensors (must have the same shape or be broadcastable)</li>
-            <li><strong>**kwargs:</strong> Standard layer keyword arguments like name and dtype</li>
+            <li><strong>None:</strong> Minimum has no configurable parameters - just connect two or more layers with the same output shape into it</li>
           </ul>
           <p><em>💡 Tip: Use Minimum with a constant tensor to implement upper bounds on activations - this can help prevent exploding gradients while maintaining differentiability!</em></p>
         `,
@@ -763,7 +734,7 @@ const layerHelp = {
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>axes:</strong> Integer or tuple of integers specifying which axes to use for the dot product (default: -1 for last axis)</li>
+            <li><strong>axes:</strong> Integer or tuple of integers specifying which axis of each input to contract over (required - use -1 for the last axis)</li>
             <li><strong>normalize:</strong> Whether to L2-normalize samples along the dot product axis before taking the dot product (useful for cosine similarity)</li>
           </ul>
           <p><em>💡 Tip: Set normalize=True when computing cosine similarity between embeddings - this converts the dot product into a similarity score between -1 and 1!</em></p>
@@ -933,7 +904,7 @@ const layerHelp = {
           <h2>SeparableConv2D Layer</h2>
           <p><strong>What it does:</strong> Performs a depthwise separable convolution that factorizes a standard convolution into a depthwise convolution followed by a pointwise convolution, significantly reducing computational cost.</p>
           <h3>How it works:</h3>
-          <p>First applies a separate filter to each input channel (depthwise convolution), then uses 1x1 convolutions to combine the outputs (pointwise convolution). This decomposition reduces parameters from filters×input_channels×output_channels to filters×input_channels + input_channels×output_channels.</p>
+          <p>First applies a separate spatial filter to each input channel (depthwise convolution), then uses 1x1 convolutions to combine the outputs (pointwise convolution). This decomposition replaces the kernel_size×kernel_size×input_channels×filters weights of a standard convolution with only kernel_size×kernel_size×input_channels + input_channels×filters weights.</p>
           <h3>When to use:</h3>
           <ul>
             <li><strong>Mobile and edge devices:</strong> When you need efficient CNNs with limited computational resources while maintaining good accuracy</li>
@@ -1008,7 +979,7 @@ const layerHelp = {
             <li><strong>strides:</strong> Upsampling factor - stride of 2 doubles spatial dimensions (default: (1,1))</li>
             <li><strong>padding:</strong> 'valid' for no padding, 'same' to maintain size relationship (default: 'valid')</li>
           </ul>
-          <p><em>💡 Tip: Use strides=(2,2) to double spatial dimensions - this is more efficient than upsampling followed by regular convolution, and helps avoid checkerboard artifacts common in image generation!</em></p>
+          <p><em>💡 Tip: Use strides=(2,2) to double spatial dimensions, but watch out for checkerboard artifacts when kernel_size isn't divisible by the stride - UpSampling2D followed by a regular Conv2D is a common artifact-free alternative!</em></p>
         `,
   'Conv1DTranspose': `
           <h2>Conv1DTranspose Layer</h2>
@@ -1026,7 +997,7 @@ const layerHelp = {
             <li><strong>filters:</strong> Number of output filters (channels) - determines the depth of the output feature maps</li>
             <li><strong>kernel_size:</strong> Length of the 1D convolution window - controls the receptive field size</li>
             <li><strong>strides:</strong> Upsampling factor - determines how much the input sequence length is increased (default: 1)</li>
-            <li><strong>padding:</strong> 'valid', 'same', or 'causal' - controls output size and boundary handling</li>
+            <li><strong>padding:</strong> 'valid' (no padding) or 'same' - controls output size and boundary handling</li>
           </ul>
           <p><em>💡 Tip: Use strides > 1 to increase sequence length (e.g., strides=2 roughly doubles the length), but be aware this can create checkerboard artifacts - consider using UpSampling1D followed by regular Conv1D as an alternative!</em></p>
         `,
@@ -1103,7 +1074,6 @@ const layerHelp = {
           <h3>Key parameters:</h3>
           <ul>
             <li><strong>layer:</strong> The layer instance to be applied to every temporal slice (e.g., Dense, Conv2D, etc.)</li>
-            <li><strong>input_shape:</strong> Expected shape of input arrays including the time dimension</li>
           </ul>
           <p><em>💡 Tip: TimeDistributed is especially useful after LSTM/GRU layers with return_sequences=True, allowing you to apply Dense layers to all time steps for sequence-to-sequence models!</em></p>
         `,
@@ -1122,7 +1092,6 @@ const layerHelp = {
           <h3>Key parameters:</h3>
           <ul>
             <li><strong>dims:</strong> Tuple of integers specifying the new order of dimensions (e.g., (2, 1) swaps the last two dimensions)</li>
-            <li><strong>input_shape:</strong> Shape of the input tensor (excluding batch dimension) - only needed for the first layer</li>
           </ul>
           <p><em>💡 Tip: Remember that dimension indices start at 1 (not 0) and don't include the batch dimension - so (2, 1) swaps the second and third dimensions of your actual tensor!</em></p>
         `,
@@ -1177,7 +1146,6 @@ const layerHelp = {
           <h3>Key parameters:</h3>
           <ul>
             <li><strong>mask_value:</strong> The value to be masked (default: 0.0) - timesteps with all features equal to this value will be masked</li>
-            <li><strong>input_shape:</strong> Shape of the input tensor, typically (batch_size, timesteps, features) for sequential data</li>
           </ul>
           <p><em>💡 Tip: Place the Masking layer immediately after your input layer and before any recurrent layers - note that not all layers support masking, so check compatibility with downstream layers!</em></p>
         `,
@@ -1213,7 +1181,7 @@ const layerHelp = {
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>stddev:</strong> Standard deviation of the Gaussian noise distribution (default: 1.0) - higher values add more noise</li>
+            <li><strong>stddev:</strong> Standard deviation of the Gaussian noise distribution (required) - higher values add more noise</li>
             <li><strong>seed:</strong> Random seed for reproducible noise generation (optional)</li>
           </ul>
           <p><em>💡 Tip: Start with small stddev values (0.1-0.3) and gradually increase if needed - too much noise can prevent the model from learning!</em></p>
@@ -1231,7 +1199,7 @@ const layerHelp = {
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>rate:</strong> Float between 0 and 1 representing the standard deviation of the noise distribution (higher values = stronger regularization)</li>
+            <li><strong>rate:</strong> Float between 0 and 1 playing the same role as the Dropout rate - the noise standard deviation is sqrt(rate / (1 - rate)), so higher rates mean stronger regularization</li>
             <li><strong>seed:</strong> Integer to use as random seed for reproducible dropout patterns</li>
           </ul>
           <p><em>💡 Tip: Start with a rate around 0.1-0.3 for gentle regularization - GaussianDropout is often more subtle than standard Dropout, so you may need slightly higher rates for comparable regularization strength!</em></p>
@@ -1240,7 +1208,7 @@ const layerHelp = {
           <h2>AlphaDropout Layer</h2>
           <p><strong>What it does:</strong> Applies dropout regularization while maintaining the self-normalizing property of SELU activations, keeping mean and variance stable.</p>
           <h3>How it works:</h3>
-          <p>During training, randomly sets input units to zero with a given probability, but scales and shifts the remaining values to preserve the mean of 0 and variance of 1. This special dropout variant is designed specifically for Self-Normalizing Neural Networks (SNNs) that use SELU activation functions.</p>
+          <p>During training, randomly sets input units to the negative saturation value of SELU (rather than zero), then applies an affine correction so the outputs keep a mean of 0 and variance of 1. This special dropout variant is designed specifically for Self-Normalizing Neural Networks (SNNs) that use SELU activation functions.</p>
           <h3>When to use:</h3>
           <ul>
             <li><strong>SELU-based networks:</strong> Essential when using SELU activation functions to maintain self-normalization properties</li>
@@ -1249,7 +1217,8 @@ const layerHelp = {
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>rate:</strong> Float between 0 and 1 representing the fraction of input units to drop (default: 0.1)</li>
+            <li><strong>rate:</strong> Float between 0 and 1 representing the fraction of input units to drop (required)</li>
+            <li><strong>noise_shape:</strong> Optional shape of the dropout mask, to share one mask across dimensions</li>
             <li><strong>seed:</strong> Integer to use as random seed for reproducible dropout patterns</li>
           </ul>
           <p><em>💡 Tip: Use AlphaDropout with a rate of 0.05-0.1 for SELU networks - regular Dropout would break the self-normalization, making training unstable!</em></p>
@@ -1312,7 +1281,7 @@ const layerHelp = {
   // Attention
   'MultiHeadAttention': `
           <h2>MultiHeadAttention Layer</h2>
-          <p><strong>What it does:</strong> Applies self-attention mechanism with multiple parallel attention heads to capture different types of relationships between elements in a sequence.</p>
+          <p><strong>What it does:</strong> Applies the attention mechanism from the Transformer with multiple parallel attention heads, capturing different types of relationships between sequence elements (works for both self-attention and cross-attention).</p>
           <h3>How it works:</h3>
           <p>It splits the input into multiple heads, computes scaled dot-product attention for each head independently, then concatenates and projects the results. This allows the model to jointly attend to information from different representation subspaces at different positions.</p>
           <h3>When to use:</h3>
@@ -1343,11 +1312,11 @@ const layerHelp = {
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>use_scale:</strong> Whether to scale the attention scores by 1/sqrt(key_dim) for numerical stability (default: True)</li>
+            <li><strong>use_scale:</strong> Whether to learn a scaling factor that multiplies the attention scores (default: False)</li>
             <li><strong>dropout:</strong> Dropout rate applied to attention weights (0.0 to 1.0) to prevent overfitting</li>
-            <li><strong>score_mode:</strong> How to compute attention scores - 'dot' for dot product or 'concat' for concatenation-based scoring</li>
+            <li><strong>score_mode:</strong> How to compute attention scores - 'dot' for dot product or 'concat' for a tanh of the concatenated query and key</li>
           </ul>
-          <p><em>💡 Tip: Start with use_scale=True for better training stability, especially with longer sequences. Add dropout (0.1-0.2) if your model shows signs of overfitting on the attention patterns!</em></p>
+          <p><em>💡 Tip: Try use_scale=True to let the model calibrate the sharpness of its attention distribution, and add dropout (0.1-0.2) if it shows signs of overfitting on the attention patterns!</em></p>
         `,
   'AdditiveAttention': `
           <h2>AdditiveAttention Layer</h2>
@@ -1362,7 +1331,7 @@ const layerHelp = {
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>use_scale:</strong> Whether to scale the attention scores by the square root of the key dimension (helps with training stability)</li>
+            <li><strong>use_scale:</strong> Whether to learn a scale vector applied to the attention scores (default: True)</li>
             <li><strong>dropout:</strong> Dropout rate applied to attention weights (0.0 to 1.0) to prevent overfitting</li>
           </ul>
           <p><em>💡 Tip: AdditiveAttention often works better than dot-product attention when queries and keys have different dimensions, as it uses a feedforward network to compute compatibility!</em></p>
@@ -1387,47 +1356,6 @@ const layerHelp = {
             <li><strong>scale:</strong> Whether to learn a multiplicative scale parameter (default: True)</li>
           </ul>
           <p><em>💡 Tip: Layer normalization is typically placed after the main computation (like attention or feed-forward) and before the residual connection in transformer blocks!</em></p>
-        `,
-  // Locally Connected
-  'LocallyConnected1D': `
-          <h2>LocallyConnected1D Layer</h2>
-          <p><strong>What it does:</strong> Applies convolution-like operations where each position has its own unique set of filters, unlike standard convolutions that share weights across all positions.</p>
-          <h3>How it works:</h3>
-          <p>Instead of using the same filter weights across the entire input sequence, this layer learns different weights for each spatial position. This creates location-specific feature detectors that can capture position-dependent patterns in your data.</p>
-          <h3>When to use:</h3>
-          <ul>
-            <li><strong>Position-specific patterns:</strong> When different positions in your sequence have fundamentally different meanings (e.g., analyzing fixed-format data where each position represents a different type of measurement)</li>
-            <li><strong>Non-translation invariant tasks:</strong> When the same pattern appearing at different positions should be treated differently (e.g., time series where early vs. late events have different significance)</li>
-            <li><strong>Small, fixed-size inputs:</strong> When working with short sequences where position-specific learning is computationally feasible and beneficial</li>
-          </ul>
-          <h3>Key parameters:</h3>
-          <ul>
-            <li><strong>filters:</strong> Number of output filters (feature maps) to produce at each position</li>
-            <li><strong>kernel_size:</strong> Size of the convolution window for each filter</li>
-            <li><strong>strides:</strong> Step size for moving the convolution window (default is 1)</li>
-            <li><strong>activation:</strong> Activation function to apply to the output (e.g., 'relu', 'sigmoid')</li>
-          </ul>
-          <p><em>💡 Tip: LocallyConnected1D uses significantly more parameters than Conv1D since weights aren't shared - only use it when position-specific features are crucial and your input size is relatively small!</em></p>
-        `,
-  'LocallyConnected2D': `
-          <h2>LocallyConnected2D Layer</h2>
-          <p><strong>What it does:</strong> Applies a locally connected operation over a 2D input where each output position has its own unique set of weights (unlike Conv2D which shares weights across all positions).</p>
-          <h3>How it works:</h3>
-          <p>Similar to a convolution layer, but without weight sharing - each spatial location learns its own set of filters. This means the layer has significantly more parameters than a standard Conv2D layer with the same filter size.</p>
-          <h3>When to use:</h3>
-          <ul>
-            <li><strong>Face recognition tasks:</strong> Different facial regions may need specialized feature detectors (eyes, nose, mouth)</li>
-            <li><strong>Non-translation invariant patterns:</strong> When features at different spatial locations have fundamentally different characteristics</li>
-            <li><strong>Small, fixed-size inputs:</strong> Works best when input dimensions are consistent and relatively small</li>
-          </ul>
-          <h3>Key parameters:</h3>
-          <ul>
-            <li><strong>filters:</strong> Number of output filters (feature maps) to produce</li>
-            <li><strong>kernel_size:</strong> Size of the local receptive field (e.g., (3, 3) for a 3x3 window)</li>
-            <li><strong>strides:</strong> Step size for moving the kernel across the input (default: (1, 1))</li>
-            <li><strong>padding:</strong> Either 'valid' (no padding) or 'same' (preserve spatial dimensions)</li>
-          </ul>
-          <p><em>💡 Tip: LocallyConnected2D uses much more memory than Conv2D due to unique weights per position - only use it when you specifically need location-dependent features, not for general image processing!</em></p>
         `,
   // Preprocessing
   'Rescaling': `
@@ -1472,7 +1400,7 @@ const layerHelp = {
           <h2>RandomFlip Layer</h2>
           <p><strong>What it does:</strong> Randomly flips images horizontally and/or vertically during training to augment the dataset and improve model generalization.</p>
           <h3>How it works:</h3>
-          <p>The layer applies random horizontal and/or vertical flipping to input images based on specified probabilities. Each flip operation mirrors the image along the respective axis, creating new variations of the original data during training.</p>
+          <p>During training, each image is flipped along the configured axis with a 50% chance. Each flip operation mirrors the image along the respective axis, creating new variations of the original data, while inference leaves images untouched.</p>
           <h3>When to use:</h3>
           <ul>
             <li><strong>Data augmentation:</strong> When you have limited training images and need to artificially increase dataset variety</li>
@@ -1518,8 +1446,8 @@ const layerHelp = {
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>height_factor:</strong> Range for vertical zoom (e.g., 0.2 means zoom between 80% and 120%)</li>
-            <li><strong>width_factor:</strong> Range for horizontal zoom (use None to match height_factor for uniform scaling)</li>
+            <li><strong>height_factor:</strong> Range for vertical zoom (e.g., 0.2 samples in [-0.2, 0.2], where negative values zoom in and positive values zoom out)</li>
+            <li><strong>width_factor:</strong> Range for horizontal zoom (leave as None to preserve the aspect ratio by reusing the height zoom)</li>
             <li><strong>fill_mode:</strong> How to fill empty pixels when zooming out ('reflect', 'constant', 'wrap', or 'nearest')</li>
             <li><strong>interpolation:</strong> Resampling method ('bilinear' or 'nearest') for pixel interpolation</li>
           </ul>
@@ -1557,10 +1485,11 @@ const layerHelp = {
           </ul>
           <h3>Key parameters:</h3>
           <ul>
-            <li><strong>factor:</strong> A float or tuple of two floats representing the contrast range (e.g., 0.5 to 1.5 where 1.0 is no change)</li>
+            <li><strong>factor:</strong> A float or pair of floats setting the adjustment range - a factor of 0.2 means the contrast multiplier is sampled from [0.8, 1.2]</li>
+            <li><strong>value_range:</strong> The range of pixel values in your images, typically [0, 255] or [0, 1]</li>
             <li><strong>seed:</strong> Random seed for reproducible augmentations during experiments</li>
           </ul>
-          <p><em>💡 Tip: Start with a moderate range like (0.7, 1.3) and adjust based on your dataset - too extreme values might make features unrecognizable!</em></p>
+          <p><em>💡 Tip: Start with a moderate factor like 0.2-0.3 and adjust based on your dataset - too extreme values might make features unrecognizable!</em></p>
         `,
   'RandomBrightness': `
           <h2>RandomBrightness Layer</h2>
@@ -1580,43 +1509,6 @@ const layerHelp = {
             <li><strong>seed:</strong> Random seed for reproducible augmentation patterns during testing</li>
           </ul>
           <p><em>💡 Tip: Start with a moderate factor like 0.2 - too high values (>0.5) can make images unnaturally dark or washed out, potentially hurting model performance!</em></p>
-        `,
-  'RandomHeight': `
-          <h2>RandomHeight Layer</h2>
-          <p><strong>What it does:</strong> Randomly adjusts the height of input images during training by stretching or compressing them vertically within a specified range.</p>
-          <h3>How it works:</h3>
-          <p>The layer randomly samples a height scaling factor from the specified range and resizes the image vertically while maintaining the original width. This transformation is applied differently to each image in a batch and changes between training epochs.</p>
-          <h3>When to use:</h3>
-          <ul>
-            <li><strong>Data augmentation:</strong> Increase training data variety to improve model generalization and reduce overfitting</li>
-            <li><strong>Object detection tasks:</strong> Help models become invariant to different object scales and aspect ratios</li>
-            <li><strong>Limited training data:</strong> Artificially expand your dataset when you have few training images</li>
-          </ul>
-          <h3>Key parameters:</h3>
-          <ul>
-            <li><strong>factor:</strong> A float or tuple of floats representing the height scaling range (e.g., 0.2 or (-0.2, 0.2) for ±20% height change)</li>
-            <li><strong>interpolation:</strong> The interpolation method for resizing ('bilinear', 'nearest', 'bicubic', etc.)</li>
-          </ul>
-          <p><em>💡 Tip: Use moderate factor values (0.1-0.3) to avoid extreme distortions that might confuse your model, and always apply this layer only during training, not during inference!</em></p>
-        `,
-  'RandomWidth': `
-          <h2>RandomWidth Layer</h2>
-          <p><strong>What it does:</strong> Randomly adjusts the width of input images during training by horizontally stretching or compressing them within a specified range.</p>
-          <h3>How it works:</h3>
-          <p>The layer randomly scales images horizontally by a factor sampled uniformly from the specified range, while keeping the height unchanged. This transformation is applied independently to each image in the batch during training, but is disabled during inference.</p>
-          <h3>When to use:</h3>
-          <ul>
-            <li><strong>Data augmentation:</strong> Increase training data diversity to improve model generalization and reduce overfitting</li>
-            <li><strong>Object detection tasks:</strong> Help models become robust to objects appearing at different aspect ratios</li>
-            <li><strong>Limited dataset scenarios:</strong> Artificially expand your training set when you have insufficient image samples</li>
-          </ul>
-          <h3>Key parameters:</h3>
-          <ul>
-            <li><strong>factor:</strong> A float or tuple of two floats representing the width adjustment range (e.g., 0.2 means ±20% width change)</li>
-            <li><strong>interpolation:</strong> Resampling method used when resizing ('bilinear', 'nearest', 'bicubic', etc.)</li>
-            <li><strong>seed:</strong> Random seed for reproducible augmentations during training</li>
-          </ul>
-          <p><em>💡 Tip: Use moderate factor values (0.1-0.3) to avoid excessive distortion that might confuse the model - start small and increase gradually if needed!</em></p>
         `,
   'RandomCrop': `
           <h2>RandomCrop Layer</h2>
@@ -1641,7 +1533,7 @@ const layerHelp = {
           <h2>CenterCrop Layer</h2>
           <p><strong>What it does:</strong> Crops the central region of input images to a specified target height and width.</p>
           <h3>How it works:</h3>
-          <p>The layer calculates the center point of the input image and extracts a rectangular region of the specified dimensions around it. If the target size is larger than the input, the image is padded instead.</p>
+          <p>The layer calculates the center point of the input image and extracts a rectangular region of the specified dimensions around it. If the input is smaller than the target size, the image is resized instead so that the largest possible window with the target aspect ratio is returned.</p>
           <h3>When to use:</h3>
           <ul>
             <li><strong>Standardizing input sizes:</strong> When you need all images to have the same dimensions for batch processing</li>
@@ -1747,7 +1639,7 @@ const layerHelp = {
           <h3>Key parameters:</h3>
           <ul>
             <li><strong>bin_boundaries:</strong> A list of boundary values that define the edges of each bin (e.g., [0, 10, 20, 30] creates 4 bins)</li>
-            <li><strong>num_bins:</strong> Alternative to bin_boundaries - automatically creates this many equal-width bins based on the data range</li>
+            <li><strong>num_bins:</strong> Alternative to bin_boundaries - the layer learns this many quantile-based bins when you call adapt() on training data</li>
             <li><strong>output_mode:</strong> How to represent the output - "int" for integer indices, "one_hot" for one-hot encoded vectors, or "multi_hot" for multi-hot encoding</li>
           </ul>
           <p><em>💡 Tip: Use adapt() method on your training data to automatically compute optimal bin boundaries based on quantiles, ensuring balanced distribution across bins!</em></p>
@@ -1787,7 +1679,6 @@ const layerHelp = {
           <h3>Key parameters:</h3>
           <ul>
             <li><strong>axis:</strong> Integer or list of integers specifying which axis to normalize along (default: -1 for last axis)</li>
-            <li><strong>epsilon:</strong> Small value added to denominator to avoid division by zero (default: 1e-7)</li>
           </ul>
           <p><em>💡 Tip: Place UnitNormalization after your final embedding layer when building similarity-based models - it makes distance metrics like cosine similarity much more effective!</em></p>
         `,
@@ -1831,6 +1722,758 @@ const layerHelp = {
             <li><strong>crop_to_aspect_ratio:</strong> If True, crops the image to match the target aspect ratio before resizing</li>
           </ul>
           <p><em>💡 Tip: Use 'bilinear' interpolation for smooth results in most cases, but switch to 'nearest' when resizing masks or categorical labels to preserve exact values!</em></p>
+        `,
+  // More Recurrent
+  'ConvLSTM1D': `
+          <h2>ConvLSTM1D Layer</h2>
+          <p><strong>What it does:</strong> Combines an LSTM with 1D convolutions to process sequences of 1D feature maps, learning temporal patterns while preserving local spatial structure.</p>
+          <h3>How it works:</h3>
+          <p>It works like an LSTM, but the input-to-state and state-to-state transformations are 1D convolutions instead of matrix multiplications. This lets each timestep be a 1D signal (like a sensor array or audio frame) whose local structure is kept while the gates decide what to remember over time.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Multi-sensor time series:</strong> Sequences where each timestep is itself a spatially ordered 1D array of measurements</li>
+            <li><strong>Audio and signal forecasting:</strong> Predicting future frames of spectrogram slices or waveform windows</li>
+            <li><strong>Spatiotemporal 1D data:</strong> Any data with one spatial dimension evolving over time, like traffic along a road</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>filters:</strong> Number of output filters in the convolutions (determines feature maps)</li>
+            <li><strong>kernel_size:</strong> Length of the 1D convolution window applied at each timestep</li>
+            <li><strong>return_sequences:</strong> Whether to return the full sequence (True) or just the last output (False)</li>
+            <li><strong>padding:</strong> 'same' to maintain the spatial length or 'valid' for no padding</li>
+          </ul>
+          <p><em>💡 Tip: Set return_sequences=True when stacking multiple ConvLSTM1D layers, and start with small kernels (3 or 5) to keep the recurrent computation affordable!</em></p>
+        `,
+  'ConvLSTM3D': `
+          <h2>ConvLSTM3D Layer</h2>
+          <p><strong>What it does:</strong> Combines an LSTM with 3D convolutions to process sequences of volumetric data, capturing temporal dynamics while preserving 3D spatial structure.</p>
+          <h3>How it works:</h3>
+          <p>It works like an LSTM, but the input-to-state and state-to-state transformations are 3D convolutions instead of matrix multiplications. Each timestep is a full 3D volume, and the LSTM gates control which volumetric features are remembered or forgotten across the sequence.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>4D medical imaging:</strong> Analyzing how 3D scans (CT, MRI) evolve over time, such as cardiac motion sequences</li>
+            <li><strong>Volumetric simulations:</strong> Forecasting fluid dynamics, weather volumes, or other physical fields over time</li>
+            <li><strong>Long video volumes:</strong> Modeling sequences where each element is a 3D block of video data</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>filters:</strong> Number of output filters in the convolutions (determines feature maps)</li>
+            <li><strong>kernel_size:</strong> Size of the 3D convolution window (depth, height, width)</li>
+            <li><strong>return_sequences:</strong> Whether to return the full sequence (True) or just the last output (False)</li>
+            <li><strong>padding:</strong> 'same' to maintain spatial dimensions or 'valid' for no padding</li>
+          </ul>
+          <p><em>💡 Tip: ConvLSTM3D is very memory-hungry - keep filters low, use small kernels like (3,3,3), and downsample your volumes before this layer if you hit memory limits!</em></p>
+        `,
+  'RNN': `
+          <h2>RNN Layer</h2>
+          <p><strong>What it does:</strong> A generic recurrent wrapper that runs any RNN cell (or stack of cells) across the timesteps of a sequence.</p>
+          <h3>How it works:</h3>
+          <p>The layer iterates over the time dimension of the input, feeding each timestep and the previous state into the provided cell, which returns an output and a new state. LSTM, GRU and SimpleRNN are essentially this wrapper combined with their respective cells - RNN lets you do the same with custom or stacked cells.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Custom recurrent cells:</strong> When you have implemented your own cell logic and need it applied across a sequence</li>
+            <li><strong>Stacked cells:</strong> Combine with StackedRNNCells to run several cells as one deep recurrent step</li>
+            <li><strong>Research architectures:</strong> Experimenting with novel recurrence without rewriting the time-loop machinery</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>cell:</strong> The RNN cell instance (e.g., LSTMCell, GRUCell, SimpleRNNCell) or list of cells to drive</li>
+            <li><strong>return_sequences:</strong> Whether to return the output at every timestep (True) or only the last one (False)</li>
+            <li><strong>return_state:</strong> Whether to also return the final internal state(s)</li>
+            <li><strong>go_backwards:</strong> Process the sequence in reverse order when True</li>
+          </ul>
+          <p><em>💡 Tip: For standard architectures prefer the ready-made LSTM/GRU layers - they use the same logic but with fused, backend-optimized implementations that are much faster!</em></p>
+        `,
+  'SimpleRNNCell': `
+          <h2>SimpleRNNCell Layer</h2>
+          <p><strong>What it does:</strong> The single-timestep computation of a SimpleRNN - it processes one input step and one previous state, producing one output and the next state.</p>
+          <h3>How it works:</h3>
+          <p>The cell combines the current input with the previous hidden state through learned weights and applies an activation function. Unlike the SimpleRNN layer, it does not loop over time itself - wrap it in an RNN layer to apply it across a whole sequence.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Inside an RNN wrapper:</strong> As the cell driving a generic RNN layer over sequences</li>
+            <li><strong>Stacked recurrent steps:</strong> Combined with other cells via StackedRNNCells for deep recurrence within one time loop</li>
+            <li><strong>Custom decoding loops:</strong> When you need manual step-by-step control, such as autoregressive generation</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>units:</strong> Number of hidden units (dimensionality of output and state)</li>
+            <li><strong>activation:</strong> Activation function applied to the new state (default: 'tanh')</li>
+            <li><strong>dropout:</strong> Fraction of input units to drop for regularization</li>
+            <li><strong>recurrent_dropout:</strong> Fraction of recurrent-state units to drop for regularization</li>
+          </ul>
+          <p><em>💡 Tip: If you just want a standard recurrent layer over a sequence, use SimpleRNN directly - only reach for the cell when you need the RNN wrapper's flexibility!</em></p>
+        `,
+  'LSTMCell': `
+          <h2>LSTMCell Layer</h2>
+          <p><strong>What it does:</strong> The single-timestep computation of an LSTM - it processes one input step with the previous hidden and cell states, producing an output and updated states.</p>
+          <h3>How it works:</h3>
+          <p>The cell applies the LSTM's input, forget, and output gates to decide what to add to, remove from, and read out of its memory cell for a single timestep. Wrap it in an RNN layer to apply it across a whole sequence.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Inside an RNN wrapper:</strong> As the cell driving a generic RNN layer when you need LSTM behavior with extra flexibility</li>
+            <li><strong>Stacked recurrent steps:</strong> Combined via StackedRNNCells to build deep LSTM recurrence within one time loop</li>
+            <li><strong>Custom decoding loops:</strong> Step-by-step generation where you manually feed each output back as the next input</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>units:</strong> Number of LSTM units (dimensionality of output and states)</li>
+            <li><strong>activation:</strong> Activation for the candidate/output state (default: 'tanh')</li>
+            <li><strong>recurrent_activation:</strong> Activation for the gates (default: 'sigmoid')</li>
+            <li><strong>unit_forget_bias:</strong> Add 1 to the forget gate bias at initialization to encourage remembering early in training (default: True)</li>
+          </ul>
+          <p><em>💡 Tip: For ordinary sequence processing use the LSTM layer instead - it wraps this same cell with a much faster fused implementation!</em></p>
+        `,
+  'GRUCell': `
+          <h2>GRUCell Layer</h2>
+          <p><strong>What it does:</strong> The single-timestep computation of a GRU - it processes one input step and one previous state, producing one output and the next state.</p>
+          <h3>How it works:</h3>
+          <p>The cell applies the GRU's update and reset gates to blend the previous state with a candidate state computed from the current input. Wrap it in an RNN layer to apply it across a whole sequence.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Inside an RNN wrapper:</strong> As the cell driving a generic RNN layer when you want GRU behavior with extra flexibility</li>
+            <li><strong>Stacked recurrent steps:</strong> Combined via StackedRNNCells to build deep GRU recurrence within one time loop</li>
+            <li><strong>Custom decoding loops:</strong> Manual step-by-step control, such as autoregressive sequence generation</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>units:</strong> Number of GRU units (dimensionality of output and state)</li>
+            <li><strong>activation:</strong> Activation for the candidate state (default: 'tanh')</li>
+            <li><strong>recurrent_activation:</strong> Activation for the gates (default: 'sigmoid')</li>
+            <li><strong>reset_after:</strong> Whether to apply the reset gate after the matrix multiplication (default: True, required for cuDNN compatibility)</li>
+          </ul>
+          <p><em>💡 Tip: For ordinary sequence processing use the GRU layer instead - it wraps this same cell with a much faster fused implementation!</em></p>
+        `,
+  'StackedRNNCells': `
+          <h2>StackedRNNCells Layer</h2>
+          <p><strong>What it does:</strong> Bundles a list of RNN cells so they behave as one single deep cell, where each timestep flows through all cells in order.</p>
+          <h3>How it works:</h3>
+          <p>At every timestep, the input passes through the first cell, its output feeds the second cell, and so on - each cell keeping its own internal state. Wrapped in an RNN layer, this gives a deep recurrent network in a single efficient time loop instead of stacking separate recurrent layers.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Deep recurrence:</strong> Building multi-layer recurrent processing inside one RNN wrapper</li>
+            <li><strong>Mixed cell types:</strong> Combining different cells (e.g., an LSTMCell followed by a GRUCell) in a single recurrent step</li>
+            <li><strong>Custom decoding stacks:</strong> Autoregressive decoders that need several cell layers applied per generated token</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>cells:</strong> The list of RNN cell instances to stack, applied in order at each timestep</li>
+          </ul>
+          <p><em>💡 Tip: For most models, simply stacking LSTM/GRU layers with return_sequences=True is equivalent and easier to read - use StackedRNNCells when you need the combined stack to act as one cell!</em></p>
+        `,
+  'DepthwiseConv1D': `
+          <h2>DepthwiseConv1D Layer</h2>
+          <p><strong>What it does:</strong> Performs a depthwise convolution on 1D data, applying a separate convolutional filter to each input channel independently without mixing channels.</p>
+          <h3>How it works:</h3>
+          <p>Instead of combining information across all input channels like a regular Conv1D, it slides an independent kernel along each channel of the sequence. Each input channel produces depth_multiplier output channels, using far fewer parameters than a standard convolution.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Efficient sequence models:</strong> Lightweight audio, sensor, or text models for mobile and edge deployment</li>
+            <li><strong>Separable convolution blocks:</strong> As the spatial half of a depthwise-separable pattern, followed by a 1x1 Conv1D to mix channels</li>
+            <li><strong>Per-channel filtering:</strong> When each feature channel should be smoothed or filtered independently over time</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>kernel_size:</strong> Length of the 1D convolution window</li>
+            <li><strong>strides:</strong> Step size for moving the filter along the sequence (default: 1)</li>
+            <li><strong>padding:</strong> 'valid' for no padding or 'same' to preserve the sequence length</li>
+            <li><strong>depth_multiplier:</strong> Number of output channels generated per input channel (default: 1)</li>
+          </ul>
+          <p><em>💡 Tip: Follow DepthwiseConv1D with a kernel_size=1 Conv1D (pointwise convolution) to recombine channels - together they approximate a full Conv1D at a fraction of the cost!</em></p>
+        `,
+  // More Core
+  'Identity': `
+          <h2>Identity Layer</h2>
+          <p><strong>What it does:</strong> Passes its input through completely unchanged - a no-op layer with no weights and no computation.</p>
+          <h3>How it works:</h3>
+          <p>The layer simply returns the input tensor as its output. It exists purely as a structural building block, giving you a named node in the graph without altering the data flowing through it.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Placeholders in architectures:</strong> Reserve a spot where you might later swap in a real layer (e.g., replacing a normalization or activation during experiments)</li>
+            <li><strong>Skip-connection branches:</strong> Make the "do nothing" branch of a residual block explicit</li>
+            <li><strong>Graph organization:</strong> Add a named point to inspect or tap intermediate tensors</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>None:</strong> Identity has no configurable parameters - input and output are exactly the same tensor</li>
+          </ul>
+          <p><em>💡 Tip: Identity is handy for A/B experiments - keep the model topology fixed and swap Identity in or out for the layer you're ablating!</em></p>
+        `,
+  'EinsumDense': `
+          <h2>EinsumDense Layer</h2>
+          <p><strong>What it does:</strong> A generalized Dense layer that expresses its computation as an einsum equation, allowing arbitrary tensor contractions with learnable weights.</p>
+          <h3>How it works:</h3>
+          <p>You describe the transformation with einstein-summation notation such as "ab,bc->ac" - the layer creates a weight tensor matching the equation and contracts the input with it, optionally adding a bias on chosen axes. This makes it possible to apply dense projections to specific dimensions of high-rank tensors without reshaping.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Transformer internals:</strong> Query/key/value and output projections in attention blocks are commonly EinsumDense layers</li>
+            <li><strong>Per-dimension projections:</strong> Projecting only one axis of a 3D+ tensor (e.g., the feature axis of a sequence) without flattening</li>
+            <li><strong>Weight-efficient custom ops:</strong> Any learned linear map that plain Dense cannot express directly</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>equation:</strong> The einsum equation describing the contraction (e.g., "abc,cd->abd"); may include "..." for batch dimensions</li>
+            <li><strong>output_shape:</strong> Expected output shape, excluding batch and any dimension fixed by the equation</li>
+            <li><strong>bias_axes:</strong> String naming which output axes receive a bias term (e.g., "d"), or None for no bias</li>
+            <li><strong>activation:</strong> Optional activation applied to the result</li>
+          </ul>
+          <p><em>💡 Tip: For a plain feature transformation, stick with Dense - reach for EinsumDense when you need to project a specific axis of a multi-dimensional tensor!</em></p>
+        `,
+  'ReversibleEmbedding': `
+          <h2>ReversibleEmbedding Layer</h2>
+          <p><strong>What it does:</strong> An embedding layer that can also run in reverse, projecting hidden states back onto the vocabulary to produce logits - the "tied weights" trick used by many language models.</p>
+          <h3>How it works:</h3>
+          <p>In the forward direction it works like a standard Embedding, mapping token IDs to dense vectors. Called with reverse=True, it multiplies hidden states by the (transposed) embedding matrix instead, turning them into one score per vocabulary entry, so the same weights serve for both input embedding and output projection.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Language models:</strong> Share weights between the token embedding and the final logit projection to save parameters</li>
+            <li><strong>Sequence-to-sequence decoders:</strong> Any decoder that maps hidden states back to token probabilities</li>
+            <li><strong>Memory-constrained NLP:</strong> Weight tying can remove a vocabulary-sized matrix from your parameter count</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>input_dim:</strong> Size of the vocabulary</li>
+            <li><strong>output_dim:</strong> Dimension of the embedding vectors</li>
+            <li><strong>tie_weights:</strong> Whether the reverse projection reuses the embedding matrix (True) or learns a separate one (False)</li>
+            <li><strong>logit_soft_cap:</strong> Optional value used to smoothly cap the reverse-mode logits (as in some modern LLMs)</li>
+          </ul>
+          <p><em>💡 Tip: Weight tying both shrinks the model and often improves perplexity in language modeling - keep tie_weights=True unless you have a reason not to!</em></p>
+        `,
+  // More Attention
+  'GroupQueryAttention': `
+          <h2>GroupQueryAttention Layer</h2>
+          <p><strong>What it does:</strong> A variant of multi-head attention where several query heads share each key/value head, cutting memory and compute while keeping most of the quality.</p>
+          <h3>How it works:</h3>
+          <p>Queries are split into num_query_heads heads, but keys and values only get num_key_value_heads heads - each key/value head is shared by a group of query heads. With one key/value head this becomes multi-query attention; with equal counts it matches standard multi-head attention.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Large language models:</strong> The standard attention used by many modern LLMs to shrink the key/value cache during generation</li>
+            <li><strong>Long sequences:</strong> When attention memory dominates and you need cheaper key/value storage</li>
+            <li><strong>Fast inference:</strong> Autoregressive decoding where key/value cache bandwidth is the bottleneck</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>head_dim:</strong> Size of each attention head</li>
+            <li><strong>num_query_heads:</strong> Number of query heads (must be a multiple of num_key_value_heads)</li>
+            <li><strong>num_key_value_heads:</strong> Number of shared key/value heads</li>
+            <li><strong>dropout:</strong> Dropout rate applied to the attention scores</li>
+          </ul>
+          <p><em>💡 Tip: A common sweet spot is grouping 4-8 query heads per key/value head - you keep most of full multi-head quality while significantly reducing the KV-cache size!</em></p>
+        `,
+  // More Normalization
+  'RMSNormalization': `
+          <h2>RMSNormalization Layer</h2>
+          <p><strong>What it does:</strong> Normalizes activations by their root-mean-square (RMS) value and applies a learnable scale, without subtracting the mean like LayerNormalization does.</p>
+          <h3>How it works:</h3>
+          <p>For each sample, the layer divides the values along the chosen axis by sqrt(mean(x²) + epsilon) and multiplies by a learned scale vector. Skipping the mean-centering and bias makes it cheaper than LayerNormalization while stabilizing training almost as well.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Modern transformer blocks:</strong> RMSNorm is the normalization used in many recent LLM architectures (LLaMA-style models)</li>
+            <li><strong>Compute-sensitive models:</strong> When you want LayerNorm-like stability with fewer operations</li>
+            <li><strong>Deep sequence models:</strong> As a drop-in alternative to LayerNormalization in pre-norm residual blocks</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>axis:</strong> The axis (or axes) along which to compute the RMS statistic (default: -1)</li>
+            <li><strong>epsilon:</strong> Small constant added inside the square root for numerical stability (default: 1e-6)</li>
+          </ul>
+          <p><em>💡 Tip: If you're reproducing a modern transformer paper, check which norm it uses - many post-2022 LLMs specify RMSNorm rather than LayerNorm, and swapping them changes results!</em></p>
+        `,
+  'SpectralNormalization': `
+          <h2>SpectralNormalization Layer</h2>
+          <p><strong>What it does:</strong> Wraps another layer (like Dense or Conv2D) and rescales its weights by their largest singular value, constraining the layer's Lipschitz constant.</p>
+          <h3>How it works:</h3>
+          <p>Before each forward pass, the wrapper estimates the spectral norm (largest singular value) of the wrapped layer's weight matrix using power iteration, then divides the weights by it. This keeps the layer from amplifying its inputs too much, which stabilizes adversarial training.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>GAN discriminators:</strong> The classic use - spectral normalization is a standard trick for stable GAN training</li>
+            <li><strong>Lipschitz-constrained models:</strong> When your method requires bounding how much a layer can stretch its inputs</li>
+            <li><strong>Training instability:</strong> As a regularizer when exploding activations plague adversarial or contrastive setups</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>layer:</strong> The layer instance whose kernel should be spectrally normalized</li>
+            <li><strong>power_iterations:</strong> Number of power-iteration steps per pass used to estimate the spectral norm (default: 1)</li>
+          </ul>
+          <p><em>💡 Tip: One power iteration per step is usually enough because the estimate is refined continuously during training - increase it only if training remains unstable!</em></p>
+        `,
+  // More Preprocessing
+  'HashedCrossing': `
+          <h2>HashedCrossing Layer</h2>
+          <p><strong>What it does:</strong> Crosses two categorical features into a single combined feature by hashing the value pairs into a fixed number of bins.</p>
+          <h3>How it works:</h3>
+          <p>The layer takes a pair of categorical inputs, combines each pair of values, and hashes the combination into an integer between 0 and num_bins - 1. This captures interactions between the two features (e.g., country × device) without building an explicit vocabulary of all combinations.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Feature interactions in tabular data:</strong> When the combination of two categories is more predictive than either alone</li>
+            <li><strong>Recommender systems:</strong> Crossing user attributes with item attributes into compact interaction features</li>
+            <li><strong>High-cardinality pairs:</strong> When enumerating every possible category combination would be infeasible</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>num_bins:</strong> Number of hash bins for the crossed feature - the output values fall in [0, num_bins)</li>
+            <li><strong>output_mode:</strong> 'int' for bin indices or 'one_hot' for one-hot encoded vectors</li>
+            <li><strong>sparse:</strong> Whether to return sparse tensors in 'one_hot' mode (TensorFlow backend only)</li>
+          </ul>
+          <p><em>💡 Tip: Choose num_bins large enough to limit collisions between important category pairs, then feed the result into an Embedding layer to learn a dense representation of the cross!</em></p>
+        `,
+  'Pipeline': `
+          <h2>Pipeline Layer</h2>
+          <p><strong>What it does:</strong> Chains a list of preprocessing layers into one composite layer that applies them in order.</p>
+          <h3>How it works:</h3>
+          <p>Each incoming batch flows through the listed layers sequentially, exactly like a small Sequential model dedicated to preprocessing. It is designed for image preprocessing and augmentation stacks and works well inside tf.data input pipelines.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Augmentation stacks:</strong> Bundle RandomFlip, RandomRotation, RandomZoom, etc. into a single reusable unit</li>
+            <li><strong>Consistent preprocessing:</strong> Keep resizing, rescaling, and normalization together so training and inference share one definition</li>
+            <li><strong>Cleaner architectures:</strong> Reduce clutter when many preprocessing steps precede the actual network</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>layers:</strong> The list of preprocessing layer instances to apply, in order</li>
+          </ul>
+          <p><em>💡 Tip: Unlike a general Sequential model, Pipeline is meant for preprocessing only - keep trainable layers out of it and let it own everything that happens before your first real layer!</em></p>
+        `,
+  // Object Detection
+  'MaxNumBoundingBoxes': `
+          <h2>MaxNumBoundingBoxes Layer</h2>
+          <p><strong>What it does:</strong> Ensures every sample carries the same number of bounding-box annotations by padding or truncating box lists to a fixed maximum.</p>
+          <h3>How it works:</h3>
+          <p>Object-detection samples naturally have varying numbers of boxes, which prevents batching into fixed-shape tensors. This layer clips samples that have more than max_number boxes and pads the rest with fill_value entries so boxes and labels always have identical shapes.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Object-detection pipelines:</strong> Right before batching, so images with different box counts can form one tensor</li>
+            <li><strong>Detection augmentation chains:</strong> After augmentations that may add or drop boxes, to restore a fixed shape</li>
+            <li><strong>Fixed-shape exports:</strong> When the training loop or accelerator requires static tensor shapes</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>max_number:</strong> The fixed number of bounding boxes each sample will have after padding/truncation</li>
+            <li><strong>fill_value:</strong> Value used for the padded box entries (default: -1, easy to mask out later)</li>
+          </ul>
+          <p><em>💡 Tip: Set max_number comfortably above the realistic box count of your dataset - truncation silently drops ground-truth objects, which hurts training more than a little padding!</em></p>
+        `,
+  // Audio
+  'MelSpectrogram': `
+          <h2>MelSpectrogram Layer</h2>
+          <p><strong>What it does:</strong> Converts raw audio waveforms into mel spectrograms - a time-frequency image representation aligned with human pitch perception.</p>
+          <h3>How it works:</h3>
+          <p>The layer applies a Short-Time Fourier Transform to the signal, maps the resulting frequency bins onto the mel scale with a filter bank, and optionally converts the magnitudes to decibels. The output is a 2D feature map (mel bins × time frames) ready for convolutional or recurrent processing.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Speech recognition:</strong> The standard front-end feature for speech and keyword-spotting models</li>
+            <li><strong>Audio classification:</strong> Turn sounds, music, or environmental audio into images for CNNs</li>
+            <li><strong>End-to-end audio models:</strong> Keep feature extraction inside the model so raw audio goes in and predictions come out</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>fft_length:</strong> Size of the FFT window (default: 2048)</li>
+            <li><strong>sequence_stride:</strong> Hop length in samples between successive frames (default: 512)</li>
+            <li><strong>num_mel_bins:</strong> Number of mel frequency bands in the output (default: 128)</li>
+            <li><strong>sampling_rate:</strong> Sample rate of the input audio in Hz (default: 16000)</li>
+            <li><strong>power_to_db:</strong> Whether to convert the mel spectrogram to decibel scale (default: True)</li>
+          </ul>
+          <p><em>💡 Tip: Make sure sampling_rate matches your actual audio - a mismatch silently shifts every mel filter and can noticeably degrade accuracy!</em></p>
+        `,
+  'STFTSpectrogram': `
+          <h2>STFTSpectrogram Layer</h2>
+          <p><strong>What it does:</strong> Computes Short-Time Fourier Transform spectrograms from raw 1D signals, exposing frame length, step, and windowing as layer configuration.</p>
+          <h3>How it works:</h3>
+          <p>The signal is split into overlapping frames of frame_length samples (advancing by frame_step), each frame is windowed and transformed to the frequency domain, and the result is returned as magnitude, log, or power-spectral-density features depending on mode. The STFT kernels are implemented as convolution weights, and can even be made trainable.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Signal analysis models:</strong> Audio, vibration, EEG, or radio signals where frequency content over time matters</li>
+            <li><strong>Custom audio front-ends:</strong> When you want raw linear-frequency spectrograms instead of mel features</li>
+            <li><strong>2D processing of sound:</strong> With expand_dims=True the output gains a channel axis, ready for Conv2D stacks</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>mode:</strong> Output type - 'log' (default), 'magnitude', 'psd', or raw real/imaginary parts</li>
+            <li><strong>frame_length:</strong> Number of samples per analysis frame (default: 256)</li>
+            <li><strong>frame_step:</strong> Hop size in samples between frames (defaults to a fraction of frame_length)</li>
+            <li><strong>window:</strong> Window function applied to each frame (default: 'hann')</li>
+            <li><strong>expand_dims:</strong> Add a trailing channel dimension so the output can feed Conv2D layers (default: False)</li>
+          </ul>
+          <p><em>💡 Tip: Longer frames give finer frequency resolution but blurrier timing, shorter frames the reverse - pick frame_length based on which matters more for your signals!</em></p>
+        `,
+  // More Image Augmentation
+  'AugMix': `
+          <h2>AugMix Layer</h2>
+          <p><strong>What it does:</strong> Applies the AugMix augmentation scheme, blending several randomly composed augmentation chains into each image to improve robustness.</p>
+          <h3>How it works:</h3>
+          <p>For every image, the layer builds num_chains parallel chains of up to chain_depth random operations (translations, shears, contrast changes, etc.), applies each chain to a copy of the image, and mixes the results together with the original using random convex weights. The output stays close to the data distribution while being much more varied than single transforms.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Robustness to corruptions:</strong> AugMix was designed to improve accuracy on shifted or corrupted test data</li>
+            <li><strong>Strong general-purpose augmentation:</strong> A good default when simple flips and crops stop helping</li>
+            <li><strong>Small datasets:</strong> Extracting more variety per image without leaving the natural image manifold</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>value_range:</strong> The range of pixel values in your images, typically [0, 255] or [0, 1]</li>
+            <li><strong>num_chains:</strong> Number of parallel augmentation chains to mix (default: 3)</li>
+            <li><strong>chain_depth:</strong> Maximum number of operations per chain (default: 3)</li>
+            <li><strong>factor:</strong> Strength of the individual augmentation operations (default: 0.3)</li>
+            <li><strong>all_ops:</strong> Whether to use the full set of operations, including brightness/contrast-style ops (default: True)</li>
+          </ul>
+          <p><em>💡 Tip: AugMix composes many transforms internally, so you usually don't need to stack other augmentation layers around it - start with the defaults and tune factor first!</em></p>
+        `,
+  'AutoContrast': `
+          <h2>AutoContrast Layer</h2>
+          <p><strong>What it does:</strong> Maximizes image contrast by remapping each channel so its darkest pixel becomes the minimum value and its brightest becomes the maximum.</p>
+          <h3>How it works:</h3>
+          <p>For each channel, the layer finds the current minimum and maximum pixel values and linearly stretches the histogram so they span the full value_range. Unlike random augmentations, the operation is deterministic - the same image always produces the same result.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Washed-out inputs:</strong> Datasets with hazy, low-contrast, or poorly exposed photographs</li>
+            <li><strong>Normalizing acquisition differences:</strong> When images come from cameras or scanners with inconsistent exposure</li>
+            <li><strong>Augmentation policies:</strong> As one of the operations in AutoAugment/RandAugment-style pipelines</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>value_range:</strong> The range of pixel values in your images, typically [0, 255] or [0, 1]</li>
+          </ul>
+          <p><em>💡 Tip: Because AutoContrast is deterministic it is safe to keep enabled at inference time too - just make sure value_range matches how your images are actually scaled!</em></p>
+        `,
+  'CutMix': `
+          <h2>CutMix Layer</h2>
+          <p><strong>What it does:</strong> Cuts a rectangular patch out of one image and pastes it into another, mixing the labels in proportion to the patch area.</p>
+          <h3>How it works:</h3>
+          <p>Within a batch, pairs of samples are combined: a random rectangle from one image replaces the same region of the other, and the label becomes a weighted mix of both labels according to the fraction of pixels swapped. This forces the network to use the whole image rather than a single discriminative region.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Image classification regularization:</strong> A strong batch-level augmentation that consistently improves accuracy on many benchmarks</li>
+            <li><strong>Fighting over-reliance on one region:</strong> Encourages models to spread attention across objects</li>
+            <li><strong>Combined with label smoothing effects:</strong> The mixed labels naturally soften targets and reduce overconfidence</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>factor:</strong> Controls the Beta distribution used to sample the patch area (default: 1.0)</li>
+            <li><strong>seed:</strong> Random seed for reproducible augmentation</li>
+          </ul>
+          <p><em>💡 Tip: CutMix operates on batches and needs labels alongside images (e.g., {"images": ..., "labels": ...}) - use it in your data pipeline, and remember it expects one-hot style labels to mix!</em></p>
+        `,
+  'Equalization': `
+          <h2>Equalization Layer</h2>
+          <p><strong>What it does:</strong> Applies histogram equalization to images, redistributing pixel intensities so they cover the value range more uniformly and enhancing global contrast.</p>
+          <h3>How it works:</h3>
+          <p>For each channel, the layer computes an intensity histogram with the configured number of bins and remaps pixel values so the cumulative distribution becomes approximately linear. Dark or bright regions with compressed intensity ranges get spread out, revealing detail.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Low-contrast imagery:</strong> Medical scans, night photos, or hazy scenes where detail hides in narrow intensity bands</li>
+            <li><strong>Heterogeneous datasets:</strong> Normalizing images captured under very different lighting conditions</li>
+            <li><strong>Augmentation policies:</strong> Equalization is a staple operation inside AutoAugment/RandAugment-style recipes</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>value_range:</strong> The range of pixel values in your images, typically [0, 255] or [0, 1]</li>
+            <li><strong>bins:</strong> Number of histogram bins used for the equalization (default: 256)</li>
+          </ul>
+          <p><em>💡 Tip: Equalization can amplify noise in flat regions like skies - if that hurts your task, apply it randomly as part of an augmentation policy rather than to every image!</em></p>
+        `,
+  'MixUp': `
+          <h2>MixUp Layer</h2>
+          <p><strong>What it does:</strong> Blends pairs of images and their labels into weighted averages, training the network on convex combinations of samples.</p>
+          <h3>How it works:</h3>
+          <p>Within a batch, pairs of samples are combined as mixed = λ·x1 + (1-λ)·x2, with λ drawn from a Beta(alpha, alpha) distribution, and the labels are mixed with the same weight. The model learns smoother decision boundaries and becomes less confident on ambiguous inputs.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Classification regularization:</strong> A cheap, widely effective way to reduce overfitting and improve calibration</li>
+            <li><strong>Label noise robustness:</strong> Mixing dilutes the impact of incorrectly labeled samples</li>
+            <li><strong>Small or imbalanced datasets:</strong> Generates a continuum of virtual training samples between classes</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>alpha:</strong> Beta-distribution parameter controlling mixing strength - small values (0.1-0.4) keep images mostly recognizable (default: 0.2)</li>
+            <li><strong>seed:</strong> Random seed for reproducible augmentation</li>
+          </ul>
+          <p><em>💡 Tip: Like CutMix, MixUp is batch-level and mixes labels too, so feed it {"images": ..., "labels": ...} with one-hot labels - and don't apply it at inference time!</em></p>
+        `,
+  'RandAugment': `
+          <h2>RandAugment Layer</h2>
+          <p><strong>What it does:</strong> Applies an automated augmentation policy - for each image it picks a few random operations from a fixed pool and applies them at a controlled strength.</p>
+          <h3>How it works:</h3>
+          <p>For every image, num_ops operations (rotate, shear, color changes, equalize, solarize, etc.) are sampled uniformly and applied in sequence with magnitude governed by factor. This reproduces the RandAugment recipe, which matches hand-tuned augmentation policies with only two knobs.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Strong baseline augmentation:</strong> A proven default for image classification when you don't want to hand-pick transforms</li>
+            <li><strong>Limited tuning budget:</strong> Only two hyperparameters to search instead of designing a whole pipeline</li>
+            <li><strong>Transfer/fine-tuning recipes:</strong> Many modern training recipes (e.g., for ViTs) specify RandAugment settings</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>value_range:</strong> The range of pixel values in your images, typically [0, 255] or [0, 1]</li>
+            <li><strong>num_ops:</strong> Number of random operations applied per image (default: 2)</li>
+            <li><strong>factor:</strong> Strength of the applied operations, between 0 and 1 (default: 0.5)</li>
+            <li><strong>interpolation:</strong> Interpolation used by geometric operations (default: 'bilinear')</li>
+          </ul>
+          <p><em>💡 Tip: Start with the defaults (2 ops, factor 0.5) and lower factor if training accuracy collapses - small datasets and small images usually want gentler magnitudes!</em></p>
+        `,
+  'RandomColorDegeneration': `
+          <h2>RandomColorDegeneration Layer</h2>
+          <p><strong>What it does:</strong> Randomly fades the colors of images toward grayscale by blending each image with its desaturated version.</p>
+          <h3>How it works:</h3>
+          <p>For each image, a blending weight is sampled based on factor, and the output is interpolated between the original image and its grayscale equivalent. Low weights barely change the image; high weights produce nearly gray results.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Color-robust models:</strong> Prevent the network from leaning too heavily on color cues that may vary in deployment</li>
+            <li><strong>Mixed color/grayscale data:</strong> When inference images may arrive with washed-out or missing color</li>
+            <li><strong>General augmentation variety:</strong> A gentler alternative to full grayscale conversion</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>factor:</strong> A float or pair of floats in [0, 1] controlling how strongly colors are degenerated - 0 keeps the image intact, 1 fully desaturates</li>
+            <li><strong>value_range:</strong> The range of pixel values in your images, typically [0, 255] or [0, 1]</li>
+          </ul>
+          <p><em>💡 Tip: If your classes are partly defined by color (e.g., ripe vs. unripe fruit), keep factor low - too much desaturation can erase the very signal you need!</em></p>
+        `,
+  'RandomColorJitter': `
+          <h2>RandomColorJitter Layer</h2>
+          <p><strong>What it does:</strong> Randomly perturbs brightness, contrast, saturation, and hue in one layer, producing varied color appearances of the same image.</p>
+          <h3>How it works:</h3>
+          <p>For each image, the layer samples an adjustment within each enabled factor range and applies the four photometric transformations. Setting any factor to None (or 0) disables that particular adjustment, so you can jitter only the properties you care about.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Real-world camera variation:</strong> Make models robust to different lighting, white balance, and sensor characteristics</li>
+            <li><strong>Replacing multiple layers:</strong> One RandomColorJitter can stand in for separate brightness/contrast/saturation/hue layers</li>
+            <li><strong>Self-supervised learning:</strong> Color jitter is a core augmentation in contrastive recipes like SimCLR</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>value_range:</strong> The range of pixel values in your images, typically [0, 255] or [0, 1]</li>
+            <li><strong>brightness_factor:</strong> Range for random brightness shifts</li>
+            <li><strong>contrast_factor:</strong> Range for random contrast scaling</li>
+            <li><strong>saturation_factor:</strong> Range for random saturation changes</li>
+            <li><strong>hue_factor:</strong> Range for random hue rotations</li>
+          </ul>
+          <p><em>💡 Tip: Keep hue_factor small (≤0.1) unless color identity truly doesn't matter - hue shifts change object colors outright, which is a much stronger intervention than brightness or contrast!</em></p>
+        `,
+  'RandomElasticTransform': `
+          <h2>RandomElasticTransform Layer</h2>
+          <p><strong>What it does:</strong> Applies random elastic ("rubber-sheet") deformations that locally warp the image, as if it were printed on a flexible membrane.</p>
+          <h3>How it works:</h3>
+          <p>A smooth random displacement field is generated and used to remap pixel positions, bending shapes without tearing them. The factor controls how often the transform is applied and scale controls the intensity of the displacement; empty areas are filled according to fill_mode.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Handwriting and OCR:</strong> Elastic distortions are the classic augmentation for digit/character recognition (e.g., MNIST)</li>
+            <li><strong>Medical imaging:</strong> Simulates natural anatomical deformation of soft tissue</li>
+            <li><strong>Shape-robust vision models:</strong> Teaches invariance to small non-rigid deformations</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>factor:</strong> Probability-like control of how often the transform is applied (default: 1.0 - always)</li>
+            <li><strong>scale:</strong> Magnitude of the random displacement field (default: 1.0)</li>
+            <li><strong>interpolation:</strong> Pixel resampling method, 'bilinear' or 'nearest' (default: 'bilinear')</li>
+            <li><strong>fill_mode:</strong> How to fill pixels pulled in from outside the image (default: 'reflect')</li>
+          </ul>
+          <p><em>💡 Tip: Strong elastic distortion can mangle thin structures like text strokes - preview augmented samples and back off scale until the content stays readable!</em></p>
+        `,
+  'RandomErasing': `
+          <h2>RandomErasing Layer</h2>
+          <p><strong>What it does:</strong> Randomly blanks out a rectangular region of the image, forcing the network to rely on the remaining context.</p>
+          <h3>How it works:</h3>
+          <p>With a probability given by factor, a rectangle whose area is sampled from the scale range is chosen and its pixels are replaced by fill_value (or random values when fill_value is None). It is the augmentation known as Random Erasing / Cutout, applied independently per image.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Occlusion robustness:</strong> Prepares models for partially hidden objects (crowds, shelves, traffic scenes)</li>
+            <li><strong>Overfitting reduction:</strong> Prevents reliance on one small discriminative region</li>
+            <li><strong>Person/vehicle re-identification:</strong> A standard trick in re-ID and fine-grained recognition training</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>factor:</strong> Probability of erasing a patch in a given image (default: 1.0 - always)</li>
+            <li><strong>scale:</strong> Range for the erased area as a fraction of the image (default: [0.02, 0.33])</li>
+            <li><strong>fill_value:</strong> Value used inside the erased patch, or None for random noise</li>
+            <li><strong>seed:</strong> Random seed for reproducible augmentation</li>
+          </ul>
+          <p><em>💡 Tip: Random Erasing pairs well with MixUp/CutMix, but keep the maximum scale moderate - erasing a third of a small image often removes the object entirely!</em></p>
+        `,
+  'RandomGaussianBlur': `
+          <h2>RandomGaussianBlur Layer</h2>
+          <p><strong>What it does:</strong> Randomly blurs images with a Gaussian kernel during training, simulating out-of-focus or low-detail inputs.</p>
+          <h3>How it works:</h3>
+          <p>Based on factor, the layer decides whether to blur each image, then convolves it with a Gaussian kernel of the configured kernel_size and sigma. Higher sigma spreads the kernel wider and removes more high-frequency detail.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Camera realism:</strong> Handle motion blur, focus errors, and compression smoothing seen in real captures</li>
+            <li><strong>Texture bias reduction:</strong> Push the model toward shapes and structure rather than fine texture</li>
+            <li><strong>Self-supervised learning:</strong> Gaussian blur is a key augmentation in contrastive frameworks like SimCLR</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>factor:</strong> Controls how often/strongly the blur is applied (default: 1.0)</li>
+            <li><strong>kernel_size:</strong> Size of the Gaussian kernel in pixels (default: 3)</li>
+            <li><strong>sigma:</strong> Standard deviation of the Gaussian - larger means blurrier (default: 1.0)</li>
+            <li><strong>value_range:</strong> The range of pixel values in your images, typically [0, 255] or [0, 1]</li>
+          </ul>
+          <p><em>💡 Tip: Match kernel_size to sigma (kernel roughly 4-6× sigma) - a large sigma with a tiny kernel truncates the Gaussian and wastes most of the intended blur!</em></p>
+        `,
+  'RandomGrayscale': `
+          <h2>RandomGrayscale Layer</h2>
+          <p><strong>What it does:</strong> Randomly converts a fraction of training images to grayscale while keeping their three channels, teaching the model not to depend on color.</p>
+          <h3>How it works:</h3>
+          <p>Each image is converted to grayscale with probability factor; converted images keep the same shape by replicating the luminance across channels. The rest of the batch passes through unchanged, so the model sees a mix of color and gray versions.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Color-invariant recognition:</strong> When object identity should not depend on color (shape-driven tasks)</li>
+            <li><strong>Mixed-source data:</strong> Deployments that may receive grayscale images (documents, infrared, old photos)</li>
+            <li><strong>Contrastive learning:</strong> Random grayscale is a standard component of SimCLR-style augmentation stacks</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>factor:</strong> Probability of converting a given image to grayscale (default: 0.5)</li>
+            <li><strong>seed:</strong> Random seed for reproducible augmentation</li>
+          </ul>
+          <p><em>💡 Tip: A factor around 0.1-0.2 is plenty for supervised classification - reserve higher values for contrastive pretraining recipes that call for them!</em></p>
+        `,
+  'RandomHue': `
+          <h2>RandomHue Layer</h2>
+          <p><strong>What it does:</strong> Randomly shifts the hue of images, rotating their colors around the color wheel while preserving brightness and structure.</p>
+          <h3>How it works:</h3>
+          <p>For each image, a hue offset is sampled according to factor and applied in HSV space, so reds may drift toward orange, greens toward teal, and so on. Structure, contrast, and saturation stay intact - only the color identity moves.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Color-agnostic categories:</strong> Objects whose class doesn't depend on their exact color (cars, clothing, furniture)</li>
+            <li><strong>Lighting/white-balance robustness:</strong> Simulates color casts from different illuminants and cameras</li>
+            <li><strong>Augmentation variety:</strong> Complements brightness/contrast jitter with a distinct color transformation</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>factor:</strong> A float or pair of floats controlling the strength of the random hue shift - 0 means no change</li>
+            <li><strong>value_range:</strong> The range of pixel values in your images, typically [0, 255] or [0, 1]</li>
+          </ul>
+          <p><em>💡 Tip: Avoid hue augmentation when color IS the label signal - ripeness detection, medical staining, or traffic-light state can be destroyed by even small hue shifts!</em></p>
+        `,
+  'RandomInvert': `
+          <h2>RandomInvert Layer</h2>
+          <p><strong>What it does:</strong> Randomly inverts the pixel values of images (negative-film effect), swapping dark and light regions.</p>
+          <h3>How it works:</h3>
+          <p>With probability given by factor, each pixel value v is replaced by max - v (relative to value_range), producing the photographic negative. Non-selected images pass through unchanged.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Polarity-invariant inputs:</strong> Documents, sketches, or scans that may appear as dark-on-light or light-on-dark</li>
+            <li><strong>Augmentation policies:</strong> Invert appears as an operation in AutoAugment-style recipes</li>
+            <li><strong>Edge/shape focused models:</strong> Forces reliance on structure rather than absolute intensity</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>factor:</strong> Probability of inverting a given image (default: 1.0 - always)</li>
+            <li><strong>value_range:</strong> The range of pixel values in your images, typically [0, 255] or [0, 1]</li>
+          </ul>
+          <p><em>💡 Tip: For natural photographs inversion usually hurts more than it helps - it shines on documents and symbols where both polarities legitimately occur!</em></p>
+        `,
+  'RandomPerspective': `
+          <h2>RandomPerspective Layer</h2>
+          <p><strong>What it does:</strong> Applies random perspective (projective) warps, as if the image were photographed from a different viewpoint.</p>
+          <h3>How it works:</h3>
+          <p>The four corners of the image are randomly displaced within limits set by scale, defining a projective transformation that is then applied to all pixels. factor controls how often the warp happens, and revealed border areas are filled with fill_value.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Viewpoint robustness:</strong> Objects photographed from varying angles - signs, documents, products on shelves</li>
+            <li><strong>Document and OCR pipelines:</strong> Simulates skewed scans and handheld photos of paper</li>
+            <li><strong>Complementing affine transforms:</strong> Perspective adds foreshortening that rotation/translation/shear cannot produce</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>factor:</strong> Probability of applying the warp to a given image (default: 1.0 - always)</li>
+            <li><strong>scale:</strong> Strength of the corner displacement - higher means more extreme viewpoints (default: 1.0)</li>
+            <li><strong>interpolation:</strong> Pixel resampling method, 'bilinear' or 'nearest' (default: 'bilinear')</li>
+            <li><strong>fill_value:</strong> Value used for pixels outside the original image (default: 0.0)</li>
+          </ul>
+          <p><em>💡 Tip: Keep scale modest for classification - extreme perspective can push key content out of frame; heavier warps are more useful for document rectification training!</em></p>
+        `,
+  'RandomPosterization': `
+          <h2>RandomPosterization Layer</h2>
+          <p><strong>What it does:</strong> Randomly reduces the number of intensity levels per channel (bit depth), giving images a flat, poster-like look.</p>
+          <h3>How it works:</h3>
+          <p>The layer keeps only the top bits of each pixel value - keeping 8 bits leaves the image untouched, while lower bit counts quantize it into fewer, coarser intensity bands. The number of bits kept is sampled from the range given by factor.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Compression robustness:</strong> Simulates banding and quantization from aggressive image compression</li>
+            <li><strong>Texture bias reduction:</strong> Removes fine intensity gradients, emphasizing shapes and edges</li>
+            <li><strong>Augmentation policies:</strong> Posterize is a standard operation in AutoAugment/RandAugment recipes</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>factor:</strong> Integer or range of integers in [1, 8] - the number of bits to keep per channel (lower = stronger effect)</li>
+            <li><strong>value_range:</strong> The range of pixel values in your images, typically [0, 255] or [0, 1]</li>
+          </ul>
+          <p><em>💡 Tip: Bits between 4 and 6 give visible but harmless quantization - 1-2 bits is drastic and best reserved for occasional application inside a policy!</em></p>
+        `,
+  'RandomSaturation': `
+          <h2>RandomSaturation Layer</h2>
+          <p><strong>What it does:</strong> Randomly strengthens or weakens the color saturation of images, from fully grayscale to oversaturated.</p>
+          <h3>How it works:</h3>
+          <p>A saturation adjustment is sampled from factor and applied to each image: values below 0.5 desaturate toward grayscale, 0.5 leaves the image unchanged, and values above 0.5 boost color intensity. Brightness and structure are preserved.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Camera and processing variety:</strong> Different devices and photo apps produce very different saturation levels</li>
+            <li><strong>Color-robust classification:</strong> Prevents over-reliance on vividness of colors</li>
+            <li><strong>Part of a jitter stack:</strong> Combine with brightness/contrast/hue jitter for full photometric coverage</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>factor:</strong> A float or pair of floats in [0, 1] - 0.0 fully desaturates, 0.5 is neutral, 1.0 fully saturates</li>
+            <li><strong>value_range:</strong> The range of pixel values in your images, typically [0, 255] or [0, 1]</li>
+          </ul>
+          <p><em>💡 Tip: Sample factor around the neutral 0.5 (e.g., (0.4, 0.6)) for gentle jitter - the ends of the range are strong effects that can wash colors out or make them garish!</em></p>
+        `,
+  'RandomSharpness': `
+          <h2>RandomSharpness Layer</h2>
+          <p><strong>What it does:</strong> Randomly sharpens images by blending each one with a sharpened version of itself, accentuating edges and fine detail.</p>
+          <h3>How it works:</h3>
+          <p>The layer computes a sharpened variant of the image (via an edge-enhancing filter) and interpolates between original and sharpened according to a weight sampled from factor. Low weights leave the image nearly untouched; high weights strongly emphasize edges.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Blur-diverse data:</strong> Counterbalance datasets full of slightly soft or downscaled images</li>
+            <li><strong>Fine-grained recognition:</strong> Edge detail matters for textures, text, and small distinguishing marks</li>
+            <li><strong>Augmentation policies:</strong> Sharpness is one of the standard AutoAugment/RandAugment operations</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>factor:</strong> A float or pair of floats in [0, 1] controlling the blend toward the sharpened image</li>
+            <li><strong>value_range:</strong> The range of pixel values in your images, typically [0, 255] or [0, 1]</li>
+          </ul>
+          <p><em>💡 Tip: Oversharpening amplifies noise and JPEG artifacts - pair RandomSharpness with RandomGaussianBlur so the model sees both directions of the detail spectrum!</em></p>
+        `,
+  'RandomShear': `
+          <h2>RandomShear Layer</h2>
+          <p><strong>What it does:</strong> Randomly shears images along the x and/or y axis, slanting them as if the image plane were tilted sideways.</p>
+          <h3>How it works:</h3>
+          <p>Shear amounts are sampled from x_factor and y_factor and applied as an affine transformation that shifts rows (or columns) proportionally to their distance from the edge. Newly exposed regions are filled according to fill_mode.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Handwriting and text:</strong> Shear mimics italic slants and varying writing angles</li>
+            <li><strong>Geometric robustness:</strong> Complements rotation and translation in an affine augmentation stack</li>
+            <li><strong>Augmentation policies:</strong> ShearX/ShearY are core operations in AutoAugment-style recipes</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>x_factor:</strong> Range for horizontal shear intensity (default: 0.0 - disabled)</li>
+            <li><strong>y_factor:</strong> Range for vertical shear intensity (default: 0.0 - disabled)</li>
+            <li><strong>interpolation:</strong> Pixel resampling method, 'bilinear' or 'nearest' (default: 'bilinear')</li>
+            <li><strong>fill_mode:</strong> How to fill revealed border pixels (default: 'reflect')</li>
+          </ul>
+          <p><em>💡 Tip: Enable only one axis (usually x) with a small factor like 0.1-0.2 first - shearing both axes at high strength quickly distorts objects beyond recognition!</em></p>
+        `,
+  'Solarization': `
+          <h2>Solarization Layer</h2>
+          <p><strong>What it does:</strong> Inverts pixel values above a threshold, producing the surreal partially-inverted look of solarized photographs.</p>
+          <h3>How it works:</h3>
+          <p>Pixels brighter than a threshold (sampled via threshold_factor) are replaced by their negative, while darker pixels stay unchanged; addition_factor can brighten the image beforehand to push more pixels over the threshold. The result mixes normal and inverted regions in one image.</p>
+          <h3>When to use:</h3>
+          <ul>
+            <li><strong>Self-supervised learning:</strong> Solarization is a signature augmentation in BYOL and related contrastive methods</li>
+            <li><strong>Augmentation policies:</strong> A standard operation inside AutoAugment/RandAugment pipelines</li>
+            <li><strong>Intensity-robust features:</strong> Discourages the model from depending on absolute brightness relationships</li>
+          </ul>
+          <h3>Key parameters:</h3>
+          <ul>
+            <li><strong>addition_factor:</strong> Range for a random brightness addition applied before thresholding (default: 0.0)</li>
+            <li><strong>threshold_factor:</strong> Range for the inversion threshold - lower thresholds invert more of the image (default: 0.0)</li>
+            <li><strong>value_range:</strong> The range of pixel values in your images, typically [0, 255] or [0, 1]</li>
+          </ul>
+          <p><em>💡 Tip: Solarization is a strong, unnatural-looking transform - apply it to a small fraction of images (as contrastive recipes do) rather than to every sample in supervised training!</em></p>
         `,
 };
 

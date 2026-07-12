@@ -1,31 +1,50 @@
 /**
  * apiClient.js
  *
- * Small wrapper around the optional NNVP cloud backend (a separate Django Ninja
+ * Small wrapper around the NNVP cloud backend (a separate Django Ninja
  * service). This is a *progressive enhancement*: the SPA works fully without it.
  *
- * Configuration lives in localStorage so it survives reloads and can be set from
- * the UI:
- *   - nnvp_backend_url   : base URL of the backend (e.g. http://localhost:8009).
- *                          Empty  => "no backend configured" state.
- *   - nnvp_backend_token : JWT bearer token. Empty => "not logged in" state.
+ * The backend lives at the same origin under `/api` — the user never
+ * configures a server URL. In dev, vite proxies `/api` to the Django port
+ * (see vite.config.js); in production a reverse proxy does the same.
+ *
+ * Auth is magic-link only, and it signs in the browser that REQUESTED the
+ * login: requestMagicLink() immediately stores a PENDING bearer token and
+ * returns a 4-char match code; the UI polls authStatus() until the emailed
+ * link is clicked (approveMagicLink(), from any browser — the clicking
+ * browser only approves, it never receives credentials). The bearer lives in
+ * localStorage so the session survives reloads:
+ *   - nnvp_backend_token : opaque bearer token. Empty => "not logged in" state.
  *
  * All network failures surface as a single ApiError with a machine-readable
  * `code` so the UI can react without string-matching messages.
  */
 
+export const DEFAULT_BASE_URL = '/api';
+
 export const STORAGE_KEYS = {
-  url: 'nnvp_backend_url',
   token: 'nnvp_backend_token',
 };
 
 export const ERROR_CODES = {
-  noBackend: 'no-backend',
   notLoggedIn: 'not-logged-in',
   network: 'network',
   malformed: 'malformed',
   http: 'http',
 };
+
+/**
+ * Fired on window whenever the stored token changes (sign-in, sign-out,
+ * expiry cleanup) so header icons / the chat bubble can re-read auth state
+ * without a store or polling.
+ */
+export const AUTH_CHANGED_EVENT = 'nnvp:auth-changed';
+
+function notifyAuthChanged() {
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    window.dispatchEvent(new CustomEvent(AUTH_CHANGED_EVENT));
+  }
+}
 
 export class ApiError extends Error {
   constructor(code, message, { status = null, body = null } = {}) {
@@ -42,8 +61,11 @@ export default class ApiClient {
    * @param {object} [options]
    * @param {typeof fetch} [options.fetch]   Injectable fetch (for tests / SSR).
    * @param {Storage}      [options.storage] Injectable storage (defaults to localStorage).
+   * @param {string}       [options.baseUrl] API base; defaults to same-origin
+   *                                         "/api". Overridden by the contract
+   *                                         tests to hit a real backend by URL.
    */
-  constructor({ fetch: fetchImpl, storage } = {}) {
+  constructor({ fetch: fetchImpl, storage, baseUrl } = {}) {
     // Bind to preserve `this` when the global fetch is used.
     this._fetch = fetchImpl
       || (typeof globalThis !== 'undefined' && globalThis.fetch
@@ -51,6 +73,8 @@ export default class ApiClient {
         : undefined);
     this._storage = storage
       || (typeof localStorage !== 'undefined' ? localStorage : null);
+    // Trim a trailing slash so `${base}${path}` never double-slashes.
+    this._baseUrl = (baseUrl || DEFAULT_BASE_URL).replace(/\/+$/, '');
   }
 
   // --- configuration ---------------------------------------------------------
@@ -72,12 +96,7 @@ export default class ApiClient {
   }
 
   getBaseUrl() {
-    // Trim a trailing slash so `${base}${path}` never double-slashes.
-    return this._get(STORAGE_KEYS.url).replace(/\/+$/, '');
-  }
-
-  setBaseUrl(url) {
-    this._set(STORAGE_KEYS.url, (url || '').trim());
+    return this._baseUrl;
   }
 
   getToken() {
@@ -86,35 +105,30 @@ export default class ApiClient {
 
   setToken(token) {
     this._set(STORAGE_KEYS.token, token || '');
+    notifyAuthChanged();
   }
 
   clearToken() {
     this._set(STORAGE_KEYS.token, '');
-  }
-
-  isConfigured() {
-    return this.getBaseUrl().length > 0;
+    notifyAuthChanged();
   }
 
   isLoggedIn() {
-    return this.isConfigured() && this.getToken().length > 0;
+    return this.getToken().length > 0;
   }
 
   // --- core request ----------------------------------------------------------
 
   /**
-   * @param {string} path   e.g. "/api/projects"
+   * @param {string} path   e.g. "/projects" (relative to the "/api" base)
    * @param {object} [opts]
    * @param {string} [opts.method]
    * @param {object} [opts.body]  serialized as JSON
-   * @param {boolean} [opts.auth] attach the bearer token (and require login)
+   * @param {boolean|'optional'} [opts.auth] attach the bearer token; `true`
+   *   also requires one to be present, `'optional'` attaches it when it exists
    */
   async request(path, { method = 'GET', body, auth = false } = {}) {
-    const base = this.getBaseUrl();
-    if (!base) {
-      throw new ApiError(ERROR_CODES.noBackend, 'No backend URL configured');
-    }
-    if (auth && !this.getToken()) {
+    if (auth === true && !this.getToken()) {
       throw new ApiError(ERROR_CODES.notLoggedIn, 'Not signed in');
     }
     if (!this._fetch) {
@@ -123,11 +137,11 @@ export default class ApiClient {
 
     const headers = { Accept: 'application/json' };
     if (body !== undefined) headers['Content-Type'] = 'application/json';
-    if (auth) headers.Authorization = `Bearer ${this.getToken()}`;
+    if (auth && this.getToken()) headers.Authorization = `Bearer ${this.getToken()}`;
 
     let response;
     try {
-      response = await this._fetch(`${base}${path}`, {
+      response = await this._fetch(`${this._baseUrl}${path}`, {
         method,
         headers,
         body: body === undefined ? undefined : JSON.stringify(body),
@@ -136,7 +150,7 @@ export default class ApiClient {
       throw new ApiError(ERROR_CODES.network, 'Network request failed', { body: String(cause) });
     }
 
-    // 204 No Content (e.g. DELETE) — nothing to parse.
+    // 204 No Content (e.g. DELETE, magic/request) — nothing to parse.
     if (response.status === 204) return null;
 
     let payload = null;
@@ -163,60 +177,111 @@ export default class ApiClient {
     return payload;
   }
 
-  // --- auth ------------------------------------------------------------------
+  // --- auth (magic-link only: no passwords, account created on first login) ---
 
-  async register({ email, password }) {
-    const data = await this.request('/api/auth/register', {
+  /**
+   * Start a login: the backend emails a single-use approval link and hands
+   * THIS browser a pending bearer (stored immediately) plus the 4-char match
+   * code to display. Poll authStatus() until the link is clicked.
+   */
+  async requestMagicLink(email) {
+    const data = await this.request('/auth/magic/request', {
       method: 'POST',
-      body: { email, password },
+      body: { email },
     });
     if (data && data.token) this.setToken(data.token);
-    return data;
+    return data; // { token, code }
   }
 
-  async login({ email, password }) {
-    const data = await this.request('/api/auth/login', {
+  /**
+   * Login-status poll for this browser's (possibly pending) bearer:
+   * { verified, user?, code? }. 401 means the pending token expired.
+   */
+  async authStatus() {
+    return this.request('/auth/status', { auth: true });
+  }
+
+  /**
+   * What the approval page shows before the deliberate click:
+   * { code, requester, requested_at, same_browser }. Sends this browser's own
+   * bearer (when present) so the backend can detect the same-browser case.
+   */
+  async magicInfo(token) {
+    return this.request('/auth/magic/info', {
       method: 'POST',
-      body: { email, password },
+      auth: 'optional',
+      body: { token },
     });
-    if (data && data.token) this.setToken(data.token);
-    return data;
+  }
+
+  /**
+   * The deliberate click: approves the browser that REQUESTED the login.
+   * Returns the signed-in user — never credentials for this browser.
+   */
+  async approveMagicLink(token) {
+    return this.request('/auth/magic/approve', {
+      method: 'POST',
+      body: { token },
+    });
   }
 
   async me() {
-    return this.request('/api/auth/me', { auth: true });
+    return this.request('/auth/me', { auth: true });
   }
 
-  logout() {
+  /**
+   * Sign out this browser: best-effort server-side revocation (also cancels a
+   * pending magic login — the emailed link dies with the token), then drop
+   * the local token regardless.
+   */
+  async logout() {
+    try {
+      if (this.getToken()) {
+        await this.request('/auth/logout', { method: 'POST', auth: 'optional' });
+      }
+    } catch { /* revoking is best-effort; the local sign-out must not fail */ }
     this.clearToken();
   }
 
   // --- projects --------------------------------------------------------------
 
   async listProjects() {
-    return this.request('/api/projects', { auth: true });
+    return this.request('/projects', { auth: true });
   }
 
   async getProject(id) {
-    return this.request(`/api/projects/${id}`, { auth: true });
+    return this.request(`/projects/${id}`, { auth: true });
   }
 
-  async createProject({ name, graph }) {
-    return this.request('/api/projects', {
+  async createProject({
+    name, graph, tags, parent,
+  }) {
+    const body = { name, graph };
+    if (tags !== undefined) body.tags = tags;
+    if (parent !== undefined && parent !== null) body.parent = parent;
+    return this.request('/projects', {
       method: 'POST',
       auth: true,
-      body: { name, graph },
+      body,
     });
+  }
+
+  /**
+   * The localized save graph around one project: ancestors + descendants,
+   * capped at 2 levels each way ({ focus, nodes, edges }).
+   */
+  async projectLineage(id) {
+    return this.request(`/projects/${id}/lineage`, { auth: true });
   }
 
   async updateProject(id, { name, graph } = {}) {
     const body = {};
     if (name !== undefined) body.name = name;
     if (graph !== undefined) body.graph = graph;
-    return this.request(`/api/projects/${id}`, { method: 'PUT', auth: true, body });
+    return this.request(`/projects/${id}`, { method: 'PUT', auth: true, body });
   }
 
   async deleteProject(id) {
-    return this.request(`/api/projects/${id}`, { method: 'DELETE', auth: true });
+    return this.request(`/projects/${id}`, { method: 'DELETE', auth: true });
   }
 }

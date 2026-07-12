@@ -1,6 +1,7 @@
 // NNVP graph JSON <-> Vue Flow nodes/edges.
 //
-// The NNVP side is exactly what D3Model.toJSON emits (and loadJSON accepts):
+// The NNVP side is exactly what D3Model.toJSON emitted (and .nnvp files
+// contain) — see src/types/model.ts:
 //   { layers: [...], edges: [{source, target, id, htmlID}], inputs: [ids], outputs: [ids] }
 // with composite layers carrying their children recursively and children using
 // ABSOLUTE board coordinates. Vue Flow children instead use coordinates
@@ -12,15 +13,19 @@
 // These are pure functions: the FlowBoard component owns state, this module
 // owns the format. Keep it importable under bun (no Vue Flow imports here).
 
+import type {
+  NnvpModel, NnvpLayer, NnvpLayerId, KerasLayerJSON, FlowNode, FlowEdge,
+} from '../../types/model';
+
 export const LAYER_NODE = 'layer';
 export const COMPOSITE_NODE = 'composite';
 
-const isComposite = (layer) => layer.class === 'D3LayerComposite';
+const isComposite = (layer: NnvpLayer) => layer.class === 'D3LayerComposite';
 
 // --- NNVP -> Vue Flow --------------------------------------------------------
 
-function layerToNode(layer, parent) {
-  const node = {
+function layerToNode(layer: NnvpLayer, parent: NnvpLayer | null): FlowNode {
+  const node: FlowNode = {
     id: String(layer.id),
     type: isComposite(layer) ? COMPOSITE_NODE : LAYER_NODE,
     position: parent === null
@@ -49,7 +54,7 @@ function layerToNode(layer, parent) {
   return node;
 }
 
-function walkLayers(layers, parent, nodes) {
+function walkLayers(layers: NnvpLayer[], parent: NnvpLayer | null, nodes: FlowNode[]): void {
   layers.forEach((layer) => {
     nodes.push(layerToNode(layer, parent));
     if (layer.children) walkLayers(layer.children, layer, nodes);
@@ -57,14 +62,14 @@ function walkLayers(layers, parent, nodes) {
 }
 
 /**
- * @param nnvp D3Model JSON (string or already-parsed object, no "NNVP" header)
- * @returns {{nodes: Array, edges: Array}} Vue Flow elements
+ * @param nnvp NNVP model JSON (string or already-parsed object, no "NNVP" header)
+ * @returns Vue Flow elements
  */
-export function nnvpToFlow(nnvp) {
-  const model = typeof nnvp === 'string' ? JSON.parse(nnvp) : nnvp;
-  const nodes = [];
+export function nnvpToFlow(nnvp: string | NnvpModel): { nodes: FlowNode[]; edges: FlowEdge[] } {
+  const model: NnvpModel = typeof nnvp === 'string' ? JSON.parse(nnvp) : nnvp;
+  const nodes: FlowNode[] = [];
   walkLayers(model.layers || [], null, nodes);
-  const edges = (model.edges || []).map(edge => ({
+  const edges = (model.edges || []).map((edge): FlowEdge => ({
     id: String(edge.id),
     source: String(edge.source),
     target: String(edge.target),
@@ -75,9 +80,19 @@ export function nnvpToFlow(nnvp) {
 
 // --- Vue Flow -> NNVP --------------------------------------------------------
 
+type AnnotatedEdge = FlowEdge & { sourceNnvpId: NnvpLayerId; targetNnvpId: NnvpLayerId };
+type EdgesByNode = Map<string, AnnotatedEdge[]>;
+
 // Reconstruct one NNVP layer entry (recursing into composite children).
 // `absolute` is the node's absolute board position, computed by the caller.
-function nodeToLayer(node, absolute, childrenByParent, edgesBySource, edgesByTarget, parentId) {
+function nodeToLayer(
+  node: FlowNode,
+  absolute: { x: number; y: number },
+  childrenByParent: Map<string, FlowNode[]>,
+  edgesBySource: EdgesByNode,
+  edgesByTarget: EdgesByNode,
+  parentId: NnvpLayerId | null,
+): NnvpLayer {
   const nnvp = node.data.nnvp;
   const children = (childrenByParent.get(node.id) || []).map(child => nodeToLayer(
     child,
@@ -95,7 +110,7 @@ function nodeToLayer(node, absolute, childrenByParent, edgesBySource, edgesByTar
     htmlID: nnvp.htmlID,
     name: nnvp.name,
     // Wiring is recomputed from the flow edges (the source of truth after
-    // editing), preserving edge order like the D3 editor does.
+    // editing), preserving edge order like the D3 editor did.
     inputLayers: (edgesByTarget.get(node.id) || []).map(e => e.sourceNnvpId),
     outputLayers: (edgesBySource.get(node.id) || []).map(e => e.targetNnvpId),
     children: children.length > 0 ? children : null,
@@ -107,32 +122,32 @@ function nodeToLayer(node, absolute, childrenByParent, edgesBySource, edgesByTar
 /**
  * @param nodes Vue Flow nodes (as produced by nnvpToFlow / edited on the board)
  * @param edges Vue Flow edges
- * @returns {string} D3Model.loadJSON-compatible JSON string
+ * @returns NNVP-model JSON string (the .nnvp file body)
  */
-export function flowToNnvp(nodes, edges) {
+export function flowToNnvp(nodes: FlowNode[], edges: FlowEdge[]): string {
   const byId = new Map(nodes.map(node => [node.id, node]));
-  const childrenByParent = new Map();
+  const childrenByParent = new Map<string, FlowNode[]>();
   nodes.forEach((node) => {
     if (node.parentNode !== undefined) {
       if (!childrenByParent.has(node.parentNode)) childrenByParent.set(node.parentNode, []);
-      childrenByParent.get(node.parentNode).push(node);
+      childrenByParent.get(node.parentNode)!.push(node);
     }
   });
 
   // Edges annotated with the ORIGINAL (typically numeric) endpoint ids.
-  const nnvpId = id => byId.get(id).data.nnvp.id;
-  const annotated = edges.map(edge => ({
+  const nnvpId = (id: string) => byId.get(id)!.data.nnvp.id;
+  const annotated = edges.map((edge): AnnotatedEdge => ({
     ...edge,
     sourceNnvpId: nnvpId(edge.source),
     targetNnvpId: nnvpId(edge.target),
   }));
-  const edgesBySource = new Map();
-  const edgesByTarget = new Map();
+  const edgesBySource: EdgesByNode = new Map();
+  const edgesByTarget: EdgesByNode = new Map();
   annotated.forEach((edge) => {
     if (!edgesBySource.has(edge.source)) edgesBySource.set(edge.source, []);
-    edgesBySource.get(edge.source).push(edge);
+    edgesBySource.get(edge.source)!.push(edge);
     if (!edgesByTarget.has(edge.target)) edgesByTarget.set(edge.target, []);
-    edgesByTarget.get(edge.target).push(edge);
+    edgesByTarget.get(edge.target)!.push(edge);
   });
 
   const layers = nodes
@@ -141,16 +156,16 @@ export function flowToNnvp(nodes, edges) {
       node, node.position, childrenByParent, edgesBySource, edgesByTarget, null,
     ));
 
-  // Model inputs: Input-typed leaves in node order (D3Model registers them in
-  // creation order). Model outputs mirror D3LayerComponent.addInputLayer: NOT
-  // the Output nodes themselves, but the source of every edge that lands on an
-  // Output node, in edge order.
-  const layerName = node => (node.data.nnvp.kerasLayer ? node.data.nnvp.kerasLayer.name : null);
+  // Model inputs: Input-typed leaves in node order (the editor registers them
+  // in creation order). Model outputs mirror D3LayerComponent.addInputLayer's
+  // historical behavior: NOT the Output nodes themselves, but the source of
+  // every edge that lands on an Output node, in edge order.
+  const layerName = (node: FlowNode) => (node.data.nnvp.kerasLayer ? node.data.nnvp.kerasLayer.name : null);
   const inputs = nodes
     .filter(node => layerName(node) === 'Input')
     .map(node => node.data.nnvp.id);
   const outputs = annotated
-    .filter(edge => layerName(byId.get(edge.target)) === 'Output')
+    .filter(edge => layerName(byId.get(edge.target)!) === 'Output')
     .map(edge => edge.sourceNnvpId);
 
   return JSON.stringify({
@@ -168,17 +183,19 @@ export function flowToNnvp(nodes, edges) {
 
 // --- Editing helpers ---------------------------------------------------------
 
+type EdgeEnds = Pick<FlowEdge, 'source' | 'target'>;
+
 /** True if `to` is reachable from `from` by following edges forward. */
-function reaches(edges, from, to) {
-  const outgoing = new Map();
+function reaches(edges: EdgeEnds[], from: string, to: string): boolean {
+  const outgoing = new Map<string, string[]>();
   edges.forEach((edge) => {
     if (!outgoing.has(edge.source)) outgoing.set(edge.source, []);
-    outgoing.get(edge.source).push(edge.target);
+    outgoing.get(edge.source)!.push(edge.target);
   });
   const stack = [from];
-  const seen = new Set();
+  const seen = new Set<string>();
   while (stack.length > 0) {
-    const current = stack.pop();
+    const current = stack.pop()!;
     if (current === to) return true;
     if (seen.has(current)) continue; // eslint-disable-line no-continue
     seen.add(current);
@@ -192,7 +209,7 @@ function reaches(edges, from, to) {
  * already reachable FROM target), or if it duplicates an existing edge, or
  * connects a node to itself. Used by the board's isValidConnection.
  */
-export function isInvalidConnection(edges, source, target) {
+export function isInvalidConnection(edges: EdgeEnds[], source: string, target: string): boolean {
   if (source === target) return true;
   if (edges.some(edge => edge.source === source && edge.target === target)) return true;
   return reaches(edges, target, source);
@@ -202,15 +219,15 @@ export function isInvalidConnection(edges, source, target) {
  * True if an EXISTING edge lies on a directed cycle: its target reaches back
  * to its source (that path plus the edge itself closes the loop). Interactive
  * connections can't create cycles (isInvalidConnection refuses them), but
- * cyclic graphs saved on the D3 board still load — the flow board marks such
- * edges with the same error color as D3's linkCycle.
+ * cyclic graphs saved on the old D3 board still load — the board marks such
+ * edges with the error color (see FloatingEdge.vue).
  */
-export function edgeInCycle(edges, edge) {
+export function edgeInCycle(edges: EdgeEnds[], edge: EdgeEnds): boolean {
   return reaches(edges, edge.target, edge.source);
 }
 
 /** Next free numeric layer id, so board-created nodes never collide. */
-export function nextLayerId(nodes) {
+export function nextLayerId(nodes: FlowNode[]): number {
   const numeric = nodes
     .map(node => Number(node.data.nnvp.id))
     .filter(id => Number.isFinite(id));
@@ -219,24 +236,25 @@ export function nextLayerId(nodes) {
 
 /**
  * Group the selected top-level nodes into a new composite node, mirroring
- * D3Model.createComposite: the composite's top-left is the min x/y of the
- * selection, children keep their board position (stored relative to the
+ * the old D3Model.createComposite: the composite's top-left is the min x/y of
+ * the selection, children keep their board position (stored relative to the
  * composite), and edges are untouched. Returns the new nodes array, or null
  * when the selection includes a node that is already inside a composite
- * (D3 refuses that with "Cannot group layer from an other group").
+ * (D3 refused that with "Cannot group layer from an other group").
  */
-export function groupSelected(nodes, selectedIds) {
+export function groupSelected(nodes: FlowNode[], selectedIds: Array<string | number>): FlowNode[] | null {
   const ids = new Set(selectedIds.map(String));
   const selected = nodes.filter(node => ids.has(node.id));
   if (selected.length === 0) return null;
   if (selected.some(node => node.parentNode !== undefined)) return null;
   const x = Math.min(...selected.map(node => node.position.x));
   const y = Math.min(...selected.map(node => node.position.y));
-  // Same padding D3LayerComposite uses when it wraps its children.
-  const width = Math.max(...selected.map(node => node.position.x + node.data.nnvp.width)) + 20 - x;
-  const height = Math.max(...selected.map(node => node.position.y + node.data.nnvp.height)) + 10 - y;
+  // Same padding D3LayerComposite used when it wrapped its children. Board
+  // nodes always carry width/height (newLayerNode/nnvpToFlow set them).
+  const width = Math.max(...selected.map(node => node.position.x + (node.data.nnvp.width ?? 0))) + 20 - x;
+  const height = Math.max(...selected.map(node => node.position.y + (node.data.nnvp.height ?? 0))) + 10 - y;
   const id = nextLayerId(nodes);
-  const composite = {
+  const composite: FlowNode = {
     id: String(id),
     type: COMPOSITE_NODE,
     position: { x, y },
@@ -248,7 +266,7 @@ export function groupSelected(nodes, selectedIds) {
       },
     },
   };
-  const children = selected.map(node => ({
+  const children = selected.map((node): FlowNode => ({
     ...node,
     position: { x: node.position.x - x, y: node.position.y - y },
     parentNode: composite.id,
@@ -260,19 +278,19 @@ export function groupSelected(nodes, selectedIds) {
   return sortParentFirst([...rest, composite, ...children]);
 }
 
-function sortParentFirst(nodes) {
-  const childrenByParent = new Map();
-  const roots = [];
+function sortParentFirst(nodes: FlowNode[]): FlowNode[] {
+  const childrenByParent = new Map<string, FlowNode[]>();
+  const roots: FlowNode[] = [];
   nodes.forEach((node) => {
     if (node.parentNode === undefined) {
       roots.push(node);
       return;
     }
     if (!childrenByParent.has(node.parentNode)) childrenByParent.set(node.parentNode, []);
-    childrenByParent.get(node.parentNode).push(node);
+    childrenByParent.get(node.parentNode)!.push(node);
   });
-  const sorted = [];
-  const visit = (node) => {
+  const sorted: FlowNode[] = [];
+  const visit = (node: FlowNode) => {
     sorted.push(node);
     (childrenByParent.get(node.id) || []).forEach(visit);
   };
@@ -281,7 +299,11 @@ function sortParentFirst(nodes) {
 }
 
 /** Build a fresh Vue Flow node for a newly added layer. */
-export function newLayerNode(id, kerasLayer, position) {
+export function newLayerNode(
+  id: number,
+  kerasLayer: KerasLayerJSON,
+  position: { x: number; y: number },
+): FlowNode {
   return {
     id: String(id),
     type: LAYER_NODE,

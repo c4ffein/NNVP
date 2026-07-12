@@ -2,7 +2,10 @@
 //
 // A static NNVP SPA can't hide a key, so this is bring-your-own-key: the API key
 // (and an optional custom base URL) live in localStorage and are read at call
-// time. Each AssistantActions method is exposed as a tool; the loop sends the
+// time. Signed-in users get a keyless default instead: with a backend token and
+// no key/base-URL of their own, requests go through the NNVP backend proxy,
+// which holds the server-side Anthropic key (see readStoredConfig).
+// Each AssistantActions method is exposed as a tool; the loop sends the
 // conversation, executes any tool_use blocks against the actions, feeds back
 // tool_result blocks, and repeats until the model returns a final text answer.
 
@@ -134,7 +137,18 @@ const TOOL_DISPATCH = {
   redo: (actions) => actions.redo(),
 };
 
+// The NNVP backend is same-origin at /api (never user-configured; see
+// lib/Backend/apiClient.js).
+const BACKEND_BASE_URL = '/api';
+
 // Read config from localStorage when available, letting explicit options win.
+//
+// Base-URL resolution (precedence, highest first):
+//   1. an explicit base URL (override or stored setting) is used verbatim;
+//   2. otherwise, a signed-in user (backend token present) who has NOT set an
+//      Anthropic API key of their own defaults to the NNVP backend proxy, so
+//      signing in is enough — no key required;
+//   3. otherwise, the public Anthropic API (bring-your-own-key).
 export function readStoredConfig(overrides = {}) {
   let stored = {};
   if (typeof localStorage !== 'undefined') {
@@ -142,26 +156,32 @@ export function readStoredConfig(overrides = {}) {
       apiKey: localStorage.getItem(STORAGE_KEY) || '',
       baseUrl: localStorage.getItem(STORAGE_BASE_URL) || '',
       model: localStorage.getItem(STORAGE_MODEL) || '',
-      backendUrl: localStorage.getItem('nnvp_backend_url') || '',
       backendToken: localStorage.getItem('nnvp_backend_token') || '',
     };
   }
+  const apiKey = overrides.apiKey || stored.apiKey || '';
+  const explicitBaseUrl = overrides.baseUrl || stored.baseUrl || '';
+  const backendUrl = overrides.backendUrl || BACKEND_BASE_URL;
+  const backendToken = overrides.backendToken || stored.backendToken || '';
+  const baseUrl = explicitBaseUrl
+    || (backendToken && !apiKey ? backendUrl : DEFAULT_BASE_URL);
   return {
-    apiKey: overrides.apiKey || stored.apiKey || '',
-    baseUrl: overrides.baseUrl || stored.baseUrl || DEFAULT_BASE_URL,
+    apiKey,
+    baseUrl,
     model: overrides.model || stored.model || DEFAULT_MODEL,
-    backendUrl: overrides.backendUrl || stored.backendUrl || '',
-    backendToken: overrides.backendToken || stored.backendToken || '',
+    backendUrl,
+    backendToken,
   };
 }
 
 const trimSlash = (url) => (url || '').replace(/\/+$/, '');
 
 // The NNVP backend exposes the assistant proxy at /api/assistant/messages with
-// JWT Bearer auth and a server-side Anthropic key — a different path and auth
-// scheme from api.anthropic.com. When the chat's base URL is the configured
-// NNVP backend, switch to that contract; any other custom base URL is treated
-// as a transparent Anthropic-compatible proxy (same /v1/messages + x-api-key).
+// Bearer-token auth and a server-side Anthropic key — a different path and
+// auth scheme from api.anthropic.com. When the chat's base URL is set to the
+// same-origin backend ("/api"), switch to that contract; any other custom base
+// URL is treated as a transparent Anthropic-compatible proxy (same
+// /v1/messages + x-api-key).
 export function usesBackendProxy(config) {
   return Boolean(config.backendUrl)
     && trimSlash(config.baseUrl) === trimSlash(config.backendUrl);
@@ -225,7 +245,9 @@ export default class AnthropicClient {
 
   // Turn a non-2xx HTTP response into a friendly, actionable message. Tries to
   // pull `error.message` out of the JSON body, falling back to the raw text.
-  static async describeHttpError(response) {
+  // `viaBackend` switches to NNVP-backend-proxy wording: there the user has no
+  // API key or base URL to fix, so the advice is about their account instead.
+  static async describeHttpError(response, viaBackend = false) {
     let detail = '';
     try {
       const body = await response.text();
@@ -236,6 +258,20 @@ export default class AnthropicClient {
         detail = body;
       }
     } catch { /* ignore unreadable bodies */ }
+    if (viaBackend) {
+      // Backend proxy statuses. When the credit system lands, a 402 entry
+      // ("You are out of assistant credits…") belongs in this map.
+      const backendKnown = {
+        401: 'Your NNVP session has expired or is not verified (401). '
+          + 'Sign in again (Account menu) to use the assistant.',
+        429: 'Rate limited (429). Try again in a bit.',
+      };
+      const base = backendKnown[response.status]
+        || (response.status >= 500
+          ? `The NNVP backend had a problem (${response.status}). Try again shortly.`
+          : `NNVP backend error (status ${response.status}).`);
+      return detail ? `${base} ${detail}` : base;
+    }
     const known = {
       400: 'The request was rejected (400 Bad Request).',
       401: 'Invalid API key (401). Check the key in the assistant settings (⚙).',
@@ -261,7 +297,10 @@ export default class AnthropicClient {
       }
     } else {
       if (!apiKey) {
-        throw new Error('No Anthropic API key set. Add one in the assistant settings (⚙).');
+        throw new Error(
+          'No Anthropic API key set. Add one in the assistant settings (⚙), '
+          + 'or sign in (Account menu) to use the assistant without an API key.',
+        );
       }
       if (!isPlausibleApiKey(apiKey)) {
         throw new Error('The Anthropic API key looks malformed. Check it in the settings (⚙).');
@@ -270,8 +309,11 @@ export default class AnthropicClient {
     if (!this.fetchImpl) {
       throw new Error('No network client is available in this environment.');
     }
+    // Backend proxy: backendUrl is the API root (Django mounts everything
+    // under /api), so the route is `${backendUrl}/assistant/messages` —
+    // NOT `${backendUrl}/api/assistant/messages`.
     const endpoint = viaBackend
-      ? `${trimSlash(baseUrl)}/api/assistant/messages`
+      ? `${trimSlash(config.backendUrl)}/assistant/messages`
       : `${baseUrl}/v1/messages`;
     const headers = viaBackend
       ? {
@@ -298,13 +340,14 @@ export default class AnthropicClient {
         }),
       });
     } catch (error) {
-      throw new Error(
-        'Network error: could not reach the Anthropic API '
-        + `(${(error && error.message) || error}). Check your connection or the base URL.`,
-      );
+      throw new Error(viaBackend
+        ? 'Could not reach the NNVP backend '
+          + `(${(error && error.message) || error}). Check your connection and try again.`
+        : 'Network error: could not reach the Anthropic API '
+          + `(${(error && error.message) || error}). Check your connection or the base URL.`);
     }
     if (!response.ok) {
-      throw new Error(await AnthropicClient.describeHttpError(response));
+      throw new Error(await AnthropicClient.describeHttpError(response, viaBackend));
     }
     let data;
     try {
