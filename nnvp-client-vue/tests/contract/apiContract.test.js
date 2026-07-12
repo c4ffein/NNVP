@@ -3,20 +3,25 @@
  *
  * REAL round-trip contract tests: the SPA's actual ApiClient
  * (src/lib/Backend/apiClient.js) talking to the actual Django Ninja backend
- * over real HTTP (Node's global fetch). No mocks anywhere.
+ * over real HTTP (Node's global fetch). No mocks anywhere — including auth:
+ * the magic-link flow reads the actual emails the backend "sends" via
+ * Django's file-based email backend (NNVP_MAIL_DIR, exported by the script).
  *
  * Requires a running backend, e.g. via `bash scripts/test-contract.sh`, or:
- *   NNVP_BACKEND_URL=http://127.0.0.1:8123 bun run test:contract
+ *   NNVP_BACKEND_URL=http://127.0.0.1:8123 NNVP_MAIL_DIR=/tmp/nnvp-mail \
+ *     bun run test:contract
  *
  * These tests are intentionally excluded from `bun run test:unit`
  * (the scripts scope bun test to tests/unit vs tests/contract).
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'bun:test';
 import ApiClient, { ApiError, ERROR_CODES } from '../../src/lib/Backend/apiClient.js';
 
 const BACKEND_URL = process.env.NNVP_BACKEND_URL || 'http://127.0.0.1:8123';
+const MAIL_DIR = process.env.NNVP_MAIL_DIR || '';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -31,9 +36,45 @@ class MemoryStorage {
 }
 
 function makeClient() {
-  const client = new ApiClient({ storage: new MemoryStorage() });
-  client.setBaseUrl(BACKEND_URL);
-  return client;
+  return new ApiClient({
+    storage: new MemoryStorage(),
+    baseUrl: `${BACKEND_URL}/api`,
+  });
+}
+
+/**
+ * The raw magic token from the ONE email sent since the last call. Django's
+ * filebased backend writes one file per send, but its filenames only have
+ * second-granularity timestamps (plus an arbitrary id) — sorting them can
+ * misorder two sends within the same second. Consuming unseen files is
+ * deterministic instead: every magic request produces exactly one new file.
+ */
+const seenMailFiles = new Set();
+function takeMagicToken() {
+  if (!MAIL_DIR) {
+    throw new Error('NNVP_MAIL_DIR is not set — run via `bash scripts/test-contract.sh`');
+  }
+  const unseen = readdirSync(MAIL_DIR).filter((f) => !seenMailFiles.has(f));
+  if (unseen.length !== 1) {
+    throw new Error(`expected exactly 1 new email in ${MAIL_DIR}, found ${unseen.length}`);
+  }
+  seenMailFiles.add(unseen[0]);
+  const body = readFileSync(join(MAIL_DIR, unseen[0]), 'utf8');
+  const match = body.match(/\?magic=([A-Za-z0-9_-]+)/);
+  if (!match) throw new Error(`no magic link found in email:\n${body}`);
+  return match[1];
+}
+
+/**
+ * Full real-HTTP magic-link sign-in for `client`: request (client stores its
+ * pending bearer), read the emailed link, approve it, confirm via status.
+ */
+async function signIn(client, email) {
+  const requested = await client.requestMagicLink(email);
+  await client.approveMagicLink(takeMagicToken());
+  const status = await client.authStatus();
+  if (!status.verified) throw new Error('approval did not verify the requesting client');
+  return { ...status, code: requested.code };
 }
 
 // Unique emails per run so re-runs against a reused DB never collide.
@@ -115,44 +156,69 @@ describe(`API contract against real backend at ${BACKEND_URL}`, () => {
   });
 
   // Shared state across the ordered tests below.
-  const alice = { client: makeClient(), email: uniqueEmail(), password: `pw-${RUN_ID}-alice` };
-  const bob = { client: makeClient(), email: uniqueEmail(), password: `pw-${RUN_ID}-bob` };
+  const alice = { client: makeClient(), email: uniqueEmail() };
+  const bob = { client: makeClient(), email: uniqueEmail() };
   const graph = realisticGraph();
   let aliceProjectId = null;
 
-  describe('auth', () => {
-    it('register returns 201 with a token and the user shape, and stores the token', async () => {
-      const data = await alice.client.register({ email: alice.email, password: alice.password });
+  describe('auth (magic link)', () => {
+    it('first login: pending bearer + code, approve verifies THE REQUESTING client', async () => {
+      const requested = await alice.client.requestMagicLink(alice.email);
+      expect(typeof requested.token).toBe('string');
+      expect(requested.code).toMatch(/^[2-9A-HJKMNP-Z]{4}$/);
+      // The pending bearer is stored but useless until approved.
+      expect(alice.client.getToken()).toBe(requested.token);
+      await expectApiError(alice.client.me(), { code: ERROR_CODES.http, status: 401 });
+      const pending = await alice.client.authStatus();
+      expect(pending).toEqual({ verified: false, user: null, code: requested.code });
 
-      expect(typeof data.token).toBe('string');
-      expect(data.token.length).toBeGreaterThan(0);
-      expect(typeof data.user.id).toBe('number');
-      expect(data.user.email).toBe(alice.email);
-      alice.id = data.user.id;
+      // The approval side gets a confirmation, never a credential.
+      const approved = await alice.client.approveMagicLink(takeMagicToken());
+      expect(approved.email).toBe(alice.email);
+      alice.id = approved.id;
 
-      // The client auto-stores the token in its (injected) storage.
-      expect(alice.client.getToken()).toBe(data.token);
-      expect(alice.client.isLoggedIn()).toBe(true);
+      // The SAME stored bearer is now a full session.
+      const status = await alice.client.authStatus();
+      expect(status.verified).toBe(true);
+      expect(status.user).toEqual({ id: alice.id, email: alice.email });
+      expect(alice.client.getToken()).toBe(requested.token);
     });
 
-    it('registering the same email again is rejected with HTTP 409', async () => {
-      const err = await expectApiError(
-        makeClient().register({ email: alice.email, password: alice.password }),
-        { code: ERROR_CODES.http, status: 409 },
-      );
-      expect(err.body).toEqual({ detail: 'A user with that email already exists.' });
-    });
-
-    it('login returns a fresh token for an existing user', async () => {
+    it('info reports the match code and detects the requesting browser', async () => {
       const client = makeClient();
-      const data = await client.login({ email: alice.email, password: alice.password });
+      const { code } = await client.requestMagicLink(alice.email);
+      const raw = takeMagicToken();
+      const sameInfo = await client.magicInfo(raw); // sends its own pending bearer
+      expect(sameInfo.code).toBe(code);
+      expect(sameInfo.same_browser).toBe(true);
+      expect(typeof sameInfo.requester).toBe('string');
+      const strangerInfo = await makeClient().magicInfo(raw); // no credentials
+      expect(strangerInfo.same_browser).toBe(false);
+      await client.approveMagicLink(raw); // clean up: finish this login
+      await client.logout();
+    });
 
-      expect(typeof data.token).toBe('string');
-      expect(data.token.length).toBeGreaterThan(0);
-      expect(data.user).toEqual({ id: alice.id, email: alice.email });
-      expect(client.getToken()).toBe(data.token);
+    it('a magic link is single-use: approving it again is a structured 401', async () => {
+      const client = makeClient();
+      await client.requestMagicLink(alice.email);
+      const raw = takeMagicToken();
+      await client.approveMagicLink(raw);
 
-      // Keep alice on a login-issued token for the rest of the suite.
+      const err = await expectApiError(
+        makeClient().approveMagicLink(raw),
+        { code: ERROR_CODES.http, status: 401 },
+      );
+      expect(err.body).toEqual({ detail: 'Invalid or expired sign-in link.' });
+      expect(err.message).toBe('Invalid or expired sign-in link.');
+      await client.logout();
+    });
+
+    it('a second login reuses the account and issues a fresh token', async () => {
+      const client = makeClient();
+      const status = await signIn(client, alice.email);
+      expect(status.user).toEqual({ id: alice.id, email: alice.email });
+
+      // Keep alice on this fresh token for the rest of the suite.
       alice.client = client;
     });
 
@@ -161,13 +227,29 @@ describe(`API contract against real backend at ${BACKEND_URL}`, () => {
       expect(me).toEqual({ id: alice.id, email: alice.email });
     });
 
-    it('login with bad credentials fails with a structured 401 ApiError', async () => {
-      const err = await expectApiError(
-        makeClient().login({ email: alice.email, password: 'definitely-wrong' }),
+    it('logout cancels a pending login: the emailed link stops working', async () => {
+      const client = makeClient();
+      await client.requestMagicLink(alice.email);
+      const raw = takeMagicToken();
+      await client.logout(); // revokes the pending bearer server-side
+      await expectApiError(
+        makeClient().approveMagicLink(raw),
         { code: ERROR_CODES.http, status: 401 },
       );
-      expect(err.body).toEqual({ detail: 'Invalid email or password.' });
-      expect(err.message).toBe('Invalid email or password.');
+    });
+
+    it('a garbage link token fails with a structured 401 ApiError', async () => {
+      await expectApiError(
+        makeClient().approveMagicLink('definitely-not-a-real-token'),
+        { code: ERROR_CODES.http, status: 401 },
+      );
+    });
+
+    it('a malformed email is rejected with 422 and sends nothing', async () => {
+      await expectApiError(
+        makeClient().requestMagicLink('not-an-email'),
+        { code: ERROR_CODES.http, status: 422 },
+      );
     });
 
     it('me with no token short-circuits client-side with a not-logged-in ApiError', async () => {
@@ -178,14 +260,14 @@ describe(`API contract against real backend at ${BACKEND_URL}`, () => {
 
     it('me with an invalid token is rejected by the backend with 401', async () => {
       const client = makeClient();
-      client.setToken('not-a-real-jwt');
+      client.setToken('not-a-real-token');
       const err = await expectApiError(client.me(), { code: ERROR_CODES.http, status: 401 });
       expect(err.body).toEqual({ detail: 'Unauthorized' });
     });
 
     it('project routes also require auth (401 with an invalid token)', async () => {
       const client = makeClient();
-      client.setToken('not-a-real-jwt');
+      client.setToken('not-a-real-token');
       await expectApiError(client.listProjects(), { code: ERROR_CODES.http, status: 401 });
     });
   });
@@ -214,7 +296,7 @@ describe(`API contract against real backend at ${BACKEND_URL}`, () => {
       expect(typeof entry.updated_at).toBe('string');
       // Contract: the list payload omits the graph entirely.
       expect('graph' in entry).toBe(false);
-      expect(Object.keys(entry).sort()).toEqual(['id', 'name', 'updated_at']);
+      expect(Object.keys(entry).sort()).toEqual(['id', 'name', 'parent_id', 'tags', 'updated_at']);
     });
 
     it('get returns the graph, deep-equal to what was sent', async () => {
@@ -257,10 +339,34 @@ describe(`API contract against real backend at ${BACKEND_URL}`, () => {
     });
   });
 
+  describe('lineage & tags', () => {
+    it('saves-as-continuation build a chain the lineage endpoint windows to ±2', async () => {
+      const mk = (name, parent) => alice.client.createProject({
+        name, graph: {}, tags: [name], parent,
+      });
+      const g2 = await mk('lineage-g2');
+      const g1 = await mk('lineage-g1', g2.id);
+      const focus = await mk('lineage-focus', g1.id);
+      const c1 = await mk('lineage-c1', focus.id);
+      const c2 = await mk('lineage-c2', c1.id);
+      const c3 = await mk('lineage-c3', c2.id); // 3 below focus: outside the window
+
+      expect(c1.parent_id).toBe(focus.id);
+      expect(c1.tags).toEqual(['lineage-c1']);
+
+      const lineage = await alice.client.projectLineage(focus.id);
+      expect(lineage.focus).toBe(focus.id);
+      const ids = lineage.nodes.map(n => n.id).sort((a, b) => a - b);
+      expect(ids).toEqual([g2.id, g1.id, focus.id, c1.id, c2.id].sort((a, b) => a - b));
+      expect(ids).not.toContain(c3.id);
+      expect(lineage.edges).toContainEqual({ source: focus.id, target: c1.id });
+    });
+  });
+
   describe('ownership isolation', () => {
     it('a second user cannot read, modify, or see the first user\'s project', async () => {
-      const data = await bob.client.register({ email: bob.email, password: bob.password });
-      expect(typeof data.token).toBe('string');
+      const status = await signIn(bob.client, bob.email);
+      expect(status.verified).toBe(true);
 
       // Read is a 404 (not a 403): existence is not leaked across owners.
       await expectApiError(

@@ -63,7 +63,7 @@ test.describe('NNVP Interactions', () => {
     expect(fileMenuItems.length).toBeGreaterThan(0);
     expect(fileMenuItems).toContain('File');
     expect(fileMenuItems).toContain('Edit');
-    expect(fileMenuItems).toContain('Training');
+    expect(fileMenuItems).toContain('View'); // Training lives under View now
     expect(fileMenuItems).toContain('About');
     expect(consoleErrors.length).toBe(0);
   });

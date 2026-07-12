@@ -12,7 +12,7 @@ test.describe('Accessibility', () => {
     await expect(page.getByRole('menubar', { name: 'Main menu' })).toBeVisible();
     await expect(page.getByRole('menuitem', { name: 'File' })).toBeVisible();
     await expect(page.getByRole('menuitem', { name: 'Edit' })).toBeVisible();
-    await expect(page.getByRole('menuitem', { name: 'Training' })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: 'View' })).toBeVisible();
     await expect(page.getByRole('menuitem', { name: 'About' })).toBeVisible();
   });
 

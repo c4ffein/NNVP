@@ -1,7 +1,9 @@
 import {
   describe, it, expect, beforeEach, mock,
 } from 'bun:test';
-import ApiClient, { ApiError, ERROR_CODES, STORAGE_KEYS } from '../../src/lib/Backend/apiClient';
+import ApiClient, {
+  ApiError, ERROR_CODES, STORAGE_KEYS, DEFAULT_BASE_URL,
+} from '../../src/lib/Backend/apiClient';
 
 // Minimal in-memory Storage stand-in so tests never touch a real localStorage.
 function makeStorage(initial = {}) {
@@ -44,29 +46,27 @@ function rawResponse(status, raw) {
   };
 }
 
-const CONFIGURED = { [STORAGE_KEYS.url]: 'http://localhost:8009' };
-const LOGGED_IN = { [STORAGE_KEYS.url]: 'http://localhost:8009', [STORAGE_KEYS.token]: 'jwt-123' };
+const LOGGED_IN = { [STORAGE_KEYS.token]: 'token-123' };
 
 describe('ApiClient configuration', () => {
-  it('reports not-configured with no backend url', () => {
+  it('talks to the same-origin /api base by default', () => {
     const api = new ApiClient({ storage: makeStorage(), fetch: makeFetch(jsonResponse(200, {})) });
-    expect(api.isConfigured()).toBe(false);
+    expect(api.getBaseUrl()).toBe(DEFAULT_BASE_URL);
     expect(api.isLoggedIn()).toBe(false);
-    expect(api.getBaseUrl()).toBe('');
   });
 
-  it('trims a trailing slash from the base url', () => {
-    const storage = makeStorage({ [STORAGE_KEYS.url]: 'http://localhost:8009/' });
-    const api = new ApiClient({ storage, fetch: makeFetch(jsonResponse(200, {})) });
-    expect(api.getBaseUrl()).toBe('http://localhost:8009');
-    expect(api.isConfigured()).toBe(true);
+  it('accepts a base-url override (contract tests) and trims trailing slashes', () => {
+    const api = new ApiClient({
+      storage: makeStorage(),
+      fetch: makeFetch(jsonResponse(200, {})),
+      baseUrl: 'http://localhost:8123/api/',
+    });
+    expect(api.getBaseUrl()).toBe('http://localhost:8123/api');
   });
 
-  it('setBaseUrl / setToken / clearToken persist to storage', () => {
+  it('setToken / clearToken persist to storage', () => {
     const storage = makeStorage();
     const api = new ApiClient({ storage, fetch: makeFetch(jsonResponse(200, {})) });
-    api.setBaseUrl('  http://host:1/  ');
-    expect(storage.getItem(STORAGE_KEYS.url)).toBe('http://host:1/');
     api.setToken('abc');
     expect(storage.getItem(STORAGE_KEYS.token)).toBe('abc');
     expect(api.isLoggedIn()).toBe(true);
@@ -76,43 +76,92 @@ describe('ApiClient configuration', () => {
   });
 });
 
-describe('ApiClient auth', () => {
-  it('register posts credentials and stores the returned token', async () => {
-    const storage = makeStorage(CONFIGURED);
-    const fetchImpl = makeFetch(jsonResponse(201, { token: 't-reg', user: { id: 1, email: 'a@b.c' } }));
+describe('ApiClient auth (magic link)', () => {
+  it('requestMagicLink stores the pending bearer and returns the match code', async () => {
+    const storage = makeStorage();
+    const fetchImpl = makeFetch(jsonResponse(200, { token: 't-pending', code: '7K3Q' }));
     const api = new ApiClient({ storage, fetch: fetchImpl });
 
-    const data = await api.register({ email: 'a@b.c', password: 'pw' });
+    const data = await api.requestMagicLink('a@b.c');
 
-    expect(data.user.email).toBe('a@b.c');
-    expect(storage.getItem(STORAGE_KEYS.token)).toBe('t-reg');
+    expect(data.code).toBe('7K3Q');
+    expect(storage.getItem(STORAGE_KEYS.token)).toBe('t-pending');
     const { url, options } = fetchImpl.calls[0];
-    expect(url).toBe('http://localhost:8009/api/auth/register');
+    expect(url).toBe('/api/auth/magic/request');
     expect(options.method).toBe('POST');
-    expect(JSON.parse(options.body)).toEqual({ email: 'a@b.c', password: 'pw' });
+    expect(JSON.parse(options.body)).toEqual({ email: 'a@b.c' });
     expect(options.headers['Content-Type']).toBe('application/json');
   });
 
-  it('login stores the token and later requests send it as a Bearer header', async () => {
-    const storage = makeStorage(CONFIGURED);
-    const loginFetch = makeFetch(jsonResponse(200, { token: 't-login', user: { id: 2, email: 'x@y.z' } }));
-    const api = new ApiClient({ storage, fetch: loginFetch });
-    await api.login({ email: 'x@y.z', password: 'pw' });
-    expect(storage.getItem(STORAGE_KEYS.token)).toBe('t-login');
-
-    // Swap the fetch for the authed call and assert the header plumbing.
-    const meFetch = makeFetch(jsonResponse(200, { id: 2, email: 'x@y.z' }));
-    api._fetch = meFetch;
-    const me = await api.me();
-    expect(me.email).toBe('x@y.z');
-    expect(meFetch.calls[0].options.headers.Authorization).toBe('Bearer t-login');
+  it('authStatus polls with the stored bearer', async () => {
+    const storage = makeStorage(LOGGED_IN);
+    const fetchImpl = makeFetch(jsonResponse(200, { verified: false, code: '7K3Q' }));
+    const api = new ApiClient({ storage, fetch: fetchImpl });
+    const data = await api.authStatus();
+    expect(data.verified).toBe(false);
+    expect(fetchImpl.calls[0].url).toBe('/api/auth/status');
+    expect(fetchImpl.calls[0].options.headers.Authorization).toBe('Bearer token-123');
   });
 
-  it('logout clears the token', () => {
+  it('magicInfo sends its own bearer when present (same-browser detection)', async () => {
     const storage = makeStorage(LOGGED_IN);
-    const api = new ApiClient({ storage, fetch: makeFetch(jsonResponse(200, {})) });
+    const fetchImpl = makeFetch(jsonResponse(200, {
+      code: '7K3Q', requester: 'Firefox on Linux', requested_at: 't', same_browser: true,
+    }));
+    const api = new ApiClient({ storage, fetch: fetchImpl });
+    const info = await api.magicInfo('raw-link-token');
+    expect(info.same_browser).toBe(true);
+    const { url, options } = fetchImpl.calls[0];
+    expect(url).toBe('/api/auth/magic/info');
+    expect(options.headers.Authorization).toBe('Bearer token-123');
+    expect(JSON.parse(options.body)).toEqual({ token: 'raw-link-token' });
+  });
+
+  it('magicInfo works without a stored bearer (auth is optional)', async () => {
+    const fetchImpl = makeFetch(jsonResponse(200, {
+      code: '7K3Q', requester: 'Safari on iPhone', requested_at: 't', same_browser: false,
+    }));
+    const api = new ApiClient({ storage: makeStorage(), fetch: fetchImpl });
+    const info = await api.magicInfo('raw-link-token');
+    expect(info.same_browser).toBe(false);
+    expect(fetchImpl.calls[0].options.headers.Authorization).toBeUndefined();
+  });
+
+  it('approveMagicLink never stores a token (approval is not a login here)', async () => {
+    const storage = makeStorage();
+    const fetchImpl = makeFetch(jsonResponse(200, { id: 1, email: 'a@b.c' }));
+    const api = new ApiClient({ storage, fetch: fetchImpl });
+    const user = await api.approveMagicLink('raw-link-token');
+    expect(user.email).toBe('a@b.c');
+    expect(fetchImpl.calls[0].url).toBe('/api/auth/magic/approve');
+    expect(storage.getItem(STORAGE_KEYS.token)).toBeNull();
+  });
+
+  it('authed calls send the stored token as a Bearer header', async () => {
+    const storage = makeStorage(LOGGED_IN);
+    const meFetch = makeFetch(jsonResponse(200, { id: 2, email: 'x@y.z' }));
+    const api = new ApiClient({ storage, fetch: meFetch });
+    const me = await api.me();
+    expect(me.email).toBe('x@y.z');
+    expect(meFetch.calls[0].url).toBe('/api/auth/me');
+    expect(meFetch.calls[0].options.headers.Authorization).toBe('Bearer token-123');
+  });
+
+  it('logout revokes server-side then clears the token', async () => {
+    const storage = makeStorage(LOGGED_IN);
+    const fetchImpl = makeFetch(rawResponse(204, ''));
+    const api = new ApiClient({ storage, fetch: fetchImpl });
     expect(api.isLoggedIn()).toBe(true);
-    api.logout();
+    await api.logout();
+    expect(api.isLoggedIn()).toBe(false);
+    expect(fetchImpl.calls[0].url).toBe('/api/auth/logout');
+    expect(fetchImpl.calls[0].options.headers.Authorization).toBe('Bearer token-123');
+  });
+
+  it('logout clears the token even when the server call fails', async () => {
+    const storage = makeStorage(LOGGED_IN);
+    const api = new ApiClient({ storage, fetch: makeFetch(new TypeError('down')) });
+    await api.logout();
     expect(api.isLoggedIn()).toBe(false);
   });
 });
@@ -126,8 +175,8 @@ describe('ApiClient projects CRUD', () => {
     const api = new ApiClient({ storage, fetch: fetchImpl });
     const projects = await api.listProjects();
     expect(projects).toHaveLength(1);
-    expect(fetchImpl.calls[0].url).toBe('http://localhost:8009/api/projects');
-    expect(fetchImpl.calls[0].options.headers.Authorization).toBe('Bearer jwt-123');
+    expect(fetchImpl.calls[0].url).toBe('/api/projects');
+    expect(fetchImpl.calls[0].options.headers.Authorization).toBe('Bearer token-123');
   });
 
   it('createProject posts name + graph', async () => {
@@ -137,7 +186,7 @@ describe('ApiClient projects CRUD', () => {
     const created = await api.createProject({ name: 'N', graph });
     expect(created.id).toBe(5);
     const { url, options } = fetchImpl.calls[0];
-    expect(url).toBe('http://localhost:8009/api/projects');
+    expect(url).toBe('/api/projects');
     expect(options.method).toBe('POST');
     expect(JSON.parse(options.body)).toEqual({ name: 'N', graph });
   });
@@ -147,7 +196,7 @@ describe('ApiClient projects CRUD', () => {
     const api = new ApiClient({ storage, fetch: fetchImpl });
     const p = await api.getProject(7);
     expect(p.id).toBe(7);
-    expect(fetchImpl.calls[0].url).toBe('http://localhost:8009/api/projects/7');
+    expect(fetchImpl.calls[0].url).toBe('/api/projects/7');
     expect(fetchImpl.calls[0].options.method).toBe('GET');
   });
 
@@ -156,7 +205,7 @@ describe('ApiClient projects CRUD', () => {
     const api = new ApiClient({ storage, fetch: fetchImpl });
     await api.updateProject(7, { name: 'R' });
     const { url, options } = fetchImpl.calls[0];
-    expect(url).toBe('http://localhost:8009/api/projects/7');
+    expect(url).toBe('/api/projects/7');
     expect(options.method).toBe('PUT');
     expect(JSON.parse(options.body)).toEqual({ name: 'R' });
   });
@@ -171,13 +220,8 @@ describe('ApiClient projects CRUD', () => {
 });
 
 describe('ApiClient error handling', () => {
-  it('throws no-backend when the url is not set', async () => {
-    const api = new ApiClient({ storage: makeStorage(), fetch: makeFetch(jsonResponse(200, {})) });
-    await expect(api.listProjects()).rejects.toMatchObject({ code: ERROR_CODES.noBackend });
-  });
-
   it('throws not-logged-in for authed calls without a token', async () => {
-    const api = new ApiClient({ storage: makeStorage(CONFIGURED), fetch: makeFetch(jsonResponse(200, {})) });
+    const api = new ApiClient({ storage: makeStorage(), fetch: makeFetch(jsonResponse(200, {})) });
     await expect(api.listProjects()).rejects.toMatchObject({ code: ERROR_CODES.notLoggedIn });
     await expect(api.me()).rejects.toBeInstanceOf(ApiError);
   });
@@ -202,12 +246,5 @@ describe('ApiClient error handling', () => {
     const storage = makeStorage(LOGGED_IN);
     const api = new ApiClient({ storage, fetch: makeFetch(rawResponse(200, '{not json')) });
     await expect(api.listProjects()).rejects.toMatchObject({ code: ERROR_CODES.malformed });
-  });
-
-  it('does not store a token when login fails', async () => {
-    const storage = makeStorage(CONFIGURED);
-    const api = new ApiClient({ storage, fetch: makeFetch(jsonResponse(400, { detail: 'bad creds' })) });
-    await expect(api.login({ email: 'a', password: 'b' })).rejects.toMatchObject({ status: 400 });
-    expect(storage.getItem(STORAGE_KEYS.token)).toBeNull();
   });
 });

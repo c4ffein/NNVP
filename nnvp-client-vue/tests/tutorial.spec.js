@@ -92,8 +92,9 @@ test.describe('Tutorial mode', () => {
     await expect(page.locator('.modal-container')).toContainText('Tutorials');
     await page.click('.about-tutorials-button');
     await page.waitForTimeout(300);
-    // About closes, the tutorial menu opens.
-    await expect(page.locator('.modal-overlay')).toHaveCount(0);
+    // About closes, the tutorial menu opens. (Both use the shared
+    // .modal-overlay chrome now, so identify the About modal by its content.)
+    await expect(page.locator('.modal-container')).toHaveCount(0);
     await expect(page.locator('.tutorial-menu-container')).toBeVisible();
   });
 });

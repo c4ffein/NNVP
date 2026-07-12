@@ -14,9 +14,8 @@ test.describe('Dataset load error handling', () => {
     await page.waitForTimeout(50);
 
     // Open the Training zone from the general menu.
-    const trainingMenu = await page.$('#GeneralMenu .menuTitle:has-text("Training")');
-    expect(trainingMenu).not.toBeNull();
-    await trainingMenu.click();
+    await page.click('#GeneralMenu .menuTitle:has-text("View")');
+    await page.click('#GeneralMenu .menuItem:has-text("Training")');
     await page.waitForTimeout(100);
 
     // The Dataset panel is the default tab; make sure it is selected.

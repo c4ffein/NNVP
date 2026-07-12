@@ -7,8 +7,8 @@ test.describe('Training Compile Options', () => {
   // Helper function to open Training panel and CompileOptions
   async function openCompileOptions(page) {
     // Click on Training menu (direct function, not dropdown)
-    const trainingMenu = await page.$('#GeneralMenu .menuTitle:has-text("Training")');
-    await trainingMenu.click();
+    await page.click('#GeneralMenu .menuTitle:has-text("View")');
+    await page.click('#GeneralMenu .menuItem:has-text("Training")');
     await page.waitForTimeout(100);
     // Click on Options tab
     const optionsTab = await page.$('.TrainingZone.bar-button:has-text("Options")');
@@ -51,9 +51,8 @@ test.describe('Training Compile Options', () => {
   test('should open Training panel and show CompileOptions', async ({ page }) => {
     console.log('\n=== TRAINING PANEL TEST ===');
     // Click on Training menu (it's a direct function call, not a dropdown)
-    const trainingMenu = await page.$('#GeneralMenu .menuTitle:has-text("Training")');
-    expect(trainingMenu).not.toBeNull();
-    await trainingMenu.click();
+    await page.click('#GeneralMenu .menuTitle:has-text("View")');
+    await page.click('#GeneralMenu .menuItem:has-text("Training")');
     await page.waitForTimeout(100);
     // Check if TrainingZone is visible
     const trainingZone = await page.$('#TrainingZone');
@@ -247,8 +246,8 @@ test.describe('Training Compile Options', () => {
     await page.waitForTimeout(100);
     // Open Training panel
     console.log('Opening Training panel...');
-    const trainingMenu = await page.$('#GeneralMenu .menuTitle:has-text("Training")');
-    await trainingMenu.click();
+    await page.click('#GeneralMenu .menuTitle:has-text("View")');
+    await page.click('#GeneralMenu .menuItem:has-text("Training")');
     await page.waitForTimeout(100);
     // Switch to Dataset tab and select a dataset
     console.log('Selecting dataset...');

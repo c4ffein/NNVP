@@ -87,7 +87,7 @@ test.describe('NNVP Core Features', () => {
         let templateToLoad = null;
         let templateName = '';
         // UI commands to skip
-        const uiCommands = ['New', 'Load', 'Save', 'Generate', 'Generate Javascript', 'Templates', 'Undo', 'Redo'];
+        const uiCommands = ['New', 'Load', 'Save', 'Generate TF - Python', 'Generate TF - JavaScript', 'Generate PyTorch', 'Generate Tinygrad', 'Templates', 'Undo', 'Redo'];
         for (const template of templates) {
           const text = await template.textContent();
           const trimmed = text.trim();
@@ -175,7 +175,7 @@ test.describe('NNVP Core Features', () => {
     const fileMenu = await page.$('text=File');
     await fileMenu.click();
     await page.waitForTimeout(30);
-    const generateJsOption = await page.$('text=Generate Javascript');
+    const generateJsOption = await page.$('text=Generate TF - JavaScript');
     await generateJsOption.click();
     await page.waitForTimeout(100);
     console.log('\n=== JAVASCRIPT GENERATION TEST ===');
@@ -245,9 +245,9 @@ test.describe('NNVP Core Features', () => {
     const fileMenu = await page.$('text=File');
     await fileMenu.click();
     await page.waitForTimeout(30);
-    const generateOption = await page.$('text=Generate');
+    const generateOption = await page.$('text=Generate TF - Python');
     const generateText = await generateOption.textContent();
-    expect(generateText.trim()).toBe('Generate');
+    expect(generateText.trim()).toBe('Generate TF - Python');
     await generateOption.click();
     await page.waitForTimeout(100);
     console.log('\n=== PYTHON GENERATION TEST ===');
@@ -284,7 +284,7 @@ def build_model():
     await templatesOption.hover();
     await page.waitForTimeout(50);
     const templates = await page.$$('.menuItem:has-text("Templates") > .dropdown-content > .menuItem');
-    const uiCommands = ['New', 'Load', 'Save', 'Generate', 'Generate Javascript', 'Templates'];
+    const uiCommands = ['New', 'Load', 'Save', 'Generate TF - Python', 'Generate TF - JavaScript', 'Generate PyTorch', 'Generate Tinygrad', 'Templates'];
     let templateLoaded = false;
     for (const template of templates) {
       const text = await template.textContent();
@@ -301,7 +301,7 @@ def build_model():
     const downloadPromise = page.waitForEvent('download', { timeout: 5000 });
     await fileMenu.click();
     await page.waitForTimeout(30);
-    const generateJsOption = await page.$('text=Generate Javascript');
+    const generateJsOption = await page.$('text=Generate TF - JavaScript');
     await generateJsOption.click();
     await page.waitForTimeout(100);
     const download = await downloadPromise;
@@ -329,7 +329,7 @@ def build_model():
     await templatesOption.hover();
     await page.waitForTimeout(50);
     const templates = await page.$$('.menuItem:has-text("Templates") > .dropdown-content > .menuItem');
-    const uiCommands = ['New', 'Load', 'Save', 'Generate', 'Generate Javascript', 'Templates'];
+    const uiCommands = ['New', 'Load', 'Save', 'Generate TF - Python', 'Generate TF - JavaScript', 'Generate PyTorch', 'Generate Tinygrad', 'Templates'];
     let templateLoaded = false;
     for (const template of templates) {
       const text = await template.textContent();
@@ -346,9 +346,9 @@ def build_model():
     const downloadPromise = page.waitForEvent('download', { timeout: 5000 });
     await fileMenu.click();
     await page.waitForTimeout(30);
-    const generateOption = await page.$('text=Generate');
+    const generateOption = await page.$('text=Generate TF - Python');
     const generateText = await generateOption.textContent();
-    expect(generateText.trim()).toBe('Generate');
+    expect(generateText.trim()).toBe('Generate TF - Python');
     await generateOption.click();
     await page.waitForTimeout(100);
     const download = await downloadPromise;
@@ -1120,8 +1120,8 @@ def build_model():
     });
     console.log('Dataset debug logging enabled');
     // Open TrainingZone by clicking "Training" in GeneralMenu
-    const trainingMenu = await page.$('text=Training');
-    await trainingMenu.click();
+    await page.click('#GeneralMenu .menuTitle:has-text("View")');
+    await page.click('#GeneralMenu .menuItem:has-text("Training")');
     await page.waitForTimeout(50);
     console.log('Clicked Training menu to open TrainingZone');
     // Verify TrainingZone is now visible
@@ -1250,8 +1250,8 @@ def build_model():
       window.nnvp = window.nnvp || {}; window.nnvp.debug = window.nnvp.debug || {}; window.nnvp.debug.enableDatasets = true;
     });
     // Open TrainingZone by clicking "Training" in GeneralMenu
-    const trainingMenu = await page.$('text=Training');
-    await trainingMenu.click();
+    await page.click('#GeneralMenu .menuTitle:has-text("View")');
+    await page.click('#GeneralMenu .menuItem:has-text("Training")');
     await page.waitForTimeout(50);
     console.log('Opened TrainingZone');
     // Go to Dataset tab
@@ -1360,8 +1360,8 @@ def build_model():
       window.nnvp = window.nnvp || {}; window.nnvp.debug = window.nnvp.debug || {}; window.nnvp.debug.enableDatasets = true;
     });
     // Open TrainingZone by clicking "Training" in GeneralMenu
-    const trainingMenu = await page.$('text=Training');
-    await trainingMenu.click();
+    await page.click('#GeneralMenu .menuTitle:has-text("View")');
+    await page.click('#GeneralMenu .menuItem:has-text("Training")');
     await page.waitForTimeout(50);
     console.log('Opened TrainingZone');
     // Go to Dataset tab
@@ -1694,7 +1694,8 @@ def build_model():
     await page.waitForTimeout(100);
     console.log('Loaded template: 2D Dense for MNIST');
     // Open Training panel via top menu
-    await page.click('text=Training');
+    await page.click('#GeneralMenu .menuTitle:has-text("View")');
+    await page.click('#GeneralMenu .menuItem:has-text("Training")');
     await page.waitForTimeout(100);
     // Verify TrainingZone is visible
     const bottomTrainer = await page.$('#trainingZone');
@@ -1726,7 +1727,7 @@ def build_model():
       console.log('Warning: Loading bar did not disappear within timeout, continuing anyway...');
     }
     // Now click Options tab to set epochs
-    await page.click('text=Options');
+    await page.click('#trainingZone >> text=Options');
     await page.waitForTimeout(50);
     // Set epochs to 10 for meaningful training progress verification
     const epochsInput = await page.$('#CompileOptions input[type="number"]');
@@ -2076,11 +2077,13 @@ def build_model():
     const fileMenu2 = await page.$('text=File');
     await fileMenu2.click();
     await page.waitForTimeout(50);
-    // Set up download listener before clicking Save
-    const downloadPromise = page.waitForEvent('download');
+    // File > Save opens the cloud-aware modal; the device path downloads.
     const saveOption = await page.$('text=Save');
     expect(saveOption).not.toBeNull();
     await saveOption.click();
+    await page.waitForTimeout(100);
+    const downloadPromise = page.waitForEvent('download');
+    await page.click('button:has-text("Save to this device")');
     // Wait for download and save to buffer
     const download = await downloadPromise;
     const downloadPath = await download.path();
@@ -2113,11 +2116,13 @@ def build_model():
     const fileMenu4 = await page.$('text=File');
     await fileMenu4.click();
     await page.waitForTimeout(50);
-    // Set up file chooser listener before clicking Load
-    const fileChooserPromise = page.waitForEvent('filechooser');
+    // File > Load opens the cloud-aware modal; the device path opens the chooser.
     const loadOption = await page.$('text=Load');
     expect(loadOption).not.toBeNull();
     await loadOption.click();
+    await page.waitForTimeout(100);
+    const fileChooserPromise = page.waitForEvent('filechooser');
+    await page.click('button:has-text("Load from this device")');
     // Upload the saved file
     const fileChooser = await fileChooserPromise;
     await fileChooser.setFiles(downloadPath);

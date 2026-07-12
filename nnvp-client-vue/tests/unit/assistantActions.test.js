@@ -4,6 +4,9 @@ import AnthropicClient, {
   buildTools,
   isMutatingTool,
   isPlausibleApiKey,
+  readStoredConfig,
+  usesBackendProxy,
+  DEFAULT_BASE_URL,
   MUTATING_TOOLS,
 } from '../../src/lib/Assistant/anthropicClient';
 
@@ -485,17 +488,32 @@ describe('AnthropicClient.send error handling', () => {
 describe('AnthropicClient backend proxy mode', () => {
   const makeActions = () => new AssistantActions(makeFakeD3Interface(), makeFakeKerasInterface());
 
-  it('posts to /api/assistant/messages with the backend JWT and no API key', async () => {
+  it('posts to <backendUrl>/assistant/messages with the backend JWT and no API key', async () => {
+    // backendUrl is the API root (Django mounts under /api), so the assistant
+    // route is <backendUrl>/assistant/messages — no extra /api segment.
     const fetchImpl = makeFakeFetch([textReply('ok')]);
     const client = new AnthropicClient(makeActions(), {
       fetch: fetchImpl,
-      baseUrl: 'http://localhost:8009/',
-      backendUrl: 'http://localhost:8009',
+      baseUrl: 'http://localhost:8009/api/',
+      backendUrl: 'http://localhost:8009/api',
       backendToken: 'backend-jwt',
     });
     const reply = await client.send([{ role: 'user', content: 'hi' }]);
     expect(reply).toBe('ok');
     expect(fetchImpl.calls[0].url).toBe('http://localhost:8009/api/assistant/messages');
+    expect(fetchImpl.calls[0].init.headers.authorization).toBe('Bearer backend-jwt');
+    expect(fetchImpl.calls[0].init.headers['x-api-key']).toBeUndefined();
+  });
+
+  it('resolves the same-origin default ("/api") to /api/assistant/messages', async () => {
+    // The real app never overrides backendUrl: it is the constant '/api'.
+    const fetchImpl = makeFakeFetch([textReply('ok')]);
+    const client = new AnthropicClient(makeActions(), {
+      fetch: fetchImpl,
+      backendToken: 'backend-jwt',
+    });
+    await client.send([{ role: 'user', content: 'hi' }]);
+    expect(fetchImpl.calls[0].url).toBe('/api/assistant/messages');
     expect(fetchImpl.calls[0].init.headers.authorization).toBe('Bearer backend-jwt');
     expect(fetchImpl.calls[0].init.headers['x-api-key']).toBeUndefined();
   });
@@ -522,5 +540,92 @@ describe('AnthropicClient backend proxy mode', () => {
     expect(fetchImpl.calls[0].url).toBe('https://myproxy.example.com/v1/messages');
     expect(fetchImpl.calls[0].init.headers['x-api-key']).toBe('sk-ant-testkey');
     expect(fetchImpl.calls[0].init.headers.authorization).toBeUndefined();
+  });
+});
+
+// --- Config resolution: who talks to what, by default -----------------------
+// Precedence: explicit base URL > (signed in + no own key -> backend proxy)
+// > public Anthropic API.
+describe('readStoredConfig resolution', () => {
+  it('defaults a signed-in user with no key and no base URL to the backend proxy', () => {
+    const config = readStoredConfig({ backendToken: 'backend-jwt' });
+    expect(config.baseUrl).toBe('/api');
+    expect(config.backendUrl).toBe('/api');
+    expect(usesBackendProxy(config)).toBe(true);
+  });
+
+  it('lets a user-provided API key win over the signed-in proxy default', () => {
+    const config = readStoredConfig({ backendToken: 'backend-jwt', apiKey: 'sk-ant-testkey' });
+    expect(config.baseUrl).toBe(DEFAULT_BASE_URL);
+    expect(usesBackendProxy(config)).toBe(false);
+  });
+
+  it('lets an explicit custom base URL win over the signed-in proxy default', () => {
+    const config = readStoredConfig({
+      backendToken: 'backend-jwt',
+      baseUrl: 'https://myproxy.example.com',
+    });
+    expect(config.baseUrl).toBe('https://myproxy.example.com');
+    expect(usesBackendProxy(config)).toBe(false);
+  });
+
+  it('still honors an explicitly typed "/api" base URL even when signed out', () => {
+    const config = readStoredConfig({ baseUrl: '/api' });
+    expect(usesBackendProxy(config)).toBe(true);
+    expect(config.backendToken).toBe('');
+  });
+
+  it('falls back to the public Anthropic API when signed out with no key', () => {
+    const config = readStoredConfig({});
+    expect(config.baseUrl).toBe(DEFAULT_BASE_URL);
+    expect(usesBackendProxy(config)).toBe(false);
+  });
+});
+
+// --- Backend proxy error mapping ---------------------------------------------
+describe('AnthropicClient backend proxy errors', () => {
+  const makeActions = () => new AssistantActions(makeFakeD3Interface(), makeFakeKerasInterface());
+
+  function makeProxyClient(queue) {
+    const fetchImpl = makeFakeFetch(queue);
+    const client = new AnthropicClient(makeActions(), {
+      fetch: fetchImpl,
+      backendToken: 'backend-jwt',
+    });
+    return { client, fetchImpl };
+  }
+
+  it('maps 401 (expired/unverified token) to a sign-in message', async () => {
+    const { client } = makeProxyClient([{ ok: false, status: 401, text: '' }]);
+    await expect(client.send([{ role: 'user', content: 'hi' }]))
+      .rejects.toThrow(/Sign in again \(Account menu\)/);
+  });
+
+  it('maps 429 to a short rate-limit message', async () => {
+    const { client } = makeProxyClient([{ ok: false, status: 429, text: '' }]);
+    await expect(client.send([{ role: 'user', content: 'hi' }]))
+      .rejects.toThrow(/Rate limited \(429\)\. Try again in a bit\./);
+  });
+
+  it('maps 5xx to a backend-problem message', async () => {
+    for (const status of [500, 503]) {
+      const { client } = makeProxyClient([{ ok: false, status, text: '' }]);
+      await expect(client.send([{ role: 'user', content: 'hi' }]))
+        .rejects.toThrow(new RegExp(`NNVP backend had a problem \\(${status}\\)`));
+    }
+  });
+
+  it('maps network failures to a backend-unreachable message', async () => {
+    const { client } = makeProxyClient([{ throwErr: new TypeError('Failed to fetch') }]);
+    await expect(client.send([{ role: 'user', content: 'hi' }]))
+      .rejects.toThrow(/Could not reach the NNVP backend.*Failed to fetch/);
+  });
+
+  it('suggests signing in when there is no key and no token', async () => {
+    const fetchImpl = makeFakeFetch([]);
+    const client = new AnthropicClient(makeActions(), { fetch: fetchImpl });
+    await expect(client.send([{ role: 'user', content: 'hi' }]))
+      .rejects.toThrow(/No Anthropic API key set.*sign in \(Account menu\)/);
+    expect(fetchImpl.calls).toHaveLength(0);
   });
 });
