@@ -415,11 +415,11 @@ export default {
       if (code === ERROR_CODES.notLoggedIn) {
         this.error = 'Please sign in first.';
       } else if (code === ERROR_CODES.network) {
-        this.error = 'Could not reach the backend. Is it running?';
+        this.error = 'Can\'t reach the server — please check your internet connection and try again.';
       } else if (code === ERROR_CODES.http && e.status >= 500) {
         // In dev, vite's /api proxy answers 500 when nothing listens on the
         // backend port (ECONNREFUSED); in prod a reverse proxy answers 502/504.
-        this.error = 'The backend is unreachable. Is it running?';
+        this.error = 'The server isn\'t responding right now — please try again in a moment.';
       } else if (code === ERROR_CODES.malformed) {
         this.error = 'The backend returned an unexpected response.';
       } else if (e && e.message) {

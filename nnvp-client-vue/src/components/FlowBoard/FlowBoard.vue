@@ -24,6 +24,9 @@
       <template #connection-line="connectionLineProps">
         <FloatingConnectionLine v-bind="connectionLineProps" />
       </template>
+      <!-- Border arrows pointing at layers outside the visible viewport;
+           must live inside VueFlow to share its injected store. -->
+      <OffscreenArrows />
     </VueFlow>
   </div>
 </template>
@@ -41,6 +44,7 @@ import LayerNode from './LayerNode.vue';
 import CompositeNode from './CompositeNode.vue';
 import FloatingEdge from './FloatingEdge.vue';
 import FloatingConnectionLine from './FloatingConnectionLine.vue';
+import OffscreenArrows from './OffscreenArrows.vue';
 
 defineProps({
   isTraining: { type: Boolean, default: false },

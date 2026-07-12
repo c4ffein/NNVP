@@ -367,9 +367,10 @@ export default {
       const code = e && e.code;
       if (code === ERROR_CODES.notLoggedIn) {
         this.error = 'Please sign in first.';
-      } else if (code === ERROR_CODES.network
-          || (code === ERROR_CODES.http && e.status >= 500)) {
-        this.error = 'The backend is unreachable. Is it running?';
+      } else if (code === ERROR_CODES.network) {
+        this.error = 'Can\'t reach the server — please check your internet connection and try again.';
+      } else if (code === ERROR_CODES.http && e.status >= 500) {
+        this.error = 'The server isn\'t responding right now — please try again in a moment.';
       } else if (e && e.message) {
         this.error = e.message;
       } else {

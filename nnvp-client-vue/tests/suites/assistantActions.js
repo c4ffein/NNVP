@@ -224,6 +224,34 @@ logicTest('assistantActions: reports a friendly error when no graph is active', 
   expect(() => bare.listLayers()).toThrow(/No active graph/);
 });
 
+logicTest('assistantActions: startTutorial dispatches the app-level event', ({ expect }) => {
+  const { actions } = setup();
+  const received = [];
+  const listener = (event) => received.push(event.detail);
+  window.addEventListener('nnvp:start-tutorial', listener);
+  try {
+    const result = actions.startTutorial('connect-layers');
+    expect(result.started).toBe('connect-layers');
+    expect(typeof result.title).toBe('string');
+    expect(received).toEqual([{ id: 'connect-layers' }]);
+  } finally {
+    window.removeEventListener('nnvp:start-tutorial', listener);
+  }
+});
+
+logicTest('assistantActions: startTutorial rejects unknown ids without dispatching', ({ expect }) => {
+  const { actions } = setup();
+  const received = [];
+  const listener = (event) => received.push(event.detail);
+  window.addEventListener('nnvp:start-tutorial', listener);
+  try {
+    expect(() => actions.startTutorial('ghost-tutorial')).toThrow(/Available ids: /);
+    expect(received).toEqual([]);
+  } finally {
+    window.removeEventListener('nnvp:start-tutorial', listener);
+  }
+});
+
 // --- AnthropicClient tool mapping ----------------------------------------------
 
 logicTest('anthropicClient: builds a valid tools array from the actions', ({ expect }) => {
@@ -242,6 +270,7 @@ logicTest('anthropicClient: builds a valid tools array from the actions', ({ exp
     'list_templates',
     'load_template',
     'list_tutorials',
+    'start_tutorial',
     'get_layer_help',
   ]);
   tools.forEach((tool) => {
@@ -309,6 +338,7 @@ logicTest('anthropicClient: marks exactly the mutating tools', ({ expect }) => {
   expect(isMutatingTool('load_template')).toBe(true); // replaces the board
   expect(isMutatingTool('list_templates')).toBe(false);
   expect(isMutatingTool('list_tutorials')).toBe(false);
+  expect(isMutatingTool('start_tutorial')).toBe(false); // navigation, not a graph edit
   expect(isMutatingTool('get_layer_help')).toBe(false);
   expect(isMutatingTool('add_layer')).toBe(true);
   expect(isMutatingTool('list_layers')).toBe(false);

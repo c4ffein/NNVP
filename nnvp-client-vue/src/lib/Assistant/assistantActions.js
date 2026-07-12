@@ -177,9 +177,8 @@ export default class AssistantActions {
     return { loaded: name, layerCount: model.d3Layers.length };
   }
 
-  // The app's guided tutorials: what exists and what each walks through. The
-  // assistant cannot START one (that is a UI action in the Tutorial menu),
-  // but it can point users there and explain the steps.
+  // The app's guided tutorials: what exists and what each walks through.
+  // startTutorial() below actually launches one.
   listTutorials() {
     return tutorials.map(tutorial => ({
       id: tutorial.id,

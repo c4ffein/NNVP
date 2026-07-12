@@ -80,6 +80,21 @@ export function makeBrowserWorld(page, canvas, expect, { exposePage = false } = 
     },
   };
 
+  // Same contract as worldComponents.makeCatalogDriver, on the real catalog.
+  const catalog = {
+    async open() {}, // always mounted in the app
+    async toggleAll() {
+      await page.click('.collapse-all-button');
+    },
+    async toggleCategory(name) {
+      await page.click(`[aria-label="Toggle ${name} layers"]`);
+    },
+    async masterArrowCollapsed() {
+      const classes = await page.locator('.collapse-all-arrow').getAttribute('class');
+      return classes.split(/\s+/).includes('collapsed');
+    },
+  };
+
   // Same contract as worldComponents.makeChatDriver, expressed as real UI.
   const chat = {
     async setSignedIn(signedIn) {
@@ -113,10 +128,27 @@ export function makeBrowserWorld(page, canvas, expect, { exposePage = false } = 
       await settle();
       return (await page.locator('#account-modal-title').count()) > 0;
     },
+    /** The help-modal handoff, as real UI: catalog (?) button → footer ask.
+        The (?) is hover-revealed, so hover the template row first. */
+    async askAbout(topic) {
+      await page.hover(`#layer-template-${topic}`);
+      await page.click(`[aria-label="Learn about the ${topic} layer"]`);
+      await settle();
+      await page.click('.layer-help-ask');
+      await settle();
+    },
+    async lastAssistantText() {
+      const bubbles = page.locator('.chat-msg-assistant .chat-bubble-text');
+      const count = await bubbles.count();
+      return count ? bubbles.nth(count - 1).textContent() : '';
+    },
+    async signInBlinking() {
+      return (await page.locator('.chat-connect .chat-btn-blink').count()) > 0;
+    },
   };
 
   const world = {
-    expect, board, chat, dispose: async () => {},
+    expect, board, chat, catalog, dispose: async () => {},
   };
   if (exposePage) {
     world.page = page;

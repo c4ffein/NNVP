@@ -41,6 +41,11 @@
           <div class="layer-help-modal-body">
             <div v-html="getLayerHelp()"></div>
           </div>
+          <div v-if="backendEnabled" class="layer-help-ask-row">
+            <button type="button" class="layer-help-ask" @click="askInChat">
+              💬 Ask the assistant about {{ layerType }}
+            </button>
+          </div>
         </div>
       </div>
       </Transition>
@@ -50,6 +55,7 @@
 
 <script>
 import layerHelp from '../../lib/KerasInterface/layerHelp';
+import { askAssistant } from '../../lib/Assistant/askAssistant';
 
 export default {
   name: 'ParamsBlock',
@@ -61,6 +67,8 @@ export default {
     return {
       isClosed: false,
       showModal: false,
+      // Same gate as App.vue's ChatBubble mount: no chat, no handoff button.
+      backendEnabled: !!import.meta.env.VITE_ENABLE_BACKEND,
     };
   },
   methods: {
@@ -72,6 +80,10 @@ export default {
     },
     closeModal() {
       this.showModal = false;
+    },
+    askInChat() {
+      askAssistant(this.layerType);
+      this.closeModal();
     },
     handleEscape(event) {
       if (event.key === 'Escape' && this.showModal) {
@@ -237,6 +249,19 @@ export default {
 
 .layer-help-modal-close:hover {
   transform: scale(1.1);
+}
+
+/* Footer handoff to the chat widget (both help modals share this family). */
+.layer-help-ask-row {
+  border-top: 1px solid var(--border-color);
+  margin-top: 16px;
+  padding-top: 14px;
+  display: flex;
+  justify-content: center;
+}
+.layer-help-ask {
+  cursor: pointer;
+  font-size: 13px;
 }
 
 .layer-help-modal-body h2 {

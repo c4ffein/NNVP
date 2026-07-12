@@ -4,7 +4,8 @@
  * real app is clicked. Both implementations control the same two boundaries:
  * localStorage auth + the nnvp:auth-changed event.
  */
-import { appTest } from '../harness/define';
+import { appTest, logicTest } from '../harness/define';
+import { askAssistant, consumePendingAsk } from '../../src/lib/Assistant/askAssistant';
 
 appTest('chat asks to sign in when signed out', async ({ chat, expect }) => {
   await chat.setSignedIn(false);
@@ -30,4 +31,35 @@ appTest('the chat connect prompt leads to the account flow', async ({ chat, expe
   await chat.setSignedIn(false);
   await chat.open();
   expect(await chat.signInFromPrompt()).toBe(true);
+});
+
+// --- Help-modal handoff: "Ask the assistant about X" ------------------------
+
+logicTest('askAssistant bridge: dispatches the event and stores one pending ask', ({ expect }) => {
+  consumePendingAsk(); // drain whatever an earlier test left behind
+  const received = [];
+  const listener = (event) => received.push(event.detail);
+  window.addEventListener('nnvp:ask-assistant', listener);
+  try {
+    askAssistant('Dense');
+    expect(received).toEqual([{ topic: 'Dense' }]);
+    expect(consumePendingAsk()).toEqual({ topic: 'Dense' });
+    expect(consumePendingAsk()).toBe(null); // consumed exactly once
+  } finally {
+    window.removeEventListener('nnvp:ask-assistant', listener);
+  }
+});
+
+appTest('help-modal ask seeds the assistant question when signed in', async ({ chat, expect }) => {
+  await chat.setSignedIn(true);
+  await chat.askAbout('Dense');
+  const text = await chat.lastAssistantText();
+  expect(text).toContain('What do you want to know about');
+  expect(text).toContain('Dense');
+});
+
+appTest('help-modal ask blinks the sign-in button when signed out', async ({ chat, expect }) => {
+  await chat.setSignedIn(false);
+  await chat.askAbout('Dense');
+  expect(await chat.signInBlinking()).toBe(true);
 });

@@ -70,6 +70,11 @@
           <div class="layer-help-modal-body">
             <div v-html="helpHtml"></div>
           </div>
+          <div v-if="backendEnabled" class="layer-help-ask-row">
+            <button type="button" class="layer-help-ask" @click="askInChat">
+              💬 Ask the assistant about {{ helpLayerType || helpCategory }}
+            </button>
+          </div>
         </div>
       </div>
       </Transition>
@@ -81,6 +86,7 @@
 import LayerTemplate from './LayerTemplate.vue';
 import layerHelp from '../../lib/KerasInterface/layerHelp';
 import categoryHelp from '../../lib/KerasInterface/categoryHelp';
+import { askAssistant } from '../../lib/Assistant/askAssistant';
 
 export default {
   name: 'LayerCatalog',
@@ -99,15 +105,30 @@ export default {
     },
   },
   methods: {
-    toggleCategory: categoryDiv => document.getElementById(categoryDiv).classList.toggle('closed'),
+    toggleCategory(categoryDiv) {
+      document.getElementById(categoryDiv).classList.toggle('closed');
+      this.refreshAllCollapsed();
+    },
     divId: categoryName => `category_${categoryName.replace(' ', '_')}`,
     categoryHelpHtmlFor: categoryName => categoryHelp[categoryName] || '',
     closeHelp() {
       this.helpLayerType = null;
       this.helpCategory = null;
     },
-    // The open/closed state lives in the DOM (classList), so the bulk toggle
-    // does too; `allCollapsed` only drives the button label.
+    // Hand the topic over to the chat widget (which opens and seeds the
+    // conversation) and get the modal out of its way.
+    askInChat() {
+      askAssistant(this.helpLayerType || this.helpCategory);
+      this.closeHelp();
+    },
+    // The open/closed state lives in the DOM (classList), so the master
+    // button's state is recomputed from it: as soon as ANY category is open,
+    // the arrow flips back to "collapse all" — one click always re-closes.
+    refreshAllCollapsed() {
+      const categories = [...this.$el.querySelectorAll('.layerCategory')];
+      this.allCollapsed = categories.length > 0
+        && categories.every((el) => el.classList.contains('closed'));
+    },
     toggleAllCategories() {
       const collapse = !this.allCollapsed;
       this.$el.querySelectorAll('.layerCategory').forEach((el) => {
@@ -161,6 +182,9 @@ export default {
     helpLayerType: null,
     helpCategory: null,
     allCollapsed: false,
+    // The ask-the-assistant handoff only exists where the chat does (same
+    // gate as App.vue's ChatBubble mount).
+    backendEnabled: !!import.meta.env.VITE_ENABLE_BACKEND,
   }),
   mounted() {
     this.$d3Interface.setLeftBarRemountCallback(this.remount);

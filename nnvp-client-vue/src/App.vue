@@ -45,6 +45,7 @@ import ChatBubble from './components/Assistant/ChatBubble.vue';
 import TutorialOverlay from './components/Tutorial/TutorialOverlay.vue';
 import TutorialMenu from './components/Tutorial/TutorialMenu.vue';
 import { getTutorial } from './lib/Tutorial/tutorials';
+import { ASK_EVENT } from './lib/Assistant/askAssistant';
 
 // Panel visibility survives reloads. Anything but an explicit '0' means shown.
 function readPanelPref(side) {
@@ -181,9 +182,17 @@ export default {
       if (event.detail && event.detail.id) this.startTutorial(event.detail.id);
     };
     window.addEventListener('nnvp:start-tutorial', this.onStartTutorial);
+    // "Ask the assistant" from a help modal must work when the chat widget is
+    // hidden via the View menu: mount it, and ChatBubble consumes the pending
+    // ask on mount (see lib/Assistant/askAssistant.js).
+    this.onAskAssistant = () => {
+      if (this.backendEnabled && !this.showChat) this.togglePanel('showChat');
+    };
+    window.addEventListener(ASK_EVENT, this.onAskAssistant);
   },
   beforeUnmount() {
     window.removeEventListener('nnvp:start-tutorial', this.onStartTutorial);
+    window.removeEventListener(ASK_EVENT, this.onAskAssistant);
   },
 };
 </script>

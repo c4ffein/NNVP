@@ -91,7 +91,11 @@
           <div v-if="!hasKey" class="chat-empty chat-connect">
             <p>Sign in to talk to the assistant — it can inspect and build
             your model for you. No API key needed.</p>
-            <button type="button" class="chat-btn" @click="$emit('open-account')">
+            <button
+              type="button"
+              :class="['chat-btn', { 'chat-btn-blink': blinkSignIn }]"
+              @click="$emit('open-account')"
+            >
               Sign in
             </button>
           </div>
@@ -163,6 +167,7 @@
 <script>
 import AssistantActions from '../../lib/Assistant/assistantActions';
 import renderMarkdown from '../../lib/Assistant/markdown';
+import { ASK_EVENT, consumePendingAsk } from '../../lib/Assistant/askAssistant';
 import AnthropicClient, {
   STORAGE_KEY,
   STORAGE_BASE_URL,
@@ -196,6 +201,7 @@ export default {
       // no user key / custom base URL) — drives the settings hint.
       proxyActive: false,
       allowEdits: false,
+      blinkSignIn: false,
     };
   },
   created() {
@@ -216,9 +222,17 @@ export default {
     // states live (apiClient dispatches this on every token change).
     this.onAuthChanged = () => this.refreshHasKey();
     window.addEventListener('nnvp:auth-changed', this.onAuthChanged);
+    // "Ask the assistant about X" from a help modal. The pending slot covers
+    // the case where App just mounted this component BECAUSE of that ask.
+    this.onAskAssistant = (event) => this.askAbout(event.detail.topic);
+    window.addEventListener(ASK_EVENT, this.onAskAssistant);
+    const pendingAsk = consumePendingAsk();
+    if (pendingAsk) this.askAbout(pendingAsk.topic);
   },
   beforeUnmount() {
     window.removeEventListener('nnvp:auth-changed', this.onAuthChanged);
+    window.removeEventListener(ASK_EVENT, this.onAskAssistant);
+    clearTimeout(this.blinkTimer);
   },
   methods: {
     renderMarkdown,
@@ -271,6 +285,29 @@ export default {
       const config = readStoredConfig();
       this.proxyActive = usesBackendProxy(config) && Boolean(config.backendToken);
       this.hasKey = Boolean(config.apiKey) || this.proxyActive;
+    },
+    // A help modal handed the user over: open the panel and let the ASSISTANT
+    // open the conversation, so the user just answers. Signed out, the chat
+    // shows its sign-in gate instead — blink that button to say "start here".
+    askAbout(topic) {
+      this.open = true;
+      this.refreshHasKey();
+      if (!this.hasKey) {
+        this.blinkSignIn = true;
+        clearTimeout(this.blinkTimer);
+        this.blinkTimer = setTimeout(() => { this.blinkSignIn = false; }, 4000);
+        return;
+      }
+      const question = `What do you want to know about **${topic}**?`;
+      // The API requires conversations to open with a user turn, so the
+      // seeded question rides on a hidden context line (not shown in the UI).
+      this.history.push({ role: 'user', content: `(I opened the in-app help for "${topic}".)` });
+      this.history.push({ role: 'assistant', content: question });
+      this.pushMessage('assistant', question);
+      this.$nextTick(() => {
+        const input = this.$refs.draftInput;
+        if (input && !input.disabled) input.focus();
+      });
     },
     scrollToBottom() {
       this.$nextTick(() => {
@@ -492,6 +529,15 @@ export default {
 
 .chat-btn {
   cursor: pointer;
+}
+
+/* Draws the eye to the sign-in gate when a help modal hands over a question
+   the signed-out user cannot ask yet. */
+.chat-btn-blink {
+  animation: chat-signin-blink 0.8s ease-in-out 5;
+}
+@keyframes chat-signin-blink {
+  50% { background-color: var(--corner-signed-out, #f59e0b); }
 }
 
 .chat-messages {
