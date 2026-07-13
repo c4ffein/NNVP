@@ -1,37 +1,28 @@
 <template>
-  <div class="chat-assistant">
-    <!-- Chat panel -->
-    <Transition name="chat-panel">
-      <div
-        v-if="open"
-        id="chat-panel"
-        ref="panel"
-        class="chat-panel floating-panel"
-        role="dialog"
-        aria-label="Assistant"
-      >
-        <div class="chat-header">
-          <div class="chat-title">Assistant</div>
-          <div class="chat-header-actions">
-            <button class="chat-icon-btn" aria-label="Settings" @click="toggleSettings">⚙</button>
-            <button class="chat-icon-btn" aria-label="Close" @click="open = false">×</button>
-          </div>
-        </div>
-
-        <!-- Settings popover. The assistant runs through the NNVP backend
-             (server-side key) — there is nothing key-related to configure. -->
-        <div v-if="settingsOpen" class="chat-settings">
-          <div v-if="proxyActive" class="chat-proxy-hint">
-            Using your NNVP account.
-          </div>
-          <label class="chat-field">
-            <span>Model</span>
-            <input type="text" v-model="model" :placeholder="defaultModel">
-          </label>
-          <div class="chat-settings-actions">
-            <button class="chat-btn" @click="saveSettings">Save</button>
-          </div>
-        </div>
+  <!-- Visibility is owned by App (Panels > Chat / the ask-assistant bridge);
+       mounted means visible. The titlebar close reports back via 'close'. -->
+  <Transition name="chat-panel" appear>
+    <FloatingWindow
+      id="chat-panel"
+      ref="panel"
+      window-id="chat"
+      class="chat-panel"
+      role="dialog"
+      aria-label="Assistant"
+      title="Assistant"
+      :initial="chatRect"
+      :min-width="340"
+      :min-height="460"
+      @close="$emit('close')"
+    >
+        <template #actions>
+          <button
+            class="chat-icon-btn"
+            aria-label="Settings"
+            title="Assistant settings (account panel)"
+            @click="$emit('open-account', 'usage')"
+          >⚙</button>
+        </template>
 
         <!-- Guardrail: read-only vs allowed-to-edit mode. Read-only is the
              default so the assistant cannot mutate the model without opt-in. -->
@@ -146,56 +137,39 @@
             Send
           </button>
         </form>
-      </div>
-    </Transition>
-
-    <!-- Bubble toggle -->
-    <button
-      class="chat-fab"
-      aria-label="Toggle assistant"
-      aria-haspopup="dialog"
-      aria-controls="chat-panel"
-      :aria-expanded="open"
-      @click="toggleOpen"
-    >
-      <span v-if="!open" aria-hidden="true">💬</span>
-      <span v-else aria-hidden="true">×</span>
-    </button>
-  </div>
+    </FloatingWindow>
+  </Transition>
 </template>
 
 <script>
 import AssistantActions from '../../lib/Assistant/assistantActions';
+import FloatingWindow from '../FloatingWindow.vue';
 import renderMarkdown from '../../lib/Assistant/markdown';
 import { ASK_EVENT, consumePendingAsk } from '../../lib/Assistant/askAssistant';
 import AnthropicClient, {
-  STORAGE_KEY,
-  STORAGE_BASE_URL,
-  STORAGE_MODEL,
   STORAGE_ALLOW_EDITS,
-  DEFAULT_MODEL,
-  DEFAULT_BASE_URL,
   readStoredConfig,
   usesBackendProxy,
 } from '../../lib/Assistant/anthropicClient';
 
 export default {
   name: 'ChatBubble',
-  emits: ['open-account'],
+  components: { FloatingWindow },
+  emits: ['open-account', 'close'],
   data() {
     return {
-      open: false,
-      settingsOpen: false,
+      // Opens bottom-right, where the fixed panel used to live.
+      chatRect: {
+        x: window.innerWidth - 340 - 12,
+        y: Math.max(12, window.innerHeight - 76 - 460),
+        width: 340,
+        height: 460,
+      },
       showModeHelp: false,
       draft: '',
       sending: false,
       messages: [],
       history: [],
-      apiKey: '',
-      model: '',
-      baseUrl: '',
-      defaultModel: DEFAULT_MODEL,
-      defaultBaseUrl: DEFAULT_BASE_URL,
       hasKey: false,
       // True when requests will go through the NNVP backend proxy (signed in,
       // no user key / custom base URL) — drives the settings hint.
@@ -205,11 +179,6 @@ export default {
     };
   },
   created() {
-    if (typeof localStorage !== 'undefined') {
-      this.apiKey = localStorage.getItem(STORAGE_KEY) || '';
-      this.model = localStorage.getItem(STORAGE_MODEL) || '';
-      this.baseUrl = localStorage.getItem(STORAGE_BASE_URL) || '';
-    }
     this.refreshHasKey();
     if (typeof localStorage !== 'undefined') {
       this.allowEdits = localStorage.getItem(STORAGE_ALLOW_EDITS) === 'true';
@@ -222,6 +191,8 @@ export default {
     // states live (apiClient dispatches this on every token change).
     this.onAuthChanged = () => this.refreshHasKey();
     window.addEventListener('nnvp:auth-changed', this.onAuthChanged);
+    // The window is visible as soon as it mounts: land focus in the input.
+    this.focusInput();
     // "Ask the assistant about X" from a help modal. The pending slot covers
     // the case where App just mounted this component BECAUSE of that ask.
     this.onAskAssistant = (event) => this.askAbout(event.detail.topic);
@@ -236,28 +207,19 @@ export default {
   },
   methods: {
     renderMarkdown,
-    toggleOpen() {
-      this.open = !this.open;
-      if (this.open) {
-        // The user may have signed in (or out) since the component mounted;
-        // re-resolve the config so the keyless proxy default kicks in live.
-        this.refreshHasKey();
-        // Move focus into the panel: the message field when it is enabled,
-        // otherwise the first available control (e.g. Settings).
-        this.$nextTick(() => {
-          const input = this.$refs.draftInput;
-          if (input && !input.disabled) {
-            input.focus();
-            return;
-          }
-          const panel = this.$refs.panel;
-          const focusable = panel && panel.querySelector('button, input:not([disabled]), [tabindex]');
-          if (focusable) focusable.focus();
-        });
-      }
-    },
-    toggleSettings() {
-      this.settingsOpen = !this.settingsOpen;
+    // Move focus into the panel: the message field when it is enabled,
+    // otherwise the first available control (e.g. Settings).
+    focusInput() {
+      this.$nextTick(() => {
+        const input = this.$refs.draftInput;
+        if (input && !input.disabled) {
+          input.focus({ preventScroll: true });
+          return;
+        }
+        const panel = this.$refs.panel && this.$refs.panel.$el;
+        const focusable = panel && panel.querySelector('button, input:not([disabled]), [tabindex]');
+        if (focusable) focusable.focus({ preventScroll: true });
+      });
     },
     setMode(allowEdits) {
       this.allowEdits = allowEdits;
@@ -265,18 +227,6 @@ export default {
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(STORAGE_ALLOW_EDITS, allowEdits ? 'true' : 'false');
       }
-    },
-    saveSettings() {
-      if (typeof localStorage !== 'undefined') {
-        if (this.apiKey) localStorage.setItem(STORAGE_KEY, this.apiKey);
-        else localStorage.removeItem(STORAGE_KEY);
-        if (this.model) localStorage.setItem(STORAGE_MODEL, this.model);
-        else localStorage.removeItem(STORAGE_MODEL);
-        if (this.baseUrl) localStorage.setItem(STORAGE_BASE_URL, this.baseUrl);
-        else localStorage.removeItem(STORAGE_BASE_URL);
-      }
-      this.refreshHasKey();
-      this.settingsOpen = false;
     },
     // "Ready to chat" means either a user-provided Anthropic key, or the
     // resolved base URL pointing at the NNVP backend proxy while signed in
@@ -290,7 +240,6 @@ export default {
     // open the conversation, so the user just answers. Signed out, the chat
     // shows its sign-in gate instead — blink that button to say "start here".
     askAbout(topic) {
-      this.open = true;
       this.refreshHasKey();
       if (!this.hasKey) {
         this.blinkSignIn = true;
@@ -304,10 +253,7 @@ export default {
       this.history.push({ role: 'user', content: `(I opened the in-app help for "${topic}".)` });
       this.history.push({ role: 'assistant', content: question });
       this.pushMessage('assistant', question);
-      this.$nextTick(() => {
-        const input = this.$refs.draftInput;
-        if (input && !input.disabled) input.focus();
-      });
+      this.focusInput();
     },
     scrollToBottom() {
       this.$nextTick(() => {
@@ -361,73 +307,15 @@ export default {
 </script>
 
 <style scoped>
-.chat-assistant {
-  position: absolute;
-  right: var(--panel-margin);
-  bottom: var(--panel-margin);
-  z-index: 200;
-  font-family: var(--font-regular);
-  font-weight: var(--font-weight-regular);
-}
-
-.chat-fab {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  border: var(--border-width) solid var(--panel-border);
-  background-color: var(--bg-panel);
-  box-shadow: var(--panel-shadow);
-  font-size: 22px;
-  line-height: 1;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform 0.15s ease;
-}
-
-.chat-fab:hover {
-  transform: translateY(-1px);
-}
-
-.chat-fab:focus-visible,
 .chat-icon-btn:focus-visible {
   outline: 2px solid #000000;
   outline-offset: 2px;
 }
 
 .chat-panel {
-  position: absolute;
-  right: 0;
-  bottom: 64px;
-  width: 340px;
-  height: 460px;
-  max-height: 70vh;
-  display: flex;
-  flex-direction: column;
-  overflow: visible;
   color: var(--text-primary);
-}
-
-.chat-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--panel-border);
-  font-weight: var(--font-weight-semibold);
-}
-
-.chat-title {
-  font-weight: var(--font-weight-semibold);
-}
-
-.chat-header-actions {
-  display: flex;
-  gap: 4px;
+  font-family: var(--font-regular);
+  font-weight: var(--font-weight-regular);
 }
 
 .chat-icon-btn {
@@ -444,40 +332,6 @@ export default {
   background-color: var(--bg-hover);
 }
 
-.chat-settings {
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--panel-border);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  background-color: var(--bg-elevated);
-}
-
-.chat-proxy-hint {
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.chat-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 12px;
-}
-
-.chat-field input {
-  font-size: 13px;
-}
-
-.chat-field-warning {
-  color: #b91c1c;
-  font-size: 11px;
-}
-
-.chat-settings-actions {
-  display: flex;
-  justify-content: flex-end;
-}
 
 .chat-mode-row {
   display: flex;

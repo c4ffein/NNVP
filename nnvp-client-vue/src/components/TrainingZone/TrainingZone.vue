@@ -1,16 +1,27 @@
 <template>
   <div id="TrainingZone" class="TrainingZone">
     <div id="trainer-bar" class="TrainingZone">
-      <div class="TrainingZone bar-button" v-on:click="datasetClicked">
+      <div
+        class="TrainingZone bar-button"
+        :class="{ active: selectedPanel === 'DatasetSelector' }"
+        v-on:click="datasetClicked"
+      >
         Dataset
       </div>
-      <div class="TrainingZone bar-button" v-on:click="compileOptionsClicked">
+      <div
+        class="TrainingZone bar-button"
+        :class="{ active: selectedPanel === 'CompileOptions' }"
+        v-on:click="compileOptionsClicked"
+      >
         Options
       </div>
-      <div class="TrainingZone bar-button" v-on:click="chartsClicked">
+      <div
+        class="TrainingZone bar-button"
+        :class="{ active: selectedPanel === 'Charts' }"
+        v-on:click="chartsClicked"
+      >
         Charts
       </div>
-      <div id="button-close-trainer" v-on:click="$emit('close-trainer')">╳</div>
     </div>
     <div id="training-zone-selector">
       <keep-alive>
@@ -337,47 +348,51 @@ export default {
   src: url("/assets/fonts/Roboto-Thin-webfont.woff") format("woff");
 }
 #TrainingZone {
-  height: 100%;
+  /* Fill the window body: the tab bar is a fixed header, only the selected
+     panel below it scrolls (so narrowing the window never hides the tabs). */
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
   width: 100%;
   cursor: default;
   font-family: var(--font-regular); font-weight: var(--font-weight-regular);
   font-size: 15px;
-  display: grid;
-  grid-template-rows: 24px 1fr;
+  display: flex;
+  flex-direction: column;
   color: var(--text-primary);
 }
 #trainer-bar {
-  display: table;
-  table-layout: fixed;
-  grid-rows: 1/2;
+  flex: none;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
   border-bottom: 1px solid var(--panel-border);
   background-color: var(--bg-panel);
-  width: 100%;
 }
-#trainer-bar > * {
-  background-color: transparent;
+.TrainingZone.bar-button {
+  font-size: 12px;
+  line-height: 1;
+  padding: 5px 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
 }
-#trainer-bar > *:hover {
+.TrainingZone.bar-button:hover {
   background-color: var(--bg-hover);
+  color: var(--text-primary);
 }
-.TrainingZone.bar-button{
-  display: table-cell;
-  height: 100%;
-  border-radius: 0;
-  border: none;
-  border-right: 1px solid var(--panel-border);
-  line-height: 24px; /* Vertical align text*/
-  padding: 0 14px;
-}
-#button-close-trainer{
-  display: table-cell;
-  border: none;
-  width: 30px;
-  text-align: center;
-  line-height: 24px;
+.TrainingZone.bar-button.active {
+  background-color: var(--fill-strong);
+  color: var(--fill-strong-text);
 }
 #training-zone-selector {
-  grid-rows: 2/2;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 .TrainingZone select, .TrainingZone input {
   border: 1px solid var(--input-border);

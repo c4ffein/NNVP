@@ -23,6 +23,7 @@
                 {{optimizer}}
               </option>
             </select>
+            <span class="help-icon" @click="openModal('algorithm')">?</span>
           </div>
 
           <!-- Dynamic Optimizer Parameters -->
@@ -138,6 +139,28 @@
               <li><strong>RMSprop:</strong> Good for recurrent networks. Adapts learning rates per parameter.</li>
             </ul>
             <p><em>💡 Tip: Start with Adam if you're unsure!</em></p>
+          </div>
+
+          <div v-else-if="activeModal === 'algorithm'">
+            <h2>Which Algorithm?</h2>
+            <p>Each entry is a different strategy for updating the weights from the
+            error signal. They differ in how they adapt the step size over time.</p>
+            <ul>
+              <li><strong>sgd:</strong> plain stochastic gradient descent — one global
+              learning rate, no adaptation. Simple and predictable; usually needs tuning.</li>
+              <li><strong>adagrad:</strong> adapts the rate per parameter, favoring rarely
+              updated ones. Rates only ever shrink, so learning can stall on long runs.</li>
+              <li><strong>adadelta:</strong> a fix for adagrad's shrinking rates using a
+              moving window; barely needs a learning rate at all.</li>
+              <li><strong>adam:</strong> combines momentum with per-parameter adaptation.
+              The go-to default for most problems.</li>
+              <li><strong>adamax:</strong> a variant of adam that is more stable with
+              sparse or spiky gradients.</li>
+              <li><strong>rmsprop:</strong> keeps a moving average of recent gradients to
+              scale each step; a solid choice and this app's default.</li>
+            </ul>
+            <p><em>💡 Tip: adam or rmsprop are safe picks; reach for sgd when you want
+            full manual control.</em></p>
           </div>
 
           <div v-else-if="activeModal === 'loss'">
@@ -345,6 +368,20 @@ export default {
 </script>
 
 <style>
+/* The (?) buttons stay quiet until the user shows interest in their box:
+   hovering (or keyboard-focusing into) a section reveals every helper inside
+   it — same hover-reveal pattern as the layer catalog rows. */
+.option-section .help-icon {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+.option-section:hover .help-icon,
+.option-section:focus-within .help-icon {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 @font-face {
   font-family: var(--font-medium); font-weight: var(--font-weight-medium);
   src: url("/assets/fonts/Roboto-Regular-webfont.woff") format("woff");

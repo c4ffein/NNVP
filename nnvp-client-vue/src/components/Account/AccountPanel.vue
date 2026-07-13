@@ -97,6 +97,34 @@
               </div>
             </section>
 
+            <section class="section" ref="usageSection">
+              <h2>Credits usage</h2>
+              <p class="hint">Assistant tokens used per day, last 14 days.</p>
+              <svg
+                v-if="usageBars.some(bar => bar.tokens > 0)"
+                class="usage-chart"
+                viewBox="0 0 280 84"
+                role="img"
+                aria-label="Daily assistant token usage"
+              >
+                <g v-for="(bar, index) in usageBars" :key="bar.date">
+                  <rect
+                    class="usage-bar"
+                    :x="index * 20 + 3"
+                    :y="70 - bar.height"
+                    width="14"
+                    :height="Math.max(bar.height, bar.tokens > 0 ? 2 : 0)"
+                    rx="2"
+                  >
+                    <title>{{ bar.date }}: {{ bar.tokens }} tokens ({{ bar.requests }} requests)</title>
+                  </rect>
+                </g>
+                <text class="usage-label" x="3" y="82">{{ usageBars[0].date.slice(5) }}</text>
+                <text class="usage-label" x="277" y="82" text-anchor="end">today</text>
+              </svg>
+              <p v-else class="hint">No assistant usage yet.</p>
+            </section>
+
             <section class="section">
               <div class="section-head">
                 <h2>My Projects</h2>
@@ -150,6 +178,7 @@ export default {
     return {
       user: null,
       projects: [],
+      usageDays: [],
       email: '',
       // { email, code } while this browser has a pending login being polled.
       waiting: null,
@@ -168,6 +197,24 @@ export default {
     show(isOpen) {
       if (isOpen) this.onOpen();
       else this.restoreFocus();
+    },
+  },
+  computed: {
+    // Last 14 days, gaps filled, scaled to the busiest day (svg is 70 tall).
+    usageBars() {
+      const byDate = new Map(this.usageDays.map(day => [day.date, day]));
+      const bars = [];
+      for (let i = 13; i >= 0; i -= 1) {
+        const date = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+        const row = byDate.get(date);
+        bars.push({
+          date,
+          tokens: row ? row.input_tokens + row.output_tokens : 0,
+          requests: row ? row.requests : 0,
+        });
+      }
+      const top = Math.max(1, ...bars.map(bar => bar.tokens));
+      return bars.map(bar => ({ ...bar, height: Math.round((bar.tokens / top) * 66) }));
     },
   },
   methods: {
@@ -192,6 +239,13 @@ export default {
         // match code so the waiting UI is resumable.
         await this.checkStatus();
         if (this.intent === 'save' && this.user) await this.saveToCloud();
+        if (this.user) await this.refreshUsage();
+        if (this.intent === 'usage') {
+          this.$nextTick(() => {
+            const section = this.$refs.usageSection;
+            if (section) section.scrollIntoView({ block: 'start', behavior: 'smooth' });
+          });
+        }
       } else {
         this.user = null;
         this.projects = [];
@@ -327,6 +381,14 @@ export default {
       const minutes = Math.round((Date.now() - then) / 60000);
       if (minutes <= 0) return 'just now';
       return minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`;
+    },
+    async refreshUsage() {
+      try {
+        const data = await this.api.getAssistantUsage(14);
+        this.usageDays = (data && data.days) || [];
+      } catch {
+        this.usageDays = []; // the graph is informational — never block the panel
+      }
     },
     async refreshProjects() {
       this.projects = (await this.api.listProjects()) || [];
@@ -504,6 +566,21 @@ export default {
   font-size: 0.9em;
 }
 
+.usage-chart {
+  width: 100%;
+  max-width: 320px;
+  display: block;
+  margin: 4px 0 10px;
+}
+.usage-bar {
+  fill: var(--accent);
+  opacity: 0.85;
+}
+.usage-bar:hover { opacity: 1; }
+.usage-label {
+  font-size: 8px;
+  fill: var(--text-muted);
+}
 .section {
   margin-top: 20px;
   padding-top: 16px;

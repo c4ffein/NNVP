@@ -3,30 +3,43 @@
     <FlowBoard :isTraining="isTraining"/>
   </div>
   <div id="generalMenu" class="floating-panel general-menu"><GeneralMenu @open-trainer="openTrainer" @open-about="openAboutModal" @open-tutorial="openTutorialMenu" @open-account="openAccount" @open-save-load="openSaveLoad" :views="{ left: showLeftPanel, right: showRightPanel, training: trainerHeight > 0, chat: backendEnabled && showChat, chatAvailable: backendEnabled }" @toggle-view="togglePanel"/><CornerControls @open-account="openAccount()"/></div>
-  <div id="layerCatalog" class="floating-panel layer-catalog" v-show="showLeftPanel"><LayerCatalog/></div>
-  <div id="layerOptions" class="floating-panel layer-options" v-show="showRightPanel"><LayerOptions msg="NNVP"/></div>
-  <button
-    class="panel-toggle panel-toggle-left"
-    :class="{ collapsed: !showLeftPanel }"
-    :title="(showLeftPanel ? 'Hide' : 'Show') + ' the layer catalog'"
-    :aria-label="(showLeftPanel ? 'Hide' : 'Show') + ' the layer catalog'"
-    @click="togglePanel('showLeftPanel')"
-  >{{ showLeftPanel ? '‹' : '›' }}</button>
-  <button
-    class="panel-toggle panel-toggle-right"
-    :class="{ collapsed: !showRightPanel }"
-    :title="(showRightPanel ? 'Hide' : 'Show') + ' the layer options'"
-    :aria-label="(showRightPanel ? 'Hide' : 'Show') + ' the layer options'"
-    @click="togglePanel('showRightPanel')"
-  >{{ showRightPanel ? '›' : '‹' }}</button>
-  <div id="trainingZone" class="floating-panel training-zone" v-if="trainerHeight > 0" v-bind:style="{height: trainerHeight+'vh'}">
+  <FloatingWindow
+    id="layerCatalog"
+    v-show="showLeftPanel"
+    window-id="catalog"
+    title="Layers"
+    :initial="windowRects.catalog"
+    :min-width="220"
+    :min-height="300"
+    @close="togglePanel('showLeftPanel')"
+  ><LayerCatalog/></FloatingWindow>
+  <FloatingWindow
+    id="layerOptions"
+    v-show="showRightPanel"
+    window-id="options"
+    title="Layer options"
+    :initial="windowRects.options"
+    :min-width="240"
+    :min-height="300"
+    @close="togglePanel('showRightPanel')"
+  ><LayerOptions msg="NNVP"/></FloatingWindow>
+  <FloatingWindow
+    id="trainingZone"
+    v-if="trainerHeight > 0"
+    window-id="training"
+    title="Training"
+    :initial="windowRects.training"
+    :min-width="300"
+    :min-height="280"
+    @close="closeTrainer"
+  >
     <TrainingZone @close-trainer="closeTrainer" :trainingZoneSize="trainerHeight" @training-started="isTraining = true" @training-stopped="isTraining = false"/>
-  </div>
+  </FloatingWindow>
   <AboutModal :show="showAboutModal" @close="closeAboutModal" @open-tutorials="openTutorialsFromAbout"/>
   <TutorialMenu :show="showTutorialMenu" @close="showTutorialMenu = false" @start="startTutorial"/>
   <AccountPanel v-if="backendEnabled" :show="showAccount" :intent="accountIntent" @close="closeAccount" @pending-login="openAccount()"/>
   <SaveLoadModal v-if="backendEnabled" :show="showSaveLoad" :mode="saveLoadMode" @close="showSaveLoad = false" @open-account="openAccount()"/>
-  <ChatBubble v-if="backendEnabled && showChat" @open-account="openAccount()"/>
+  <ChatBubble v-if="backendEnabled && showChat" @open-account="openAccount($event)" @close="togglePanel('showChat')"/>
   <TutorialOverlay :active="tutorialActive" :tutorial="activeTutorial" @exit="stopTutorial" @open-menu="openMenuFromTutorial"/>
 </template>
 
@@ -41,18 +54,23 @@ import AboutModal from './components/AboutModal.vue';
 import AccountPanel from './components/Account/AccountPanel.vue';
 import SaveLoadModal from './components/SaveLoad/SaveLoadModal.vue';
 import CornerControls from './components/CornerControls.vue';
+import FloatingWindow from './components/FloatingWindow.vue';
 import ChatBubble from './components/Assistant/ChatBubble.vue';
 import TutorialOverlay from './components/Tutorial/TutorialOverlay.vue';
 import TutorialMenu from './components/Tutorial/TutorialMenu.vue';
 import { getTutorial } from './lib/Tutorial/tutorials';
 import { ASK_EVENT } from './lib/Assistant/askAssistant';
 
-// Panel visibility survives reloads. Anything but an explicit '0' means shown.
-function readPanelPref(side) {
+// Panel visibility survives reloads. Anything but an explicit '0' means
+// shown, except panels that default to hidden (the chat) which need an
+// explicit '1'.
+function readPanelPref(side, shownByDefault = true) {
   try {
-    return localStorage.getItem(`nnvp-panel-${side}`) !== '0';
+    const stored = localStorage.getItem(`nnvp-panel-${side}`);
+    if (stored === null) return shownByDefault;
+    return stored !== '0';
   } catch {
-    return true;
+    return shownByDefault;
   }
 }
 
@@ -68,6 +86,7 @@ export default {
     AccountPanel,
     SaveLoadModal,
     CornerControls,
+    FloatingWindow,
     ChatBubble,
     TutorialOverlay,
     TutorialMenu,
@@ -141,7 +160,7 @@ export default {
       backendEnabled: !!import.meta.env.VITE_ENABLE_BACKEND,
       showLeftPanel: readPanelPref('left'),
       showRightPanel: readPanelPref('right'),
-      showChat: readPanelPref('chat'),
+      showChat: readPanelPref('chat', false),
       trainerHeight: 0,
       trainerOpenHeight: 50,
       showAboutModal: false,
@@ -150,6 +169,22 @@ export default {
       showSaveLoad: false,
       saveLoadMode: 'load',
       isTraining: false,
+      // Each window opens where its fixed panel used to live (56 = menu
+      // height + margins); computed once at startup from the viewport.
+      windowRects: {
+        catalog: {
+          x: 12, y: 56, width: 220, height: window.innerHeight - 68,
+        },
+        options: {
+          x: window.innerWidth - 252, y: 56, width: 240, height: window.innerHeight - 68,
+        },
+        training: {
+          x: 12,
+          y: window.innerHeight - 12 - Math.round(window.innerHeight * 0.5),
+          width: window.innerWidth - 24,
+          height: Math.round(window.innerHeight * 0.5),
+        },
+      },
       tutorialActive: false,
       activeTutorial: null,
       showTutorialMenu: false,
@@ -189,10 +224,15 @@ export default {
       if (this.backendEnabled && !this.showChat) this.togglePanel('showChat');
     };
     window.addEventListener(ASK_EVENT, this.onAskAssistant);
+    // The assistant opens the Training panel through this event
+    // (assistantActions.openTrainingPanel).
+    this.onOpenTraining = () => this.openTrainer();
+    window.addEventListener('nnvp:open-training', this.onOpenTraining);
   },
   beforeUnmount() {
     window.removeEventListener('nnvp:start-tutorial', this.onStartTutorial);
     window.removeEventListener(ASK_EVENT, this.onAskAssistant);
+    window.removeEventListener('nnvp:open-training', this.onOpenTraining);
   },
 };
 </script>
@@ -500,65 +540,7 @@ body,html {
   display: flex;
   align-items: stretch;
   overflow: visible;  /* Allow dropdown menus to show outside the panel */
-  z-index: 100;  /* Ensure dropdowns appear above other panels */
-}
-
-/* LayerCatalog - left panel */
-.layer-catalog {
-  top: calc(32px + var(--panel-margin) * 2);
-  left: var(--panel-margin);
-  bottom: var(--panel-margin);
-  width: 220px;
-  overflow-y: auto;
-}
-
-/* LayerOptions - right panel */
-.layer-options {
-  top: calc(32px + var(--panel-margin) * 2);
-  right: var(--panel-margin);
-  bottom: var(--panel-margin);
-  width: 240px;
-  overflow-y: auto;
-}
-
-/* Slim edge chevrons to hide/show the side panels, aligned with the top of
-   the panels. When a panel is hidden its chevron slides to the screen edge. */
-.panel-toggle {
-  position: absolute;
-  top: calc(32px + var(--panel-margin) * 2 + 6px);
-  z-index: 11;
-  width: 18px;
-  height: 44px;
-  padding: 0;
-  border: 1px solid var(--panel-border);
-  background-color: var(--bg-panel);
-  color: var(--text-muted);
-  box-shadow: var(--panel-shadow);
-  cursor: pointer;
-  font-size: 13px;
-  line-height: 1;
-}
-.panel-toggle:hover { color: var(--text-primary); }
-.panel-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.panel-toggle-left {
-  left: calc(220px + var(--panel-margin));
-  border-radius: 0 8px 8px 0;
-  border-left: none;
-}
-.panel-toggle-left.collapsed { left: 0; }
-.panel-toggle-right {
-  right: calc(240px + var(--panel-margin));
-  border-radius: 8px 0 0 8px;
-  border-right: none;
-}
-.panel-toggle-right.collapsed { right: 0; }
-
-/* TrainingZone - bottom panel */
-.training-zone {
-  left: var(--panel-margin);
-  right: var(--panel-margin);
-  bottom: var(--panel-margin);
-  /* height set dynamically via inline style */
+  z-index: 500;  /* Above the raisable window stack (see lib/windowing.js) */
 }
 
 /* Adjust spacing for buttons/inputs */

@@ -61,7 +61,7 @@ export default {
   },
   props: {
     // Visibility of the toggleable views, owned by App.vue: { left, right,
-    // chat, chatAvailable }. Drives the ticks in the View menu.
+    // chat, chatAvailable }. Drives the ticks in the Panels menu.
     views: {
       type: Object,
       default: () => ({
@@ -103,7 +103,7 @@ export default {
     }
   },
   computed: {
-    // The menu is computed (not data) so the View ticks re-render when App's
+    // The menu is computed (not data) so the Panels ticks re-render when App's
     // visibility state changes. Handlers run with the component as `this`
     // (levelNClickHandler applies them), so shorthand methods work as before.
     menuTree() {
@@ -145,7 +145,7 @@ export default {
           Redo: [() => this.$d3Interface.redo(), () => (this.$d3Interface.getRedoStackContainer().e.length === 0)],
           Group() { this.$d3Interface.createGroup(); },
         },
-        View: {
+        Panels: {
           [`${tick(this.views.left)} Layer Catalog`]: () => this.$emit('toggle-view', 'showLeftPanel'),
           [`${tick(this.views.right)} Layer Options`]: () => this.$emit('toggle-view', 'showRightPanel'),
           [`${tick(this.views.training)} Training`]: () => this.$emit('toggle-view', 'training'),

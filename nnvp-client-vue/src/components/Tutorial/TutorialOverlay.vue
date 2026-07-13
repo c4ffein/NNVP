@@ -12,8 +12,21 @@
       }"
     ></div>
 
-    <!-- Floating instruction card, bottom-center -->
-    <div ref="card" class="tutorial-card" role="dialog" aria-label="Tutorial step" tabindex="-1">
+    <!-- Floating instruction card: a movable window, opens bottom-center -->
+    <FloatingWindow
+      ref="card"
+      window-id="tutorial"
+      class="tutorial-card"
+      role="dialog"
+      aria-label="Tutorial step"
+      tabindex="-1"
+      title="Tutorial"
+      :initial="cardRect"
+      :min-width="360"
+      :min-height="210"
+      @close="exit"
+    >
+      <div class="tutorial-card-content">
       <div class="tutorial-card-header">
         <span class="tutorial-progress">Step {{ currentStep + 1 }} / {{ totalSteps }}</span>
         <span class="tutorial-card-actions">
@@ -44,15 +57,18 @@
           @click="finish"
         >Finish</button>
       </div>
-    </div>
+      </div>
+    </FloatingWindow>
   </div>
 </template>
 
 <script>
 import { markStepReached, markCompleted } from '../../lib/Tutorial/tutorials';
+import FloatingWindow from '../FloatingWindow.vue';
 
 export default {
   name: 'TutorialOverlay',
+  components: { FloatingWindow },
   props: {
     active: {
       type: Boolean,
@@ -66,7 +82,15 @@ export default {
     },
   },
   data() {
+    const width = Math.min(440, window.innerWidth - 48);
     return {
+      // Opens bottom-center, like the fixed card used to.
+      cardRect: {
+        x: Math.round((window.innerWidth - width) / 2),
+        y: Math.max(12, window.innerHeight - 24 - 240),
+        width,
+        height: 240,
+      },
       currentStep: 0,
       stepComplete: false,
       highlight: null,
@@ -122,7 +146,11 @@ export default {
       this.pollTimer = setInterval(() => this.checkCompletion(), 500);
       this.$nextTick(() => {
         this.refreshState();
-        if (this.$refs.card) this.$refs.card.focus();
+        if (this.$refs.card && this.$refs.card.$el) {
+          // preventScroll: focusing must not scroll the overflow-hidden app
+          // container (that would visually shift every absolute panel).
+          this.$refs.card.$el.focus({ preventScroll: true });
+        }
       });
     },
     teardown() {
@@ -226,20 +254,12 @@ export default {
 }
 
 .tutorial-card {
-  position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(440px, calc(100vw - 48px));
-  background-color: var(--bg-panel);
-  border: var(--border-width) solid var(--panel-border);
-  border-radius: var(--border-radius);
-  box-shadow: var(--panel-shadow);
-  padding: 16px 18px;
-  box-sizing: border-box;
   font-family: var(--font-regular);
   color: var(--text-primary);
-  pointer-events: auto; /* the card itself is interactive */
+  pointer-events: auto; /* the overlay around it is pointer-events: none */
+}
+.tutorial-card-content {
+  padding: 12px 18px 16px;
 }
 
 .tutorial-card-header {

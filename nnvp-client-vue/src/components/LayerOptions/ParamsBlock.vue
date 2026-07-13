@@ -211,14 +211,15 @@ export default {
 }
 
 .layer-help-modal-container {
+  /* Same chrome as every panel/window: hairline border + soft shadow. */
   background: var(--bg-panel);
-  border-radius: 15px;
-  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  border: var(--border-width) solid var(--panel-border);
   max-width: 600px;
   width: 90%;
   max-height: 85vh;
   overflow-y: auto;
-  box-shadow: none;
+  box-shadow: var(--panel-shadow);
   position: relative;
   padding: 32px;
   font-family: var(--font-regular);
@@ -228,32 +229,34 @@ export default {
   text-align: left;
 }
 
+/* Same round close button as the window titlebars. */
 .layer-help-modal-close {
   position: absolute;
-  top: 16px;
-  right: 16px;
-  background: transparent;
-  border: none;
-  font-size: 32px;
-  line-height: 1;
-  color: var(--text-primary);
-  cursor: pointer;
+  top: 14px;
+  right: 14px;
+  width: 24px;
+  height: 24px;
   padding: 0;
-  width: 32px;
-  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--panel-border);
+  background-color: var(--bg-elevated);
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.2s ease;
 }
 
 .layer-help-modal-close:hover {
-  transform: scale(1.1);
+  color: var(--text-primary);
+  background-color: var(--bg-hover);
 }
 
 /* Footer handoff to the chat widget (both help modals share this family). */
 .layer-help-ask-row {
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid var(--panel-border);
   margin-top: 16px;
   padding-top: 14px;
   display: flex;

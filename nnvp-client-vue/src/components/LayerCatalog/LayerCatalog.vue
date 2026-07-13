@@ -16,6 +16,7 @@
         @click="toggleAllCategories"
       ><span class="collapse-all-arrow" :class="{ collapsed: allCollapsed }" aria-hidden="true">▲</span></button>
     </div>
+    <div class="catalog-scroll">
     <div
       v-for="(layers, categoryName) in $kerasInterface.getCategories()"
       v-bind:key="categoryName.id"
@@ -52,6 +53,7 @@
           @show-help="helpLayerType = $event"
         />
       </div>
+    </div>
     </div>
 
     <!-- One shared help modal for the whole catalog (layers AND categories;
@@ -214,16 +216,35 @@ export default {
   user-select: none;
   -webkit-user-select: none;
   color: var(--text-primary);
+  /* Fill the window body: the search bar is a fixed header, only the list
+     below it scrolls. */
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 .search-container {
-  /* Stays pinned while the layer list scrolls under it. */
-  position: sticky;
-  top: 0;
+  /* A real header OUTSIDE the scroller (a sticky element bounces along with
+     rubber-band overscroll; a header cannot). */
+  position: relative;
   z-index: 2;
+  flex: none;
   width: 100%;
   background-color: var(--bg-panel);
   display: flex;
   align-items: center;
+  border-bottom: 1px solid var(--panel-border);
+}
+.catalog-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* The search bar above already draws this line — a border-top on the first
+   category would double it. */
+.catalog-scroll > .layerCategory:first-child > .title {
+  border-top: none;
 }
 .collapse-all-button {
   flex: none;
@@ -279,7 +300,7 @@ export default {
 #layerSearchBox::placeholder {
   color: var(--text-muted);
 }
-.LayerCatalog > .layerCategory > .title {
+.catalog-scroll > .layerCategory > .title {
   background-color: transparent;
   overflow: hidden;
   display: grid;
@@ -289,13 +310,12 @@ export default {
   border-top: 1px solid var(--panel-border);
   border-left: 1px solid var(--panel-border);
   border-right: 1px solid var(--panel-border);
-  border-radius: 15px 15px 0 0;
   font-weight: var(--font-weight-medium);
   position: relative;
   margin-left: -1px;
   margin-right: -1px;
 }
-.LayerCatalog > .layerCategory > .title > .text {
+.catalog-scroll > .layerCategory > .title > .text {
   grid-area: text;
   text-align: left;
   padding: 8px 12px;
@@ -303,53 +323,59 @@ export default {
   transition: transform 0.15s ease;
 }
 
-.LayerCatalog > .layerCategory > .title:hover > .text {
+.catalog-scroll > .layerCategory > .title:hover > .text {
   transform: translate(1px, -1px);
   cursor: pointer;
 }
-.LayerCatalog > .layerCategory > .title:focus-visible {
+.catalog-scroll > .layerCategory > .title:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
-.LayerCatalog > .layerCategory > .title > .arrow {
+.catalog-scroll > .layerCategory > .title > .arrow {
   color: var(--text-muted);
   grid-area: arrow;
   height: 15px;
   width: 15px;
-  transform: rotate(180deg) translateY(-10%);
-  vertical-align: middle;
-  text-align: center;
   padding: 8px;
   font-size: 10px;
+  /* Center the glyph geometrically and rotate around that center — a
+     translate nudge here would run in the ROTATED frame and shift the arrow
+     down/right depending on where it points. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transform: rotate(180deg);
+  transition: transform 0.15s ease;
 }
-.LayerCatalog > .layerCategory.closed > .title > .arrow {
-  transform: rotate(90deg) translateY(-10%);
+.catalog-scroll > .layerCategory.closed > .title > .arrow {
+  transform: rotate(90deg);
 }
 /* The category (?) sits at the right end of the title row, visible on hover
    or focus (same behavior as the per-layer help dots). */
-.LayerCatalog > .layerCategory > .title > .category-help {
+.catalog-scroll > .layerCategory > .title > .category-help {
   grid-area: help;
   margin-right: 8px;
   opacity: 0;
   transition: opacity 0.12s ease;
 }
-.LayerCatalog > .layerCategory > .title:hover > .category-help,
-.LayerCatalog > .layerCategory > .title:focus-visible > .category-help,
-.LayerCatalog > .layerCategory > .title > .category-help:focus-visible {
+.catalog-scroll > .layerCategory > .title:hover > .category-help,
+.catalog-scroll > .layerCategory > .title:focus-visible > .category-help,
+.catalog-scroll > .layerCategory > .title > .category-help:focus-visible {
   opacity: 1;
 }
-.LayerCatalog > .layerCategory.closed > .layerList {
+.catalog-scroll > .layerCategory.closed > .layerList {
   height: 0;
   overflow: hidden;
 }
-.LayerCatalog > .layerCategory > .layerList > .layer {
+.catalog-scroll > .layerCategory > .layerList > .layer {
   text-align: left;
   padding: 8px 12px;
   color: var(--text-primary);
   border-left: 3px solid transparent;
   transition: all 0.15s ease;
 }
-.LayerCatalog > .layerCategory > .layerList > .layer:hover {
+.catalog-scroll > .layerCategory > .layerList > .layer:hover {
   cursor: pointer;
 }
 </style>

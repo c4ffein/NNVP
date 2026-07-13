@@ -1,6 +1,15 @@
 <template>
   <div class="line-chart-container">
-    <div class="chart-title">{{ title }}</div>
+    <div class="chart-title">
+      {{ title }}
+      <button
+        v-if="hasHelp"
+        type="button"
+        class="help-icon chart-help"
+        :aria-label="'What is the ' + title + ' chart?'"
+        @click="$emit('show-help')"
+      >?</button>
+    </div>
     <div class="chart-wrapper" ref="chartWrapper">
       <svg
         class="line-chart-svg"
@@ -132,7 +141,12 @@
 <script>
 export default {
   name: 'LineChart',
+  emits: ['show-help'],
   props: {
+    hasHelp: {
+      type: Boolean,
+      default: false,
+    },
     title: {
       type: String,
       required: true
@@ -336,6 +350,10 @@ export default {
 }
 
 .chart-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   grid-row: 1/2;
   font-family: var(--font-regular); font-weight: var(--font-weight-regular);
   font-size: 15px;
