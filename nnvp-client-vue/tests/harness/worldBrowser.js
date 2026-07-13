@@ -80,6 +80,83 @@ export function makeBrowserWorld(page, canvas, expect, { exposePage = false } = 
     },
   };
 
+  // Same contract as worldComponents.makeWindowsDriver, mapped onto the real
+  // catalog ('a') and layer-options ('b') windows.
+  const winSel = (name) => (name === 'a' ? '#layerCatalog' : '#layerOptions');
+  const windows = {
+    async open() {}, // both windows are on screen by default
+    async isVisible(name) {
+      return page.locator(winSel(name)).isVisible();
+    },
+    async close(name) {
+      await page.click(`${winSel(name)} .floating-window-close`);
+    },
+    async position(name) {
+      const box = await page.locator(winSel(name)).boundingBox();
+      return { x: box.x, y: box.y };
+    },
+    async size(name) {
+      const box = await page.locator(winSel(name)).boundingBox();
+      return { width: box.width, height: box.height };
+    },
+    async zIndexOf(name) {
+      return page.locator(winSel(name))
+        .evaluate((el) => parseInt(getComputedStyle(el).zIndex, 10));
+    },
+    async raise(name) {
+      const bar = await page.locator(`${winSel(name)} .floating-window-titlebar`).boundingBox();
+      await page.mouse.click(bar.x + bar.width / 2, bar.y + bar.height / 2);
+    },
+    async dragBy(name, dx, dy) {
+      const bar = await page.locator(`${winSel(name)} .floating-window-titlebar`).boundingBox();
+      const startX = bar.x + bar.width / 2;
+      const startY = bar.y + bar.height / 2;
+      await page.mouse.move(startX, startY);
+      await page.mouse.down();
+      await page.mouse.move(startX + dx, startY + dy, { steps: 5 });
+      await page.mouse.up();
+      await settle();
+    },
+    async resizeBy(name, dx, dy) {
+      const handle = await page.locator(`${winSel(name)} .floating-window-resize`).boundingBox();
+      const startX = handle.x + handle.width / 2;
+      const startY = handle.y + handle.height / 2;
+      await page.mouse.move(startX, startY);
+      await page.mouse.down();
+      await page.mouse.move(startX + dx, startY + dy, { steps: 5 });
+      await page.mouse.up();
+      await settle();
+    },
+    async resizeLeftEdgeBy(name, dx) {
+      const strip = await page.locator(`${winSel(name)} .fw-edge-w`).boundingBox();
+      const startX = strip.x + strip.width / 2;
+      const startY = strip.y + strip.height / 2;
+      await page.mouse.move(startX, startY);
+      await page.mouse.down();
+      await page.mouse.move(startX + dx, startY, { steps: 5 });
+      await page.mouse.up();
+      await settle();
+    },
+  };
+
+  // Same contract as worldComponents.makeChartsDriver, via the real app.
+  const charts = {
+    async open() {
+      await page.click('#GeneralMenu .menuTitle:has-text("Panels")');
+      await page.click('#GeneralMenu .menuItem:has-text("Training")');
+      await page.click('.TrainingZone.bar-button:has-text("Charts")');
+      await settle();
+    },
+    async helpText(which) {
+      await page.click(`.chart-help >> nth=${which === 'batch' ? 0 : 1}`);
+      await settle();
+      const text = await page.locator('.layer-help-modal-body').textContent();
+      await page.click('.layer-help-modal-close');
+      await settle();
+      return text;
+    },
+  };
+
   // Same contract as worldComponents.makeCatalogDriver, on the real catalog.
   const catalog = {
     async open() {}, // always mounted in the app
@@ -105,7 +182,9 @@ export function makeBrowserWorld(page, canvas, expect, { exposePage = false } = 
       }, signedIn);
     },
     async open() {
-      await page.click('.chat-fab');
+      // Chat defaults to hidden; the Panels menu is the way in.
+      await page.click('#GeneralMenu .menuTitle:has-text("Panels")');
+      await page.click('#GeneralMenu .menuItem:has-text("Chat")');
       await settle();
     },
     async connectPromptVisible() {
@@ -116,12 +195,12 @@ export function makeBrowserWorld(page, canvas, expect, { exposePage = false } = 
       if ((await input.count()) === 0) return false;
       return input.isEnabled();
     },
-    async settingsAsksForApiKey() {
+    async settingsOpensAccountUsage() {
       await page.click('#chat-panel [aria-label="Settings"]');
       await settle();
-      const text = await page.locator('.chat-settings').textContent();
-      const hasKeyField = (await page.locator('.chat-settings input[type="password"]').count()) > 0;
-      return /api key/i.test(text || '') && hasKeyField;
+      const panelOpen = (await page.locator('#account-modal-title').count()) > 0;
+      const passwordFields = await page.locator('input[type="password"]').count();
+      return panelOpen && passwordFields === 0;
     },
     async signInFromPrompt() {
       await page.click('.chat-connect button');
@@ -145,10 +224,28 @@ export function makeBrowserWorld(page, canvas, expect, { exposePage = false } = 
     async signInBlinking() {
       return (await page.locator('.chat-connect .chat-btn-blink').count()) > 0;
     },
+    async windowPosition() {
+      const box = await page.locator('#chat-panel').boundingBox();
+      return { x: box.x, y: box.y };
+    },
+    async dragWindowBy(dx, dy) {
+      const bar = await page.locator('#chat-panel .floating-window-titlebar').boundingBox();
+      const startX = bar.x + bar.width / 2;
+      const startY = bar.y + bar.height / 2;
+      await page.mouse.move(startX, startY);
+      await page.mouse.down();
+      await page.mouse.move(startX + dx, startY + dy, { steps: 5 });
+      await page.mouse.up();
+      await settle();
+    },
+    async closeWindow() {
+      await page.click('#chat-panel .floating-window-close');
+      await settle();
+    },
   };
 
   const world = {
-    expect, board, chat, catalog, dispose: async () => {},
+    expect, board, chat, catalog, windows, charts, dispose: async () => {},
   };
   if (exposePage) {
     world.page = page;

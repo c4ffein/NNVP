@@ -21,10 +21,10 @@ appTest('chat is ready once signed in, with no API key involved', async ({ chat,
   expect(await chat.inputEnabled()).toBe(true);
 });
 
-appTest('chat settings never ask for an API key', async ({ chat, expect }) => {
+appTest('the chat settings gear opens the account panel (never an API key form)', async ({ chat, expect }) => {
   await chat.setSignedIn(false);
   await chat.open();
-  expect(await chat.settingsAsksForApiKey()).toBe(false);
+  expect(await chat.settingsOpensAccountUsage()).toBe(true);
 });
 
 appTest('the chat connect prompt leads to the account flow', async ({ chat, expect }) => {
@@ -62,4 +62,17 @@ appTest('help-modal ask blinks the sign-in button when signed out', async ({ cha
   await chat.setSignedIn(false);
   await chat.askAbout('Dense');
   expect(await chat.signInBlinking()).toBe(true);
+});
+
+appTest('the chat window reopens where the user left it', async ({ chat, expect }) => {
+  await chat.setSignedIn(true);
+  await chat.open();
+  const before = await chat.windowPosition();
+  await chat.dragWindowBy(-80, -60);
+  const moved = await chat.windowPosition();
+  expect(Math.round(moved.x - before.x)).toBe(-80);
+  expect(Math.round(moved.y - before.y)).toBe(-60);
+  await chat.closeWindow();
+  await chat.open();
+  expect(await chat.windowPosition()).toEqual(moved);
 });

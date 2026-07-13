@@ -11,7 +11,9 @@ import FlowGraphEditor from '../../src/lib/FlowInterface/FlowGraphEditor';
 import { isInvalidConnection } from '../../src/lib/FlowInterface/adapter';
 import KerasInterface from '../../src/lib/KerasInterface/KerasInterface';
 import generatedKerasLayers from '../../src/lib/KerasInterface/generatedKerasLayers.json';
-import { makeChatDriver, makeCatalogDriver } from './worldComponents';
+import {
+  makeChatDriver, makeCatalogDriver, makeWindowsDriver, makeChartsDriver,
+} from './worldComponents';
 
 // Commits are coalesced per microtask (FlowGraphEditor.commit); every
 // mutating driver method drains them so assertions observe committed state.
@@ -122,14 +124,20 @@ export function makeBoardDriver() {
 export function makeBunWorld(expect) {
   const chat = makeChatDriver();
   const catalog = makeCatalogDriver();
+  const windows = makeWindowsDriver();
+  const charts = makeChartsDriver();
   return {
     expect,
     board: makeBoardDriver(),
     chat,
     catalog,
+    windows,
+    charts,
     async dispose() {
       await chat.teardown();
       await catalog.teardown();
+      await windows.teardown();
+      await charts.teardown();
     },
   };
 }

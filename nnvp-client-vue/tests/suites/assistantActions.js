@@ -116,6 +116,19 @@ function makeFakeD3Interface() {
       model.d3Layers.push({ id: nextId, name: 'FromTemplate', kerasLayer: null });
       nextId += 1;
     },
+    connectLayers(sourceId, targetId) {
+      if (sourceId === targetId) return false;
+      if (model.d3Edges.some(e => e.source === sourceId && e.target === targetId)) return false;
+      model.d3Edges.push({ source: sourceId, target: targetId });
+      return true;
+    },
+    disconnectLayers(sourceId, targetId) {
+      const before = model.d3Edges.length;
+      model.d3Edges = model.d3Edges.filter(
+        e => !(e.source === sourceId && e.target === targetId),
+      );
+      return model.d3Edges.length < before;
+    },
   };
 }
 
@@ -239,6 +252,19 @@ logicTest('assistantActions: startTutorial dispatches the app-level event', ({ e
   }
 });
 
+logicTest('assistantActions: openTrainingPanel dispatches the app-level event', ({ expect }) => {
+  const { actions } = setup();
+  let received = 0;
+  const listener = () => { received += 1; };
+  window.addEventListener('nnvp:open-training', listener);
+  try {
+    expect(actions.openTrainingPanel()).toEqual({ opened: true });
+    expect(received).toBe(1);
+  } finally {
+    window.removeEventListener('nnvp:open-training', listener);
+  }
+});
+
 logicTest('assistantActions: startTutorial rejects unknown ids without dispatching', ({ expect }) => {
   const { actions } = setup();
   const received = [];
@@ -250,6 +276,34 @@ logicTest('assistantActions: startTutorial rejects unknown ids without dispatchi
   } finally {
     window.removeEventListener('nnvp:start-tutorial', listener);
   }
+});
+
+logicTest('assistantActions: connects two layers and reports the pair', ({ expect }) => {
+  const { d3, actions } = setup();
+  const a = actions.addLayer('Input');
+  const b = actions.addLayer('Dense');
+  const result = actions.connectLayers(a.id, b.id);
+  expect(result).toEqual({ connected: true, source: a.id, target: b.id });
+  expect(d3.activeGraph.model.d3Edges).toEqual([{ source: a.id, target: b.id }]);
+});
+
+logicTest('assistantActions: edge tools name the missing layer id', ({ expect }) => {
+  const { actions } = setup();
+  const a = actions.addLayer('Dense');
+  expect(() => actions.connectLayers(999, a.id)).toThrow(/No source layer with id "999"/);
+  expect(() => actions.connectLayers(a.id, 999)).toThrow(/No target layer with id "999"/);
+  expect(() => actions.disconnectLayers(999, a.id)).toThrow(/No source layer/);
+});
+
+logicTest('assistantActions: surfaces refused connections and missing edges as errors', ({ expect }) => {
+  const { actions } = setup();
+  const a = actions.addLayer('Input');
+  const b = actions.addLayer('Dense');
+  actions.connectLayers(a.id, b.id);
+  expect(() => actions.connectLayers(a.id, b.id)).toThrow(/already exists.*self-loop.*cycle/);
+  expect(() => actions.disconnectLayers(b.id, a.id)).toThrow(/no .* connection to remove/);
+  const gone = actions.disconnectLayers(a.id, b.id);
+  expect(gone).toEqual({ disconnected: true, source: a.id, target: b.id });
 });
 
 // --- AnthropicClient tool mapping ----------------------------------------------
@@ -264,6 +318,8 @@ logicTest('anthropicClient: builds a valid tools array from the actions', ({ exp
     'set_param',
     'get_model_summary',
     'generate_code',
+    'connect_layers',
+    'disconnect_layers',
     'delete_selected',
     'undo',
     'redo',
@@ -271,6 +327,7 @@ logicTest('anthropicClient: builds a valid tools array from the actions', ({ exp
     'load_template',
     'list_tutorials',
     'start_tutorial',
+    'open_training_panel',
     'get_layer_help',
   ]);
   tools.forEach((tool) => {
@@ -333,12 +390,14 @@ logicTest('assistantActions: reports a missing layer id distinctly from a bad pa
 
 logicTest('anthropicClient: marks exactly the mutating tools', ({ expect }) => {
   expect([...MUTATING_TOOLS].sort()).toEqual(
-    ['add_layer', 'delete_selected', 'load_template', 'redo', 'set_param', 'undo'],
+    ['add_layer', 'connect_layers', 'delete_selected', 'disconnect_layers',
+      'load_template', 'redo', 'set_param', 'undo'],
   );
   expect(isMutatingTool('load_template')).toBe(true); // replaces the board
   expect(isMutatingTool('list_templates')).toBe(false);
   expect(isMutatingTool('list_tutorials')).toBe(false);
   expect(isMutatingTool('start_tutorial')).toBe(false); // navigation, not a graph edit
+  expect(isMutatingTool('open_training_panel')).toBe(false); // navigation too
   expect(isMutatingTool('get_layer_help')).toBe(false);
   expect(isMutatingTool('add_layer')).toBe(true);
   expect(isMutatingTool('list_layers')).toBe(false);

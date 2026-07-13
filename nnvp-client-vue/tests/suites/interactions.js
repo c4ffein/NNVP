@@ -72,7 +72,7 @@ e2eOnly(
     expect(fileMenuItems.length).toBeGreaterThan(0);
     expect(fileMenuItems).toContain('File');
     expect(fileMenuItems).toContain('Edit');
-    expect(fileMenuItems).toContain('View'); // Training lives under View now
+    expect(fileMenuItems).toContain('Panels'); // Training lives under Panels now
     expect(fileMenuItems).toContain('About');
     expect(consoleErrors.length).toBe(0);
   },

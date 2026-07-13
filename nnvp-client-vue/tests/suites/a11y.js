@@ -13,7 +13,7 @@ e2eOnly(
     await expect(page.getByRole('menubar', { name: 'Main menu' })).toBeVisible();
     await expect(page.getByRole('menuitem', { name: 'File' })).toBeVisible();
     await expect(page.getByRole('menuitem', { name: 'Edit' })).toBeVisible();
-    await expect(page.getByRole('menuitem', { name: 'View' })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: 'Panels' })).toBeVisible();
     await expect(page.getByRole('menuitem', { name: 'About' })).toBeVisible();
   },
 );

@@ -12,6 +12,7 @@ import './layerHelpModals';
 import './markdown';
 import './offscreenIndicators';
 import './layerCatalogCollapse';
+import './floatingWindows';
 import './tutorial';
 import './a11y';
 import './datasetError';

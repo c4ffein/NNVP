@@ -288,3 +288,47 @@ logicTest('flowGraphEditor: toJSON round-trips the loaded template structurally'
   const { editor } = loadedEditor();
   expect(JSON.parse(editor.toJSON())).toEqual(JSON.parse(templates[DENSE_MNIST]));
 });
+
+// --- Programmatic edges (the assistant's connect/disconnect tools) -----------
+
+logicTest('flowGraphEditor: connectLayers wires two layers with board rules', ({ expect }) => {
+  const { store, editor } = makeEditor();
+  editor.addLayer(kl('Input'));
+  editor.addLayer(kl('Dense'));
+  const [a, b] = store.state.nodes.map(node => node.id);
+  expect(editor.connectLayers(a, b)).toBe(true);
+  expect(store.state.edges).toHaveLength(1);
+  expect(store.state.edges[0].source).toBe(a);
+  expect(store.state.edges[0].target).toBe(b);
+  // Same rules as dragging on the board:
+  expect(editor.connectLayers(a, b)).toBe(false); // duplicate
+  expect(editor.connectLayers(a, a)).toBe(false); // self-loop
+  expect(editor.connectLayers(b, a)).toBe(false); // would close a cycle
+  expect(store.state.edges).toHaveLength(1);
+});
+
+logicTest('flowGraphEditor: connectLayers is undoable', ({ expect }) => {
+  const { store, editor } = makeEditor();
+  editor.addLayer(kl('Input'));
+  editor.addLayer(kl('Dense'));
+  const [a, b] = store.state.nodes.map(node => node.id);
+  editor.connectLayers(a, b);
+  editor.undo();
+  expect(store.state.edges).toHaveLength(0);
+  editor.redo();
+  expect(store.state.edges).toHaveLength(1);
+});
+
+logicTest('flowGraphEditor: disconnectLayers removes exactly the named edge', ({ expect }) => {
+  const { store, editor } = makeEditor();
+  editor.addLayer(kl('Input'));
+  editor.addLayer(kl('Dense'));
+  editor.addLayer(kl('Dense'));
+  const [a, b, c] = store.state.nodes.map(node => node.id);
+  editor.connectLayers(a, b);
+  editor.connectLayers(b, c);
+  expect(editor.disconnectLayers(a, b)).toBe(true);
+  expect(store.state.edges).toHaveLength(1);
+  expect(store.state.edges[0].source).toBe(b);
+  expect(editor.disconnectLayers(a, b)).toBe(false); // already gone
+});

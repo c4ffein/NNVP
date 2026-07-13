@@ -21,7 +21,7 @@ e2eOnly(
     await page.waitForTimeout(50);
 
     // Open the Training zone from the general menu.
-    await page.click('#GeneralMenu .menuTitle:has-text("View")');
+    await page.click('#GeneralMenu .menuTitle:has-text("Panels")');
     await page.click('#GeneralMenu .menuItem:has-text("Training")');
     await page.waitForTimeout(100);
 

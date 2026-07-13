@@ -7,7 +7,7 @@
  * Long tests carry { timeoutMs } (dataset CDN loads 150s, the full training
  * workflow 180s) — both runners honor it.
  */
-import { e2eOnly } from '../harness/define';
+import { e2eOnly, appTest } from '../harness/define';
 
 // Replicates the original spec's beforeEach: attach console/pageerror
 // collectors, then (re)load the app so load-time errors are captured too —
@@ -43,7 +43,7 @@ e2eOnly(
     });
     console.log('Dataset debug logging enabled');
     // Open TrainingZone by clicking "Training" in GeneralMenu
-    await page.click('#GeneralMenu .menuTitle:has-text("View")');
+    await page.click('#GeneralMenu .menuTitle:has-text("Panels")');
     await page.click('#GeneralMenu .menuItem:has-text("Training")');
     await page.waitForTimeout(50);
     console.log('Clicked Training menu to open TrainingZone');
@@ -179,7 +179,7 @@ e2eOnly(
       window.nnvp = window.nnvp || {}; window.nnvp.debug = window.nnvp.debug || {}; window.nnvp.debug.enableDatasets = true;
     });
     // Open TrainingZone by clicking "Training" in GeneralMenu
-    await page.click('#GeneralMenu .menuTitle:has-text("View")');
+    await page.click('#GeneralMenu .menuTitle:has-text("Panels")');
     await page.click('#GeneralMenu .menuItem:has-text("Training")');
     await page.waitForTimeout(50);
     console.log('Opened TrainingZone');
@@ -295,7 +295,7 @@ e2eOnly(
       window.nnvp = window.nnvp || {}; window.nnvp.debug = window.nnvp.debug || {}; window.nnvp.debug.enableDatasets = true;
     });
     // Open TrainingZone by clicking "Training" in GeneralMenu
-    await page.click('#GeneralMenu .menuTitle:has-text("View")');
+    await page.click('#GeneralMenu .menuTitle:has-text("Panels")');
     await page.click('#GeneralMenu .menuItem:has-text("Training")');
     await page.waitForTimeout(50);
     console.log('Opened TrainingZone');
@@ -460,7 +460,7 @@ e2eOnly(
     await page.waitForTimeout(100);
     console.log('Loaded template: 2D Dense for MNIST');
     // Open Training panel via top menu
-    await page.click('#GeneralMenu .menuTitle:has-text("View")');
+    await page.click('#GeneralMenu .menuTitle:has-text("Panels")');
     await page.click('#GeneralMenu .menuItem:has-text("Training")');
     await page.waitForTimeout(100);
     // Verify TrainingZone is visible
@@ -667,3 +667,22 @@ e2eOnly(
   },
   { timeoutMs: 180000 },
 );
+
+// --- Chart helpers ------------------------------------------------------------
+
+appTest('charts: the Batch Results helper explains per-batch training metrics', async ({ charts, expect }) => {
+  await charts.open();
+  const text = await charts.helpText('batch');
+  expect(text).toContain('after every batch');
+  expect(text).toContain('acc');
+  expect(text).toContain('loss');
+  expect(text).toContain('validation runs once per epoch');
+});
+
+appTest('charts: the Epoch Results helper explains validation and overfitting', async ({ charts, expect }) => {
+  await charts.open();
+  const text = await charts.helpText('epoch');
+  expect(text).toContain('after every epoch');
+  expect(text).toContain('val-acc / val-loss');
+  expect(text).toContain('overfitting');
+});
