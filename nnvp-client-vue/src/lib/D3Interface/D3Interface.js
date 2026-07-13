@@ -102,6 +102,16 @@ export default class {
     }
   }
 
+  connectLayers(sourceId, targetId) {
+    if (this.activeGraph === null) return false;
+    return this.activeGraph.connectLayers(sourceId, targetId);
+  }
+
+  disconnectLayers(sourceId, targetId) {
+    if (this.activeGraph === null) return false;
+    return this.activeGraph.disconnectLayers(sourceId, targetId);
+  }
+
   setLeftBarRemountCallback(func) {
     this.leftBarRemountCallback = func;
   }

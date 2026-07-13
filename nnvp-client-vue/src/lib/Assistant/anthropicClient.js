@@ -11,7 +11,6 @@
 
 export const STORAGE_KEY = 'nnvp_anthropic_key';
 export const STORAGE_BASE_URL = 'nnvp_anthropic_base_url';
-export const STORAGE_MODEL = 'nnvp_anthropic_model';
 export const STORAGE_ALLOW_EDITS = 'nnvp_anthropic_allow_edits';
 
 export const DEFAULT_MODEL = 'claude-sonnet-5';
@@ -23,6 +22,8 @@ export const ANTHROPIC_VERSION = '2023-06-01';
 // code generation) always run. Kept as a single source of truth so the UI, the
 // tool descriptions and the runtime guard can never drift apart.
 export const MUTATING_TOOLS = new Set([
+  'connect_layers',
+  'disconnect_layers',
   'add_layer',
   'set_param',
   'delete_selected',
@@ -54,6 +55,12 @@ export const SYSTEM_PROMPT = [
   'The app ships ready-made templates (list_templates / load_template) and guided',
   'tutorials (list_tutorials) — suggest them before building common networks from',
   'scratch, and use get_layer_help to explain layers with the app\'s own docs.',
+  'The model CAN be trained right here in the browser: the Training panel runs',
+  'it with TensorFlow.js on built-in datasets (MNIST, FashionMNIST, CIFAR-10),',
+  'with optimizer/loss/epochs options and live charts. When the user asks to run',
+  'or train the model, open the panel with open_training_panel and walk them',
+  'through it (pick a dataset, then Train) — never claim training needs an',
+  'external Python setup, though generate_code exists for exporting.',
 ].join(' ');
 
 // Tool surface: one entry per AssistantActions method the model may call.
@@ -112,6 +119,30 @@ export function buildTools() {
       },
     },
     {
+      name: 'connect_layers',
+      description: '[Modifies the model] Connect two layers (data flows source -> target), like dragging an edge on the board. Self-loops, duplicates and cycles are refused.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          source_id: { description: 'Layer id the connection starts from (see list_layers).' },
+          target_id: { description: 'Layer id the connection goes to.' },
+        },
+        required: ['source_id', 'target_id'],
+      },
+    },
+    {
+      name: 'disconnect_layers',
+      description: '[Modifies the model] Remove the source -> target connection between two layers.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          source_id: { description: 'Layer id the existing connection starts from.' },
+          target_id: { description: 'Layer id the existing connection goes to.' },
+        },
+        required: ['source_id', 'target_id'],
+      },
+    },
+    {
       name: 'delete_selected',
       description: '[Modifies the model] Delete the currently selected layers/edges from the graph.',
       input_schema: { type: 'object', properties: {} },
@@ -159,6 +190,11 @@ export function buildTools() {
       },
     },
     {
+      name: 'open_training_panel',
+      description: 'Open the in-browser Training panel (TensorFlow.js): dataset picker (MNIST, FashionMNIST, CIFAR-10), compile options and live charts. Navigation only — works in read-only mode.',
+      input_schema: { type: 'object', properties: {} },
+    },
+    {
       name: 'get_layer_help',
       description: "The app's own documentation for a layer type or catalog category, as plain text (the same content the (?) buttons show). Prefer this over memory when explaining layers.",
       input_schema: {
@@ -179,6 +215,8 @@ const TOOL_DISPATCH = {
   set_param: (actions, input) => actions.setParam(input.layer_id, input.param_name, input.value),
   get_model_summary: (actions) => actions.getModelSummary(),
   generate_code: (actions, input) => actions.generateCode(input.lang),
+  connect_layers: (actions, input) => actions.connectLayers(input.source_id, input.target_id),
+  disconnect_layers: (actions, input) => actions.disconnectLayers(input.source_id, input.target_id),
   delete_selected: (actions) => actions.deleteSelected(),
   undo: (actions) => actions.undo(),
   redo: (actions) => actions.redo(),
@@ -186,6 +224,7 @@ const TOOL_DISPATCH = {
   load_template: (actions, input) => actions.loadTemplate(input.name),
   list_tutorials: (actions) => actions.listTutorials(),
   start_tutorial: (actions, input) => actions.startTutorial(input.tutorial_id),
+  open_training_panel: (actions) => actions.openTrainingPanel(),
   get_layer_help: (actions, input) => actions.getLayerHelp(input.name),
 };
 
@@ -207,7 +246,6 @@ export function readStoredConfig(overrides = {}) {
     stored = {
       apiKey: localStorage.getItem(STORAGE_KEY) || '',
       baseUrl: localStorage.getItem(STORAGE_BASE_URL) || '',
-      model: localStorage.getItem(STORAGE_MODEL) || '',
       backendToken: localStorage.getItem('nnvp_backend_token') || '',
     };
   }
@@ -220,7 +258,9 @@ export function readStoredConfig(overrides = {}) {
   return {
     apiKey,
     baseUrl,
-    model: overrides.model || stored.model || DEFAULT_MODEL,
+    // The model is pinned: no user override (the backend enforces its own
+    // pin too — see nnvp-backend core/api/assistant.py).
+    model: DEFAULT_MODEL,
     backendUrl,
     backendToken,
   };

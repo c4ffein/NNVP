@@ -22,6 +22,7 @@ import D3Templates from '../D3Interface/D3Templates';
 import KerasLayer from '../KerasInterface/KerasLayer';
 import {
   nnvpToFlow, flowToNnvp, nextLayerId, newLayerNode, groupSelected, COMPOSITE_NODE,
+  isInvalidConnection,
 } from './adapter';
 
 // Default node footprint (see newLayerNode) — used to center drops on the cursor.
@@ -156,6 +157,41 @@ export default class FlowGraphEditor {
     this.store.setGraph([...nodes, node], this.store.getEdges());
     this.committed = this.toJSON();
     this.updateGraph();
+  }
+
+  /**
+   * Programmatic connect (the assistant's tool): same result and same rules
+   * as dragging an edge on the board — self-loops, duplicates and cycles are
+   * refused. Returns whether the edge was created.
+   */
+  connectLayers(sourceId, targetId) {
+    const source = String(sourceId);
+    const target = String(targetId);
+    const edges = this.store.getEdges();
+    if (isInvalidConnection(edges, source, target)) return false;
+    this.saveState();
+    this.store.setGraph(this.store.getNodes(), [...edges, {
+      id: `edge-${source}-${target}`,
+      source,
+      target,
+    }]);
+    this.committed = this.toJSON();
+    this.updateGraph();
+    return true;
+  }
+
+  /** Remove the source -> target edge. Returns whether one existed. */
+  disconnectLayers(sourceId, targetId) {
+    const source = String(sourceId);
+    const target = String(targetId);
+    const edges = this.store.getEdges();
+    const kept = edges.filter(edge => !(edge.source === source && edge.target === target));
+    if (kept.length === edges.length) return false;
+    this.saveState();
+    this.store.setGraph(this.store.getNodes(), kept);
+    this.committed = this.toJSON();
+    this.updateGraph();
+    return true;
   }
 
   /** Catalog click drop point: center of the viewport, slightly staggered. */

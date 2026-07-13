@@ -245,6 +245,10 @@ export default class ApiClient {
 
   // --- projects --------------------------------------------------------------
 
+  async getAssistantUsage(days = 30) {
+    return this.request(`/assistant/usage?days=${days}`, { auth: true });
+  }
+
   async listProjects() {
     return this.request('/projects', { auth: true });
   }

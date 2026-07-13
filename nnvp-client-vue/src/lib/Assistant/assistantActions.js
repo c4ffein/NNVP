@@ -144,6 +144,41 @@ export default class AssistantActions {
     throw new Error(`Unknown language "${lang}" (expected "python" or "javascript").`);
   }
 
+  // Internal: both edge tools need existing layer ids and friendly errors.
+  requireLayer(layerId, role) {
+    const layer = this.d3Interface.findLayerById(layerId);
+    if (layer === null || layer === undefined) {
+      throw new Error(`No ${role} layer with id "${layerId}" (see list_layers for valid ids).`);
+    }
+    return layer;
+  }
+
+  // Connect two layers (source output -> target input), like dragging an
+  // edge on the board. Same rules: self-loops, duplicates and cycles refused.
+  connectLayers(sourceId, targetId) {
+    this.requireLayer(sourceId, 'source');
+    this.requireLayer(targetId, 'target');
+    const connected = this.d3Interface.connectLayers(sourceId, targetId);
+    if (!connected) {
+      throw new Error(
+        `Cannot connect ${sourceId} -> ${targetId}: the connection already exists, `
+        + 'is a self-loop, or would create a cycle.',
+      );
+    }
+    return { connected: true, source: sourceId, target: targetId };
+  }
+
+  // Remove the source -> target connection, if it exists.
+  disconnectLayers(sourceId, targetId) {
+    this.requireLayer(sourceId, 'source');
+    this.requireLayer(targetId, 'target');
+    const disconnected = this.d3Interface.disconnectLayers(sourceId, targetId);
+    if (!disconnected) {
+      throw new Error(`There is no ${sourceId} -> ${targetId} connection to remove.`);
+    }
+    return { disconnected: true, source: sourceId, target: targetId };
+  }
+
   deleteSelected() {
     this.d3Interface.deleteSelectedElements();
     return { ok: true };
@@ -200,6 +235,14 @@ export default class AssistantActions {
     }
     window.dispatchEvent(new CustomEvent('nnvp:start-tutorial', { detail: { id: tutorialId } }));
     return { started: tutorialId, title: known.title };
+  }
+
+  // Open the in-browser Training panel (TensorFlow.js). Same event-bridge
+  // pattern as startTutorial: App.vue listens and opens the window.
+  // Navigation, not a graph mutation — available even in read-only mode.
+  openTrainingPanel() {
+    window.dispatchEvent(new CustomEvent('nnvp:open-training'));
+    return { opened: true };
   }
 
   // The in-app documentation for a layer type (or a catalog category), as
