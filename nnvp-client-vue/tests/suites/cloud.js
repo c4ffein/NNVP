@@ -147,8 +147,8 @@ e2eOnly(
     // --- clear the board, then reopen the saved project ---------------------
     await page.click('.modal-close');
     await page.evaluate(() => {
-      window.d3Interface.activeGraph.clearBoard(true);
-      window.d3Interface.activeGraph.updateGraph();
+      window.boardInterface.activeGraph.clearBoard(true);
+      window.boardInterface.activeGraph.updateGraph();
     });
     await expect(page.locator(canvas.layer)).toHaveCount(0);
 

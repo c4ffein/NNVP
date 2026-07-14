@@ -189,7 +189,7 @@ export default {
     backendEnabled: !!import.meta.env.VITE_ENABLE_BACKEND,
   }),
   mounted() {
-    this.$d3Interface.setLeftBarRemountCallback(this.remount);
+    this.$boardInterface.setLeftBarRemountCallback(this.remount);
     this.handleEscape = (event) => {
       if (event.key === 'Escape' && (this.helpLayerType || this.helpCategory)) this.closeHelp();
     };

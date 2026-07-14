@@ -4,18 +4,19 @@
  * world needed, still executed by BOTH runners.
  */
 import { logicTest } from '../harness/define';
-import D3Templates from '../../src/lib/D3Interface/D3Templates';
+import BoardTemplates from '../../src/lib/BoardInterface/BoardTemplates';
 import KerasGenerator from '../../src/lib/KerasInterface/KerasGenerator';
 import {
   nnvpToFlow, flowToNnvp, isInvalidConnection, edgeInCycle, nextLayerId, newLayerNode,
   groupSelected, LAYER_NODE, COMPOSITE_NODE,
 } from '../../src/lib/FlowInterface/adapter';
+import { CURRENT_FORMAT_VERSION } from '../../src/lib/ModelFormat/migrations';
 
 // KerasGenerator mutates the graph it is given, so always feed it a fresh parse.
 const pythonOf = json => new KerasGenerator(JSON.parse(json)).generatePythonFromGraph();
 const javascriptOf = json => new KerasGenerator(JSON.parse(json)).generateJavascriptFromGraph();
 
-const templates = new D3Templates().templates;
+const templates = new BoardTemplates().templates;
 
 // A graph with a composite (grouped) layer, in D3Model.toJSON shape: children
 // carry ABSOLUTE coordinates and a parentID pointing at the composite.
@@ -91,13 +92,16 @@ logicTest('flowAdapter: nnvpToFlow maps composite children to nested nodes with 
 logicTest('flowAdapter: round-trip is lossless for a flat template (structure)', ({ expect }) => {
   const original = templates['2D Dense for MNIST'];
   const { nodes, edges } = nnvpToFlow(original);
-  expect(JSON.parse(flowToNnvp(nodes, edges))).toEqual(JSON.parse(original));
+  // Saving stamps the (previously unversioned) model with the current format.
+  expect(JSON.parse(flowToNnvp(nodes, edges)))
+    .toEqual({ ...JSON.parse(original), formatVersion: CURRENT_FORMAT_VERSION });
 });
 
 logicTest('flowAdapter: round-trip is lossless for the composite fixture (structure, absolute coords, parentID)', ({ expect }) => {
   const original = compositeFixture();
   const { nodes, edges } = nnvpToFlow(original);
-  expect(JSON.parse(flowToNnvp(nodes, edges))).toEqual(JSON.parse(original));
+  expect(JSON.parse(flowToNnvp(nodes, edges)))
+    .toEqual({ ...JSON.parse(original), formatVersion: CURRENT_FORMAT_VERSION });
 });
 
 logicTest('flowAdapter: round-trip preserves generated Python and JavaScript for every shipped template', ({ expect }) => {

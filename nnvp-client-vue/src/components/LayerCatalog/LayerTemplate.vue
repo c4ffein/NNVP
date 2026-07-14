@@ -5,9 +5,9 @@
     :aria-label="'Add ' + layerName + ' layer'"
     draggable="true"
     v-on:dragstart="$event.dataTransfer.setData('text/html', '<h1>test</h1>')"
-    @click="$d3Interface.addLayer(layerContent.clone())"
-    @keydown.enter.prevent="$d3Interface.addLayer(layerContent.clone())"
-    @keydown.space.prevent="$d3Interface.addLayer(layerContent.clone())"
+    @click="$boardInterface.addLayer(layerContent.clone())"
+    @keydown.enter.prevent="$boardInterface.addLayer(layerContent.clone())"
+    @keydown.space.prevent="$boardInterface.addLayer(layerContent.clone())"
   >
     <span class="layer-template-name">{{ this.layerName }}</span>
     <button
@@ -36,10 +36,10 @@ export default {
     divId: categoryName => `category_${categoryName.replace(' ', '_')}`,
   },
   mounted() {
-    this.$d3Interface.addEventHandlerDragOnHtmlClass(this.layerContent, this.$el);
+    this.$boardInterface.addEventHandlerDragOnHtmlClass(this.layerContent, this.$el);
   },
   updated() {
-    this.$d3Interface.addEventHandlerDragOnHtmlClass(this.layerContent, this.$el);
+    this.$boardInterface.addEventHandlerDragOnHtmlClass(this.layerContent, this.$el);
   },
   props: {
     layerName: String,

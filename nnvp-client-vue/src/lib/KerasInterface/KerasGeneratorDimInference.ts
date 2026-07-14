@@ -13,32 +13,46 @@
 //
 // Anything not derivable is null; the generators fall back to their documented
 // defaults with a loud TODO comment so the user cannot miss the guess.
+//
+// Numeric parameter values (units, filters, output_dim) are read straight off
+// parameterValues, which the editor populates with numbers for int params —
+// the `as number` casts encode that trust, exactly like the untyped code did.
 
-export default function inferFeatureDims(graph, list) {
-  const dims = {};
+import type { NnvpLayerId, ParameterValue } from '../../types/model';
+import type { GeneratorGraph } from './KerasGenerator';
+
+export interface InferredDims {
+  shape: number[] | null;
+  features: number | null;
+}
+
+export default function inferFeatureDims(
+  graph: GeneratorGraph, list: NnvpLayerId[],
+): Record<NnvpLayerId, InferredDims> {
+  const dims: Record<NnvpLayerId, InferredDims> = {};
   // Dim record of an already-treated node, with nulls for anything unknown.
-  const dimsOf = node => dims[node] || { shape: null, features: null };
+  const dimsOf = (node: NnvpLayerId | undefined): InferredDims => dims[node as NnvpLayerId] || { shape: null, features: null };
   list.forEach((node) => {
-    const { name, parameterValues } = graph[node].keras_data;
-    const p = parameterValues || {};
-    const sources = graph[node].sources || [];
+    const { name, parameterValues } = graph[node]!.keras_data!;
+    const p: Record<string, ParameterValue> = parameterValues || {};
+    const sources = graph[node]!.sources || [];
     const source = dimsOf(sources[0]);
-    let shape = null;
-    let features = null;
+    let shape: number[] | null = null;
+    let features: number | null = null;
     switch (name) {
       case 'Input':
         // The user-declared shape is the one fully-known starting point.
         if (Array.isArray(p.shape) && p.shape.length > 0
             && p.shape.every(d => typeof d === 'number')) {
           shape = p.shape.slice();
-          features = shape[shape.length - 1];
+          features = shape[shape.length - 1]!;
         }
         break;
       case 'Dense':
         // Dense maps the last axis to `units`, leaving the other axes untouched.
         if (p.units !== undefined) {
-          features = p.units;
-          if (source.shape) shape = [...source.shape.slice(0, -1), p.units];
+          features = p.units as number;
+          if (source.shape) shape = [...source.shape.slice(0, -1), p.units as number];
         }
         break;
       case 'LSTM':
@@ -47,20 +61,20 @@ export default function inferFeatureDims(graph, list) {
       case 'RNN':
         // Recurrent output features = units (with or without return_sequences);
         // the timestep axis is not tracked, so only `features` survives.
-        if (p.units !== undefined) features = p.units;
+        if (p.units !== undefined) features = p.units as number;
         break;
       case 'Embedding':
         // Embedding appends an `output_dim`-sized axis to its (integer) input.
         if (p.output_dim !== undefined) {
-          features = p.output_dim;
-          if (source.shape) shape = [...source.shape, p.output_dim];
+          features = p.output_dim as number;
+          if (source.shape) shape = [...source.shape, p.output_dim as number];
         }
         break;
       case 'Conv1D':
       case 'Conv2D':
       case 'Conv3D':
         // Channels become `filters`; spatial axes change in ways we do not compute.
-        if (p.filters !== undefined) features = p.filters;
+        if (p.filters !== undefined) features = p.filters as number;
         break;
       case 'MaxPooling1D':
       case 'MaxPooling2D':
@@ -98,7 +112,7 @@ export default function inferFeatureDims(graph, list) {
         // Keras Concatenate defaults to axis=-1: features add up when all are known.
         const sourceDims = sources.map(dimsOf);
         if (sourceDims.length > 0 && sourceDims.every(d => d.features !== null)) {
-          features = sourceDims.reduce((acc, d) => acc + d.features, 0);
+          features = sourceDims.reduce((acc, d) => acc + d.features!, 0);
         }
         break;
       }
@@ -106,8 +120,8 @@ export default function inferFeatureDims(graph, list) {
         // Element-wise merge: features pass through when every source agrees.
         const sourceDims = sources.map(dimsOf);
         if (sourceDims.length > 0 && sourceDims.every(d => d.features !== null
-            && d.features === sourceDims[0].features)) {
-          features = sourceDims[0].features;
+            && d.features === sourceDims[0]!.features)) {
+          features = sourceDims[0]!.features;
         }
         break;
       }

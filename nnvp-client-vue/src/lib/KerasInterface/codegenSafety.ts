@@ -12,14 +12,14 @@
 // A JSON string literal is valid source in both JavaScript and Python
 // (double-quoted, with `"`, `\`, and control characters escaped), so one
 // quoting function serves every generator.
-export function quoteString(value) {
+export function quoteString(value: unknown): string {
   return JSON.stringify(String(value));
 }
 
 // Identifiers (layer type names, parameter names) end up unquoted in the
 // generated code — as `tf.layers.<name>`, Python kwargs, or attribute names —
 // so they cannot be escaped, only validated.
-export function assertSafeIdentifier(name, what = 'identifier') {
+export function assertSafeIdentifier(name: unknown, what = 'identifier'): string {
   if (typeof name !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
     throw new Error(`Unsafe ${what} in model: ${JSON.stringify(name)}`);
   }
@@ -28,7 +28,7 @@ export function assertSafeIdentifier(name, what = 'identifier') {
 
 // Node ids are used as variable-name suffixes (layer_<id>); real models use
 // numeric ids, so anything outside [A-Za-z0-9_] means a tampered file.
-export function assertSafeIdSuffix(id) {
+export function assertSafeIdSuffix(id: unknown): string {
   const asString = String(id);
   if (!/^[A-Za-z0-9_]+$/.test(asString)) {
     throw new Error(`Unsafe node id in model: ${JSON.stringify(asString)}`);

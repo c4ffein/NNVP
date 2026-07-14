@@ -41,6 +41,30 @@ export interface KerasLayerJSON {
   customUserLayer: boolean;
 }
 
+// --- Layer catalog (generatedKerasLayers.json) --------------------------------
+
+/**
+ * One layer's entry in generatedKerasLayers.json. `input`/`output` are
+ * doc-style shape hints (e.g. { shape: "Arbitrary" }), NOT ParameterDefs.
+ */
+export interface KerasLayerCatalogEntry {
+  category: string;
+  preferredName?: string;
+  parameters: Record<string, ParameterDef>;
+  input?: { shape: string | string[] };
+  output?: { shape: string | string[] };
+}
+
+/**
+ * The whole generatedKerasLayers.json: nested { aliasToCanonical, layers }
+ * today; the old flat format was just the `layers` record on its own, and
+ * KerasInterface.load still accepts both.
+ */
+export interface KerasLayerCatalog {
+  aliasToCanonical?: Record<string, string>;
+  layers?: Record<string, KerasLayerCatalogEntry>;
+}
+
 // --- Persisted graph (.nnvp files) -------------------------------------------
 
 /** Layer ids are integers from the editor, but old files may carry strings. */
@@ -73,6 +97,11 @@ export interface NnvpLayer {
 }
 
 export interface NnvpModel {
+  /**
+   * Save-format version (see lib/ModelFormat/migrations.ts). Absent on files
+   * saved before versioning existed, which reads as version 1.
+   */
+  formatVersion?: number;
   layers: NnvpLayer[];
   edges: NnvpEdge[];
   /** Ids of the Input layers, in creation order. */

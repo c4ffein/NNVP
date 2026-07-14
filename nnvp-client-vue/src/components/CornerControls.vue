@@ -24,6 +24,20 @@
       </svg>
     </button>
     <button
+      type="button"
+      class="corner-btn viz3d-btn"
+      title="3D network view (experimental)"
+      aria-label="3D network view (experimental)"
+      @click="$emit('open-viz3d')"
+    >
+      <svg class="corner-icon" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+        <g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+          <path d="M12 2.5 21 7.5v9L12 21.5 3 16.5v-9z"/>
+          <path d="M3 7.5l9 5 9-5M12 12.5v9"/>
+        </g>
+      </svg>
+    </button>
+    <button
       v-if="backendEnabled"
       type="button"
       class="corner-btn account-btn"
@@ -45,7 +59,7 @@
 <script>
 export default {
   name: 'CornerControls',
-  emits: ['open-account'],
+  emits: ['open-account', 'open-viz3d'],
   data() {
     return {
       backendEnabled: !!import.meta.env.VITE_ENABLE_BACKEND,

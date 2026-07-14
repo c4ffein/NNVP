@@ -3,17 +3,17 @@
 // This module is intentionally Vue-agnostic and side-effect free so it can be
 // unit-tested in isolation. It exports a declarative list of steps; each step's
 // `isComplete` predicate inspects the real editor state exposed through the
-// `$d3Interface` (see src/lib/D3Interface/D3Interface.js).
+// `$boardInterface` (see src/lib/BoardInterface/BoardInterface.js).
 //
-// Editor-state contract used here (verified against D3Interface / D3Model / D3Layer):
-//   $d3Interface.activeGraph.model.d3Layers  -> array of placed layers
+// Editor-state contract used here (verified against BoardInterface / D3Model / D3Layer):
+//   $boardInterface.activeGraph.model.d3Layers  -> array of placed layers
 //   layer.kerasLayer.name                    -> Keras layer type, e.g. "Conv2D"
 //   layer.kerasLayer.parameterValues         -> object of set parameter values
 
 /**
  * Return the array of placed layers for the active graph, or [] when the graph
  * (or interface) is not ready yet. Never throws so predicates stay safe to poll.
- * @param {object} $d3 the $d3Interface instance (or a fake in tests)
+ * @param {object} $d3 the $boardInterface instance (or a fake in tests)
  * @returns {Array} placed layers
  */
 export function placedLayers($d3) {
@@ -24,7 +24,7 @@ export function placedLayers($d3) {
 
 /**
  * Count placed layers whose Keras type matches `name`.
- * @param {object} $d3 the $d3Interface instance
+ * @param {object} $d3 the $boardInterface instance
  * @param {string} name the Keras layer name (e.g. "Dense")
  * @returns {number}
  */
@@ -38,7 +38,7 @@ export function countLayersNamed($d3, name) {
  * True when at least one placed Input layer has a non-empty `shape` parameter.
  * The Input layer's shape is stored in kerasLayer.parameterValues.shape as a
  * tuple_int (array). We treat any non-empty value as "set".
- * @param {object} $d3 the $d3Interface instance
+ * @param {object} $d3 the $boardInterface instance
  * @returns {boolean}
  */
 export function inputShapeIsSet($d3) {
@@ -68,7 +68,7 @@ export function trainingPanelIsOpen() {
 //   instruction what the user should do
 //   target      CSS selector (string) or (document) => Element locating the
 //               UI element to highlight
-//   isComplete  ($d3Interface) => boolean, inspecting real editor state
+//   isComplete  ($boardInterface) => boolean, inspecting real editor state
 export const steps = [
   {
     id: 'add-input',

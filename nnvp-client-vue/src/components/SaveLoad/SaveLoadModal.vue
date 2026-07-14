@@ -304,7 +304,7 @@ export default {
         this.error = 'Please provide a name.';
         return;
       }
-      const graphString = this.$d3Interface ? this.$d3Interface.getGraphJSON() : null;
+      const graphString = this.$boardInterface ? this.$boardInterface.getGraphJSON() : null;
       if (!graphString) {
         this.error = 'No board to save.';
         return;
@@ -334,7 +334,7 @@ export default {
       try {
         const full = await this.api.getProject(this.selectedId);
         const graph = typeof full.graph === 'string' ? full.graph : JSON.stringify(full.graph);
-        if (this.$d3Interface) this.$d3Interface.loadGraphFromJSON(graph);
+        if (this.$boardInterface) this.$boardInterface.loadGraphFromJSON(graph);
         setCurrentProject(full);
         this.closeModal();
       } catch (e) {
@@ -347,10 +347,10 @@ export default {
       // Device files know nothing about cloud lineage: a local load resets the
       // continuation anchor.
       if (this.mode === 'save') {
-        this.$d3Interface.saveBoard();
+        this.$boardInterface.saveBoard();
       } else {
         clearCurrentProject();
-        this.$d3Interface.loadBoard();
+        this.$boardInterface.loadBoard();
       }
       this.closeModal();
     },

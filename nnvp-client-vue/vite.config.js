@@ -7,7 +7,7 @@ import path from 'path'
 export default defineConfig({
   plugins: [vue(), vueJsx()],
   server: {
-    allowedHosts: ['c6.p1.c4ffein.io'],
+    allowedHosts: true,
     // The cloud backend is same-origin at /api (the SPA never configures a
     // backend URL). In dev, forward it to the Django server; `make backend`
     // at the repo root runs one there.

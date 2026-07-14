@@ -67,9 +67,9 @@ function makeKerasLayer(name) {
   };
 }
 
-// A fake $d3Interface mirroring the real add/find/model structure closely
+// A fake $boardInterface mirroring the real add/find/model structure closely
 // enough to exercise the actions (activeGraph.model.d3Layers, findLayerById...).
-function makeFakeD3Interface() {
+function makeFakeBoardInterface() {
   const model = {
     d3Layers: [],
     d3Edges: [],
@@ -152,7 +152,7 @@ function makeFakeKerasInterface() {
 
 // Former beforeEach: fresh fakes + actions per test.
 function setup() {
-  const d3 = makeFakeD3Interface();
+  const d3 = makeFakeBoardInterface();
   const keras = makeFakeKerasInterface();
   const actions = new AssistantActions(d3, keras);
   return { d3, keras, actions };
@@ -339,7 +339,7 @@ logicTest('anthropicClient: builds a valid tools array from the actions', ({ exp
 });
 
 logicTest('anthropicClient: executes a mapped tool against the actions', ({ expect }) => {
-  const d3 = makeFakeD3Interface();
+  const d3 = makeFakeBoardInterface();
   const keras = makeFakeKerasInterface();
   const actions = new AssistantActions(d3, keras);
   // add_layer is a mutating tool, so allow edits to exercise the success path.
@@ -593,7 +593,7 @@ logicTest('anthropicClient: refuses to send with a malformed API key', async ({ 
 
 // --- Backend proxy mode ---------------------------------------------------------
 
-const makeActions = () => new AssistantActions(makeFakeD3Interface(), makeFakeKerasInterface());
+const makeActions = () => new AssistantActions(makeFakeBoardInterface(), makeFakeKerasInterface());
 
 logicTest('anthropicClient: posts to <backendUrl>/assistant/messages with the backend JWT and no API key', async ({ expect }) => {
   // backendUrl is the API root (Django mounts under /api), so the assistant

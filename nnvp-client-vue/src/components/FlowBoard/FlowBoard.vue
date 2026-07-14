@@ -1,8 +1,8 @@
 <template>
   <div id="FlowBoard" class="flow-board" @dragover.prevent @drop="onDrop">
-    <!-- GeneralMenu's Load / ctrl+O go through D3Interface.loadBoard(), which
+    <!-- GeneralMenu's Load / ctrl+O go through BoardInterface.loadBoard(), which
          clicks this input by id. -->
-    <input type="file" id="hidden-file-upload" accept=".nnvp" @change="onFileChosen" />
+    <input type="file" id="hidden-file-upload" accept=".nnvp,.keras" @change="onFileChosen" />
     <!-- Training indicator -->
     <div v-if="isTraining" class="training-indicator" data-testid="training-indicator">
       <div class="training-spinner"></div>
@@ -67,7 +67,7 @@ const {
   getSelectedNodes, getSelectedEdges, screenToFlowCoordinate,
 } = useVueFlow();
 
-// The facade the rest of the app drives through $d3Interface. It only sees
+// The facade the rest of the app drives through $boardInterface. It only sees
 // the Vue Flow store through this small adapter, keeping it unit-testable.
 // Vue Flow's own store is the single source of truth — no v-model mirrors:
 // with mirrored refs, wholesale edge replacement races edge validation
@@ -87,9 +87,9 @@ const editor = new FlowGraphEditor({
 });
 
 // This is the only board, so this editor registers first and becomes the
-// active graph — no D3Interface changes needed.
-const d3Interface = getCurrentInstance().appContext.config.globalProperties.$d3Interface;
-onMounted(() => d3Interface.addGraphEditor(editor));
+// active graph — no BoardInterface changes needed.
+const boardInterface = getCurrentInstance().appContext.config.globalProperties.$boardInterface;
+onMounted(() => boardInterface.addGraphEditor(editor));
 
 watch(getSelectedNodes, () => editor.syncSelection());
 

@@ -404,7 +404,7 @@ export default {
     },
     async saveToCloud() {
       if (this.busy) return;
-      const graphString = this.$d3Interface ? this.$d3Interface.getGraphJSON() : null;
+      const graphString = this.$boardInterface ? this.$boardInterface.getGraphJSON() : null;
       if (graphString === null || graphString === undefined) {
         this.error = 'No board to save.';
         return;
@@ -438,7 +438,7 @@ export default {
         const full = await this.api.getProject(project.id);
         const graph = full && full.graph !== undefined ? full.graph : project.graph;
         const graphString = typeof graph === 'string' ? graph : JSON.stringify(graph);
-        if (this.$d3Interface) this.$d3Interface.loadGraphFromJSON(graphString);
+        if (this.$boardInterface) this.$boardInterface.loadGraphFromJSON(graphString);
         this.status = `Opened “${full ? full.name : project.name}”.`;
         this.closeModal();
       } catch (e) {

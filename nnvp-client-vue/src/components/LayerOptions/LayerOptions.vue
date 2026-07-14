@@ -41,7 +41,7 @@
           v-bind:title="selectedLayer.kerasLayer.parameterDef[1]"
           v-bind:itemList="selectedLayer.inputLayers"
           v-bind:idFunc="e => e"
-          v-bind:nameFunc="e => $d3Interface.findLayerById(e).kerasLayer.name"
+          v-bind:nameFunc="e => $boardInterface.findLayerById(e).kerasLayer.name"
         />
         <div v-if="index != selectedNode.e.length - 1">
           <br>
@@ -51,7 +51,7 @@
       <ParamsBlock title="Model Inputs" v-if="inputInLayersAndMoreThanOneInModel">
         <div class="LayerOptions param">
           <OrderParameter
-            v-bind:itemList="$d3Interface.activeGraph.model.modelInputs"
+            v-bind:itemList="$boardInterface.activeGraph.model.modelInputs"
             :idFunc="e => e.id"
             :nameFunc="e => e.name"
         />
@@ -61,7 +61,7 @@
       <ParamsBlock title="Model Outputs" v-if="outputInLayers">
         <div class="LayerOptions param">
           <OrderParameter
-            v-bind:itemList="$d3Interface.activeGraph.model.modelOutputs"
+            v-bind:itemList="$boardInterface.activeGraph.model.modelOutputs"
             :idFunc="e => e.id"
             :nameFunc="e => e.name"
           />
@@ -104,27 +104,27 @@ export default {
     this.selectionChangeHandler = () => {
       this.refreshKey++;
     };
-    this.$d3Interface.on('selection-changed', this.selectionChangeHandler);
+    this.$boardInterface.on('selection-changed', this.selectionChangeHandler);
     // Subscribe to graph structure changes (layers added/removed, template loaded, etc.)
     this.graphChangeHandler = () => {
       this.refreshKey++;
     };
-    this.$d3Interface.on('graph-changed', this.graphChangeHandler);
+    this.$boardInterface.on('graph-changed', this.graphChangeHandler);
   },
   beforeUnmount() {
     // Unsubscribe from events
     if (this.selectionChangeHandler) {
-      this.$d3Interface.off('selection-changed', this.selectionChangeHandler);
+      this.$boardInterface.off('selection-changed', this.selectionChangeHandler);
     }
     if (this.graphChangeHandler) {
-      this.$d3Interface.off('graph-changed', this.graphChangeHandler);
+      this.$boardInterface.off('graph-changed', this.graphChangeHandler);
     }
   },
   computed: {
     selectedNode() {
       // Force reactivity by accessing refreshKey
       this.refreshKey; // eslint-disable-line
-      const container = this.$d3Interface.getActiveElementsContainer();
+      const container = this.$boardInterface.getActiveElementsContainer();
       // Create a new object with a fresh array reference so Vue can detect changes
       return {
         e: container.e ? [...container.e] : [],
@@ -140,7 +140,7 @@ export default {
     inputInLayersAndMoreThanOneInModel() {
       for (const layer of this.selectedNode.e) { // eslint-disable-line
         if (this.isInputLayer(layer)) {
-          if (this.$d3Interface.activeGraph.model.modelInputs.length > 1) {
+          if (this.$boardInterface.activeGraph.model.modelInputs.length > 1) {
             return true;
           }
           return false;
@@ -158,23 +158,23 @@ export default {
     },
     totalLayers() {
       this.refreshKey; // eslint-disable-line
-      if (!this.$d3Interface?.activeGraph?.model?.d3Layers) return 0;
-      return this.$d3Interface.activeGraph.model.d3Layers.length;
+      if (!this.$boardInterface?.activeGraph?.model?.d3Layers) return 0;
+      return this.$boardInterface.activeGraph.model.d3Layers.length;
     },
     totalInputs() {
       this.refreshKey; // eslint-disable-line
-      if (!this.$d3Interface?.activeGraph?.model?.modelInputs) return 0;
-      return this.$d3Interface.activeGraph.model.modelInputs.length;
+      if (!this.$boardInterface?.activeGraph?.model?.modelInputs) return 0;
+      return this.$boardInterface.activeGraph.model.modelInputs.length;
     },
     totalOutputs() {
       this.refreshKey; // eslint-disable-line
-      if (!this.$d3Interface?.activeGraph?.model?.modelOutputs) return 0;
-      return this.$d3Interface.activeGraph.model.modelOutputs.length;
+      if (!this.$boardInterface?.activeGraph?.model?.modelOutputs) return 0;
+      return this.$boardInterface.activeGraph.model.modelOutputs.length;
     },
     totalEdges() {
       this.refreshKey; // eslint-disable-line
-      if (!this.$d3Interface?.activeGraph?.model?.d3Edges) return 0;
-      return this.$d3Interface.activeGraph.model.d3Edges.length;
+      if (!this.$boardInterface?.activeGraph?.model?.d3Edges) return 0;
+      return this.$boardInterface.activeGraph.model.d3Edges.length;
     },
   },
   methods: {

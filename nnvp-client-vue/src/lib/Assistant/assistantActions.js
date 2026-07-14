@@ -1,6 +1,6 @@
 // Assistant actions API.
 //
-// A thin, Vue-decoupled facade over the app's $d3Interface / $kerasInterface so
+// A thin, Vue-decoupled facade over the app's $boardInterface / $kerasInterface so
 // the AI assistant can inspect and modify the Keras model through a small set of
 // clean, unit-testable functions. Every method is defensive about the graph
 // being empty (activeGraph === null) and about unknown layer types / ids so the
@@ -20,14 +20,14 @@ function htmlToText(html) {
 }
 
 export default class AssistantActions {
-  constructor(d3Interface, kerasInterface) {
-    this.d3Interface = d3Interface;
+  constructor(boardInterface, kerasInterface) {
+    this.boardInterface = boardInterface;
     this.kerasInterface = kerasInterface;
   }
 
   // Internal: the active D3Model, or throw a friendly error if no graph is ready.
   requireModel() {
-    const graph = this.d3Interface.activeGraph;
+    const graph = this.boardInterface.activeGraph;
     if (graph === null || graph === undefined || graph.model === undefined) {
       throw new Error('No active graph is available yet.');
     }
@@ -54,7 +54,7 @@ export default class AssistantActions {
 
   // Add a layer of the given type. Mirrors how LayerCatalog/LayerTemplate build
   // the layer: take the catalog's KerasLayer, clone it, hand the clone to
-  // $d3Interface.addLayer(...). Returns the created layer's id and type.
+  // $boardInterface.addLayer(...). Returns the created layer's id and type.
   addLayer(typeName) {
     if (typeof typeName !== 'string' || typeName.trim() === '') {
       throw new Error('addLayer requires a non-empty layer type name (a string).');
@@ -67,7 +67,7 @@ export default class AssistantActions {
     }
     const model = this.requireModel();
     const beforeIds = new Set(model.d3Layers.map(layer => layer.id));
-    this.d3Interface.addLayer(template.clone());
+    this.boardInterface.addLayer(template.clone());
     const created = model.d3Layers.find(layer => !beforeIds.has(layer.id));
     return {
       id: created ? created.id : null,
@@ -97,7 +97,7 @@ export default class AssistantActions {
     if (value === undefined) {
       throw new Error('setParam requires a value to set.');
     }
-    const layer = this.d3Interface.findLayerById(layerId);
+    const layer = this.boardInterface.findLayerById(layerId);
     if (layer === null || layer === undefined) {
       throw new Error(`No layer with id "${layerId}".`);
     }
@@ -130,7 +130,7 @@ export default class AssistantActions {
   // Generate the Keras model source. Reuses KerasGenerator through the same
   // KerasInterface entry points the File > Generate menu uses.
   generateCode(lang) {
-    const graph = this.d3Interface.activeGraph;
+    const graph = this.boardInterface.activeGraph;
     if (graph === null || graph === undefined) {
       throw new Error('No active graph is available yet.');
     }
@@ -146,7 +146,7 @@ export default class AssistantActions {
 
   // Internal: both edge tools need existing layer ids and friendly errors.
   requireLayer(layerId, role) {
-    const layer = this.d3Interface.findLayerById(layerId);
+    const layer = this.boardInterface.findLayerById(layerId);
     if (layer === null || layer === undefined) {
       throw new Error(`No ${role} layer with id "${layerId}" (see list_layers for valid ids).`);
     }
@@ -158,7 +158,7 @@ export default class AssistantActions {
   connectLayers(sourceId, targetId) {
     this.requireLayer(sourceId, 'source');
     this.requireLayer(targetId, 'target');
-    const connected = this.d3Interface.connectLayers(sourceId, targetId);
+    const connected = this.boardInterface.connectLayers(sourceId, targetId);
     if (!connected) {
       throw new Error(
         `Cannot connect ${sourceId} -> ${targetId}: the connection already exists, `
@@ -172,7 +172,7 @@ export default class AssistantActions {
   disconnectLayers(sourceId, targetId) {
     this.requireLayer(sourceId, 'source');
     this.requireLayer(targetId, 'target');
-    const disconnected = this.d3Interface.disconnectLayers(sourceId, targetId);
+    const disconnected = this.boardInterface.disconnectLayers(sourceId, targetId);
     if (!disconnected) {
       throw new Error(`There is no ${sourceId} -> ${targetId} connection to remove.`);
     }
@@ -180,23 +180,23 @@ export default class AssistantActions {
   }
 
   deleteSelected() {
-    this.d3Interface.deleteSelectedElements();
+    this.boardInterface.deleteSelectedElements();
     return { ok: true };
   }
 
   undo() {
-    this.d3Interface.undo();
+    this.boardInterface.undo();
     return { ok: true };
   }
 
   redo() {
-    this.d3Interface.redo();
+    this.boardInterface.redo();
     return { ok: true };
   }
 
   // Ready-made example networks (the File > Templates menu).
   listTemplates() {
-    const container = this.d3Interface.getTemplatesContainer();
+    const container = this.boardInterface.getTemplatesContainer();
     if (!container || !Array.isArray(container.e)) return [];
     return [...container.e];
   }
@@ -207,7 +207,7 @@ export default class AssistantActions {
     if (!available.includes(name)) {
       throw new Error(`Unknown template "${name}". Available templates: ${available.join(', ')}.`);
     }
-    this.d3Interface.loadTemplate(name);
+    this.boardInterface.loadTemplate(name);
     const model = this.requireModel();
     return { loaded: name, layerCount: model.d3Layers.length };
   }

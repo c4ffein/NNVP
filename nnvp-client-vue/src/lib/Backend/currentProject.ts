@@ -5,9 +5,18 @@
  * local file, or signing out. Survives reloads via localStorage.
  */
 
+import type { StorageLike } from './apiClient';
+
 const STORAGE_KEY = 'nnvp_current_project';
 
-export function getCurrentProject(storage = typeof localStorage !== 'undefined' ? localStorage : null) {
+export interface CurrentProject {
+  id: number;
+  name: string;
+}
+
+export function getCurrentProject(
+  storage: StorageLike | null = typeof localStorage !== 'undefined' ? localStorage : null,
+): CurrentProject | null {
   try {
     const raw = storage && storage.getItem(STORAGE_KEY);
     if (!raw) return null;
@@ -18,7 +27,10 @@ export function getCurrentProject(storage = typeof localStorage !== 'undefined' 
   }
 }
 
-export function setCurrentProject(project, storage = typeof localStorage !== 'undefined' ? localStorage : null) {
+export function setCurrentProject(
+  project: { id?: unknown; name?: string | null } | null,
+  storage: StorageLike | null = typeof localStorage !== 'undefined' ? localStorage : null,
+) {
   try {
     if (!storage) return;
     if (project && typeof project.id === 'number') {
@@ -29,6 +41,8 @@ export function setCurrentProject(project, storage = typeof localStorage !== 'un
   } catch { /* storage unavailable */ }
 }
 
-export function clearCurrentProject(storage = typeof localStorage !== 'undefined' ? localStorage : null) {
+export function clearCurrentProject(
+  storage: StorageLike | null = typeof localStorage !== 'undefined' ? localStorage : null,
+) {
   setCurrentProject(null, storage);
 }

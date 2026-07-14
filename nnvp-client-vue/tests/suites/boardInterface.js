@@ -1,11 +1,11 @@
 /**
- * D3Interface event bus + active-graph delegation. Migrated from
- * tests/unit/D3Interface.test.js into the dual registry as logicTest. The
- * per-describe beforeEach (`iface = new D3Interface()`) became a fresh
+ * BoardInterface event bus + active-graph delegation. Migrated from
+ * tests/unit/BoardInterface.test.js into the dual registry as logicTest. The
+ * per-describe beforeEach (`iface = new BoardInterface()`) became a fresh
  * instance created at the top of each test.
  */
 import { logicTest } from '../harness/define';
-import D3Interface from '../../src/lib/D3Interface/D3Interface';
+import BoardInterface from '../../src/lib/BoardInterface/BoardInterface';
 import FlowGraphEditor from '../../src/lib/FlowInterface/FlowGraphEditor';
 import KerasLayer from '../../src/lib/KerasInterface/KerasLayer';
 
@@ -27,10 +27,10 @@ function makeEditor() {
   return { store, editor: new FlowGraphEditor(store) };
 }
 
-// --- D3Interface event bus ------------------------------------------------------
+// --- BoardInterface event bus ------------------------------------------------------
 
-logicTest('D3Interface: emit calls every registered listener with the payload', ({ expect }) => {
-  const iface = new D3Interface();
+logicTest('BoardInterface: emit calls every registered listener with the payload', ({ expect }) => {
+  const iface = new BoardInterface();
   const received = [];
   iface.on('ping', data => received.push(['a', data]));
   iface.on('ping', data => received.push(['b', data]));
@@ -38,13 +38,13 @@ logicTest('D3Interface: emit calls every registered listener with the payload', 
   expect(received).toEqual([['a', 42], ['b', 42]]);
 });
 
-logicTest('D3Interface: emit on an event with no listeners is a no-op', ({ expect }) => {
-  const iface = new D3Interface();
+logicTest('BoardInterface: emit on an event with no listeners is a no-op', ({ expect }) => {
+  const iface = new BoardInterface();
   expect(() => iface.emit('nobody-home', 1)).not.toThrow();
 });
 
-logicTest('D3Interface: off removes a specific listener and leaves the others', ({ expect }) => {
-  const iface = new D3Interface();
+logicTest('BoardInterface: off removes a specific listener and leaves the others', ({ expect }) => {
+  const iface = new BoardInterface();
   const received = [];
   const first = () => received.push('first');
   const second = () => received.push('second');
@@ -55,21 +55,21 @@ logicTest('D3Interface: off removes a specific listener and leaves the others', 
   expect(received).toEqual(['second']);
 });
 
-logicTest('D3Interface: off on an unknown event is a no-op', ({ expect }) => {
-  const iface = new D3Interface();
+logicTest('BoardInterface: off on an unknown event is a no-op', ({ expect }) => {
+  const iface = new BoardInterface();
   expect(() => iface.off('unknown', () => {})).not.toThrow();
 });
 
-// --- D3Interface active-graph delegation -------------------------------------------
+// --- BoardInterface active-graph delegation -------------------------------------------
 
-logicTest('D3Interface: getActiveElements returns null when there is no active graph', ({ expect }) => {
-  const iface = new D3Interface();
+logicTest('BoardInterface: getActiveElements returns null when there is no active graph', ({ expect }) => {
+  const iface = new BoardInterface();
   expect(iface.activeGraph).toBe(null);
   expect(iface.getActiveElements()).toBe(null);
 });
 
-logicTest('D3Interface: delegating methods are safe no-ops when there is no active graph', ({ expect }) => {
-  const iface = new D3Interface();
+logicTest('BoardInterface: delegating methods are safe no-ops when there is no active graph', ({ expect }) => {
+  const iface = new BoardInterface();
   expect(() => iface.undo()).not.toThrow();
   expect(() => iface.redo()).not.toThrow();
   expect(() => iface.addLayer(new KerasLayer('Dense', 'Core'))).not.toThrow();
@@ -77,8 +77,8 @@ logicTest('D3Interface: delegating methods are safe no-ops when there is no acti
   expect(iface.generateJavascriptNoSave({})).toBe(null);
 });
 
-logicTest('D3Interface: addGraphEditor activates the first editor and exposes its selection', ({ expect }) => {
-  const iface = new D3Interface();
+logicTest('BoardInterface: addGraphEditor activates the first editor and exposes its selection', ({ expect }) => {
+  const iface = new BoardInterface();
   const { editor } = makeEditor();
   iface.addGraphEditor(editor);
   expect(iface.graphEditors).toContain(editor);
@@ -89,8 +89,8 @@ logicTest('D3Interface: addGraphEditor activates the first editor and exposes it
   expect(iface.getRedoStackContainer().e).toBe(editor.redoStack);
 });
 
-logicTest('D3Interface: addGraphEditor does not re-activate once an active graph exists', ({ expect }) => {
-  const iface = new D3Interface();
+logicTest('BoardInterface: addGraphEditor does not re-activate once an active graph exists', ({ expect }) => {
+  const iface = new BoardInterface();
   const first = makeEditor().editor;
   const second = makeEditor().editor;
   iface.addGraphEditor(first);
@@ -99,8 +99,8 @@ logicTest('D3Interface: addGraphEditor does not re-activate once an active graph
   expect(iface.graphEditors).toHaveLength(2);
 });
 
-logicTest('D3Interface: wires editor selection/graph changes onto the event bus', ({ expect }) => {
-  const iface = new D3Interface();
+logicTest('BoardInterface: wires editor selection/graph changes onto the event bus', ({ expect }) => {
+  const iface = new BoardInterface();
   let selectionEvents = 0;
   let graphEvents = 0;
   iface.on('selection-changed', () => { selectionEvents += 1; });
@@ -119,8 +119,8 @@ logicTest('D3Interface: wires editor selection/graph changes onto the event bus'
   expect(selectionEvents).toBeGreaterThan(baseline);
 });
 
-logicTest('D3Interface: setActiveGraphEditor emits the reactive refresh events', ({ expect }) => {
-  const iface = new D3Interface();
+logicTest('BoardInterface: setActiveGraphEditor emits the reactive refresh events', ({ expect }) => {
+  const iface = new BoardInterface();
   const { editor } = makeEditor();
   const emitted = [];
   ['templates-changed', 'selection-changed', 'undo-stack-changed', 'redo-stack-changed']
@@ -131,8 +131,8 @@ logicTest('D3Interface: setActiveGraphEditor emits the reactive refresh events',
   ]);
 });
 
-logicTest('D3Interface: findLayerById delegates to the active graph', ({ expect }) => {
-  const iface = new D3Interface();
+logicTest('BoardInterface: findLayerById delegates to the active graph', ({ expect }) => {
+  const iface = new BoardInterface();
   const { editor } = makeEditor();
   iface.addGraphEditor(editor);
   editor.addLayer(new KerasLayer('Dense', 'Core'));
@@ -141,8 +141,8 @@ logicTest('D3Interface: findLayerById delegates to the active graph', ({ expect 
   expect(iface.findLayerById(9999)).toBe(null);
 });
 
-logicTest('D3Interface: addLayer / deleteSelectedElements / undo delegate to the active graph', ({ expect }) => {
-  const iface = new D3Interface();
+logicTest('BoardInterface: addLayer / deleteSelectedElements / undo delegate to the active graph', ({ expect }) => {
+  const iface = new BoardInterface();
   const { store, editor } = makeEditor();
   iface.addGraphEditor(editor);
 
@@ -158,10 +158,10 @@ logicTest('D3Interface: addLayer / deleteSelectedElements / undo delegate to the
   expect(editor.model.d3Layers).toHaveLength(1);
 });
 
-// --- D3Interface.debugGetBoardState -------------------------------------------------
+// --- BoardInterface.debugGetBoardState -------------------------------------------------
 
-logicTest('D3Interface: debugGetBoardState returns empty counters when there is no active graph', ({ expect }) => {
-  const iface = new D3Interface();
+logicTest('BoardInterface: debugGetBoardState returns empty counters when there is no active graph', ({ expect }) => {
+  const iface = new BoardInterface();
   const state = iface.debugGetBoardState();
   expect(state).toEqual({
     layers: [], inputs: [], outputs: [], edges: [], undoStack: 0, redoStack: 0,
@@ -171,8 +171,8 @@ logicTest('D3Interface: debugGetBoardState returns empty counters when there is 
 // Regression: debugGetBoardState read model.layers / model.edges, but the
 // model shim exposes those as d3Layers / d3Edges. With a populated graph the
 // getter threw "Cannot read properties of undefined (reading 'map')".
-logicTest('D3Interface: debugGetBoardState reports the real board state for a populated graph', ({ expect }) => {
-  const iface = new D3Interface();
+logicTest('BoardInterface: debugGetBoardState reports the real board state for a populated graph', ({ expect }) => {
+  const iface = new BoardInterface();
   const { editor } = makeEditor();
   iface.addGraphEditor(editor);
   editor.loadTemplate('2D Dense for MNIST');

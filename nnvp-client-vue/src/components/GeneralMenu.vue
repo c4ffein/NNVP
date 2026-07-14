@@ -77,8 +77,8 @@ export default {
       backendEnabled: !!import.meta.env.VITE_ENABLE_BACKEND,
       activatedState: false,
       activatedChain: [],
-      undoStackContainer: this.$d3Interface.getUndoStackContainer(),
-      redoStackContainer: this.$d3Interface.getRedoStackContainer(),
+      undoStackContainer: this.$boardInterface.getUndoStackContainer(),
+      redoStackContainer: this.$boardInterface.getRedoStackContainer(),
       templatesRefreshKey: 0,
       menuRefreshKey: 0,
     };
@@ -89,7 +89,7 @@ export default {
       this.templatesRefreshKey++;
       this.menuRefreshKey++; // Trigger menu re-render
     };
-    this.$d3Interface.on('templates-changed', this.templatesChangeHandler);
+    this.$boardInterface.on('templates-changed', this.templatesChangeHandler);
 
     // Trigger initial refresh in case templates were loaded before this component mounted
     // (the board mounts before GeneralMenu, so the templates-changed event fires before we subscribe)
@@ -99,7 +99,7 @@ export default {
   beforeUnmount() {
     // Unsubscribe from events
     if (this.templatesChangeHandler) {
-      this.$d3Interface.off('templates-changed', this.templatesChangeHandler);
+      this.$boardInterface.off('templates-changed', this.templatesChangeHandler);
     }
   },
   computed: {
@@ -113,37 +113,38 @@ export default {
         File: {
           New() {
             clearCurrentProject(); // a fresh board starts a new save history
-            this.$d3Interface.clearBoard();
+            this.$boardInterface.clearBoard();
           },
           // With a backend build, Load/Save open the cloud-aware modal (which
           // still offers plain device files); without one they go straight to
           // the device dialogs.
           Load() {
             if (backendEnabled) this.$emit('open-save-load', 'load');
-            else this.$d3Interface.loadBoard();
+            else this.$boardInterface.loadBoard();
           },
           Templates: 'templatesMenu',
           Save() {
             if (backendEnabled) this.$emit('open-save-load', 'save');
-            else this.$d3Interface.saveBoard();
+            else this.$boardInterface.saveBoard();
           },
           'Generate TF - Python': function generateTfPython() {
-            this.$d3Interface.generatePythonInBrowser(this.$kerasInterface);
+            this.$boardInterface.generatePythonInBrowser(this.$kerasInterface);
           },
           'Generate TF - JavaScript': function generateTfJavascript() {
-            this.$d3Interface.generateJavascriptInBrowser(this.$kerasInterface);
+            this.$boardInterface.generateJavascriptInBrowser(this.$kerasInterface);
           },
           Generate_PyTorch() {
-            this.$d3Interface.generatePyTorchInBrowser(this.$kerasInterface);
+            this.$boardInterface.generatePyTorchInBrowser(this.$kerasInterface);
           },
           Generate_Tinygrad() {
-            this.$d3Interface.generateTinygradInBrowser(this.$kerasInterface);
+            this.$boardInterface.generateTinygradInBrowser(this.$kerasInterface);
           },
         },
         Edit: {
-          Undo: [() => this.$d3Interface.undo(), () => (this.$d3Interface.getUndoStackContainer().e.length === 0)],
-          Redo: [() => this.$d3Interface.redo(), () => (this.$d3Interface.getRedoStackContainer().e.length === 0)],
-          Group() { this.$d3Interface.createGroup(); },
+          Undo: [() => this.$boardInterface.undo(), () => (this.$boardInterface.getUndoStackContainer().e.length === 0)],
+          Redo: [() => this.$boardInterface.redo(), () => (this.$boardInterface.getRedoStackContainer().e.length === 0)],
+          Group() { this.$boardInterface.createGroup(); },
+          Auto_layout() { this.$boardInterface.autoLayout(); },
         },
         Panels: {
           [`${tick(this.views.left)} Layer Catalog`]: () => this.$emit('toggle-view', 'showLeftPanel'),
@@ -154,20 +155,21 @@ export default {
           } : {}),
         },
         Tutorial: () => { this.$emit('open-tutorial'); },
+        Settings: () => { this.$emit('open-settings'); },
         About: () => { this.$emit('open-about'); },
       };
     },
     templatesMenu() {
       // Access refreshKey to trigger reactivity
       this.templatesRefreshKey; // eslint-disable-line
-      const container = this.$d3Interface.getTemplatesContainer();
+      const container = this.$boardInterface.getTemplatesContainer();
       if (container === undefined
         || container.e === undefined
         || container.e.length === 0) {
         return {};
       }
       return container.e
-        .map(name => [name, () => this.$d3Interface.loadTemplate(name)])
+        .map(name => [name, () => this.$boardInterface.loadTemplate(name)])
         .reduce((p, c) => { p[c[0]] = c[1]; return p; }, {}); // eslint-disable-line
     },
   },

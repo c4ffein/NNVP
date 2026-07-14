@@ -4,8 +4,9 @@
  * logicTest.
  */
 import { logicTest } from '../harness/define';
-import D3Templates from '../../src/lib/D3Interface/D3Templates';
+import BoardTemplates from '../../src/lib/BoardInterface/BoardTemplates';
 import FlowGraphEditor from '../../src/lib/FlowInterface/FlowGraphEditor';
+import { CURRENT_FORMAT_VERSION } from '../../src/lib/ModelFormat/migrations';
 
 // FlowGraphEditor sees Vue Flow only through the small store adapter FlowBoard
 // injects, so the tests drive a plain fake instead of mounting Vue.
@@ -24,7 +25,7 @@ function makeStore() {
   };
 }
 
-const templates = new D3Templates().templates;
+const templates = new BoardTemplates().templates;
 const DENSE_MNIST = '2D Dense for MNIST';
 
 function makeEditor() {
@@ -46,7 +47,7 @@ const kl = name => ({
   clone() { return { ...this, parameterValues: { ...this.parameterValues } }; },
 });
 
-// --- D3Interface reference contracts -------------------------------------------
+// --- BoardInterface reference contracts -------------------------------------------
 
 logicTest('flowGraphEditor: keeps the exact array instances captured by setActiveGraphEditor', ({ expect }) => {
   const { store, editor } = makeEditor();
@@ -267,7 +268,7 @@ logicTest('flowGraphEditor: skips composites (no kerasLayer to edit in the panel
   expect(editor.selectedNodes.map(l => l.id)).toEqual([0]);
 });
 
-// --- cloud / D3Interface flows ------------------------------------------------------------
+// --- cloud / BoardInterface flows ------------------------------------------------------------
 
 logicTest('flowGraphEditor: supports the loadGraphFromJSON sequence (saveState, clear, loadJSON, updateGraph)', ({ expect }) => {
   const { editor } = loadedEditor();
@@ -286,7 +287,9 @@ logicTest('flowGraphEditor: supports the loadGraphFromJSON sequence (saveState, 
 
 logicTest('flowGraphEditor: toJSON round-trips the loaded template structurally', ({ expect }) => {
   const { editor } = loadedEditor();
-  expect(JSON.parse(editor.toJSON())).toEqual(JSON.parse(templates[DENSE_MNIST]));
+  // toJSON stamps the (previously unversioned) template with the current format.
+  expect(JSON.parse(editor.toJSON()))
+    .toEqual({ ...JSON.parse(templates[DENSE_MNIST]), formatVersion: CURRENT_FORMAT_VERSION });
 });
 
 // --- Programmatic edges (the assistant's connect/disconnect tools) -----------

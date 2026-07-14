@@ -1,5 +1,5 @@
 /**
- * apiClient.js
+ * apiClient.ts
  *
  * Small wrapper around the NNVP cloud backend (a separate Django Ninja
  * service). This is a *progressive enhancement*: the SPA works fully without it.
@@ -34,6 +34,16 @@ export const ERROR_CODES = {
 };
 
 /**
+ * The minimal Storage surface the client uses; the DOM's localStorage
+ * satisfies it, and tests inject plain-object stand-ins.
+ */
+export interface StorageLike {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+}
+
+/**
  * Fired on window whenever the stored token changes (sign-in, sign-out,
  * expiry cleanup) so header icons / the chat bubble can re-read auth state
  * without a store or polling.
@@ -47,7 +57,15 @@ function notifyAuthChanged() {
 }
 
 export class ApiError extends Error {
-  constructor(code, message, { status = null, body = null } = {}) {
+  code: string;
+  status: number | null;
+  body: unknown;
+
+  constructor(
+    code: string,
+    message?: string,
+    { status = null, body = null }: { status?: number | null; body?: unknown } = {},
+  ) {
     super(message || code);
     this.name = 'ApiError';
     this.code = code;
@@ -56,16 +74,24 @@ export class ApiError extends Error {
   }
 }
 
-export default class ApiClient {
+export interface ApiClientOptions {
+  /** Injectable fetch (for tests / SSR). */
+  fetch?: typeof fetch;
+  /** Injectable storage (defaults to localStorage). */
+  storage?: StorageLike;
   /**
-   * @param {object} [options]
-   * @param {typeof fetch} [options.fetch]   Injectable fetch (for tests / SSR).
-   * @param {Storage}      [options.storage] Injectable storage (defaults to localStorage).
-   * @param {string}       [options.baseUrl] API base; defaults to same-origin
-   *                                         "/api". Overridden by the contract
-   *                                         tests to hit a real backend by URL.
+   * API base; defaults to same-origin "/api". Overridden by the contract
+   * tests to hit a real backend by URL.
    */
-  constructor({ fetch: fetchImpl, storage, baseUrl } = {}) {
+  baseUrl?: string;
+}
+
+export default class ApiClient {
+  _fetch: typeof fetch | undefined;
+  _storage: StorageLike | null;
+  _baseUrl: string;
+
+  constructor({ fetch: fetchImpl, storage, baseUrl }: ApiClientOptions = {}) {
     // Bind to preserve `this` when the global fetch is used.
     this._fetch = fetchImpl
       || (typeof globalThis !== 'undefined' && globalThis.fetch
@@ -79,7 +105,7 @@ export default class ApiClient {
 
   // --- configuration ---------------------------------------------------------
 
-  _get(key) {
+  _get(key: string): string {
     try {
       return (this._storage && this._storage.getItem(key)) || '';
     } catch {
@@ -87,7 +113,7 @@ export default class ApiClient {
     }
   }
 
-  _set(key, value) {
+  _set(key: string, value: string) {
     try {
       if (!this._storage) return;
       if (value) this._storage.setItem(key, value);
@@ -103,7 +129,7 @@ export default class ApiClient {
     return this._get(STORAGE_KEYS.token);
   }
 
-  setToken(token) {
+  setToken(token: string | null | undefined) {
     this._set(STORAGE_KEYS.token, token || '');
     notifyAuthChanged();
   }
@@ -120,14 +146,16 @@ export default class ApiClient {
   // --- core request ----------------------------------------------------------
 
   /**
-   * @param {string} path   e.g. "/projects" (relative to the "/api" base)
-   * @param {object} [opts]
-   * @param {string} [opts.method]
-   * @param {object} [opts.body]  serialized as JSON
-   * @param {boolean|'optional'} [opts.auth] attach the bearer token; `true`
-   *   also requires one to be present, `'optional'` attaches it when it exists
+   * @param path   e.g. "/projects" (relative to the "/api" base)
+   * @param opts.body  serialized as JSON
+   * @param opts.auth  attach the bearer token; `true` also requires one to be
+   *   present, `'optional'` attaches it when it exists
    */
-  async request(path, { method = 'GET', body, auth = false } = {}) {
+  async request(path: string, { method = 'GET', body, auth = false }: {
+    method?: string;
+    body?: unknown;
+    auth?: boolean | 'optional';
+  } = {}): Promise<unknown> {
     if (auth === true && !this.getToken()) {
       throw new ApiError(ERROR_CODES.notLoggedIn, 'Not signed in');
     }
@@ -135,11 +163,11 @@ export default class ApiClient {
       throw new ApiError(ERROR_CODES.network, 'No fetch implementation available');
     }
 
-    const headers = { Accept: 'application/json' };
+    const headers: Record<string, string> = { Accept: 'application/json' };
     if (body !== undefined) headers['Content-Type'] = 'application/json';
     if (auth && this.getToken()) headers.Authorization = `Bearer ${this.getToken()}`;
 
-    let response;
+    let response: Response;
     try {
       response = await this._fetch(`${this._baseUrl}${path}`, {
         method,
@@ -153,7 +181,7 @@ export default class ApiClient {
     // 204 No Content (e.g. DELETE, magic/request) — nothing to parse.
     if (response.status === 204) return null;
 
-    let payload = null;
+    let payload: unknown = null;
     const raw = await response.text();
     if (raw) {
       try {
@@ -169,7 +197,8 @@ export default class ApiClient {
     }
 
     if (!response.ok) {
-      const message = (payload && (payload.detail || payload.message || payload.error))
+      const errorBody = payload as { detail?: string; message?: string; error?: string } | null;
+      const message = (errorBody && (errorBody.detail || errorBody.message || errorBody.error))
         || `Request failed with status ${response.status}`;
       throw new ApiError(ERROR_CODES.http, message, { status: response.status, body: payload });
     }
@@ -184,11 +213,11 @@ export default class ApiClient {
    * THIS browser a pending bearer (stored immediately) plus the 4-char match
    * code to display. Poll authStatus() until the link is clicked.
    */
-  async requestMagicLink(email) {
+  async requestMagicLink(email: string) {
     const data = await this.request('/auth/magic/request', {
       method: 'POST',
       body: { email },
-    });
+    }) as { token?: string; code?: string } | null;
     if (data && data.token) this.setToken(data.token);
     return data; // { token, code }
   }
@@ -206,7 +235,7 @@ export default class ApiClient {
    * { code, requester, requested_at, same_browser }. Sends this browser's own
    * bearer (when present) so the backend can detect the same-browser case.
    */
-  async magicInfo(token) {
+  async magicInfo(token: string) {
     return this.request('/auth/magic/info', {
       method: 'POST',
       auth: 'optional',
@@ -218,7 +247,7 @@ export default class ApiClient {
    * The deliberate click: approves the browser that REQUESTED the login.
    * Returns the signed-in user — never credentials for this browser.
    */
-  async approveMagicLink(token) {
+  async approveMagicLink(token: string) {
     return this.request('/auth/magic/approve', {
       method: 'POST',
       body: { token },
@@ -253,14 +282,19 @@ export default class ApiClient {
     return this.request('/projects', { auth: true });
   }
 
-  async getProject(id) {
+  async getProject(id: number | string) {
     return this.request(`/projects/${id}`, { auth: true });
   }
 
   async createProject({
     name, graph, tags, parent,
+  }: {
+    name: string;
+    graph: unknown;
+    tags?: string[];
+    parent?: number | null;
   }) {
-    const body = { name, graph };
+    const body: Record<string, unknown> = { name, graph };
     if (tags !== undefined) body.tags = tags;
     if (parent !== undefined && parent !== null) body.parent = parent;
     return this.request('/projects', {
@@ -274,18 +308,18 @@ export default class ApiClient {
    * The localized save graph around one project: ancestors + descendants,
    * capped at 2 levels each way ({ focus, nodes, edges }).
    */
-  async projectLineage(id) {
+  async projectLineage(id: number | string) {
     return this.request(`/projects/${id}/lineage`, { auth: true });
   }
 
-  async updateProject(id, { name, graph } = {}) {
-    const body = {};
+  async updateProject(id: number | string, { name, graph }: { name?: string; graph?: unknown } = {}) {
+    const body: Record<string, unknown> = {};
     if (name !== undefined) body.name = name;
     if (graph !== undefined) body.graph = graph;
     return this.request(`/projects/${id}`, { method: 'PUT', auth: true, body });
   }
 
-  async deleteProject(id) {
+  async deleteProject(id: number | string) {
     return this.request(`/projects/${id}`, { method: 'DELETE', auth: true });
   }
 }

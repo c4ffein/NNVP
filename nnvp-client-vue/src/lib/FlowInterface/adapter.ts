@@ -16,6 +16,7 @@
 import type {
   NnvpModel, NnvpLayer, NnvpLayerId, KerasLayerJSON, FlowNode, FlowEdge,
 } from '../../types/model';
+import { CURRENT_FORMAT_VERSION, migrateModel } from '../ModelFormat/migrations';
 
 export const LAYER_NODE = 'layer';
 export const COMPOSITE_NODE = 'composite';
@@ -62,11 +63,13 @@ function walkLayers(layers: NnvpLayer[], parent: NnvpLayer | null, nodes: FlowNo
 }
 
 /**
- * @param nnvp NNVP model JSON (string or already-parsed object, no "NNVP" header)
+ * @param nnvp NNVP model JSON (string or already-parsed object, no "NNVP" header);
+ *   migrated to the current format first — throws FormatVersionError on files
+ *   from a newer NNVP.
  * @returns Vue Flow elements
  */
 export function nnvpToFlow(nnvp: string | NnvpModel): { nodes: FlowNode[]; edges: FlowEdge[] } {
-  const model: NnvpModel = typeof nnvp === 'string' ? JSON.parse(nnvp) : nnvp;
+  const model: NnvpModel = migrateModel(nnvp);
   const nodes: FlowNode[] = [];
   walkLayers(model.layers || [], null, nodes);
   const edges = (model.edges || []).map((edge): FlowEdge => ({
@@ -169,6 +172,7 @@ export function flowToNnvp(nodes: FlowNode[], edges: FlowEdge[]): string {
     .map(edge => edge.sourceNnvpId);
 
   return JSON.stringify({
+    formatVersion: CURRENT_FORMAT_VERSION,
     layers,
     edges: annotated.map(edge => ({
       source: edge.sourceNnvpId,

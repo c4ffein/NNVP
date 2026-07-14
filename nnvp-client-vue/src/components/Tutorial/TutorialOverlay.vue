@@ -136,8 +136,8 @@ export default {
     startTutorial() {
       this.currentStep = 0;
       this.stepComplete = false;
-      this.$d3Interface.on('graph-changed', this.stateChangeHandler);
-      this.$d3Interface.on('selection-changed', this.stateChangeHandler);
+      this.$boardInterface.on('graph-changed', this.stateChangeHandler);
+      this.$boardInterface.on('selection-changed', this.stateChangeHandler);
       window.addEventListener('resize', this.reposition);
       window.addEventListener('scroll', this.reposition, true);
       document.addEventListener('keydown', this.handleKeydown);
@@ -154,8 +154,8 @@ export default {
       });
     },
     teardown() {
-      this.$d3Interface.off('graph-changed', this.stateChangeHandler);
-      this.$d3Interface.off('selection-changed', this.stateChangeHandler);
+      this.$boardInterface.off('graph-changed', this.stateChangeHandler);
+      this.$boardInterface.off('selection-changed', this.stateChangeHandler);
       window.removeEventListener('resize', this.reposition);
       window.removeEventListener('scroll', this.reposition, true);
       document.removeEventListener('keydown', this.handleKeydown);
@@ -173,7 +173,7 @@ export default {
       if (!this.active) return;
       let complete = false;
       try {
-        complete = this.step.isComplete(this.$d3Interface);
+        complete = this.step.isComplete(this.$boardInterface);
       } catch {
         complete = false;
       }

@@ -1,5 +1,5 @@
 export default class {
-  constructor(d3Interface, kerasInterface) {
+  constructor(boardInterface, kerasInterface) {
     const isApple = navigator.platform.match(/(Mac|iPhone|iPod|iPad)/i);
     const inputs = ['input', 'select', 'button', 'textarea'];
 
@@ -21,45 +21,51 @@ export default class {
 
       switch (event.code) {
         case 'Delete':
-          d3Interface.deleteSelectedElements();
+          boardInterface.deleteSelectedElements();
           break;
         case 'KeyZ':
           if (modKeyPressed) {
             event.preventDefault();
             if (event.shiftKey) {
-              d3Interface.redo();
+              boardInterface.redo();
             } else {
-              d3Interface.undo();
+              boardInterface.undo();
             }
           }
           break;
         case 'KeyY':
           if (modKeyPressed) {
-            d3Interface.redo();
+            boardInterface.redo();
             event.preventDefault();
           }
           break;
         case 'KeyG':
           if (modKeyPressed) {
-            d3Interface.createGroup();
+            boardInterface.createGroup();
+            event.preventDefault();
+          }
+          break;
+        case 'KeyL':
+          if (modKeyPressed) {
+            boardInterface.autoLayout();
             event.preventDefault();
           }
           break;
         case 'KeyO':
           if (modKeyPressed) {
-            d3Interface.loadBoard();
+            boardInterface.loadBoard();
             event.preventDefault();
           }
           break;
         case 'KeyS':
           if (modKeyPressed) {
-            d3Interface.saveBoard();
+            boardInterface.saveBoard();
             event.preventDefault();
           }
           break;
         case 'KeyX':
           if (modKeyPressed) {
-            d3Interface.generatePython(kerasInterface);
+            boardInterface.generatePython(kerasInterface);
             event.preventDefault();
           }
           break;
@@ -79,7 +85,7 @@ export default class {
       switch (event.code) {
         case 'Backspace':
         case 'Delete':
-          d3Interface.deleteSelectedElements();
+          boardInterface.deleteSelectedElements();
           break;
         default:
           return false;

@@ -183,7 +183,7 @@ export default {
     if (typeof localStorage !== 'undefined') {
       this.allowEdits = localStorage.getItem(STORAGE_ALLOW_EDITS) === 'true';
     }
-    this.actions = new AssistantActions(this.$d3Interface, this.$kerasInterface);
+    this.actions = new AssistantActions(this.$boardInterface, this.$kerasInterface);
     this.client = new AnthropicClient(this.actions, { allowEdits: this.allowEdits });
   },
   mounted() {

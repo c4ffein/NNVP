@@ -22,6 +22,13 @@
       >
         Charts
       </div>
+      <div
+        class="TrainingZone bar-button"
+        :class="{ active: selectedPanel === 'InspectPanel' }"
+        v-on:click="inspectClicked"
+      >
+        Inspect
+      </div>
     </div>
     <div id="training-zone-selector">
       <keep-alive>
@@ -49,6 +56,8 @@
           v-bind:getWarningMessage="getWarningMessage"
           v-bind:batchData="chartData0"
           v-bind:epochData="chartData1"
+          v-bind:hasTrainedModel="hasTrainedModel"
+          v-bind:getTrainedModel="getTrainedModel"
         ></component>
       </keep-alive>
     </div>
@@ -65,6 +74,7 @@ import watchTraining from '../../lib/ModelTrainer/watchTraining';
 import Charts from './Charts.vue';
 import CompileOptions from './CompileOptions.vue';
 import DatasetSelector from './DatasetSelector.vue';
+import InspectPanel from './InspectPanel.vue';
 
 export default {
   name: 'TrainingZone',
@@ -72,10 +82,14 @@ export default {
     Charts,
     CompileOptions,
     DatasetSelector,
+    InspectPanel,
   },
   data() {
     return {
       isTraining: false,
+      // Reactive availability flag for Inspect mode; the tf model itself is
+      // kept OFF data() (this.trainedModel) so Vue never proxies it.
+      hasTrainedModel: false,
       cancelRequested: false,
       selectedDataset: 'MNIST',
       loadableDatasets: loadableDatasets(this.cdnDir),
@@ -128,6 +142,14 @@ export default {
     chartsClicked() {
       this.selectedPanel = "Charts";
     },
+    inspectClicked() {
+      this.selectedPanel = "InspectPanel";
+    },
+    // The model (and the graph JSON it was generated from) the Inspect panel
+    // probes. Returned through a function so the tf model stays un-proxied.
+    getTrainedModel() {
+      return { model: this.trainedModel, graphJson: this.trainedGraphJson };
+    },
     async trainClicked() {
       if (this.isTraining) { this.cancelRequested = true; return; }
       this.chartsClicked();
@@ -166,7 +188,7 @@ export default {
         // lib/KerasInterface/codegenSafety.js), so a crafted .nnvp file cannot inject code here;
         // this could still be replaced with direct model building from the graph JSON to avoid
         // eval entirely.
-        generatedCode = this.$d3Interface.generateJavascriptNoSave(this.$kerasInterface);
+        generatedCode = this.$boardInterface.generateJavascriptNoSave(this.$kerasInterface);
         if (window.nnvp?.debug?.enableTraining) {
           console.log('[TrainingZone] Generated JavaScript code:\n', generatedCode);
         }
@@ -224,6 +246,14 @@ export default {
         optimizerConfig: model.optimizer.getConfig(),
         loss: model.loss,
       };
+
+      // Inspect mode: keep the (about to be trained) model and the graph JSON
+      // it was generated from — lib/Inspector maps its layers back onto the
+      // board through that JSON. Any previous inspection is now stale.
+      this.$boardInterface.setInspection(null);
+      this.trainedModel = model;
+      this.trainedGraphJson = this.$boardInterface.getGraphJSON();
+      this.hasTrainedModel = true;
 
       const datasetName = this.selectedDataset;
       await this.loadDataset(datasetName);

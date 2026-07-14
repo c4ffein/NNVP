@@ -1,6 +1,6 @@
 /**
  * MNIST tutorial step definitions and predicates (pure functions over a fake
- * $d3Interface). Migrated from tests/unit/mnistTutorial.test.js into the dual
+ * $boardInterface). Migrated from tests/unit/mnistTutorial.test.js into the dual
  * registry as logicTest.
  */
 import { logicTest } from '../harness/define';
@@ -13,13 +13,13 @@ import steps, {
   inputShapeIsSet,
 } from '../../src/lib/Tutorial/mnistTutorial';
 
-// Build a fake $d3Interface exposing only what the tutorial predicates read:
+// Build a fake $boardInterface exposing only what the tutorial predicates read:
 // activeGraph.model.d3Layers, each layer with a kerasLayer { name, parameterValues }.
 function makeLayer(name, parameterValues = {}) {
   return { kerasLayer: { name, parameterValues } };
 }
 
-function makeD3Interface(layers) {
+function makeBoardInterface(layers) {
   return {
     activeGraph: {
       model: { d3Layers: layers },
@@ -88,53 +88,53 @@ logicTest('mnistTutorial: predicates return false for an unready interface', ({ 
 
 logicTest('mnistTutorial: add-input completes once an Input layer exists', ({ expect }) => {
   const step = getStep('add-input');
-  expect(step.isComplete(makeD3Interface([]))).toBe(false);
-  expect(step.isComplete(makeD3Interface([makeLayer('Dense')]))).toBe(false);
-  expect(step.isComplete(makeD3Interface([makeLayer('Input')]))).toBe(true);
+  expect(step.isComplete(makeBoardInterface([]))).toBe(false);
+  expect(step.isComplete(makeBoardInterface([makeLayer('Dense')]))).toBe(false);
+  expect(step.isComplete(makeBoardInterface([makeLayer('Input')]))).toBe(true);
 });
 
 logicTest('mnistTutorial: set-input-shape completes only once the Input shape is set', ({ expect }) => {
   const step = getStep('set-input-shape');
-  expect(step.isComplete(makeD3Interface([makeLayer('Input')]))).toBe(false);
-  expect(step.isComplete(makeD3Interface([makeLayer('Input', { shape: [] })]))).toBe(false);
-  expect(step.isComplete(makeD3Interface([makeLayer('Input', { shape: ['', ''] })]))).toBe(false);
-  expect(step.isComplete(makeD3Interface([makeLayer('Input', { shape: [28, 28, 1] })]))).toBe(true);
+  expect(step.isComplete(makeBoardInterface([makeLayer('Input')]))).toBe(false);
+  expect(step.isComplete(makeBoardInterface([makeLayer('Input', { shape: [] })]))).toBe(false);
+  expect(step.isComplete(makeBoardInterface([makeLayer('Input', { shape: ['', ''] })]))).toBe(false);
+  expect(step.isComplete(makeBoardInterface([makeLayer('Input', { shape: [28, 28, 1] })]))).toBe(true);
 });
 
 logicTest('mnistTutorial: add-conv2d completes once a Conv2D exists', ({ expect }) => {
   const step = getStep('add-conv2d');
-  expect(step.isComplete(makeD3Interface([makeLayer('Input', { shape: [28, 28, 1] })]))).toBe(false);
-  expect(step.isComplete(makeD3Interface([makeLayer('Conv2D')]))).toBe(true);
+  expect(step.isComplete(makeBoardInterface([makeLayer('Input', { shape: [28, 28, 1] })]))).toBe(false);
+  expect(step.isComplete(makeBoardInterface([makeLayer('Conv2D')]))).toBe(true);
 });
 
 logicTest('mnistTutorial: add-maxpooling2d completes once a MaxPooling2D exists', ({ expect }) => {
   const step = getStep('add-maxpooling2d');
-  expect(step.isComplete(makeD3Interface([makeLayer('Conv2D')]))).toBe(false);
-  expect(step.isComplete(makeD3Interface([makeLayer('MaxPooling2D')]))).toBe(true);
+  expect(step.isComplete(makeBoardInterface([makeLayer('Conv2D')]))).toBe(false);
+  expect(step.isComplete(makeBoardInterface([makeLayer('MaxPooling2D')]))).toBe(true);
 });
 
 logicTest('mnistTutorial: add-flatten completes once a Flatten exists', ({ expect }) => {
   const step = getStep('add-flatten');
-  expect(step.isComplete(makeD3Interface([makeLayer('MaxPooling2D')]))).toBe(false);
-  expect(step.isComplete(makeD3Interface([makeLayer('Flatten')]))).toBe(true);
+  expect(step.isComplete(makeBoardInterface([makeLayer('MaxPooling2D')]))).toBe(false);
+  expect(step.isComplete(makeBoardInterface([makeLayer('Flatten')]))).toBe(true);
 });
 
 logicTest('mnistTutorial: add-dense-hidden completes once one Dense exists', ({ expect }) => {
   const step = getStep('add-dense-hidden');
-  expect(step.isComplete(makeD3Interface([makeLayer('Flatten')]))).toBe(false);
-  expect(step.isComplete(makeD3Interface([makeLayer('Dense')]))).toBe(true);
+  expect(step.isComplete(makeBoardInterface([makeLayer('Flatten')]))).toBe(false);
+  expect(step.isComplete(makeBoardInterface([makeLayer('Dense')]))).toBe(true);
 });
 
 logicTest('mnistTutorial: add-dense-output requires a second Dense', ({ expect }) => {
   const step = getStep('add-dense-output');
-  expect(step.isComplete(makeD3Interface([makeLayer('Dense')]))).toBe(false);
-  expect(step.isComplete(makeD3Interface([makeLayer('Dense'), makeLayer('Dense')]))).toBe(true);
+  expect(step.isComplete(makeBoardInterface([makeLayer('Dense')]))).toBe(false);
+  expect(step.isComplete(makeBoardInterface([makeLayer('Dense'), makeLayer('Dense')]))).toBe(true);
 });
 
 logicTest('mnistTutorial: open-training does not complete without a Training panel in the DOM', ({ expect }) => {
   // Unit tests run in a node environment (no document), so the guard returns false.
   const step = getStep('open-training');
-  const fullModel = makeD3Interface([
+  const fullModel = makeBoardInterface([
     makeLayer('Input', { shape: [28, 28, 1] }),
     makeLayer('Conv2D'),
     makeLayer('MaxPooling2D'),
@@ -146,7 +146,7 @@ logicTest('mnistTutorial: open-training does not complete without a Training pan
 });
 
 logicTest('mnistTutorial: a full MNIST CNN model satisfies every layer-building step', ({ expect }) => {
-  const fullModel = makeD3Interface([
+  const fullModel = makeBoardInterface([
     makeLayer('Input', { shape: [28, 28, 1] }),
     makeLayer('Conv2D'),
     makeLayer('MaxPooling2D'),

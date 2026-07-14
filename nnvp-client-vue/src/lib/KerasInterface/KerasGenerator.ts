@@ -11,10 +11,35 @@ import KerasGeneratorPythonHelper from './KerasGeneratorPythonHelper';
 import KerasGeneratorJavascriptHelper from './KerasGeneratorJavascriptHelper';
 import KerasGeneratorPyTorchHelper from './KerasGeneratorPyTorchHelper';
 import KerasGeneratorTinygradHelper from './KerasGeneratorTinygradHelper';
+import type { KerasLayerJSON, NnvpLayer, NnvpLayerId, NnvpModel } from '../../types/model';
 
+/**
+ * The generator moves each layer's `kerasLayer` to the node's `keras_data`
+ * and deletes it from the stashed `d3_data`, hence the optional override.
+ */
+export type GeneratorLayerData = Omit<NnvpLayer, 'kerasLayer'> & { kerasLayer?: KerasLayerJSON | null };
+
+/** One node of the generator's working graph (also what the helpers consume). */
+export interface GeneratorGraphNode {
+  sources: NnvpLayerId[];
+  targets: NnvpLayerId[];
+  keras_data: KerasLayerJSON | null;
+  d3_data: GeneratorLayerData | null;
+  treated: boolean;
+}
+
+export type GeneratorGraph = Record<NnvpLayerId, GeneratorGraphNode>;
 
 export default class KerasGenerator {
-  constructor(json, isJavascript) {
+  json: NnvpModel;
+  graph: GeneratorGraph;
+  inputs: NnvpLayerId[];
+  outputs: NnvpLayerId[];
+  list: NnvpLayerId[];
+  sequential: boolean;
+  helper: KerasGeneratorJavascriptHelper | KerasGeneratorPythonHelper;
+
+  constructor(json: NnvpModel, isJavascript?: boolean) {
     this.json = json;
     this.graph = this.jsonToGraph(json);
     this.inputs = this.findInputs();
@@ -33,15 +58,15 @@ export default class KerasGenerator {
   }
 
   // Convert a json from the graph editor to a more adapted object
-  jsonToGraph(json) {
-    const result = {};
+  jsonToGraph(json: NnvpModel): GeneratorGraph {
+    const result: GeneratorGraph = {};
     for (const layer of json.layers) { // eslint-disable-line
       this.addLayerToResult(layer, result);
     }
     return result;
   }
 
-  addLayerToResult(layer, result) {
+  addLayerToResult(layer: NnvpLayer, result: GeneratorGraph) {
     if (layer.children === null) {
       const nodeId = layer.id;
       if (!Object.prototype.hasOwnProperty.call(result, nodeId)) {
@@ -49,20 +74,20 @@ export default class KerasGenerator {
           sources: [], targets: [], keras_data: null, d3_data: null, treated: false,
         };
       }
-      result[nodeId].d3_data = layer;
-      result[nodeId].keras_data = layer.kerasLayer;
-      delete result[nodeId].d3_data.kerasLayer;
-      result[nodeId].sources = layer.inputLayers;
-      result[nodeId].targets = layer.outputLayers;
+      result[nodeId]!.d3_data = layer;
+      result[nodeId]!.keras_data = layer.kerasLayer;
+      delete result[nodeId]!.d3_data!.kerasLayer;
+      result[nodeId]!.sources = layer.inputLayers;
+      result[nodeId]!.targets = layer.outputLayers;
     } else {
-      for (const child of layer.children) { // eslint-disable-line
+      for (const child of layer.children!) { // eslint-disable-line
         this.addLayerToResult(child, result);
       }
     }
   }
 
   // Return a list of the different inputs
-  findInputs() {
+  findInputs(): NnvpLayerId[] {
     const inputs = [];
     for (const id of this.json.inputs) { // eslint-disable-line
       inputs.push(id);
@@ -71,7 +96,7 @@ export default class KerasGenerator {
   }
 
   // Return a list of the different outputs
-  findOutputs() {
+  findOutputs(): NnvpLayerId[] {
     const outputs = [];
     for (const id of this.json.outputs) { // eslint-disable-line
       outputs.push(id);
@@ -82,29 +107,29 @@ export default class KerasGenerator {
   // Build a treatment array from a graph
   // The array contains the nodes that will be used to generate Python code in the
   // right order so that every input of a Keras layer is already defined.
-  createTreatmentList() {
-    const list = [];
+  createTreatmentList(): NnvpLayerId[] {
+    const list: NnvpLayerId[] = [];
     // Adds the node and his targets to the array.
     // Adds the node only if all his sources are already added. Otherwise,
     // it waits for another call of this function to add the node. That way,
     // each node is added only once, and the Keras layers will be generated in
     // the correct order.
-    const addNodeToList = (node) => {
+    const addNodeToList = (node: NnvpLayerId): boolean => {
       // Guard against cycles (and diamond/converging DAGs): never treat a node
       // twice. Without this, a graph whose targets loop back to an already
       // treated node would recurse infinitely / blow the stack, and a node
       // reachable through several paths could be added more than once.
-      if (this.graph[node].treated) {
+      if (this.graph[node]!.treated) {
         return false;
       }
-      for (const s of this.graph[node].sources) { // eslint-disable-line
-        if (!this.graph[s].treated) {
+      for (const s of this.graph[node]!.sources) { // eslint-disable-line
+        if (!this.graph[s]!.treated) {
           return false;
         }
       }
       list.push(node);
-      this.graph[node].treated = true;
-      for (const t of this.graph[node].targets) { // eslint-disable-line
+      this.graph[node]!.treated = true;
+      for (const t of this.graph[node]!.targets) { // eslint-disable-line
         addNodeToList(t);
       }
       return true;
@@ -116,23 +141,24 @@ export default class KerasGenerator {
   }
 
   // Return true if we can generate a sequential layer, false otherwise
-  isSequential() {
+  isSequential(): boolean {
     if (this.inputs.length !== 1) return false;
     if (this.outputs.length !== 1) return false;
     // Check that all layers form a linear chain
     for (const layer of Object.values(this.graph)) { // eslint-disable-line
       if (layer.sources.length !== 1) {
-        if (!(layer.keras_data.name === 'Input' && layer.sources.length === 0)) return false;
+        if (!(layer.keras_data!.name === 'Input' && layer.sources.length === 0)) return false;
       }
       if (layer.targets.length !== 1) {
-        if (!(layer.keras_data.name === 'Output' && layer.targets.length === 0)) return false;
+        if (!(layer.keras_data!.name === 'Output' && layer.targets.length === 0)) return false;
       }
     }
     return true;
   }
 
   generateFromGraph() {
-    return this.helper.generateFromGraph();
+    // (No helper actually defines generateFromGraph; dead code kept as-is.)
+    return (this.helper as unknown as { generateFromGraph(): string }).generateFromGraph();
   }
 
   generatePythonFromGraph() {

@@ -21,7 +21,7 @@ function stubGlobalProperties() {
   // ChatBubble builds AssistantActions over these; the chat-state helpers
   // never invoke tools, so inert stubs are enough.
   return {
-    $d3Interface: { on: () => {}, off: () => {} },
+    $boardInterface: { on: () => {}, off: () => {} },
     $kerasInterface: {},
   };
 }
@@ -136,7 +136,7 @@ export function makeCatalogDriver() {
               Merging: { Add: { searchTerms: ['Add'] } },
             }),
           },
-          $d3Interface: {
+          $boardInterface: {
             setLeftBarRemountCallback: () => {},
             addEventHandlerDragOnHtmlClass: () => {},
           },

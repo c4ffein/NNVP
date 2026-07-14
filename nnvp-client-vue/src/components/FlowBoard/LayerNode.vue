@@ -2,12 +2,14 @@
   <div class="flow-layer-node" :class="{ selected }">
     <Handle id="t-left" type="target" :position="Position.Left" />
     <span class="flow-layer-label">{{ data.label }}</span>
+    <InspectionOverlay v-if="data.nnvp" :layer-id="String(data.nnvp.id)" />
     <Handle id="s-right" type="source" :position="Position.Right" />
   </div>
 </template>
 
 <script setup>
 import { Handle, Position } from '@vue-flow/core';
+import InspectionOverlay from './InspectionOverlay.vue';
 
 defineProps({
   data: { type: Object, required: true },
