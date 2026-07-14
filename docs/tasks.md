@@ -37,7 +37,7 @@ But if you read this and you want to get involved, you can actually create one f
 
 ### 3. Canvas migration (D3 => Vue Flow)
 
-The canvas is [Vue Flow](https://vueflow.dev) behind the `$d3Interface` facade
+The canvas is [Vue Flow](https://vueflow.dev) behind the `$boardInterface` facade (renamed from `$d3Interface`)
 the rest of the app talks to; the hand-rolled D3 whiteboard is migrated and deleted.
 
 - [x] Migrate to Vue Flow (adapter with lossless NNVP round-trip, D3GraphEditor-shaped
