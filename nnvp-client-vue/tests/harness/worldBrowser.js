@@ -83,10 +83,13 @@ export function makeBrowserWorld(page, canvas, expect, { exposePage = false } = 
   // Same contract as worldComponents.makeWindowsDriver, mapped onto the real
   // catalog ('a') and layer-options ('b') windows.
   const winSel = (name) => (name === 'a' ? '#layerCatalog' : '#layerOptions');
-  // Chromium drops synthetic mouse events with negative coordinates, so the
-  // huge crush-drags must aim at the viewport edge instead of far past it.
-  const clampX = (x) => Math.max(1, Math.min(x, page.viewportSize().width - 1));
-  const clampY = (y) => Math.max(1, Math.min(y, page.viewportSize().height - 1));
+  // Chromium drops synthetic mouse events with NEGATIVE coordinates (beyond
+  // the far edges they deliver fine), so crush-drags aimed up/left must stop
+  // at 1 instead of going far past zero. No upper cap: growth drags need to
+  // travel below/right of the viewport (the side windows already touch its
+  // bottom edge).
+  const clampX = (x) => Math.max(1, x);
+  const clampY = (y) => Math.max(1, y);
   const windows = {
     async open() {}, // both windows are on screen by default
     async isVisible(name) {

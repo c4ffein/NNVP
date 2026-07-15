@@ -88,7 +88,7 @@ appTest('panel windows: resizing from the left edge keeps the right edge anchore
   await windows.resizeLeftEdgeBy('b', 2000);
   const clamped = await windows.size('b');
   const clampedPos = await windows.position('b');
-  expect(clamped.width).toBe(300); // the window's minimum
+  expect(clamped.width).toBe(await windows.expectedMinWidth('b'));
   expect(Math.round(clampedPos.x + clamped.width)).toBe(Math.round(rightEdge));
 });
 
