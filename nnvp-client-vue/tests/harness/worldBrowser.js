@@ -83,6 +83,10 @@ export function makeBrowserWorld(page, canvas, expect, { exposePage = false } = 
   // Same contract as worldComponents.makeWindowsDriver, mapped onto the real
   // catalog ('a') and layer-options ('b') windows.
   const winSel = (name) => (name === 'a' ? '#layerCatalog' : '#layerOptions');
+  // Chromium drops synthetic mouse events with negative coordinates, so the
+  // huge crush-drags must aim at the viewport edge instead of far past it.
+  const clampX = (x) => Math.max(1, Math.min(x, page.viewportSize().width - 1));
+  const clampY = (y) => Math.max(1, Math.min(y, page.viewportSize().height - 1));
   const windows = {
     async open() {}, // both windows are on screen by default
     async isVisible(name) {
@@ -123,7 +127,7 @@ export function makeBrowserWorld(page, canvas, expect, { exposePage = false } = 
       const startY = handle.y + handle.height / 2;
       await page.mouse.move(startX, startY);
       await page.mouse.down();
-      await page.mouse.move(startX + dx, startY + dy, { steps: 5 });
+      await page.mouse.move(clampX(startX + dx), clampY(startY + dy), { steps: 5 });
       await page.mouse.up();
       await settle();
     },
@@ -133,9 +137,14 @@ export function makeBrowserWorld(page, canvas, expect, { exposePage = false } = 
       const startY = strip.y + strip.height / 2;
       await page.mouse.move(startX, startY);
       await page.mouse.down();
-      await page.mouse.move(startX + dx, startY, { steps: 5 });
+      await page.mouse.move(clampX(startX + dx), clampY(startY), { steps: 5 });
       await page.mouse.up();
       await settle();
+    },
+    /** What size() reports at the minimum: min-width + the 2px of borders
+        that boundingBox includes (the bun world reads style.width instead). */
+    async expectedMinWidth(name) {
+      return (name === 'a' ? 220 : 240) + 2;
     },
   };
 
@@ -182,10 +191,11 @@ export function makeBrowserWorld(page, canvas, expect, { exposePage = false } = 
       }, signedIn);
     },
     async open() {
-      // Chat defaults to hidden; the Panels menu is the way in.
+      // Chat defaults to hidden; the Panels menu is the way in. Wait out the
+      // entrance transition (translateY) so position measurements are stable.
       await page.click('#GeneralMenu .menuTitle:has-text("Panels")');
       await page.click('#GeneralMenu .menuItem:has-text("Chat")');
-      await settle();
+      await page.waitForTimeout(300);
     },
     async connectPromptVisible() {
       return (await page.locator('.chat-connect').count()) > 0;

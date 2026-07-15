@@ -59,19 +59,18 @@ e2eOnly(
 );
 
 e2eOnly(
-  'a11y: assistant toggle button has an accessible name and expanded state',
-  'Asserts aria-expanded state transitions, the labelled dialog role, and that focus physically moves into the opened panel (document.activeElement) — live a11y tree plus real focus management.',
+  'a11y: the assistant window is a labelled dialog with named controls and receives focus',
+  'Asserts the labelled dialog role, accessible names on the close button and message field, and that focus physically moves into the opened window (document.activeElement) — live a11y tree plus real focus management. (The old floating toggle button was removed; the Panels menu opens the chat.)',
   async ({ page, expect }) => {
-    const fab = page.getByRole('button', { name: 'Toggle assistant' });
-    await expect(fab).toBeVisible();
-    await expect(fab).toHaveAttribute('aria-expanded', 'false');
-    await fab.click();
-    await expect(fab).toHaveAttribute('aria-expanded', 'true');
-    // The panel is a labelled dialog and the message field has an accessible name.
+    await page.click('#GeneralMenu .menuTitle:has-text("Panels")');
+    await page.click('#GeneralMenu .menuItem:has-text("Chat")');
+    // The window is a labelled dialog; its controls carry accessible names.
     const panel = page.getByRole('dialog', { name: 'Assistant' });
     await expect(panel).toBeVisible();
+    await expect(panel.getByRole('button', { name: 'Close Assistant' })).toBeVisible();
     await expect(page.getByRole('textbox', { name: 'Message the assistant' })).toBeVisible();
-    // Opening the panel moves focus into it.
+    // Opening the window moves focus into it (mounted = visible = focused).
+    await page.waitForTimeout(300); // entrance transition + focus tick
     expect(await panel.evaluate(el => el.contains(document.activeElement))).toBe(true);
   },
 );

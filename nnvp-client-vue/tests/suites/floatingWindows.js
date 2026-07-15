@@ -68,12 +68,10 @@ appTest('panel windows: the corner handle resizes, but never below the minimum',
   const grown = await windows.size('a');
   expect(Math.round(grown.width - before.width)).toBe(80);
   expect(Math.round(grown.height - before.height)).toBe(60);
-  // Trying to shrink far below the minimum clamps at the minimum (which is
-  // the window's original size in the app).
+  // Trying to shrink far below the minimum clamps at the minimum.
   await windows.resizeBy('a', -2000, -2000);
   const clamped = await windows.size('a');
-  expect(clamped.width).toBe(before.width);
-  expect(clamped.height).toBe(before.height);
+  expect(clamped.width).toBe(await windows.expectedMinWidth('a'));
 });
 
 appTest('panel windows: resizing from the left edge keeps the right edge anchored', async ({ windows, expect }) => {

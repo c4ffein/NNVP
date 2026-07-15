@@ -116,6 +116,10 @@ export function makeWindowsDriver() {
       firePointer('pointerup', 500 + dx, 500);
       await wrapper.vm.$nextTick();
     },
+    /** Both host windows use minWidth 300 (style width, no border term). */
+    async expectedMinWidth() {
+      return 300;
+    },
     async teardown() {
       if (wrapper) wrapper.unmount();
     },

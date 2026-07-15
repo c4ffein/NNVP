@@ -106,13 +106,15 @@ e2eOnly(
   'offscreen: border arrows appear for off-screen layers and clicking one pans back',
   'Needs Vue Flow to measure real node dimensions and the pane size, and asserts on rendered .offscreen-arrow DOM plus the post-pan viewport transform — none of which exist headless.',
   async ({ page, expect }) => {
-    // Two layers: one on screen, one far off to the right.
+    // Two layers: one on screen, one far off BELOW — its arrow lands on the
+    // bottom border, the only edge no floating window covers by default
+    // (right/left/top belong to the options/catalog/menu chrome).
     await page.evaluate(() => {
       const editor = window.nnvp.debug.graphEditor;
       editor.model.loadJSON({
         layers: [
           { id: 0, class: 'Dense', name: 'Near', x: 100, y: 100, inputs: [], outputs: [] },
-          { id: 1, class: 'Dense', name: 'Far', x: 4000, y: 100, inputs: [], outputs: [] },
+          { id: 1, class: 'Dense', name: 'Far', x: 100, y: 4000, inputs: [], outputs: [] },
         ],
         edges: [],
       });
