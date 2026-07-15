@@ -6,18 +6,13 @@ on:
   pull_request:
     branches: [ master ]
 
-# The box is bun-first: no package-lock.json exists, so every job installs
-# with bun (setup-node's npm cache used to fail on the missing lockfile and
-# killed the old Lint/E2E jobs during setup).
+# Every job runs the same Makefile targets a developer runs locally — the
+# Makefile is the single source of truth for how things are built and tested.
+# The box is bun-first (only bun.lock exists), so `make install` uses bun.
 jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: nnvp-client-vue
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -26,19 +21,14 @@ jobs:
         uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: make install
 
       - name: Run oxlint
-        run: bun run lint
+        run: make front-lint
 
   typecheck:
     name: Typecheck
     runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: nnvp-client-vue
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -47,10 +37,10 @@ jobs:
         uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: make install
 
       - name: Run tsc
-        run: bun run typecheck
+        run: make front-typecheck
 
   # The dual-mode suite runs twice: once headless under bun (fast, logic +
   # component halves) and once for real in Chromium via Playwright (the
@@ -58,11 +48,6 @@ jobs:
   test-bun:
     name: Tests - Bun Runner
     runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: nnvp-client-vue
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -71,19 +56,14 @@ jobs:
         uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: make install
 
       - name: Run the dual-mode suite (bun runner)
-        run: bun run test:fast
+        run: make test-unit
 
   test-playwright:
     name: Tests - Playwright
     runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: nnvp-client-vue
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -92,15 +72,18 @@ jobs:
         uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: make install
 
       - name: Install Playwright browsers
-        run: bunx playwright install --with-deps chromium
+        run: cd nnvp-client-vue && bunx playwright install --with-deps chromium
 
       - name: Run the dual-mode suite (Playwright)
-        run: PW_DISABLE_TS_ESM=1 bunx playwright test
-        # The config self-starts vite (bun-aware, IPv4-pinned) — see
-        # nnvp-client-vue/playwright.config.js.
+        # make test-e2e forces the BUN runtime (`bunx --bun`): the runner
+        # image ships node, and node's strict ESM resolution rejects the
+        # suite's extensionless/vite-style imports. The dev box has no node
+        # at all, so this keeps CI and local runs identical. The playwright
+        # config self-starts vite, bun-aware and IPv4-pinned.
+        run: make test-e2e
 
       - name: Upload test results
         if: always()
