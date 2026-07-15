@@ -63,15 +63,17 @@ appTest('panel windows: clicking a window raises it above the others', async ({ 
 
 appTest('panel windows: the corner handle resizes, but never below the minimum', async ({ windows, expect }) => {
   await windows.open();
-  const before = await windows.size('a');
-  await windows.resizeBy('a', 80, 60);
-  const grown = await windows.size('a');
-  expect(Math.round(grown.width - before.width)).toBe(80);
-  expect(Math.round(grown.height - before.height)).toBe(60);
-  // Trying to shrink far below the minimum clamps at the minimum.
+  // Crush first, grow second: growing first would push the browser catalog's
+  // corner below the viewport (it already reaches near the bottom edge), and
+  // a drag cannot START from outside the viewport — the grab would miss.
   await windows.resizeBy('a', -2000, -2000);
   const clamped = await windows.size('a');
   expect(clamped.width).toBe(await windows.expectedMinWidth('a'));
+  // Growing from the minimum tracks the drag exactly.
+  await windows.resizeBy('a', 80, 60);
+  const grown = await windows.size('a');
+  expect(Math.round(grown.width - clamped.width)).toBe(80);
+  expect(Math.round(grown.height - clamped.height)).toBe(60);
 });
 
 appTest('panel windows: resizing from the left edge keeps the right edge anchored', async ({ windows, expect }) => {
