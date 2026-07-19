@@ -269,6 +269,13 @@ export default class BoardInterface {
     return null;
   }
 
+  generateTinygradNoSave(kerasInterface: CodeGenerator): string | null {
+    if (this.activeGraph !== null) {
+      return this.activeGraph.generateTinygradNoSave(kerasInterface);
+    }
+    return null;
+  }
+
   loadBoard() {
     if (this.activeGraph !== null) {
       document.getElementById('hidden-file-upload')!.click();
