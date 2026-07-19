@@ -686,3 +686,32 @@ appTest('charts: the Epoch Results helper explains validation and overfitting', 
   expect(text).toContain('val-acc / val-loss');
   expect(text).toContain('overfitting');
 });
+
+e2eOnly(
+  'bench: the Bench tab exists only for ?bench=1 browsers (sticky)',
+  'Navigates with real URL params and asserts the rendered tab bar — the localStorage-backed gate and Vue re-render only exist in a live page.',
+  async ({ page, expect }) => {
+    // Plain load: no Bench tab.
+    await page.click('#GeneralMenu .menuTitle:has-text("Panels")');
+    await page.click('#GeneralMenu .menuItem:has-text("Training")');
+    expect(await page.locator('.TrainingZone.bar-button:has-text("Bench")').count()).toBe(0);
+    // Opt in via the URL: the tab appears...
+    await page.goto('/?bench=1');
+    await page.waitForSelector('.vue-flow__pane');
+    await page.click('#GeneralMenu .menuTitle:has-text("Panels")');
+    await page.click('#GeneralMenu .menuItem:has-text("Training")');
+    expect(await page.locator('.TrainingZone.bar-button:has-text("Bench")').count()).toBe(1);
+    // ...and STICKS on a plain reload (localStorage), until ?bench=0.
+    await page.goto('/');
+    await page.waitForSelector('.vue-flow__pane');
+    await page.click('#GeneralMenu .menuTitle:has-text("Panels")');
+    await page.click('#GeneralMenu .menuItem:has-text("Training")');
+    expect(await page.locator('.TrainingZone.bar-button:has-text("Bench")').count()).toBe(1);
+    await page.goto('/?bench=0');
+    await page.waitForSelector('.vue-flow__pane');
+    await page.click('#GeneralMenu .menuTitle:has-text("Panels")');
+    await page.click('#GeneralMenu .menuItem:has-text("Training")');
+    expect(await page.locator('.TrainingZone.bar-button:has-text("Bench")').count()).toBe(0);
+  },
+  { timeoutMs: 30000 },
+);

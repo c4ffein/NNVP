@@ -20,7 +20,7 @@ tests/
 | Command                          | What runs                                        |
 |----------------------------------|--------------------------------------------------|
 | `bun run test:fast`              | every `both`-mode test, headless, ~2s total      |
-| `bun run test:e2e:bun`           | the SAME tests in a real browser + the e2eOnly ones (bun box: `PW_DISABLE_TS_ESM=1` is set by the script) |
+| `bun run test:e2e:bun`           | the SAME tests in a real browser + the e2eOnly ones (forces the bun runtime via bunx --bun) |
 | `make test-contract` (repo root) | contract/ against a throwaway real backend       |
 
 ## Writing a test

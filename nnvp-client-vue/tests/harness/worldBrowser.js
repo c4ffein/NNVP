@@ -124,6 +124,21 @@ export function makeBrowserWorld(page, canvas, expect, { exposePage = false } = 
       await page.mouse.up();
       await settle();
     },
+    async dragTo(name, x, y) {
+      const box = await page.locator(winSel(name)).boundingBox();
+      await this.dragBy(name, x - box.x, y - box.y);
+    },
+    async dragPointerTo(name, x, y) {
+      const bar = await page.locator(`${winSel(name)} .floating-window-titlebar`).boundingBox();
+      await page.mouse.move(bar.x + bar.width / 2, bar.y + bar.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(clampX(x), clampY(y), { steps: 5 });
+      await page.mouse.up();
+      await settle();
+    },
+    async viewport() {
+      return page.viewportSize();
+    },
     async resizeBy(name, dx, dy) {
       const handle = await page.locator(`${winSel(name)} .floating-window-resize`).boundingBox();
       const startX = handle.x + handle.width / 2;
@@ -148,6 +163,17 @@ export function makeBrowserWorld(page, canvas, expect, { exposePage = false } = 
         that boundingBox includes (the bun world reads style.width instead). */
     async expectedMinWidth(name) {
       return (name === 'a' ? 220 : 240) + 2;
+    },
+    /** boundingBox includes the 1px border on each side. */
+    async borderOverhead() {
+      return 2;
+    },
+    /** The app's default window rects (App.vue windowRects). */
+    async defaults(name) {
+      const { height } = page.viewportSize();
+      return name === 'a'
+        ? { width: 220, height: height - 68 }
+        : { width: 240, height: height - 68 };
     },
   };
 

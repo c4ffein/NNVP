@@ -76,3 +76,14 @@ appTest('the chat window reopens where the user left it', async ({ chat, expect 
   await chat.open();
   expect(await chat.windowPosition()).toEqual(moved);
 });
+
+appTest('the conversation survives closing and reopening the chat', async ({ chat, expect }) => {
+  await chat.setSignedIn(true);
+  await chat.open();
+  await chat.askAbout('Dense'); // seeds an assistant message without any network
+  const seeded = await chat.lastAssistantText();
+  expect(seeded).toContain('Dense');
+  await chat.closeWindow();
+  await chat.open();
+  expect(await chat.lastAssistantText()).toBe(seeded);
+});

@@ -37,6 +37,8 @@ import './mnistTutorial';
 import './tutorials';
 import './googleDataLoader';
 import './tfjsTraining';
+import './trainingEngine';
+import './tinygradEngine';
 import './inspector';
 import './settings';
 import './viz3d';

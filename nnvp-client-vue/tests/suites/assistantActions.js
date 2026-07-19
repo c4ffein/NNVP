@@ -89,7 +89,7 @@ function makeFakeBoardInterface() {
   return {
     activeGraph,
     calls: {
-      deleteSelected: 0, undo: 0, redo: 0, loadedTemplates: [],
+      deleteSelected: 0, undo: 0, redo: 0, autoLayout: 0, loadedTemplates: [],
     },
     addLayer(kerasLayer) {
       const id = nextId;
@@ -101,6 +101,9 @@ function makeFakeBoardInterface() {
     },
     deleteSelectedElements() {
       this.calls.deleteSelected += 1;
+    },
+    autoLayout() {
+      this.calls.autoLayout += 1;
     },
     undo() {
       this.calls.undo += 1;
@@ -227,7 +230,7 @@ logicTest('assistantActions: delegates delete/undo/redo to the d3 interface', ({
   actions.undo();
   actions.redo();
   expect(d3.calls).toEqual({
-    deleteSelected: 1, undo: 1, redo: 1, loadedTemplates: [],
+    deleteSelected: 1, undo: 1, redo: 1, autoLayout: 0, loadedTemplates: [],
   });
 });
 
@@ -306,6 +309,12 @@ logicTest('assistantActions: surfaces refused connections and missing edges as e
   expect(gone).toEqual({ disconnected: true, source: a.id, target: b.id });
 });
 
+logicTest('assistantActions: autoLayout delegates to the board facade', ({ expect }) => {
+  const { d3, actions } = setup();
+  expect(actions.autoLayout()).toEqual({ arranged: true });
+  expect(d3.calls.autoLayout).toBe(1);
+});
+
 // --- AnthropicClient tool mapping ----------------------------------------------
 
 logicTest('anthropicClient: builds a valid tools array from the actions', ({ expect }) => {
@@ -320,6 +329,8 @@ logicTest('anthropicClient: builds a valid tools array from the actions', ({ exp
     'generate_code',
     'connect_layers',
     'disconnect_layers',
+    'auto_layout',
+    'propose_choices',
     'delete_selected',
     'undo',
     'redo',
@@ -390,14 +401,16 @@ logicTest('assistantActions: reports a missing layer id distinctly from a bad pa
 
 logicTest('anthropicClient: marks exactly the mutating tools', ({ expect }) => {
   expect([...MUTATING_TOOLS].sort()).toEqual(
-    ['add_layer', 'connect_layers', 'delete_selected', 'disconnect_layers',
-      'load_template', 'redo', 'set_param', 'undo'],
+    ['add_layer', 'auto_layout', 'connect_layers', 'delete_selected',
+      'disconnect_layers', 'load_template', 'redo', 'set_param', 'undo'],
   );
   expect(isMutatingTool('load_template')).toBe(true); // replaces the board
   expect(isMutatingTool('list_templates')).toBe(false);
   expect(isMutatingTool('list_tutorials')).toBe(false);
   expect(isMutatingTool('start_tutorial')).toBe(false); // navigation, not a graph edit
   expect(isMutatingTool('open_training_panel')).toBe(false); // navigation too
+  expect(isMutatingTool('auto_layout')).toBe(true); // moves every layer
+  expect(isMutatingTool('propose_choices')).toBe(false); // pure UI affordance
   expect(isMutatingTool('get_layer_help')).toBe(false);
   expect(isMutatingTool('add_layer')).toBe(true);
   expect(isMutatingTool('list_layers')).toBe(false);
@@ -774,4 +787,29 @@ logicTest('assistantActions: serves layer and category help as plain text', ({ e
   const category = actions.getLayerHelp('Convolution');
   expect(category).toContain('Conv2D');
   expect(() => actions.getLayerHelp('NotAThing')).toThrow(/No help entry/);
+});
+
+logicTest('anthropicClient: propose_choices reaches onActivity and the loop completes', async ({ expect }) => {
+  const d3 = makeFakeBoardInterface();
+  const keras = makeFakeKerasInterface();
+  const actions = new AssistantActions(d3, keras);
+  const client = new AnthropicClient(actions, { allowEdits: false });
+  client.fetchImpl = makeFakeFetch([
+    toolReply('t1', 'propose_choices', { choices: ['Yes, tidy it', 'No thanks'] }),
+    textReply('Want me to tidy the layout?'),
+  ]);
+  localStorage.setItem('nnvp_anthropic_key', 'sk-ant-test-0000000000');
+  try {
+    const events = [];
+    const reply = await client.send(
+      [{ role: 'user', content: 'build done' }],
+      event => events.push(event),
+    );
+    expect(reply).toBe('Want me to tidy the layout?');
+    const choiceEvents = events.filter(e => e.type === 'tool_use' && e.name === 'propose_choices');
+    expect(choiceEvents).toHaveLength(1);
+    expect(choiceEvents[0].input.choices).toEqual(['Yes, tidy it', 'No thanks']);
+  } finally {
+    localStorage.removeItem('nnvp_anthropic_key');
+  }
 });

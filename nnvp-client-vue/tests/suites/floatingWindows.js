@@ -10,6 +10,7 @@ import { logicTest, appTest } from '../harness/define';
 import {
   bringToFront, resetWindowStack, clampToViewport, DRAG_GRIP,
   rememberRect, recallRect, resetWindowRects,
+  snapRect, SNAP_DIST, dockZoneAt,
 } from '../../src/lib/windowing';
 
 logicTest('windowing: bringToFront hands out strictly increasing z-indexes', ({ expect }) => {
@@ -47,9 +48,11 @@ appTest('panel windows: the titlebar close button hides the window', async ({ wi
 appTest('panel windows: dragging the titlebar moves the window', async ({ windows, expect }) => {
   await windows.open();
   const before = await windows.position('a');
-  await windows.dragBy('a', 60, 40);
+  // 65/40 keeps the landing spot outside every snap candidate's SNAP_DIST
+  // (60 used to land the bun host window flush-left of its sibling).
+  await windows.dragBy('a', 65, 40);
   const after = await windows.position('a');
-  expect(Math.round(after.x - before.x)).toBe(60);
+  expect(Math.round(after.x - before.x)).toBe(65);
   expect(Math.round(after.y - before.y)).toBe(40);
 });
 
@@ -103,4 +106,122 @@ logicTest('windowing: remembered rects survive by id and reset cleanly', ({ expe
   expect(recallRect('')).toBe(undefined);
   resetWindowRects();
   expect(recallRect('chat')).toBe(undefined);
+});
+
+logicTest('windowing: snapRect magnetizes to viewport margins within SNAP_DIST', ({ expect }) => {
+  const viewport = { width: 1000, height: 700 };
+  const rect = { x: 20, y: 100, width: 300, height: 200 };
+  // 20 is within 12+? no: |20-12| = 8 <= 12 -> snaps to the left margin.
+  expect(snapRect(rect, viewport).x).toBe(12);
+  // Farther than SNAP_DIST: untouched.
+  expect(snapRect({ ...rect, x: 12 + SNAP_DIST + 1 }, viewport).x).toBe(12 + SNAP_DIST + 1);
+  // Right margin: viewport.width - 12 - width = 688.
+  expect(snapRect({ ...rect, x: 680 }, viewport).x).toBe(688);
+});
+
+logicTest('windowing: snapRect aligns and abuts against sibling windows', ({ expect }) => {
+  const viewport = { width: 2000, height: 1500 };
+  const other = { x: 400, y: 300, width: 300, height: 250 };
+  const rect = { width: 200, height: 100 };
+  // Alignment: left edges shared.
+  expect(snapRect({ ...rect, x: 392, y: 700 }, viewport, [other]).x).toBe(400);
+  // Adjacency: flush against the sibling's right side (400 + 300 = 700).
+  expect(snapRect({ ...rect, x: 706, y: 700 }, viewport, [other]).x).toBe(700);
+  // Adjacency: flush to its left (400 - 200 = 200).
+  expect(snapRect({ ...rect, x: 195, y: 700 }, viewport, [other]).x).toBe(200);
+  // Vertical: top edges align.
+  expect(snapRect({ ...rect, x: 1000, y: 291 }, viewport, [other]).y).toBe(300);
+  // The nearest candidate wins when several are in range.
+  expect(snapRect({ ...rect, x: 699, y: 700 }, viewport, [other]).x).toBe(700);
+});
+
+appTest('panel windows: dragging near the screen edge snaps to the margin', async ({ windows, expect }) => {
+  await windows.open();
+  // Dropped well away from every snap candidate: lands exactly where asked.
+  await windows.dragTo('a', 200, 300);
+  const free = await windows.position('a');
+  expect(Math.round(free.x)).toBe(200);
+  expect(Math.round(free.y)).toBe(300);
+  // Within SNAP_DIST of the left margin: magnetizes to exactly 12.
+  await windows.dragTo('a', 20, 300);
+  const snapped = await windows.position('a');
+  expect(Math.round(snapped.x)).toBe(12);
+  expect(Math.round(snapped.y)).toBe(300);
+});
+
+logicTest('windowing: dockZoneAt — sides at default width, bottom bar full width, top max, corners quadrants', ({ expect }) => {
+  const viewport = { width: 1000, height: 700 };
+  const pref = { width: 220, height: 300 };
+  // Left edge (away from corners): classic side panel — DEFAULT width, full height.
+  expect(dockZoneAt({ x: 3, y: 350 }, viewport, pref)).toEqual({
+    zone: 'left', rect: { x: 12, y: 56, width: 220, height: 632 },
+  });
+  // Right edge mirrors it against the right border.
+  expect(dockZoneAt({ x: 998, y: 350 }, viewport, pref).rect.x).toBe(1000 - 12 - 220);
+  // A huge default width is capped at half the board.
+  expect(dockZoneAt({ x: 3, y: 350 }, viewport, { width: 900, height: 300 }).rect.width).toBe(485);
+  // Bottom edge: a full-width bar at the default height (capped at half).
+  expect(dockZoneAt({ x: 500, y: 698 }, viewport, pref)).toEqual({
+    zone: 'bottom', rect: { x: 12, y: 700 - 12 - 300, width: 976, height: 300 },
+  });
+  // With an existing bottom bar (its top passed in), side docks stop above it.
+  expect(dockZoneAt({ x: 3, y: 350 }, viewport, pref, { sideBottomY: 382 }).rect.height).toBe(382 - 56);
+  // Top edge (center): maximize to the whole board area.
+  expect(dockZoneAt({ x: 500, y: 2 }, viewport, pref).zone).toBe('max');
+  // Corners: quadrants (forgiving 40px corner reach on the long axis).
+  expect(dockZoneAt({ x: 3, y: 30 }, viewport, pref).zone).toBe('top-left');
+  expect(dockZoneAt({ x: 997, y: 680 }, viewport, pref).zone).toBe('bottom-right');
+  // Anywhere else: no dock.
+  expect(dockZoneAt({ x: 500, y: 350 }, viewport, pref)).toBe(null);
+});
+
+appTest('panel windows: dropping on the left border docks at default width, dragging away restores', async ({ windows, expect }) => {
+  await windows.open();
+  const viewport = await windows.viewport();
+  const overhead = await windows.borderOverhead(); // boundingBox counts borders
+  const defaults = await windows.defaults('b');
+  const before = await windows.size('b');
+  // Ride the pointer onto the left border and drop: classic side panel.
+  await windows.dragPointerTo('b', 2, Math.round(viewport.height / 2));
+  const docked = await windows.position('b');
+  const dockedSize = await windows.size('b');
+  expect(Math.round(docked.x)).toBe(12);
+  expect(Math.round(docked.y)).toBe(56);
+  expect(Math.round(dockedSize.width)).toBe(defaults.width + overhead);
+  expect(Math.round(dockedSize.height)).toBe(viewport.height - 68 + overhead);
+  // Dragging it away restores the pre-dock size.
+  await windows.dragBy('b', 200, 150);
+  const restored = await windows.size('b');
+  expect(Math.round(restored.width)).toBe(Math.round(before.width));
+  expect(Math.round(restored.height)).toBe(Math.round(before.height));
+});
+
+appTest('panel windows: the bottom bar goes full width and side docks make room, in any order', async ({ windows, expect }) => {
+  await windows.open();
+  const viewport = await windows.viewport();
+  const overhead = await windows.borderOverhead();
+  const aDefaults = await windows.defaults('a');
+  const bDefaults = await windows.defaults('b');
+  const innerH = viewport.height - 68;
+  const barHeight = Math.min(bDefaults.height, innerH / 2);
+  const barTop = viewport.height - 12 - barHeight;
+  const sideHeight = barTop - 6 - 56;
+
+  // Order 1: side first, bottom second — the side SHRINKS to make room.
+  await windows.dragPointerTo('a', 2, Math.round(viewport.height / 2));
+  await windows.dragPointerTo('b', Math.round(viewport.width / 2), viewport.height - 2);
+  expect(Math.round((await windows.size('b')).width)).toBe(viewport.width - 24 + overhead);
+  expect(Math.round((await windows.size('b')).height)).toBe(Math.round(barHeight) + overhead);
+  expect(Math.round((await windows.size('a')).width)).toBe(aDefaults.width + overhead);
+  expect(Math.round((await windows.size('a')).height)).toBe(Math.round(sideHeight) + overhead);
+
+  // Undock both (drag-away restores their floating sizes).
+  await windows.dragTo('a', 300, 200);
+  await windows.dragTo('b', 600, 200);
+
+  // Order 2: bottom first, side second — the side is BORN short.
+  await windows.dragPointerTo('b', Math.round(viewport.width / 2), viewport.height - 2);
+  await windows.dragPointerTo('a', 2, Math.round(viewport.height / 2));
+  expect(Math.round((await windows.size('a')).height)).toBe(Math.round(sideHeight) + overhead);
+  expect(Math.round((await windows.position('a')).y)).toBe(56);
 });

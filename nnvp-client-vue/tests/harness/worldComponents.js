@@ -15,6 +15,7 @@ import LayerCatalog from '../../src/components/LayerCatalog/LayerCatalog.vue';
 import FloatingWindow from '../../src/components/FloatingWindow.vue';
 import Charts from '../../src/components/TrainingZone/Charts.vue';
 import { resetWindowRects } from '../../src/lib/windowing';
+import { resetChatSession } from '../../src/lib/Assistant/chatSession';
 import { askAssistant } from '../../src/lib/Assistant/askAssistant';
 
 function stubGlobalProperties() {
@@ -102,6 +103,23 @@ export function makeWindowsDriver() {
       firePointer('pointerup', 500 + dx, 500 + dy);
       await wrapper.vm.$nextTick();
     },
+    async dragTo(name, x, y) {
+      const { style } = el(name).element;
+      const dx = x - parseFloat(style.left);
+      const dy = y - parseFloat(style.top);
+      await this.dragBy(name, dx, dy);
+    },
+    /** Grab the titlebar, then move the POINTER to exact viewport coords. */
+    async dragPointerTo(name, x, y) {
+      await el(name).find('.floating-window-titlebar')
+        .trigger('pointerdown', { clientX: 500, clientY: 500, button: 0 });
+      firePointer('pointermove', x, y);
+      firePointer('pointerup', x, y);
+      await wrapper.vm.$nextTick();
+    },
+    async viewport() {
+      return { width: window.innerWidth, height: window.innerHeight };
+    },
     async resizeBy(name, dx, dy) {
       await el(name).find('.floating-window-resize')
         .trigger('pointerdown', { clientX: 500, clientY: 500, button: 0 });
@@ -119,6 +137,16 @@ export function makeWindowsDriver() {
     /** Both host windows use minWidth 300 (style width, no border term). */
     async expectedMinWidth() {
       return 300;
+    },
+    /** What size() adds over the style width: nothing — it reads style. */
+    async borderOverhead() {
+      return 0;
+    },
+    /** The initial (default) rect each host window is mounted with. */
+    async defaults(name) {
+      return name === 'a'
+        ? { width: 300, height: 250 }
+        : { width: 300, height: 250 };
     },
     async teardown() {
       if (wrapper) wrapper.unmount();
@@ -248,6 +276,7 @@ export function makeChatDriver() {
       if (wrapper) wrapper.unmount();
       localStorage.removeItem('nnvp_backend_token');
       resetWindowRects(); // window positions must not leak between tests
+      resetChatSession(); // neither does the conversation
     },
   };
 }

@@ -143,9 +143,10 @@ logicTest('kerasGeneratorTinygrad: mixes module layers and Tensor-method layers 
     + '  def __init__(self):\n'
     + '    self.layer_2 = nn.Conv2d(1, 16, (3,3,))\n'
     + '    self.layer_3 = nn.BatchNorm2d(16)\n'
-    // Flatten after a Conv2D: spatial arithmetic is not attempted, so the Dense
-    // in_features is not inferable -> out-dim fallback with a loud TODO.
-    + '    self.layer_6 = nn.Linear(10, 10)  # TODO: set in_features (could not infer from graph)\n'
+    // Flatten after a Conv2D: dim inference walks the conv's spatial
+    // arithmetic (28-3+1 = 26; 26*26*16 = 10816), so the Dense in_features
+    // is COMPUTED, no fallback needed.
+    + '    self.layer_6 = nn.Linear(10816, 10)\n'
     + '\n'
     + '  def __call__(self, x):\n'
     + '    x = self.layer_2(x)\n'
@@ -241,6 +242,39 @@ logicTest('kerasGeneratorTinygrad: maps module layers, falling back to the out-d
   expect(ctor('BatchNormalization')).toBe(
     'nn.BatchNorm2d(1)  # TODO: set num_features (could not infer from graph)',
   );
+});
+
+logicTest('kerasGeneratorTinygrad: Conv2D carries stride and same-padding into the constructor', ({ expect }) => {
+  expect(ctor('Conv2D', { filters: 32, kernel_size: [3, 3], padding: 'same' }))
+    .toContain('nn.Conv2d(32, 32, (3,3,), padding=(1,1,))');
+  expect(ctor('Conv2D', { filters: 32, kernel_size: [3, 3], strides: [2, 2] }))
+    .toContain('nn.Conv2d(32, 32, (3,3,), stride=(2,2,))');
+  // Even kernels: Keras 'same' is end-heavy — the exact 4-tuple
+  // (left, right, top, bottom) is emitted.
+  expect(ctor('Conv2D', { filters: 8, kernel_size: [2, 2], padding: 'same' }))
+    .toContain('nn.Conv2d(8, 8, (2,2,), padding=(0,1,0,1,))');
+  // 'same' + stride depends on the input size: loud TODO.
+  expect(ctor('Conv2D', { filters: 8, kernel_size: [3, 3], strides: [2, 2], padding: 'same' }))
+    .toContain('# TODO: padding="same"');
+});
+
+logicTest('kerasGeneratorTinygrad: maps pooling and dropout to Tensor methods', ({ expect }) => {
+  expect(method('MaxPooling2D', { pool_size: [2, 2] })).toBe('.max_pool2d(kernel_size=(2,2,))');
+  expect(method('MaxPooling2D', { pool_size: [2, 2], strides: [1, 1] }))
+    .toBe('.max_pool2d(kernel_size=(2,2,), stride=(1,1,))');
+  expect(method('AveragePooling2D', { pool_size: [3, 3] })).toBe('.avg_pool2d(kernel_size=(3,3,))');
+  expect(method('Dropout', { rate: 0.25 })).toBe('.dropout(0.25)');
+});
+
+logicTest('kerasGeneratorTinygrad: chains Dense/Conv2D activation params as Tensor methods', ({ expect }) => {
+  // Keras folds the activation into the layer; tinygrad chains it after the
+  // module call — and unknown activations leave a loud TODO, never silence.
+  const json = sequentialJson();
+  json.layers[2].kerasLayer.parameterValues.activation = 'relu';
+  json.layers[3].kerasLayer.parameterValues.activation = 'squish';
+  const code = new KerasGenerator(json).generateTinygradFromGraph();
+  expect(code).toContain('    x = self.layer_3(x).relu()\n');
+  expect(code).toContain('    x = self.layer_4(x)  # TODO: unsupported activation "squish"\n');
 });
 
 logicTest('kerasGeneratorTinygrad: maps Flatten and activations to Tensor methods', ({ expect }) => {

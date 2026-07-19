@@ -373,12 +373,15 @@ e2eOnly(
     // Verify epochs
     expect(trainingConfig.epochs).toBe(1);
     console.log('✓ Epochs match: 1');
-    // Verify the ACTUAL TensorFlow.js compiled model configuration
+    // Verify the ACTUAL TensorFlow.js compiled model configuration.
     console.log('Compiled model config:', compiledModel);
-    // TensorFlow.js wraps optimizer params in a nested object
-    expect(compiledModel.optimizerConfig.learningRate.learningRate).toBe(0.002);
+    // These used to assert learningRate.learningRate — the fingerprint of the
+    // params OBJECT being passed where tf.train.adam expects a NUMBER (an
+    // effectively-NaN learning rate). The engine now builds positionally, so
+    // the config carries the real scalars.
+    expect(compiledModel.optimizerConfig.learningRate).toBe(0.002);
     console.log('✓ TF.js optimizer learning rate matches: 0.002');
-    expect(compiledModel.optimizerConfig.learningRate.beta1).toBe(0.95);
+    expect(compiledModel.optimizerConfig.beta1).toBe(0.95);
     console.log('✓ TF.js optimizer beta1 matches: 0.95');
     expect(compiledModel.loss).toBe('meanSquaredError');
     console.log('✓ TF.js loss function matches: meanSquaredError');
