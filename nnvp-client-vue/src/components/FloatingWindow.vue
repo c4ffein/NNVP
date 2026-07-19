@@ -34,12 +34,28 @@
     <div class="floating-window-edge fw-edge-s" aria-hidden="true" @pointerdown.stop="startResize($event, 's')"></div>
     <div class="floating-window-edge fw-corner-sw" aria-hidden="true" @pointerdown.stop="startResize($event, 'sw')"></div>
     <div class="floating-window-resize" aria-hidden="true" @pointerdown.stop="startResize($event, 'se')"></div>
+    <!-- Ghost preview of the dock target while the pointer rides a border
+         (below every window in the z-stack, above the board). -->
+    <Teleport to="body">
+      <div
+        v-if="dockPreview"
+        class="floating-window-dock-preview"
+        :style="{
+          left: dockPreview.rect.x + 'px',
+          top: dockPreview.rect.y + 'px',
+          width: dockPreview.rect.width + 'px',
+          height: dockPreview.rect.height + 'px',
+        }"
+      ></div>
+    </Teleport>
   </div>
 </template>
 
 <script>
 import {
   bringToFront, clampToViewport, rememberRect, recallRect,
+  registerWindow, unregisterWindow, otherWindowRects, dockedSiblings,
+  snapRect, dockZoneAt,
 } from '../lib/windowing';
 
 // A movable, resizable, closable window over the board: drag by the titlebar,
@@ -65,11 +81,32 @@ export default {
       rect: { ...(recallRect(this.windowId) || this.initial) },
       z: bringToFront(),
       dragFrom: null,
+      dockPreview: null,
+      // Size before the last dock, restored when dragged away (Windows-like).
+      preDock: null,
+      // Which dock zone this window currently occupies (null = free-floating).
+      dockedZone: null,
     };
+  },
+  created() {
+    // Register with the window registry: siblings snap against our rect, and
+    // dock layouts may resize us (a bottom bar shortens side-docked windows).
+    this.snapToken = registerWindow({
+      getRect: () => ({ ...this.rect }),
+      getZone: () => this.dockedZone,
+      applyRect: (partial) => {
+        if (partial.width !== undefined) this.rect.width = Math.max(this.minWidth, partial.width);
+        if (partial.height !== undefined) this.rect.height = Math.max(this.minHeight, partial.height);
+        if (partial.x !== undefined) this.rect.x = partial.x;
+        if (partial.y !== undefined) this.rect.y = partial.y;
+        rememberRect(this.windowId, this.rect);
+      },
+    });
   },
   beforeUnmount() {
     this.stopTracking();
     rememberRect(this.windowId, this.rect);
+    unregisterWindow(this.snapToken);
   },
   methods: {
     raise() {
@@ -80,6 +117,7 @@ export default {
     },
     startResize(event, direction) {
       this.raise();
+      this.dockedZone = null; // a manual resize opts out of the dock layout
       this.startTracking(event, direction);
     },
     startTracking(event, mode) {
@@ -103,12 +141,35 @@ export default {
       const dx = event.clientX - from.px;
       const dy = event.clientY - from.py;
       if (from.mode === 'move') {
-        const next = clampToViewport(
-          { ...this.rect, x: from.x + dx, y: from.y + dy },
-          { width: window.innerWidth, height: window.innerHeight },
+        const viewport = { width: window.innerWidth, height: window.innerHeight };
+        // Dragging away from a dock restores the pre-dock size under the
+        // pointer (a plain titlebar click must not — hence the 4px gate).
+        if (this.preDock && Math.abs(dx) + Math.abs(dy) > 4) {
+          this.rect.width = this.preDock.width;
+          this.rect.height = this.preDock.height;
+          this.preDock = null;
+          this.dockedZone = null;
+          from.x = event.clientX - this.rect.width / 2;
+          from.y = event.clientY - 12;
+          from.px = event.clientX;
+          from.py = event.clientY;
+        }
+        const next = snapRect(
+          clampToViewport({ ...this.rect, x: from.x + dx, y: from.y + dy }, viewport),
+          viewport,
+          otherWindowRects(this.snapToken),
         );
         this.rect.x = next.x;
         this.rect.y = next.y;
+        // Side docks stop above an existing bottom bar, so the ghost preview
+        // already shows the exact final rect.
+        const bottomBar = dockedSiblings(this.snapToken).find(sib => sib.zone === 'bottom');
+        this.dockPreview = dockZoneAt(
+          { x: event.clientX, y: event.clientY },
+          viewport,
+          { width: this.initial.width, height: this.initial.height },
+          bottomBar ? { sideBottomY: bottomBar.rect.y - 6 } : {},
+        );
         return;
       }
       if (from.mode.includes('e')) {
@@ -126,6 +187,27 @@ export default {
     },
     onPointerUp() {
       const resized = this.dragFrom && this.dragFrom.mode !== 'move';
+      if (this.dockPreview) {
+        // Drop on a border: take the dock rect (never below the minimums),
+        // remembering the free-floating size for the drag-away restore.
+        this.preDock = { width: this.rect.width, height: this.rect.height };
+        const { zone, rect: dock } = this.dockPreview;
+        this.rect.x = dock.x;
+        this.rect.y = dock.y;
+        this.rect.width = Math.max(this.minWidth, dock.width);
+        this.rect.height = Math.max(this.minHeight, dock.height);
+        this.dockedZone = zone;
+        this.dockPreview = null;
+        // A new bottom bar claims the bottom strip: side-docked siblings
+        // shorten so they end just above it.
+        if (zone === 'bottom') {
+          for (const sibling of dockedSiblings(this.snapToken)) {
+            if (sibling.zone === 'left' || sibling.zone === 'right') {
+              sibling.applyRect({ height: this.rect.y - sibling.rect.y - 6 });
+            }
+          }
+        }
+      }
       this.stopTracking();
       rememberRect(this.windowId, this.rect);
       // Content that measures itself against the window (e.g. the training
@@ -241,6 +323,15 @@ export default {
   width: 16px;
   height: 16px;
   cursor: nesw-resize;
+}
+
+.floating-window-dock-preview {
+  position: fixed;
+  z-index: 15; /* above the board (10), below every window (20+) */
+  pointer-events: none;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border: 2px solid var(--accent);
+  border-radius: var(--border-radius);
 }
 
 /* Invisible like the edge strips — the cursor is the affordance. */
