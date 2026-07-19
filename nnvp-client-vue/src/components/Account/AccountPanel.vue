@@ -151,6 +151,30 @@
               </ul>
             </section>
           </template>
+
+          <!-- Device-local settings: available signed-in or not. -->
+          <section class="section" ref="settingsSection">
+            <h2>Settings</h2>
+            <p class="hint">Stored on this device.</p>
+            <h3 class="settings-subtitle">Activation colors</h3>
+            <p class="hint">The color ramp used wherever activations are shown —
+            the inspect overlays on the board and the 3D view. Viridis is the
+            colorblind-safe choice.</p>
+            <label v-for="scheme in schemes" :key="scheme.id" class="settings-scheme">
+              <input
+                type="radio"
+                name="colorScheme"
+                :value="scheme.id"
+                :checked="scheme.id === colorScheme"
+                @change="setColorScheme(scheme.id)"
+              />
+              <span class="settings-scheme-body">
+                <span class="settings-scheme-label">{{ scheme.label }}</span>
+                <span class="settings-scheme-swatch" :style="{ background: gradientOf(scheme) }"></span>
+                <span class="settings-scheme-description">{{ scheme.description }}</span>
+              </span>
+            </label>
+          </section>
         </div>
       </div>
     </div>
@@ -159,6 +183,8 @@
 
 <script>
 import ApiClient, { ERROR_CODES } from '../../lib/Backend/apiClient';
+import { COLOR_SCHEMES, rampGradientCss } from '../../lib/Settings/colorSchemes';
+import { settings } from '../../lib/Settings/settings';
 import { clearCurrentProject } from '../../lib/Backend/currentProject';
 
 export default {
@@ -179,6 +205,8 @@ export default {
       user: null,
       projects: [],
       usageDays: [],
+      schemes: Object.values(COLOR_SCHEMES),
+      colorScheme: settings.get('colorScheme'),
       email: '',
       // { email, code } while this browser has a pending login being polled.
       waiting: null,
@@ -240,15 +268,21 @@ export default {
         await this.checkStatus();
         if (this.intent === 'save' && this.user) await this.saveToCloud();
         if (this.user) await this.refreshUsage();
-        if (this.intent === 'usage') {
+        if (this.intent === 'usage' || this.intent === 'settings') {
           this.$nextTick(() => {
-            const section = this.$refs.usageSection;
+            const section = this.intent === 'usage' ? this.$refs.usageSection : this.$refs.settingsSection;
             if (section) section.scrollIntoView({ block: 'start', behavior: 'smooth' });
           });
         }
       } else {
         this.user = null;
         this.projects = [];
+        if (this.intent === 'settings') {
+          this.$nextTick(() => {
+            const section = this.$refs.settingsSection;
+            if (section) section.scrollIntoView({ block: 'start', behavior: 'smooth' });
+          });
+        }
       }
     },
     // The emailed link lands on the SPA as /?magic=<token> (App.vue opens this
@@ -381,6 +415,13 @@ export default {
       const minutes = Math.round((Date.now() - then) / 60000);
       if (minutes <= 0) return 'just now';
       return minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`;
+    },
+    setColorScheme(id) {
+      settings.set('colorScheme', id);
+      this.colorScheme = id;
+    },
+    gradientOf(scheme) {
+      return rampGradientCss(scheme);
     },
     async refreshUsage() {
       try {
@@ -564,6 +605,38 @@ export default {
   color: var(--text-muted);
   margin: 0 0 18px 0;
   font-size: 0.9em;
+}
+
+.settings-subtitle {
+  margin: 10px 0 4px;
+  font-size: 14px;
+  font-weight: var(--font-weight-semibold);
+}
+.settings-scheme {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 0;
+  cursor: pointer;
+}
+.settings-scheme input { margin-top: 3px; }
+.settings-scheme-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+}
+.settings-scheme-label { font-weight: var(--font-weight-semibold); }
+.settings-scheme-swatch {
+  display: block;
+  width: 180px;
+  height: 10px;
+  border-radius: 5px;
+  border: 1px solid var(--panel-border);
+}
+.settings-scheme-description {
+  color: var(--text-muted);
+  font-size: 12px;
 }
 
 .usage-chart {
