@@ -179,6 +179,12 @@ export default class AssistantActions {
     return { disconnected: true, source: sourceId, target: targetId };
   }
 
+  // Tidy the whole board (layered auto-layout; single undoable step).
+  autoLayout() {
+    this.boardInterface.autoLayout();
+    return { arranged: true };
+  }
+
   deleteSelected() {
     this.boardInterface.deleteSelectedElements();
     return { ok: true };
