@@ -1,8 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// Under bun (the node-less dev box; run with PW_DISABLE_TS_ESM=1) everything
-// is pinned to IPv4: vite binds ::1 by default here while bun's readiness
-// probe resolves localhost to 127.0.0.1, so the two never meet otherwise.
+// Under bun (the node-less dev box) everything is pinned to IPv4: vite binds
+// ::1 by default here while bun's readiness probe resolves localhost to
+// 127.0.0.1, so the two never meet otherwise.
 // Under node (local `make test-e2e`) the historical localhost setup stays.
 const bunRuntime = !!process.versions.bun;
 const baseURL = bunRuntime ? 'http://127.0.0.1:5173' : 'http://localhost:5173';
@@ -43,6 +43,28 @@ export default defineConfig({
     {
       name: 'flow',
       use: { ...chromium },
+      testIgnore: '**/tinygradRuntime.spec.js',
+    },
+    // Opt-in (make test-webgpu): the REAL tinygrad trace pipeline on a real
+    // (SwiftShader) WebGPU device. Needs the FULL Chromium build — the
+    // headless shell exposes no navigator.gpu — plus network for Pyodide.
+    // The spec itself also self-skips unless NNVP_WEBGPU_E2E=1.
+    {
+      name: 'webgpu',
+      testMatch: '**/tinygradRuntime.spec.js',
+      use: {
+        ...devices['Desktop Chrome'],
+        channel: 'chromium',
+        headless: true,
+        launchOptions: {
+          args: [
+            '--enable-unsafe-webgpu',
+            '--enable-features=Vulkan',
+            '--use-vulkan=swiftshader',
+            '--disable-vulkan-surface',
+          ],
+        },
+      },
     },
   ],
   webServer: {
