@@ -1,4 +1,4 @@
-.PHONY: help test test-e2e test-e2e-debug test-e2e-fast test-unit run-docker install dev dev-host dev-host-with-backend front-lint front-lint-fix front-typecheck generate-layers generate-layer-docs backend backend-install backend-test test-contract
+.PHONY: help test test-e2e test-e2e-debug test-e2e-fast test-unit test-webgpu run-docker install dev dev-host dev-host-with-backend front-lint front-lint-fix front-typecheck generate-layers generate-layer-docs backend backend-install backend-test test-contract
 
 # The Django backend lives in a sibling checkout; the SPA reaches it at the
 # same-origin /api path (vite dev-proxies /api to this server's port).
@@ -11,9 +11,9 @@ BACKEND_DIR ?= ../nnvp-backend
 JS_RUN := $(shell command -v npm >/dev/null 2>&1 && echo "npm run" || echo "bun run")
 # Playwright must run under the BUN runtime even where node exists (CI
 # runners): node's strict ESM resolution rejects the suite's vite-style
-# extensionless imports; `bunx --bun` forces bun, PW_DISABLE_TS_ESM avoids
-# playwright's ESM loader hanging under bun.
-PLAYWRIGHT := PW_DISABLE_TS_ESM=1 bunx --bun playwright test
+# extensionless imports; `bunx --bun` forces bun. (@playwright/test >= 1.58
+# no longer needs the old PW_DISABLE_TS_ESM workaround under bun.)
+PLAYWRIGHT := bunx --bun playwright test
 # Optional: make dev-host PORT=8080
 PORT_FLAG = $(if $(PORT),--port $(PORT))
 
@@ -32,6 +32,7 @@ help:
 	@echo "  make test-e2e-debug  - Run end-to-end tests with Playwright, 1 worker"
 	@echo "  make test-e2e-fast   - Run end-to-end tests with Playwright, 4 workers"
 	@echo "  make test-unit       - Run the dual-mode suite headlessly (bun runner)"
+	@echo "  make test-webgpu     - Opt-in: real tinygrad trace pipeline on SwiftShader WebGPU (network + full Chromium)"
 	@echo "  make front-lint      - Run oxlint on front-end code"
 	@echo "  make front-lint-fix  - Run oxlint and auto-fix issues"
 	@echo "  make front-typecheck - Run tsc on front-end code"
@@ -88,6 +89,12 @@ test-e2e-fast:
 # in the browser via `make test-e2e`)
 test-unit:
 	cd nnvp-client-vue && bun run test:fast
+
+# Opt-in: the REAL tinygrad trace pipeline (Pyodide from CDN, real emitted
+# runner, SwiftShader WebGPU) — needs network + the full Chromium build
+# (`bunx playwright install chromium`). ~2-4 min, dominated by the traces.
+test-webgpu:
+	cd nnvp-client-vue && NNVP_WEBGPU_E2E=1 $(PLAYWRIGHT) --project=webgpu
 
 # Run with Docker
 run-docker:
