@@ -115,8 +115,32 @@ export default class KerasGeneratorTinygradHelper {
         const kernel = p.kernel_size !== undefined ? this.renderValue(p.kernel_size) : '3';
         const inferred = this.inferredInputFeatures(node);
         const inChannels = inferred !== null ? this.renderValue(inferred) : filters;
-        const todo = inferred !== null ? '' : '  # TODO: set in_channels (could not infer from graph)';
-        return `nn.Conv2d(${inChannels}, ${filters}, ${kernel})${todo}`;
+        let todo = inferred !== null ? '' : '  # TODO: set in_channels (could not infer from graph)';
+        let extra = '';
+        const explicitStride = p.strides !== undefined && p.strides !== null;
+        if (explicitStride) extra += `, stride=${this.renderValue(p.strides)}`;
+        if (p.padding === 'same') {
+          // Keras 'same' at stride 1 pads a total of k-1 per axis, end-heavy
+          // for even kernels — expressible exactly as tinygrad's 4-tuple
+          // (left, right, top, bottom). At stride > 1 the padding depends on
+          // the input size, so it cannot be emitted statically: loud TODO.
+          const kv = p.kernel_size;
+          const pair = typeof kv === 'number' ? [kv, kv]
+            : (Array.isArray(kv) && kv.length === 2 && kv.every(k => typeof k === 'number') ? kv : null);
+          if (!explicitStride && pair) {
+            const [kh, kw] = pair;
+            if (kh % 2 === 1 && kw % 2 === 1) {
+              extra += `, padding=${this.generateTuple([(kh - 1) / 2, (kw - 1) / 2])}`;
+            } else {
+              const bh = Math.floor((kh - 1) / 2);
+              const bw = Math.floor((kw - 1) / 2);
+              extra += `, padding=${this.generateTuple([bw, kw - 1 - bw, bh, kh - 1 - bh])}`;
+            }
+          } else {
+            todo += '  # TODO: padding="same" with stride>1 depends on the input size — set padding manually';
+          }
+        }
+        return `nn.Conv2d(${inChannels}, ${filters}, ${kernel}${extra})${todo}`;
       }
       case 'BatchNormalization': {
         // BatchNorm2d needs num_features = the input channel count, inferred from the
@@ -138,6 +162,22 @@ export default class KerasGeneratorTinygradHelper {
     switch (name) {
       case 'Flatten':
         return '.flatten(1)';
+      case 'MaxPooling2D':
+      case 'AveragePooling2D': {
+        // tinygrad's stride defaults to kernel_size, exactly like Keras' strides
+        // default to pool_size — so it is only emitted when explicitly set.
+        const method = name === 'MaxPooling2D' ? 'max_pool2d' : 'avg_pool2d';
+        const pool = p.pool_size !== undefined ? this.renderValue(p.pool_size) : '(2,2,)';
+        const stride = p.strides !== undefined && p.strides !== null
+          ? `, stride=${this.renderValue(p.strides)}` : '';
+        return `.${method}(kernel_size=${pool}${stride})`;
+      }
+      case 'Dropout': {
+        // Active only under Tensor.training, like Keras' training=True — a
+        // no-op at inference either way.
+        const rate = p.rate !== undefined ? this.renderValue(p.rate) : '0.5';
+        return `.dropout(${rate})`;
+      }
       case 'Activation':
         return this.activationMethod(p.activation);
       case 'ReLU':
@@ -152,6 +192,18 @@ export default class KerasGeneratorTinygradHelper {
       default:
         return null;
     }
+  }
+
+  // Keras folds activations into Dense/Conv2D as a parameter; tinygrad chains
+  // them as Tensor methods after the module call. Unknown activations get a
+  // loud trailing TODO instead of silently vanishing.
+  moduleActivationSuffix(node) {
+    const { name, parameterValues: params } = this.graph[node].keras_data;
+    if (name !== 'Dense' && name !== 'Conv2D') return '';
+    const activation = (params || {}).activation;
+    if (!activation || activation === 'linear') return '';
+    const method = this.activationMethod(activation);
+    return method !== null ? method : `  # TODO: unsupported activation ${quoteString(activation)}`;
   }
 
   // True when the node emits a real nn module in __init__ / a self.layer_N call.
@@ -200,7 +252,7 @@ export default class KerasGeneratorTinygradHelper {
       const { name } = this.graph[node].keras_data;
       if (name === 'Input' || name === 'Output') return;
       if (this.isModuleNode(node)) {
-        rs += `    x = self.${this.nodeName(node)}(x)\n`;
+        rs += `    x = self.${this.nodeName(node)}(x)${this.moduleActivationSuffix(node)}\n`;
       } else if (this.isMethodNode(node)) {
         rs += `    x = x${this.methodCall(node)}\n`;
       } else if (this.isUnsupportedNode(node)) {
@@ -216,7 +268,7 @@ export default class KerasGeneratorTinygradHelper {
     const { name } = this.graph[node].keras_data;
     const sources = this.graph[node].sources.map(s => this.nodeName(s));
     if (this.isModuleNode(node)) {
-      return `self.${this.nodeName(node)}(${sources.join(', ')})`;
+      return `self.${this.nodeName(node)}(${sources.join(', ')})${this.moduleActivationSuffix(node)}`;
     }
     if (this.isMethodNode(node)) {
       return `${sources[0]}${this.methodCall(node)}`;
