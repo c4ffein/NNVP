@@ -7,9 +7,10 @@
 //     is also the channel count consumed by Conv / BatchNorm on the next node;
 //   - `shape`: the FULL output shape (without batch), kept only while every axis is
 //     still known - it is what makes Flatten's in-features computable.
-// Conv and pooling layers keep their channel count but drop the full shape: spatial
-// arithmetic (stride / padding / dilation) is deliberately NOT attempted, so a
-// Flatten downstream of a Conv is treated as unknown rather than guessed.
+// Conv2D and 2-D pooling compute their spatial output shape (valid/same padding,
+// strides) so a downstream Flatten's in-features is derivable — that is what lets
+// the generators emit a correct Linear after a conv stack. The 1-D/3-D variants
+// still only track the channel count.
 //
 // Anything not derivable is null; the generators fall back to their documented
 // defaults with a loud TODO comment so the user cannot miss the guess.
@@ -24,6 +25,21 @@ import type { GeneratorGraph } from './KerasGenerator';
 export interface InferredDims {
   shape: number[] | null;
   features: number | null;
+}
+
+// Keras int-or-pair parameters ((3,3) may be stored as 3): normalized to a pair.
+function asPair(value: ParameterValue | undefined, fallback: [number, number] | null): [number, number] | null {
+  if (typeof value === 'number') return [value, value];
+  if (Array.isArray(value) && value.length === 2
+      && value.every(d => typeof d === 'number')) {
+    return [value[0] as number, value[1] as number];
+  }
+  return fallback;
+}
+
+// One spatial axis through a conv/pool window, Keras semantics.
+function convOut(size: number, kernel: number, stride: number, same: boolean): number {
+  return same ? Math.ceil(size / stride) : Math.floor((size - kernel) / stride) + 1;
 }
 
 export default function inferFeatureDims(
@@ -70,17 +86,48 @@ export default function inferFeatureDims(
           if (source.shape) shape = [...source.shape, p.output_dim as number];
         }
         break;
-      case 'Conv1D':
       case 'Conv2D':
+        // Channels become `filters`; the spatial axes follow Keras' formula
+        // (channels-last), so the full shape survives when the input's did.
+        if (p.filters !== undefined) {
+          features = p.filters as number;
+          if (source.shape && source.shape.length === 3) {
+            const kernel = asPair(p.kernel_size, null);
+            const stride = asPair(p.strides ?? undefined, [1, 1]);
+            const same = p.padding === 'same';
+            if (kernel && stride) {
+              const h = convOut(source.shape[0]!, kernel[0], stride[0], same);
+              const w = convOut(source.shape[1]!, kernel[1], stride[1], same);
+              if (h > 0 && w > 0) shape = [h, w, features];
+            }
+          }
+        }
+        break;
+      case 'Conv1D':
       case 'Conv3D':
         // Channels become `filters`; spatial axes change in ways we do not compute.
         if (p.filters !== undefined) features = p.filters as number;
         break;
-      case 'MaxPooling1D':
       case 'MaxPooling2D':
+      case 'AveragePooling2D': {
+        // Channel count unchanged; spatial axes shrink by the window (Keras:
+        // strides default to pool_size, padding defaults to valid).
+        features = source.features;
+        if (source.shape && source.shape.length === 3) {
+          const pool = asPair(p.pool_size, [2, 2]);
+          const stride = asPair(p.strides ?? undefined, pool);
+          const same = p.padding === 'same';
+          if (pool && stride) {
+            const h = convOut(source.shape[0]!, pool[0], stride[0], same);
+            const w = convOut(source.shape[1]!, pool[1], stride[1], same);
+            if (h > 0 && w > 0) shape = [h, w, source.shape[2]!];
+          }
+        }
+        break;
+      }
+      case 'MaxPooling1D':
       case 'MaxPooling3D':
       case 'AveragePooling1D':
-      case 'AveragePooling2D':
       case 'AveragePooling3D':
         // Pooling keeps the channel count but shrinks spatial axes we do not compute.
         features = source.features;
