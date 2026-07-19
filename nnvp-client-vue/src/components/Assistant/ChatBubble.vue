@@ -120,6 +120,16 @@
           </div>
         </div>
 
+        <div v-if="choices.length && !sending" class="chat-choices">
+          <button
+            v-for="choice in choices"
+            :key="choice"
+            type="button"
+            class="chat-choice"
+            @click="pickChoice(choice)"
+          >{{ choice }}</button>
+        </div>
+
         <form class="chat-input-row" @submit.prevent="send">
           <input
             ref="draftInput"
@@ -146,6 +156,7 @@ import AssistantActions from '../../lib/Assistant/assistantActions';
 import FloatingWindow from '../FloatingWindow.vue';
 import renderMarkdown from '../../lib/Assistant/markdown';
 import { ASK_EVENT, consumePendingAsk } from '../../lib/Assistant/askAssistant';
+import { chatSession } from '../../lib/Assistant/chatSession';
 import AnthropicClient, {
   STORAGE_ALLOW_EDITS,
   readStoredConfig,
@@ -168,9 +179,13 @@ export default {
       showModeHelp: false,
       draft: '',
       sending: false,
-      messages: [],
-      history: [],
+      // The shared reactive session: the conversation survives closing the
+      // window (this component unmounts) and rebinds on the next mount.
+      messages: chatSession.messages,
+      history: chatSession.history,
       hasKey: false,
+      // Tappable answers the assistant proposed (propose_choices tool).
+      choices: [],
       // True when requests will go through the NNVP backend proxy (signed in,
       // no user key / custom base URL) — drives the settings hint.
       proxyActive: false,
@@ -273,6 +288,11 @@ export default {
       }
       return 'Currently experiencing technical difficulties — please try again soon.';
     },
+    pickChoice(choice) {
+      this.choices = [];
+      this.draft = choice;
+      this.send();
+    },
     pushMessage(role, text, isError = false) {
       this.messages.push({ role, text, isError });
       this.scrollToBottom();
@@ -281,14 +301,19 @@ export default {
       const text = this.draft.trim();
       if (text === '' || this.sending || !this.hasKey) return;
       this.draft = '';
+      this.choices = []; // typing free text dismisses the proposed answers
       this.pushMessage('user', text);
       this.history.push({ role: 'user', content: text });
       this.sending = true;
       try {
         const onActivity = (event) => {
-          if (event.type === 'tool_use') {
-            this.pushMessage('tool', `⚙ ${event.name}`);
+          if (event.type !== 'tool_use') return;
+          if (event.name === 'propose_choices') {
+            const proposed = (event.input && event.input.choices) || [];
+            this.choices = proposed.filter(c => typeof c === 'string').slice(0, 4);
+            return; // a UI affordance, not a board action — no ⚙ line
           }
+          this.pushMessage('tool', `⚙ ${event.name}`);
         };
         const reply = await this.client.send(this.history, onActivity);
         if (reply) this.pushMessage('assistant', reply);
@@ -517,6 +542,27 @@ export default {
 }
 .chat-bubble-md pre code { background: none; padding: 0; }
 .chat-bubble-md a { color: var(--accent); }
+
+/* Tappable answers proposed by the assistant (propose_choices). */
+.chat-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 12px 8px;
+}
+.chat-choice {
+  font-size: 12px;
+  padding: 4px 10px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+}
+.chat-choice:hover {
+  background-color: var(--accent);
+  color: var(--accent-text);
+}
 
 .chat-input-row {
   display: flex;
