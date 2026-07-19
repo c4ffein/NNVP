@@ -23,6 +23,14 @@
         Charts
       </div>
       <div
+        v-if="benchMode"
+        class="TrainingZone bar-button"
+        :class="{ active: selectedPanel === 'BenchPanel' }"
+        v-on:click="selectedPanel = 'BenchPanel'"
+      >
+        Bench
+      </div>
+      <div
         class="TrainingZone bar-button"
         :class="{ active: selectedPanel === 'InspectPanel' }"
         v-on:click="inspectClicked"
@@ -70,15 +78,20 @@ import { loadTf } from '../../lib/tf/loadTf';
 import Dataset from '../../lib/JSDatasets/google-data-loader';
 import loadableDatasets from '../../lib/JSDatasets/datasets-sources';
 import watchTraining from '../../lib/ModelTrainer/watchTraining';
+import { TrainingPrepareError } from '../../lib/Training/engine';
+import { createTfjsEngine } from '../../lib/Training/tfjsEngine';
 
 import Charts from './Charts.vue';
 import CompileOptions from './CompileOptions.vue';
 import DatasetSelector from './DatasetSelector.vue';
 import InspectPanel from './InspectPanel.vue';
+import BenchPanel from './BenchPanel.vue';
+import { benchModeEnabled } from '../../lib/Training/benchMode';
 
 export default {
   name: 'TrainingZone',
   components: {
+    BenchPanel,
     Charts,
     CompileOptions,
     DatasetSelector,
@@ -108,6 +121,9 @@ export default {
         'meanAbsoluteError',
       ],
       selectedPanel: "DatasetSelector",
+      // The A/B engine benchmark tab: hidden unless ?bench=1 opted this
+      // browser in (see lib/Training/benchMode.js).
+      benchMode: benchModeEnabled(),
       // Chart data, owned here and passed down to Charts as props; watchTraining
       // reassigns labels/series during a fit and reactivity re-renders the charts.
       chartData0: {
@@ -173,129 +189,57 @@ export default {
     },
     changeEpochs(value) { this.epochs = value; },
     async startTraining() {
-      // tfjs is loaded lazily so it stays out of the initial bundle; make sure
-      // it is ready (and CPU backend applied if requested) before training.
-      const tf = await loadTf();
-      window.tf = tf;
-      const optimizer = this.selectedOptimizer;
-      const epochs = this.epochs;
-      let createModel;
-      let generatedCode;
+      // The engine (lib/Training) owns model building, compile and fit; this
+      // component supplies the options from its UI state and keeps the
+      // chart + cancellation wiring (watchTraining) and the error surfaces.
+      // Always tfjs for now: the tinygrad engine (lib/Training/tinygradEngine)
+      // is not user-exposed — it lives behind the ?bench=1 Bench tab and the
+      // make test-webgpu harness until it graduates.
+      const engine = createTfjsEngine({ loadTf });
+      let session;
       try {
-        // NOTE: Using eval here to execute the generated JavaScript code from the visual graph editor.
-        // The graph is converted to TensorFlow.js code (as a string), then eval'd to get a runnable
-        // function. The generator escapes every graph-provided string/identifier (see
-        // lib/KerasInterface/codegenSafety.js), so a crafted .nnvp file cannot inject code here;
-        // this could still be replaced with direct model building from the graph JSON to avoid
-        // eval entirely.
-        generatedCode = this.$boardInterface.generateJavascriptNoSave(this.$kerasInterface);
-        if (window.nnvp?.debug?.enableTraining) {
-          console.log('[TrainingZone] Generated JavaScript code:\n', generatedCode);
+        session = await engine.prepare(this.$boardInterface.getGraphJSON(), {
+          generateCode: () => this.$boardInterface.generateJavascriptNoSave(this.$kerasInterface),
+          optimizer: this.selectedOptimizer,
+          optimizerParams: this.optimizerParams,
+          loss: this.selectedLoss,
+          epochs: this.epochs,
+        });
+      }
+      catch (error) {
+        // Errors the engine did not tag (tfjs load, compile) used to escape
+        // startTraining untouched — keep letting them propagate.
+        if (!(error instanceof TrainingPrepareError)) throw error;
+        if (error.stage === 'create') {
+          // Param errors
+          alert(error.cause);
+          console.error('[TrainingZone] Error creating model:', error.cause);
         }
-        createModel = eval(
-          `(function() { const tf = window.tf; ${generatedCode} return createModel; })()`
-        );
-      }
-      catch (error) {
-        alert("Couldn't build the model from the graph — check that Inputs and Outputs exist "
-          + `and are connected. (${error.message || error})`);
-        console.error('[TrainingZone] Error generating model:', error);
-        console.error('[TrainingZone] Generated code that failed:\n', generatedCode);
+        else {
+          alert("Couldn't build the model from the graph — check that Inputs and Outputs exist "
+            + `and are connected. (${error.cause?.message || error.cause})`);
+          console.error('[TrainingZone] Error generating model:', error.cause);
+          console.error('[TrainingZone] Generated code that failed:\n', error.generatedCode);
+        }
         return;
       }
-      let model;
-      try {
-        model = createModel();
-      }
-      catch (error) {
-        // Param errors
-        alert(error);
-        console.error('[TrainingZone] Error creating model:', error);
-        return;
-      }
-      // Build optimizer config with parameters
-      let optimizerConfig = optimizer;
-      const filteredParams = Object.fromEntries(
-        Object.entries(this.optimizerParams).filter(([k, v]) => v !== undefined && v !== null && v !== '')
-      );
-      if (Object.keys(filteredParams).length > 0) {
-        optimizerConfig = window.tf.train[optimizer](filteredParams);
-      }
-      if (window.nnvp?.debug?.enableTraining) {
-        console.log('[TrainingZone] Compiling model with optimizer:', optimizer, 'params:', this.optimizerParams);
-      }
-
-      // Expose compilation config for testing/debugging
-      window.nnvp = window.nnvp || {};
-      window.nnvp.debug = window.nnvp.debug || {};
-      window.nnvp.debug.trainingConfig = {
-        optimizer,
-        optimizerParams: filteredParams,
-        loss: this.selectedLoss,
-        epochs: this.epochs,
-      };
-
-      model.compile({
-        optimizer: optimizerConfig,
-        loss: this.selectedLoss,
-        metrics: ['accuracy'],
-      });
-
-      // Expose compiled model configuration for testing
-      window.nnvp.debug.compiledModel = {
-        optimizerConfig: model.optimizer.getConfig(),
-        loss: model.loss,
-      };
-
       // Inspect mode: keep the (about to be trained) model and the graph JSON
       // it was generated from — lib/Inspector maps its layers back onto the
-      // board through that JSON. Any previous inspection is now stale.
+      // board through that JSON. Any previous inspection is now stale. The
+      // seam allows engines without a tf model (session.model null): Inspect
+      // then shows its "train a model first" hint instead of probing one.
       this.$boardInterface.setInspection(null);
-      this.trainedModel = model;
-      this.trainedGraphJson = this.$boardInterface.getGraphJSON();
-      this.hasTrainedModel = true;
+      this.trainedModel = session.model;
+      this.trainedGraphJson = session.graphJson;
+      this.hasTrainedModel = session.model !== null && session.model !== undefined;
 
       const datasetName = this.selectedDataset;
       await this.loadDataset(datasetName);
       const data = this.datasets[datasetName];
-      const shape = this.datasets[datasetName].shape;
-      async function train(model, data, fitCallbacks) {
-        const BATCH_SIZE = 64;
-        const trainDataSize = 500;
-        const testDataSize = 100;
-        const [trainXs, trainYs] = tf.tidy(() => {
-          const d = data.nextTrainBatch(trainDataSize);
-          return [d.xs.reshape([trainDataSize, ...shape]), d.labels];
-        });
-        const [testXs, testYs] = tf.tidy(() => {
-          const d = data.nextTestBatch(testDataSize);
-          return [d.xs.reshape([testDataSize, ...shape]), d.labels];
-        });
-
-        // Debug: Log actual TensorFlow.js training configuration
-        const debugEnabled = window.nnvp?.debug?.enableTraining;
-        if (debugEnabled) {
-          const optimizerConfig = model.optimizer.getConfig();
-          console.log('[TrainingZone] Starting training with TensorFlow.js configuration:');
-          console.log('[TrainingZone]   Optimizer:', model.optimizer.getClassName());
-          console.log('[TrainingZone]   Learning Rate:', optimizerConfig.learningRate?.learningRate || optimizerConfig.learningRate);
-          console.log('[TrainingZone]   Loss:', model.loss);
-          console.log('[TrainingZone]   Epochs:', epochs);
-          console.log('[TrainingZone]   Batch Size:', BATCH_SIZE);
-        }
-
-        return model.fit(trainXs, trainYs, {
-          batchSize: BATCH_SIZE,
-          validationData: [testXs, testYs],
-          epochs: epochs,
-          shuffle: true,
-          callbacks: fitCallbacks,
-        });
-      }
       try {
         await watchTraining(
           this.chartData0, this.chartData1,
-          (callbacks) => train(model, data, callbacks), () => this.cancelRequested,
+          (callbacks) => session.fit(data, callbacks), () => this.cancelRequested,
           'cancelRequested',
         );
       }
