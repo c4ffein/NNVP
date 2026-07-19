@@ -22,6 +22,7 @@ export const ANTHROPIC_VERSION = '2023-06-01';
 // code generation) always run. Kept as a single source of truth so the UI, the
 // tool descriptions and the runtime guard can never drift apart.
 export const MUTATING_TOOLS = new Set([
+  'auto_layout',
   'connect_layers',
   'disconnect_layers',
   'add_layer',
@@ -61,6 +62,10 @@ export const SYSTEM_PROMPT = [
   'or train the model, open the panel with open_training_panel and walk them',
   'through it (pick a dataset, then Train) — never claim training needs an',
   'external Python setup, though generate_code exists for exporting.',
+  'When your question has a few natural answers, call propose_choices so the',
+  'user can tap one. After building or rewiring a multi-layer network, offer',
+  'auto_layout (ask first, e.g. via propose_choices) — it tidies the board in',
+  'one undoable step.',
 ].join(' ');
 
 // Tool surface: one entry per AssistantActions method the model may call.
@@ -143,6 +148,26 @@ export function buildTools() {
       },
     },
     {
+      name: 'auto_layout',
+      description: '[Modifies the model] Rearrange ALL layers into a tidy layered layout (undoable in one step). Ask the user before running it unless they asked for tidying.',
+      input_schema: { type: 'object', properties: {} },
+    },
+    {
+      name: 'propose_choices',
+      description: 'Offer the user a small set of tappable answers to your question (rendered as buttons under the chat). Use whenever your question has a few natural answers — e.g. after building a network: ["Yes, tidy the layout", "No thanks"].',
+      input_schema: {
+        type: 'object',
+        properties: {
+          choices: {
+            type: 'array',
+            items: { type: 'string' },
+            description: '2 to 4 short answers, each under ~40 characters.',
+          },
+        },
+        required: ['choices'],
+      },
+    },
+    {
       name: 'delete_selected',
       description: '[Modifies the model] Delete the currently selected layers/edges from the graph.',
       input_schema: { type: 'object', properties: {} },
@@ -217,6 +242,10 @@ const TOOL_DISPATCH = {
   generate_code: (actions, input) => actions.generateCode(input.lang),
   connect_layers: (actions, input) => actions.connectLayers(input.source_id, input.target_id),
   disconnect_layers: (actions, input) => actions.disconnectLayers(input.source_id, input.target_id),
+  auto_layout: (actions) => actions.autoLayout(),
+  // UI-level: the chat surfaces the buttons via onActivity; the model just
+  // needs an acknowledgment.
+  propose_choices: () => ({ shown: true }),
   delete_selected: (actions) => actions.deleteSelected(),
   undo: (actions) => actions.undo(),
   redo: (actions) => actions.redo(),
