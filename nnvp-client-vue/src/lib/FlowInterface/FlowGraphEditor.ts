@@ -589,6 +589,10 @@ export default class FlowGraphEditor {
     return kerasInterface.generateJavascript(this.toJSON());
   }
 
+  generateTinygradNoSave(kerasInterface: CodeGenerator): string {
+    return kerasInterface.generateTinygrad(this.toJSON());
+  }
+
   // --- Layer-like wrappers and the model shim --------------------------------
 
   findLayerById(id: NnvpLayerId): LayerWrapper | null {
