@@ -30,3 +30,11 @@ nnvp-client-vue/test-results
 nnvp-client-vue/playwright-report
 test-results
 nnvp-client-vue/core.*
+
+# Vite dev cache
+nnvp-client-vue/.vite
+
+# Local-only experiment sandboxes (the productized results live in
+# nnvp-client-vue/src/lib/TinygradRuntime — see its py/README.md)
+/experiments
+/experiments-bak-1
