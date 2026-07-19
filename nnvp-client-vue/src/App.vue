@@ -2,7 +2,7 @@
   <div id="canvas-background" class="canvas-background">
     <FlowBoard :isTraining="isTraining"/>
   </div>
-  <div id="generalMenu" class="floating-panel general-menu"><GeneralMenu @open-trainer="openTrainer" @open-about="openAboutModal" @open-tutorial="openTutorialMenu" @open-account="openAccount" @open-save-load="openSaveLoad" @open-settings="showSettingsModal = true" :views="{ left: showLeftPanel, right: showRightPanel, training: trainerHeight > 0, chat: backendEnabled && showChat, chatAvailable: backendEnabled }" @toggle-view="togglePanel"/><CornerControls @open-account="openAccount()" @open-viz3d="showViz3D = !showViz3D"/></div>
+  <div id="generalMenu" class="floating-panel general-menu"><GeneralMenu @open-trainer="openTrainer" @open-about="openAboutModal" @open-tutorial="openTutorialMenu" @open-account="openAccount" @open-save-load="openSaveLoad" @open-settings="openAccount('settings')" :views="{ left: showLeftPanel, right: showRightPanel, training: trainerHeight > 0, chat: backendEnabled && showChat, chatAvailable: backendEnabled }" @toggle-view="togglePanel"/><CornerControls @open-account="openAccount()" @open-viz3d="showViz3D = !showViz3D"/></div>
   <FloatingWindow
     id="layerCatalog"
     v-show="showLeftPanel"
@@ -35,9 +35,8 @@
   >
     <TrainingZone @close-trainer="closeTrainer" :trainingZoneSize="trainerHeight" @training-started="isTraining = true" @training-stopped="isTraining = false"/>
   </FloatingWindow>
-  <Viz3DWindow v-if="showViz3D" @close="showViz3D = false" @open-settings="showSettingsModal = true"/>
+  <Viz3DWindow v-if="showViz3D" @close="showViz3D = false" @open-settings="openAccount('settings')"/>
   <AboutModal :show="showAboutModal" @close="closeAboutModal" @open-tutorials="openTutorialsFromAbout"/>
-  <SettingsModal :show="showSettingsModal" @close="showSettingsModal = false"/>
   <TutorialMenu :show="showTutorialMenu" @close="showTutorialMenu = false" @start="startTutorial"/>
   <AccountPanel v-if="backendEnabled" :show="showAccount" :intent="accountIntent" @close="closeAccount" @pending-login="openAccount()"/>
   <SaveLoadModal v-if="backendEnabled" :show="showSaveLoad" :mode="saveLoadMode" @close="showSaveLoad = false" @open-account="openAccount()"/>
@@ -53,7 +52,6 @@ import LayerOptions from './components/LayerOptions/LayerOptions.vue';
 import FlowBoard from './components/FlowBoard/FlowBoard.vue';
 import TrainingZone from './components/TrainingZone/TrainingZone.vue';
 import AboutModal from './components/AboutModal.vue';
-import SettingsModal from './components/SettingsModal.vue';
 import AccountPanel from './components/Account/AccountPanel.vue';
 import SaveLoadModal from './components/SaveLoad/SaveLoadModal.vue';
 import CornerControls from './components/CornerControls.vue';
@@ -87,7 +85,6 @@ export default {
     FlowBoard,
     TrainingZone,
     AboutModal,
-    SettingsModal,
     AccountPanel,
     SaveLoadModal,
     CornerControls,
@@ -170,7 +167,6 @@ export default {
       trainerHeight: 0,
       trainerOpenHeight: 50,
       showAboutModal: false,
-      showSettingsModal: false,
       showAccount: false,
       accountIntent: '',
       showSaveLoad: false,
