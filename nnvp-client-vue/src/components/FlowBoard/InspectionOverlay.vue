@@ -4,12 +4,13 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import {
   ref, computed, watch, onMounted, onBeforeUnmount, nextTick, getCurrentInstance,
 } from 'vue';
 import { drawInspection } from '../../lib/Inspector/drawInspection';
 import { settings } from '../../lib/Settings/settings';
+import type { InspectionEntry } from '../../lib/Inspector/probe';
 
 // Per-node activation thumbnail for Inspect mode. Subscribes to the facade's
 // 'inspection-changed' event (published by InspectPanel through
@@ -24,13 +25,15 @@ const instance = getCurrentInstance();
 const boardInterface = instance
   ? instance.appContext.config.globalProperties.$boardInterface : null;
 
-const entry = ref(null);
-const overlayCanvas = ref(null);
+const entry = ref<InspectionEntry | null>(null);
+const overlayCanvas = ref<HTMLCanvasElement | null>(null);
 
 const tooltip = computed(() => (entry.value ? `activations ${entry.value.shape.join('×')}` : ''));
 
-function onInspectionChanged(data) {
-  entry.value = (data && data.byLayerId && data.byLayerId[props.layerId]) || null;
+function onInspectionChanged(data?: unknown) {
+  // The facade publishes untyped snapshots; narrow to the InspectPanel shape.
+  const snapshot = data as { byLayerId?: Record<string, InspectionEntry> } | null | undefined;
+  entry.value = (snapshot && snapshot.byLayerId && snapshot.byLayerId[props.layerId]) || null;
 }
 
 watch(entry, async (value) => {

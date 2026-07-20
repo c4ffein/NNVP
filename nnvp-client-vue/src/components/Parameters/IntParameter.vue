@@ -28,33 +28,40 @@
   </div>
 </template>
 
-<script>
-export default {
+<script lang="ts">
+import { defineComponent } from 'vue';
+import type { PropType } from 'vue';
+import type KerasLayer from '../../lib/KerasInterface/KerasLayer';
+
+export default defineComponent({
   name: 'IntParameter',
   props: {
-    name: String,
+    name: { type: String, required: true },
     value: Number,
-    conditions: null,
-    activeLayer: null,
+    conditions: { type: Array as PropType<string[]> },
+    activeLayer: { type: Object as PropType<KerasLayer>, required: true },
   },
   data() {
     return {
-      valueContainer: this.activeLayer.parameterValues[this.name],
-      minCond: '',
-      maxCond: '',
+      // Starts as the stored number (or undefined); v-model (no .number
+      // modifier) writes strings back into it.
+      valueContainer:
+        this.activeLayer.parameterValues[this.name] as string | number | null | undefined,
+      minCond: '' as number | '',
+      maxCond: '' as number | '',
       errorMessage: '',
     };
   },
 
   computed: {
-    hasRange() {
+    hasRange(): boolean {
       return this.minCond !== '' || this.maxCond !== '';
     },
-    isValid() {
+    isValid(): boolean {
       if (this.valueContainer === '' || this.valueContainer === null) {
         return true; // Empty is valid, let HTML5 required handle it if needed
       }
-      const numValue = parseInt(this.valueContainer, 10);
+      const numValue = parseInt(this.valueContainer as string, 10);
       if (isNaN(numValue)) {
         return false;
       }
@@ -79,7 +86,7 @@ export default {
         this.errorMessage = '';
         return;
       }
-      const numValue = parseInt(this.valueContainer, 10);
+      const numValue = parseInt(this.valueContainer as string, 10);
       if (isNaN(numValue)) {
         this.errorMessage = 'Please enter a valid integer';
         return;
@@ -101,12 +108,12 @@ export default {
       }
     },
     updateParamFromKerasLayer() {
-      this.activeLayer.setParameterValue(this.name, parseInt(this.valueContainer, 10));
+      this.activeLayer.setParameterValue(this.name, parseInt(this.valueContainer as string, 10));
     },
     isConditionsNotRanged() {
       const conditionsEmpty = (this.conditions == null);
       if (!conditionsEmpty) {
-        return this.conditions.length !== 2;
+        return this.conditions!.length !== 2;
       }
       return conditionsEmpty;
     },
@@ -115,8 +122,8 @@ export default {
     },
     parseMinCond() {
       if (!this.isConditionsNull()) { // To fix some warning
-        if (this.conditions.length > 0) {
-          const strMinCond = this.conditions[0];
+        if (this.conditions!.length > 0) {
+          const strMinCond = this.conditions![0]!;
           if (strMinCond.slice(0, 2) === '>=') {
             this.minCond = parseInt(strMinCond.slice(2), 10);
           } else { // cas du supérieur stricte
@@ -127,8 +134,8 @@ export default {
     },
     parseMaxCond() {
       if (!this.isConditionsNull()) {
-        if (this.conditions.length === 2) {
-          const strMaxCond = this.conditions[1];
+        if (this.conditions!.length === 2) {
+          const strMaxCond = this.conditions![1]!;
           if (strMaxCond.slice(0, 2) === '<=') {
             this.maxCond = parseInt(strMaxCond.slice(2), 10);
           } else { // cas du inférieur strict
@@ -138,7 +145,7 @@ export default {
       }
     },
   },
-};
+});
 </script>
 
 <style>

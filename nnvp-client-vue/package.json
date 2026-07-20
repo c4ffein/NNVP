@@ -16,8 +16,9 @@
     "test:e2e:ui": "playwright test --ui",
     "test:contract": "bun test tests/contract --timeout 15000",
     "lint": "oxlint src tests",
-    "typecheck": "tsc",
-    "test:fast": "bun test tests/harness/bun.test.js tests/harness/vueLoader.test.js",
+    "typecheck": "bun scripts/vue-tsc-bun.js --noEmit",
+    "typecheck:tsc": "tsc",
+    "test:fast": "bun test tests/harness/bun.test.ts tests/harness/vueLoader.test.ts",
     "lint:fix": "oxlint src tests --fix"
   },
   "dependencies": {
@@ -34,6 +35,7 @@
     "@vue/test-utils": "^2.4.11",
     "oxlint": "^1.24.0",
     "typescript": "^5.9.0",
-    "vite": "^6.4.1"
+    "vite": "^6.4.1",
+    "vue-tsc": "^3.3.7"
   }
 }

@@ -19,19 +19,27 @@
   </div>
 </template>
 
-<script>
-export default {
+<script lang="ts">
+import { defineComponent } from 'vue';
+import type { PropType } from 'vue';
+import type KerasLayer from '../../lib/KerasInterface/KerasLayer';
+import type { ParameterValue } from '../../types/model';
+
+export default defineComponent({
   name: 'BooleanParameter',
   props: {
-    name: String,
+    name: { type: String, required: true },
     value: Boolean,
-    defaultValue: [Boolean, undefined],
-    activeLayer: null,
+    // Historical quirk: `undefined` was never a valid runtime prop type — the
+    // cast keeps the exact array Vue has always seen.
+    defaultValue: [Boolean, undefined] as unknown as PropType<boolean | 'None'>,
+    activeLayer: { type: Object as PropType<KerasLayer>, required: true },
   },
   data() {
     return {
-      selectedValue: this.activeLayer.parameterValues[this.name] !== undefined
-        ? this.activeLayer.parameterValues[this.name] : 'void', // Ugly, needed for select
+      selectedValue: (this.activeLayer.parameterValues[this.name] !== undefined
+        ? this.activeLayer.parameterValues[this.name]
+        : 'void') as ParameterValue | 'void' | undefined, // Ugly, needed for select
     };
   },
   methods: {
@@ -44,7 +52,7 @@ export default {
       this.selectedValue = this.activeLayer.parameterValues[this.name];
     },
   },
-};
+});
 </script>
 
 <style >

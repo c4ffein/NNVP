@@ -56,13 +56,23 @@
   </div>
 </template>
 
-<script>
-export default {
+<script lang="ts">
+import { defineComponent } from 'vue';
+
+// import.meta.env is Vite-only (absent under bun/unit tests) — typed locally
+// instead of pulling in vite/client types (same choice as BoardInterface.ts).
+type ImportMetaWithEnv = ImportMeta & { env?: { VITE_ENABLE_BACKEND?: string } };
+
+// Non-reactive instance field assigned outside data() (pure typing pass:
+// keeping it out of data() preserves its non-reactive nature).
+interface CornerControlsInstanceExtra { readLogged?: () => void }
+
+export default defineComponent({
   name: 'CornerControls',
   emits: ['open-account', 'open-viz3d'],
   data() {
     return {
-      backendEnabled: !!import.meta.env.VITE_ENABLE_BACKEND,
+      backendEnabled: !!(import.meta as ImportMetaWithEnv).env?.VITE_ENABLE_BACKEND,
       loggedIn: false,
       theme: 'light',
     };
@@ -79,20 +89,22 @@ export default {
     }
   },
   mounted() {
+    const self = this as unknown as CornerControlsInstanceExtra;
     // Person-icon state: token presence now + on every auth change
     // (apiClient dispatches nnvp:auth-changed on token set/clear).
-    this.readLogged = () => {
+    self.readLogged = () => {
       try {
         this.loggedIn = !!localStorage.getItem('nnvp_backend_token');
       } catch {
         this.loggedIn = false;
       }
     };
-    this.readLogged();
-    window.addEventListener('nnvp:auth-changed', this.readLogged);
+    self.readLogged();
+    window.addEventListener('nnvp:auth-changed', self.readLogged);
   },
   beforeUnmount() {
-    window.removeEventListener('nnvp:auth-changed', this.readLogged);
+    const self = this as unknown as CornerControlsInstanceExtra;
+    window.removeEventListener('nnvp:auth-changed', self.readLogged!);
   },
   methods: {
     toggleTheme() {
@@ -108,7 +120,7 @@ export default {
       } catch { /* localStorage unavailable (private mode) */ }
     },
   },
-};
+});
 </script>
 
 <style scoped>

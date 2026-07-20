@@ -138,8 +138,37 @@
   </div>
 </template>
 
-<script>
-export default {
+<script lang="ts">
+import { defineComponent } from 'vue';
+import type { PropType } from 'vue';
+
+/** One chart line; `data` may carry gaps (metrics an engine cannot measure). */
+interface ChartSeries {
+  className?: string;
+  name: string;
+  data: (number | undefined | null)[];
+}
+
+interface ChartData {
+  labels: number[];
+  series: ChartSeries[];
+}
+
+interface AxisTick {
+  value: number;
+  label: string;
+}
+
+interface ChartPoint {
+  x: number;
+  y: number;
+  value: number;
+  label: number;
+  seriesName: string;
+  seriesIndex: number;
+}
+
+export default defineComponent({
   name: 'LineChart',
   emits: ['show-help'],
   props: {
@@ -152,7 +181,7 @@ export default {
       required: true
     },
     chartData: {
-      type: Object,
+      type: Object as PropType<ChartData>,
       required: true
     }
   },
@@ -172,28 +201,28 @@ export default {
     };
   },
   computed: {
-    validSeries() {
+    validSeries(): ChartSeries[] {
       if (!this.chartData || !this.chartData.series) return [];
       return this.chartData.series.filter(s => s.data && s.data.length > 0);
     },
 
-    labels() {
+    labels(): number[] {
       return this.chartData?.labels || [];
     },
 
-    chartWidth() {
+    chartWidth(): number {
       return this.svgWidth - this.margin.left - this.margin.right;
     },
 
-    chartHeight() {
+    chartHeight(): number {
       return this.svgHeight - this.margin.top - this.margin.bottom;
     },
 
     // Calculate Y-axis range
-    yExtent() {
+    yExtent(): [number, number] {
       if (this.validSeries.length === 0) return [0, 1];
 
-      const allValues = this.validSeries.flatMap(s => s.data).filter(v => v != null);
+      const allValues = this.validSeries.flatMap(s => s.data).filter((v): v is number => v != null);
       if (allValues.length === 0) return [0, 1];
 
       const min = Math.min(...allValues);
@@ -205,20 +234,20 @@ export default {
     },
 
     // Calculate X-axis range
-    xExtent() {
+    xExtent(): [number, number] {
       if (this.labels.length === 0) return [0, 1];
       return [0, Math.max(...this.labels)];
     },
 
     // Scaling functions
-    xScale() {
+    xScale(): (value: number) => number {
       const [min, max] = this.xExtent;
       return (value) => {
         return this.margin.left + ((value - min) / (max - min)) * this.chartWidth;
       };
     },
 
-    yScale() {
+    yScale(): (value: number) => number {
       const [min, max] = this.yExtent;
       return (value) => {
         return this.margin.top + this.chartHeight - ((value - min) / (max - min)) * this.chartHeight;
@@ -226,10 +255,10 @@ export default {
     },
 
     // Y-axis ticks
-    yTicks() {
+    yTicks(): (AxisTick & { y: number })[] {
       const [min, max] = this.yExtent;
       const tickCount = 5;
-      const ticks = [];
+      const ticks: (AxisTick & { y: number })[] = [];
 
       for (let i = 0; i <= tickCount; i++) {
         const value = min + (max - min) * (i / tickCount);
@@ -244,13 +273,13 @@ export default {
     },
 
     // X-axis ticks
-    xTicks() {
+    xTicks(): (AxisTick & { x: number })[] {
       if (this.labels.length === 0) return [];
 
       const [min, max] = this.xExtent;
       const tickCount = Math.min(10, this.labels.length);
       const step = Math.ceil((max - min + 1) / tickCount);
-      const ticks = [];
+      const ticks: (AxisTick & { x: number })[] = [];
 
       for (let i = min; i <= max; i += step) {
         ticks.push({
@@ -264,17 +293,18 @@ export default {
     },
 
     // Flatten all points for hover detection
-    allPoints() {
-      const points = [];
+    allPoints(): ChartPoint[] {
+      const points: ChartPoint[] = [];
 
       this.validSeries.forEach((series, seriesIndex) => {
         series.data.forEach((value, i) => {
-          if (value != null && this.labels[i] != null) {
+          const label = this.labels[i];
+          if (value != null && label != null) {
             points.push({
-              x: this.xScale(this.labels[i]),
+              x: this.xScale(label),
               y: this.yScale(value),
               value,
-              label: this.labels[i],
+              label,
               seriesName: series.name,
               seriesIndex
             });
@@ -286,15 +316,16 @@ export default {
     }
   },
   methods: {
-    getLinePath(series) {
+    getLinePath(series: ChartSeries): string {
       if (!series.data || series.data.length === 0) return '';
 
       let path = '';
       let firstPoint = true;
 
       series.data.forEach((value, i) => {
-        if (value != null && this.labels[i] != null) {
-          const x = this.xScale(this.labels[i]);
+        const label = this.labels[i];
+        if (value != null && label != null) {
+          const x = this.xScale(label);
           const y = this.yScale(value);
 
           if (firstPoint) {
@@ -309,17 +340,17 @@ export default {
       return path;
     },
 
-    getLastValue(series) {
+    getLastValue(series: ChartSeries): string {
       const lastValue = series.data[series.data.length - 1];
       return lastValue != null ? lastValue.toFixed(3) : 'N/A';
     },
 
-    handleMouseMove(event) {
+    handleMouseMove(event: MouseEvent) { // eslint-disable-line no-unused-vars
       // Mouse move is handled by individual hover points
     },
 
-    showTooltip(point, event) {
-      const wrapper = this.$refs.chartWrapper;
+    showTooltip(point: ChartPoint, event: MouseEvent) {
+      const wrapper = this.$refs.chartWrapper as HTMLElement | undefined;
       if (!wrapper) return;
 
       const rect = wrapper.getBoundingClientRect();
@@ -338,7 +369,7 @@ export default {
       this.tooltip.visible = false;
     }
   }
-};
+});
 </script>
 
 <style scoped>

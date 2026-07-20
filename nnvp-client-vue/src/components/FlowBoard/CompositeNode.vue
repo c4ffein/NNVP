@@ -4,9 +4,12 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import type { PropType } from 'vue';
+import type { NnvpNodeData } from '../../types/model';
+
 defineProps({
-  data: { type: Object, required: true },
+  data: { type: Object as PropType<NnvpNodeData>, required: true },
   selected: { type: Boolean, default: false },
 });
 </script>

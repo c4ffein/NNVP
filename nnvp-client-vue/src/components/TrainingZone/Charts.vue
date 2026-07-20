@@ -67,33 +67,55 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
+import { defineComponent } from 'vue';
+import type { PropType } from 'vue';
 import LineChart from './LineChart.vue';
+
+/** One chart line as watchTraining reassigns it (gaps for missing metrics). */
+interface ChartSeries {
+  className: string;
+  name: string;
+  data: (number | undefined)[];
+}
+
+/** The reactive chart-data objects owned by TrainingZone. */
+interface ChartData {
+  labels: number[];
+  series: ChartSeries[];
+}
+
+/** Instance state kept OFF data() — non-reactive by design. */
+interface ChartsNonReactive {
+  handleEscape?: (event: KeyboardEvent) => void;
+}
 
 // Purely presentational: TrainingZone owns the chart data (updated by
 // watchTraining during a fit) and passes it down; reactivity handles the rest.
-export default {
+export default defineComponent({
   name: 'Charts',
   components: {
     LineChart
   },
   props: {
-    batchData: { type: Object, default: () => ({ labels: [], series: [] }) },
-    epochData: { type: Object, default: () => ({ labels: [], series: [] }) },
+    batchData: { type: Object as PropType<ChartData>, default: () => ({ labels: [], series: [] }) },
+    epochData: { type: Object as PropType<ChartData>, default: () => ({ labels: [], series: [] }) },
   },
   data() {
-    return { helpTopic: null };
+    return { helpTopic: null as 'batch' | 'epoch' | null };
   },
   mounted() {
-    this.handleEscape = (event) => {
+    const self = this as unknown as ChartsNonReactive; // non-reactive by design
+    self.handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && this.helpTopic) this.helpTopic = null;
     };
-    document.addEventListener('keydown', this.handleEscape);
+    document.addEventListener('keydown', self.handleEscape);
   },
   beforeUnmount() {
-    document.removeEventListener('keydown', this.handleEscape);
+    const self = this as unknown as ChartsNonReactive; // non-reactive by design
+    document.removeEventListener('keydown', self.handleEscape!);
   },
-};
+});
 </script>
 
 <style>

@@ -1,16 +1,49 @@
-<script lang="jsx">
+<script lang="tsx">
+import { defineComponent } from 'vue';
+import type { ComponentPublicInstance, PropType, VNode } from 'vue';
 import { clearCurrentProject } from '../lib/Backend/currentProject';
 
-export default {
+// import.meta.env is Vite-only (absent under bun/unit tests) — typed locally
+// instead of pulling in vite/client types (same choice as BoardInterface.ts).
+type ImportMetaWithEnv = ImportMeta & { env?: { VITE_ENABLE_BACKEND?: string } };
+
+// Panel visibility flags owned by App.vue (the `views` prop).
+interface ViewsState {
+  left: boolean;
+  right: boolean;
+  training?: boolean;
+  chat: boolean;
+  chatAvailable: boolean;
+}
+
+// The menu tree: a leaf is an action (run with the component as `this` via
+// levelNClickHandler's apply) or an [action, isDisabled] pair; a branch is a
+// nested tree, or the name of a computed holding one (e.g. 'templatesMenu').
+type MenuAction = (this: ComponentPublicInstance) => unknown;
+type MenuEntry = MenuAction | [MenuAction, () => boolean] | MenuSubtree | string;
+interface MenuSubtree { [label: string]: MenuEntry }
+
+// Non-reactive instance field assigned outside data() (pure typing pass:
+// keeping it out of data() preserves its non-reactive nature).
+interface GeneralMenuInstanceExtra { templatesChangeHandler?: () => void }
+
+// The render sticks the raw [title, content] entry on each top-level <li> as
+// a plain `obj` attribute (kept as-is by this typing pass); teach Vue's JSX
+// attribute types about it rather than dropping it.
+declare module '@vue/runtime-dom' {
+  interface LiHTMLAttributes { obj?: unknown }
+}
+
+export default defineComponent({
   name: 'GeneralMenu',
   components: {
   },
-  render(h) { // eslint-disable-line
+  render(h: unknown): VNode { // eslint-disable-line
     // Force reactivity by accessing refreshKey
     this.menuRefreshKey; // eslint-disable-line
 
-    const generateMenu = (menu, level) => {
-      if (typeof (menu) === 'string') menu = this[menu] || {}; // eslint-disable-line no-param-reassign
+    const generateMenu = (menu: MenuEntry, level: number): VNode | undefined => {
+      if (typeof (menu) === 'string') menu = (this as unknown as Record<string, MenuSubtree | undefined>)[menu] || {}; // eslint-disable-line no-param-reassign
       if (typeof (menu) !== 'function' && !Array.isArray(menu)) {
         const rows = Object.entries(menu).map((entry, i) => {
           const itemKey = `${level}-${i}-${entry[0]}`;
@@ -63,8 +96,8 @@ export default {
     // Visibility of the toggleable views, owned by App.vue: { left, right,
     // chat, chatAvailable }. Drives the ticks in the Panels menu.
     views: {
-      type: Object,
-      default: () => ({
+      type: Object as PropType<ViewsState>,
+      default: (): ViewsState => ({
         left: true, right: true, chat: false, chatAvailable: false,
       }),
     },
@@ -74,9 +107,9 @@ export default {
     // without VITE_ENABLE_BACKEND (e.g. a static-only deploy) hide every
     // account entry point (see also App.vue).
     return {
-      backendEnabled: !!import.meta.env.VITE_ENABLE_BACKEND,
+      backendEnabled: !!(import.meta as ImportMetaWithEnv).env?.VITE_ENABLE_BACKEND,
       activatedState: false,
-      activatedChain: [],
+      activatedChain: [] as HTMLElement[],
       undoStackContainer: this.$boardInterface.getUndoStackContainer(),
       redoStackContainer: this.$boardInterface.getRedoStackContainer(),
       templatesRefreshKey: 0,
@@ -84,12 +117,13 @@ export default {
     };
   },
   mounted() {
+    const self = this as unknown as GeneralMenuInstanceExtra;
     // Subscribe to templates changes
-    this.templatesChangeHandler = () => {
+    self.templatesChangeHandler = () => {
       this.templatesRefreshKey++;
       this.menuRefreshKey++; // Trigger menu re-render
     };
-    this.$boardInterface.on('templates-changed', this.templatesChangeHandler);
+    this.$boardInterface.on('templates-changed', self.templatesChangeHandler);
 
     // Trigger initial refresh in case templates were loaded before this component mounted
     // (the board mounts before GeneralMenu, so the templates-changed event fires before we subscribe)
@@ -97,18 +131,19 @@ export default {
     this.menuRefreshKey++;
   },
   beforeUnmount() {
+    const self = this as unknown as GeneralMenuInstanceExtra;
     // Unsubscribe from events
-    if (this.templatesChangeHandler) {
-      this.$boardInterface.off('templates-changed', this.templatesChangeHandler);
+    if (self.templatesChangeHandler) {
+      this.$boardInterface.off('templates-changed', self.templatesChangeHandler);
     }
   },
   computed: {
     // The menu is computed (not data) so the Panels ticks re-render when App's
     // visibility state changes. Handlers run with the component as `this`
     // (levelNClickHandler applies them), so shorthand methods work as before.
-    menuTree() {
+    menuTree(): MenuSubtree {
       const { backendEnabled } = this;
-      const tick = shown => (shown ? '✓' : ' '); // figure space aligns labels
+      const tick = (shown?: boolean) => (shown ? '✓' : ' '); // figure space aligns labels
       return {
         File: {
           New() {
@@ -159,7 +194,7 @@ export default {
         About: () => { this.$emit('open-about'); },
       };
     },
-    templatesMenu() {
+    templatesMenu(): MenuSubtree {
       // Access refreshKey to trigger reactivity
       this.templatesRefreshKey; // eslint-disable-line
       const container = this.$boardInterface.getTemplatesContainer();
@@ -169,40 +204,42 @@ export default {
         return {};
       }
       return container.e
-        .map(name => [name, () => this.$boardInterface.loadTemplate(name)])
-        .reduce((p, c) => { p[c[0]] = c[1]; return p; }, {}); // eslint-disable-line
+        .map((name): [string, MenuAction] => [name, () => this.$boardInterface.loadTemplate(name)])
+        .reduce((p, c) => { p[c[0]] = c[1]; return p; }, {} as MenuSubtree); // eslint-disable-line
     },
   },
   methods: {
-    level0ClickHandler(menuTitle, menuContent, event) {
+    level0ClickHandler(menuTitle: string, menuContent: MenuEntry, event: MouseEvent | KeyboardEvent) {
       event.stopPropagation();
       // Refresh menu state to update disabled items
       this.menuRefreshKey++;
 
       if (typeof (menuContent) === 'function') {
         this.deactivateChain();
-        menuContent();
+        // Level-0 leaves are always arrows over the component (see menuTree),
+        // so the bare call never actually relies on `this`.
+        (menuContent as () => unknown)();
       } else if (this.$data.activatedState) {
         this.deactivateChain();
       } else {
         this.$data.activatedState = true;
-        const menuElement = this.getMenuElement(event.target);
+        const menuElement = this.getMenuElement(event.target)!;
         this.$data.activatedChain = [menuElement];
         menuElement.classList.toggle('activated');
         document.body.addEventListener('click', this.clickElseWhere);
       }
     },
-    clickElseWhere(event) {
+    clickElseWhere(event: MouseEvent) {
       const menuElement = document.getElementById('GeneralMenu');
-      if (menuElement && menuElement.contains(event.target)) return;
+      if (menuElement && menuElement.contains(event.target as Node | null)) return;
       this.deactivateChain();
       document.body.removeEventListener('click', this.clickElseWhere);
     },
-    level0HoverHandler(menuTitle, menuContent, event) {
+    level0HoverHandler(menuTitle: string, menuContent: MenuEntry, event: MouseEvent) {
       if (typeof (menuContent) !== 'function') {
         if (this.$data.activatedState) {
           this.deactivateChain();
-          const menuElement = this.getMenuElement(event.target);
+          const menuElement = this.getMenuElement(event.target)!;
           this.$data.activatedChain = [menuElement];
           this.$data.activatedState = true;
           menuElement.classList.toggle('activated');
@@ -210,19 +247,19 @@ export default {
         }
       }
     },
-    level0KeyHandler(menuTitle, menuContent, event) {
+    level0KeyHandler(menuTitle: string, menuContent: MenuEntry, event: KeyboardEvent) {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
         this.level0ClickHandler(menuTitle, menuContent, event);
       }
     },
-    levelNKeyHandler(menuTitle, menuContent, event) {
+    levelNKeyHandler(menuTitle: string, menuContent: MenuEntry, event: KeyboardEvent) {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
         this.levelNClickHandler(menuTitle, menuContent);
       }
     },
-    levelNClickHandler(menuTitle, menuContent) {
+    levelNClickHandler(menuTitle: string, menuContent: MenuEntry) {
       if (this.isItemDisabled(menuTitle, menuContent)) {
         return;
       }
@@ -232,7 +269,7 @@ export default {
         this.deactivateChain();
       }
     },
-    levelNHoverHandler(menuTitle, menuContent, event, level) {
+    levelNHoverHandler(menuTitle: string, menuContent: MenuEntry, event: MouseEvent, level: number) {
       const { target } = event;
       const element = this.getMenuElement(target);
       if (element === undefined) {
@@ -240,12 +277,12 @@ export default {
         return;
       }
       while (this.$data.activatedChain.length > level) {
-        this.$data.activatedChain.pop().classList.remove('activated');
+        this.$data.activatedChain.pop()!.classList.remove('activated');
       }
       // Resolve string references (like 'templatesMenu') to actual menu objects
       let resolvedContent = menuContent;
       if (typeof (menuContent) === 'string') {
-        resolvedContent = this[menuContent] || {};
+        resolvedContent = (this as unknown as Record<string, MenuSubtree | undefined>)[menuContent] || {};
       }
       if (typeof (resolvedContent) !== 'function' && !Array.isArray(resolvedContent)) {
         element.classList.add('activated');
@@ -253,7 +290,7 @@ export default {
       }
       event.stopPropagation();
     },
-    isItemDisabled(menuTitle, menuContent) {
+    isItemDisabled(menuTitle: string, menuContent: MenuEntry): boolean {
       if (!Array.isArray(menuContent)) {
         return false;
       }
@@ -261,23 +298,25 @@ export default {
     },
     deactivateChain() {
       for (let i = 0; i < this.$data.activatedChain.length; i += 1) {
-        this.$data.activatedChain[i].classList.remove('activated');
+        this.$data.activatedChain[i]!.classList.remove('activated');
       }
       this.$data.activatedState = false;
       this.$data.activatedChain = [];
     },
-    getMenuElement(element) {
-      let el = element;
+    getMenuElement(element: EventTarget | null): HTMLElement | undefined {
+      // The original walked whatever the event handed it; a non-element target
+      // would throw then as it would now — the cast preserves that behavior.
+      let el = element as HTMLElement;
       while (el.classList.contains('GeneralMenu')) {
         if (el.classList.contains('menu') || el.classList.contains('menuItem')) {
           return el;
         }
-        el = el.parentElement;
+        el = el.parentElement!;
       }
       return undefined;
     },
   },
-};
+});
 </script>
 
 <style>

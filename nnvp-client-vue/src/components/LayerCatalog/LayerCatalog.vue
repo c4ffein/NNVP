@@ -19,7 +19,7 @@
     <div class="catalog-scroll">
     <div
       v-for="(layers, categoryName) in $kerasInterface.getCategories()"
-      v-bind:key="categoryName.id"
+      v-bind:key="(categoryName as any).id"
       v-bind:id="divId(categoryName)"
       class="layerCategory"
     >
@@ -49,7 +49,7 @@
         <LayerTemplate
           v-for="(layerContent, layerName) in filteredSearchList(layers)"
           v-bind:layerName="layerName" v-bind:layerContent="layerContent"
-          :key="layerName.id" :id="'layer-template-' + layerName"
+          :key="(layerName as any).id" :id="'layer-template-' + layerName"
           @show-help="helpLayerType = $event"
         />
       </div>
@@ -84,19 +84,30 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
+import { defineComponent } from 'vue';
 import LayerTemplate from './LayerTemplate.vue';
 import layerHelp from '../../lib/KerasInterface/layerHelp';
 import categoryHelp from '../../lib/KerasInterface/categoryHelp';
 import { askAssistant } from '../../lib/Assistant/askAssistant';
+import type KerasLayer from '../../lib/KerasInterface/KerasLayer';
 
-export default {
+// import.meta.env is Vite-only (absent under bun/unit tests) — typed locally
+// instead of pulling in vite/client types (same choice as BoardInterface.ts).
+type ImportMetaWithEnv = ImportMeta & { env?: { VITE_ENABLE_BACKEND?: string } };
+
+// Non-reactive instance field assigned outside data() (pure typing pass:
+// keeping it out of data() preserves its non-reactive nature — same pattern
+// as CornerControls.vue).
+interface LayerCatalogInstanceExtra { handleEscape?: (event: KeyboardEvent) => void }
+
+export default defineComponent({
   name: 'LayerCatalog',
   components: {
     LayerTemplate,
   },
   computed: {
-    helpHtml() {
+    helpHtml(): string {
       if (this.helpCategory) return categoryHelp[this.helpCategory] || '';
       if (!this.helpLayerType) return '';
       return layerHelp[this.helpLayerType] || `
@@ -107,12 +118,12 @@ export default {
     },
   },
   methods: {
-    toggleCategory(categoryDiv) {
-      document.getElementById(categoryDiv).classList.toggle('closed');
+    toggleCategory(categoryDiv: string) {
+      document.getElementById(categoryDiv)!.classList.toggle('closed');
       this.refreshAllCollapsed();
     },
-    divId: categoryName => `category_${categoryName.replace(' ', '_')}`,
-    categoryHelpHtmlFor: categoryName => categoryHelp[categoryName] || '',
+    divId: (categoryName: string) => `category_${categoryName.replace(' ', '_')}`,
+    categoryHelpHtmlFor: (categoryName: string) => categoryHelp[categoryName] || '',
     closeHelp() {
       this.helpLayerType = null;
       this.helpCategory = null;
@@ -120,55 +131,57 @@ export default {
     // Hand the topic over to the chat widget (which opens and seeds the
     // conversation) and get the modal out of its way.
     askInChat() {
-      askAssistant(this.helpLayerType || this.helpCategory);
+      // Only reachable while the modal is open, so one of the two is set.
+      askAssistant((this.helpLayerType || this.helpCategory)!);
       this.closeHelp();
     },
     // The open/closed state lives in the DOM (classList), so the master
     // button's state is recomputed from it: as soon as ANY category is open,
     // the arrow flips back to "collapse all" — one click always re-closes.
     refreshAllCollapsed() {
-      const categories = [...this.$el.querySelectorAll('.layerCategory')];
+      const categories = [...this.$el.querySelectorAll('.layerCategory')] as HTMLElement[];
       this.allCollapsed = categories.length > 0
         && categories.every((el) => el.classList.contains('closed'));
     },
     toggleAllCategories() {
       const collapse = !this.allCollapsed;
-      this.$el.querySelectorAll('.layerCategory').forEach((el) => {
+      (this.$el.querySelectorAll('.layerCategory') as NodeListOf<HTMLElement>).forEach((el) => {
         el.classList.toggle('closed', collapse);
       });
       this.allCollapsed = collapse;
     },
-    inSearch(layer) {
+    inSearch(layer: KerasLayer): boolean {
       if (this.$data.searchBox === '') {
         return true;
       }
       const searchStrings = this.$data.searchBox.split(' ');
       for (let i = 0; i < searchStrings.length; i += 1) {
-        const searchString = searchStrings[i].toLowerCase();
+        const searchString = searchStrings[i]!.toLowerCase();
         for (let j = 0; j < layer.searchTerms.length; j += 1) {
-          if (layer.searchTerms[j].toLowerCase().includes(searchString)) {
+          if (layer.searchTerms[j]!.toLowerCase().includes(searchString)) {
             return true;
           }
         }
       }
       return false;
     },
-    filteredSearchList(layers) {
-      const result = {};
+    filteredSearchList(layers: Record<string, KerasLayer>): Record<string, KerasLayer> {
+      const result: Record<string, KerasLayer> = {};
       const layersEntries = Object.entries(layers);
       for (let i = 0; i < layersEntries.length; i += 1) {
-        const layerContent = layersEntries[i][1];
+        const layerContent = layersEntries[i]![1];
         if (this.inSearch(layerContent)) {
-          const layerName = layersEntries[i][0];
+          const layerName = layersEntries[i]![0];
           result[layerName] = layerContent;
         }
       }
       return result;
     },
-    layersNotEmptyAfterSearch(layers) {
+    // The second argument has always been passed by the template and ignored.
+    layersNotEmptyAfterSearch(layers: Record<string, KerasLayer>, _categoryName?: string): boolean {
       const layerArray = Object.values(layers);
       for (let i = 0; i < layerArray.length; i += 1) {
-        if (this.inSearch(layerArray[i])) {
+        if (this.inSearch(layerArray[i]!)) {
           return true;
         }
       }
@@ -181,24 +194,26 @@ export default {
   data: () => ({
     searchBox: '',
     reloadKey: 0,
-    helpLayerType: null,
-    helpCategory: null,
+    helpLayerType: null as string | null,
+    helpCategory: null as string | null,
     allCollapsed: false,
     // The ask-the-assistant handoff only exists where the chat does (same
     // gate as App.vue's ChatBubble mount).
-    backendEnabled: !!import.meta.env.VITE_ENABLE_BACKEND,
+    backendEnabled: !!(import.meta as ImportMetaWithEnv).env?.VITE_ENABLE_BACKEND,
   }),
   mounted() {
+    const self = this as unknown as LayerCatalogInstanceExtra;
     this.$boardInterface.setLeftBarRemountCallback(this.remount);
-    this.handleEscape = (event) => {
+    self.handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && (this.helpLayerType || this.helpCategory)) this.closeHelp();
     };
-    document.addEventListener('keydown', this.handleEscape);
+    document.addEventListener('keydown', self.handleEscape);
   },
   beforeUnmount() {
-    document.removeEventListener('keydown', this.handleEscape);
+    const self = this as unknown as LayerCatalogInstanceExtra;
+    document.removeEventListener('keydown', self.handleEscape!);
   },
-};
+});
 </script>
 
 <style>

@@ -1,5 +1,5 @@
 [test]
 # Register happy-dom's window/document/etc. as globals before every test file,
-# and teach bun to import .vue single-file components (tests/harness/vue-loader.js) so
+# and teach bun to import .vue single-file components (tests/harness/vue-loader.ts) so
 # dual-mode tests can mount real components without a browser or vite.
-preload = ["./tests/harness/happydom.js", "./tests/harness/vue-loader.js"]
+preload = ["./tests/harness/happydom.ts", "./tests/harness/vue-loader.ts"]

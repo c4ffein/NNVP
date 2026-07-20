@@ -31,33 +31,40 @@
   </div>
 </template>
 
-<script>
-export default {
+<script lang="ts">
+import { defineComponent } from 'vue';
+import type { PropType } from 'vue';
+import type KerasLayer from '../../lib/KerasInterface/KerasLayer';
+
+export default defineComponent({
   name: 'FloatParameter',
   props: {
-    name: String,
+    name: { type: String, required: true },
     value: Number,
-    conditions: null,
-    activeLayer: null,
+    conditions: { type: Array as PropType<string[]> },
+    activeLayer: { type: Object as PropType<KerasLayer>, required: true },
   },
   data() {
     return {
-      valueContainer: this.activeLayer.parameterValues[this.name],
-      minCond: '',
-      maxCond: '',
+      // Starts as the stored number (or undefined); v-model (no .number
+      // modifier) writes strings back into it.
+      valueContainer:
+        this.activeLayer.parameterValues[this.name] as string | number | null | undefined,
+      minCond: '' as number | '',
+      maxCond: '' as number | '',
       errorMessage: '',
     };
   },
 
   computed: {
-    hasRange() {
+    hasRange(): boolean {
       return this.minCond !== '' || this.maxCond !== '';
     },
-    isValid() {
+    isValid(): boolean {
       if (this.valueContainer === '' || this.valueContainer === null) {
         return true; // Empty is valid, let HTML5 required handle it if needed
       }
-      const numValue = parseFloat(this.valueContainer);
+      const numValue = parseFloat(this.valueContainer as string);
       if (isNaN(numValue)) {
         return false;
       }
@@ -82,7 +89,7 @@ export default {
         this.errorMessage = '';
         return;
       }
-      const numValue = parseFloat(this.valueContainer);
+      const numValue = parseFloat(this.valueContainer as string);
       if (isNaN(numValue)) {
         this.errorMessage = 'Please enter a valid number';
         return;
@@ -104,15 +111,16 @@ export default {
       }
     },
     updateParamFromKerasLayer() {
-      this.activeLayer.setParameterValue(this.name, parseFloat(this.valueContainer));
+      this.activeLayer.setParameterValue(this.name, parseFloat(this.valueContainer as string));
     },
     setStepInputRange() {
-      return (this.maxCond - this.minCond) / 100.0;
+      // Only called from the ranged branch, where both bounds are numbers.
+      return ((this.maxCond as number) - (this.minCond as number)) / 100.0;
     },
     isConditionsNotRanged() {
       const conditionsEmpty = (this.conditions == null);
       if (!conditionsEmpty) {
-        return this.conditions.length !== 2;
+        return this.conditions!.length !== 2;
       }
       return conditionsEmpty;
     },
@@ -121,8 +129,8 @@ export default {
     },
     parseMinCond() {
       if (!this.isConditionsNull()) {
-        if (this.conditions.length > 0) {
-          const strMinCond = this.conditions[0];
+        if (this.conditions!.length > 0) {
+          const strMinCond = this.conditions![0]!;
           if (strMinCond.slice(0, 2) === '>=') {
             this.minCond = parseFloat(strMinCond.slice(2));
           } else { // cas du supérieur stricte
@@ -134,8 +142,8 @@ export default {
 
     parseMaxCond() {
       if (!this.isConditionsNull()) {
-        if (this.conditions.length === 2) {
-          const strMaxCond = this.conditions[1];
+        if (this.conditions!.length === 2) {
+          const strMaxCond = this.conditions![1]!;
           if (strMaxCond.slice(0, 2) === '<=') {
             this.maxCond = parseFloat(strMaxCond.slice(2));
           } else { // cas du inférieur stricte
@@ -145,7 +153,7 @@ export default {
       }
     },
   },
-};
+});
 </script>
 
 <!-- Add "scoped" attribute to limit CSS to this component only -->

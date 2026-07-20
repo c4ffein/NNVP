@@ -14,7 +14,7 @@
           id="inspect-class-select"
           aria-label="Sample class"
           v-bind:value="selectedClass"
-          v-on:change="selectClass(Number($event.target.value))"
+          v-on:change="selectClass(Number(($event.target as HTMLSelectElement).value))"
         >
           <option v-bind:key="cls" v-for="cls in numClasses" v-bind:value="cls - 1">
             {{ cls - 1 }}
@@ -46,19 +46,43 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
+import { defineComponent } from 'vue';
+import type { PropType } from 'vue';
 import { loadTf } from '../../lib/tf/loadTf';
 import { buildProbe, inputEntries, runInspection } from '../../lib/Inspector/probe';
+import type { InspectionEntry, ProbeSourceModel, ProbeTf } from '../../lib/Inspector/probe';
 import { buildClassIndex, sampleAt } from '../../lib/Inspector/datasetSamples';
 import { drawSample } from '../../lib/Inspector/drawInspection';
+import type Dataset from '../../lib/JSDatasets/google-data-loader';
+import type { NnvpLayerId } from '../../types/model';
 
-export default {
+/** What TrainingZone.getTrainedModel hands over (the tf model, un-proxied). */
+interface TrainedModelRef {
+  model: unknown;
+  graphJson: string | null;
+}
+
+/** Instance state kept OFF data() — non-reactive by design (never proxied). */
+interface InspectPanelNonReactive {
+  /** per-class test-sample positions */
+  classIndex: number[][] | null;
+  onVizParamsChanged?: () => void;
+}
+
+export default defineComponent({
   name: 'InspectPanel',
   props: {
     value: { type: String, default: null }, // selected dataset name
-    getDatasets: { type: Function, default: () => ({}) },
+    getDatasets: {
+      type: Function as PropType<() => Record<string, Dataset>>,
+      default: () => ({}),
+    },
     hasTrainedModel: { type: Boolean, default: false },
-    getTrainedModel: { type: Function, default: () => null },
+    getTrainedModel: {
+      type: Function as PropType<() => TrainedModelRef | null>,
+      default: () => null,
+    },
   },
   data() {
     return {
@@ -69,23 +93,26 @@ export default {
       sampleNumber: 0,
       inspectionShown: false,
       busy: false,
-      errorMessage: null,
+      errorMessage: null as string | null,
     };
   },
   created() {
-    this.classIndex = null; // per-class test-sample positions; kept non-reactive
+    // per-class test-sample positions; kept non-reactive
+    (this as unknown as InspectPanelNonReactive).classIndex = null;
   },
   mounted() {
+    const self = this as unknown as InspectPanelNonReactive; // non-reactive by design
     this.refresh();
     // Channel paging in the 3D layer panel: re-probe so the summaries cover
     // the newly selected channels (2D overlays and 3D read the same data).
-    this.onVizParamsChanged = () => {
+    self.onVizParamsChanged = () => {
       if (this.inspectionShown && !this.busy) this.inspect();
     };
-    this.$boardInterface.on('viz-params-changed', this.onVizParamsChanged);
+    this.$boardInterface.on('viz-params-changed', self.onVizParamsChanged);
   },
   beforeUnmount() {
-    this.$boardInterface.off('viz-params-changed', this.onVizParamsChanged);
+    const self = this as unknown as InspectPanelNonReactive; // non-reactive by design
+    this.$boardInterface.off('viz-params-changed', self.onVizParamsChanged!);
   },
   activated() {
     // The panel lives under <keep-alive>; the dataset may have loaded (or
@@ -98,27 +125,29 @@ export default {
     },
   },
   methods: {
-    dataset() {
+    dataset(): Dataset | undefined {
       return this.getDatasets()[this.value];
     },
     refresh() {
+      const self = this as unknown as InspectPanelNonReactive; // non-reactive by design
       const dataset = this.dataset();
       this.datasetReady = !!(dataset && dataset.testLabels);
       if (!this.datasetReady) return;
-      this.numClasses = dataset.numClasses;
-      this.classIndex = buildClassIndex(dataset.testLabels, dataset.numClasses);
+      this.numClasses = dataset!.numClasses;
+      self.classIndex = buildClassIndex(dataset!.testLabels, dataset!.numClasses);
       if (this.selectedClass >= this.numClasses) this.selectedClass = 0;
-      this.classCount = this.classIndex[this.selectedClass].length;
+      this.classCount = self.classIndex[this.selectedClass]!.length;
       if (this.sampleNumber >= this.classCount) this.sampleNumber = 0;
       this.drawPreview();
     },
-    selectClass(cls) {
+    selectClass(cls: number) {
+      const self = this as unknown as InspectPanelNonReactive; // non-reactive by design
       this.selectedClass = cls;
       this.sampleNumber = 0;
-      this.classCount = this.classIndex ? this.classIndex[cls].length : 0;
+      this.classCount = self.classIndex ? self.classIndex[cls]!.length : 0;
       this.onSampleChanged();
     },
-    step(direction) {
+    step(direction: number) {
       if (this.classCount === 0) return;
       this.sampleNumber = (this.sampleNumber + direction + this.classCount) % this.classCount;
       this.onSampleChanged();
@@ -128,16 +157,17 @@ export default {
       // Live mode: while an inspection is shown, browsing samples re-runs it.
       if (this.inspectionShown && !this.busy) this.inspect();
     },
-    currentSampleData() {
+    currentSampleData(): Float32Array {
+      const self = this as unknown as InspectPanelNonReactive; // non-reactive by design
       const dataset = this.dataset();
-      const index = this.classIndex[this.selectedClass][this.sampleNumber];
-      return sampleAt(dataset.testImages, dataset.imageByteSize, index);
+      const index = self.classIndex![this.selectedClass]![this.sampleNumber]!;
+      return sampleAt(dataset!.testImages, dataset!.imageByteSize, index);
     },
     drawPreview() {
       this.$nextTick(() => {
-        const canvas = this.$refs.previewCanvas;
+        const canvas = this.$refs.previewCanvas as HTMLCanvasElement | undefined;
         if (!canvas || !this.datasetReady || this.classCount === 0) return;
-        drawSample(canvas, this.currentSampleData(), this.dataset().shape);
+        drawSample(canvas, this.currentSampleData(), this.dataset()!.shape!);
       });
     },
     async inspect() {
@@ -146,25 +176,28 @@ export default {
       this.busy = true;
       try {
         const tf = await loadTf();
-        const dataset = this.dataset();
-        const { model, graphJson } = this.getTrainedModel();
-        const { probe, layerIds } = buildProbe(model, graphJson, tf);
+        const dataset = this.dataset()!;
+        const { model, graphJson } = this.getTrainedModel()!;
+        // tfjs values cross the probe seam untyped on purpose (engine.ts policy).
+        const { probe, layerIds } = buildProbe(
+          model as ProbeSourceModel, graphJson!, tf as unknown as ProbeTf,
+        );
         const sampleData = this.currentSampleData();
-        const input = tf.tensor(sampleData, [1, ...dataset.shape]);
+        const input = tf.tensor(sampleData, [1, ...dataset.shape!]);
         // Conv summaries follow the 3D layer panel's channel paging.
         const vizParams = this.$boardInterface.getLayerVizParams();
-        const channelOffsets = {};
+        const channelOffsets: Record<string, number> = {};
         Object.entries(vizParams).forEach(([id, params]) => {
           if (params.channelOffset) channelOffsets[id] = params.channelOffset;
         });
-        let byLayerId;
+        let byLayerId: Record<NnvpLayerId, InspectionEntry>;
         try {
           byLayerId = await runInspection(probe, layerIds, input, { channelOffsets });
         } finally {
           input.dispose();
         }
         // The Input node(s) show the sample itself — the probe only taps real layers.
-        Object.assign(byLayerId, inputEntries(graphJson, sampleData, dataset.shape));
+        Object.assign(byLayerId, inputEntries(graphJson!, sampleData, dataset.shape!));
         this.$boardInterface.setInspection({
           byLayerId,
           sample: { class: this.selectedClass, number: this.sampleNumber, dataset: this.value },
@@ -172,7 +205,10 @@ export default {
         this.inspectionShown = true;
       } catch (error) {
         console.error('[InspectPanel] Inspection failed:', error);
-        this.errorMessage = String(error && error.message ? error.message : error);
+        const errorWithMessage = error as { message?: unknown } | null | undefined;
+        this.errorMessage = String(
+          errorWithMessage && errorWithMessage.message ? errorWithMessage.message : error,
+        );
       } finally {
         this.busy = false;
       }
@@ -182,7 +218,7 @@ export default {
       this.inspectionShown = false;
     },
   },
-};
+});
 </script>
 
 <style>

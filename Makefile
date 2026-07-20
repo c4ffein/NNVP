@@ -4,11 +4,9 @@
 # same-origin /api path (vite dev-proxies /api to this server's port).
 BACKEND_DIR ?= ../nnvp-backend
 
-# Dev-server runner: npm where it exists (the historical path), bun on the
-# node-free box. Install/lint/typecheck/test targets are bun-first — they are
-# what CI runs (.github/workflows/ci.yml calls these exact targets), and the
-# repo only ships a bun lockfile.
-JS_RUN := $(shell command -v npm >/dev/null 2>&1 && echo "npm run" || echo "bun run")
+# All JS tooling runs under bun — the repo only ships a bun lockfile and the
+# dev box has no node. CI (.github/workflows/ci.yml) calls these exact targets.
+JS_RUN := bun run
 # Playwright must run under the BUN runtime even where node exists (CI
 # runners): node's strict ESM resolution rejects the suite's vite-style
 # extensionless imports; `bunx --bun` forces bun. (@playwright/test >= 1.58

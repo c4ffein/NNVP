@@ -31,15 +31,19 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { markRaw, watch, getCurrentInstance, onMounted } from 'vue';
 import { VueFlow, useVueFlow } from '@vue-flow/core';
+import type {
+  Connection, Edge, EdgeComponent, EdgeTypesObject, Node, NodeComponent, NodeTypesObject,
+} from '@vue-flow/core';
 import '@vue-flow/core/dist/style.css';
 import '@vue-flow/core/dist/theme-default.css';
 import {
   isInvalidConnection, LAYER_NODE, COMPOSITE_NODE,
 } from '../../lib/FlowInterface/adapter';
 import FlowGraphEditor from '../../lib/FlowInterface/FlowGraphEditor';
+import type { FlowEdge, FlowNode } from '../../types/model';
 import LayerNode from './LayerNode.vue';
 import CompositeNode from './CompositeNode.vue';
 import FloatingEdge from './FloatingEdge.vue';
@@ -50,16 +54,18 @@ defineProps({
   isTraining: { type: Boolean, default: false },
 });
 
-const nodeTypes = {
-  [LAYER_NODE]: markRaw(LayerNode),
-  [COMPOSITE_NODE]: markRaw(CompositeNode),
+// The custom node/edge SFCs declare only the props they read, not Vue Flow's
+// full NodeProps/EdgeProps surface — hence the casts.
+const nodeTypes: NodeTypesObject = {
+  [LAYER_NODE]: markRaw(LayerNode) as unknown as NodeComponent,
+  [COMPOSITE_NODE]: markRaw(CompositeNode) as unknown as NodeComponent,
 };
 
 // Overriding the 'default' edge type makes every edge floating (they attach
 // to the nearest border point instead of fixed handles) without the adapter
 // or the model ever storing an edge type.
-const edgeTypes = {
-  default: markRaw(FloatingEdge),
+const edgeTypes: EdgeTypesObject = {
+  default: markRaw(FloatingEdge) as unknown as EdgeComponent,
 };
 
 const {
@@ -74,21 +80,24 @@ const {
 // against the not-yet-applied nodes (edges get dropped), and position
 // mutations land on objects Vue Flow doesn't render. setNodes/setEdges
 // update the internal store synchronously, in order.
+// The facade speaks the structural FlowNode/FlowEdge slice of Vue Flow's
+// graph types (types/model.ts keeps lib/ free of @vue-flow/core imports);
+// the casts below bridge the two views of the same objects.
 const editor = new FlowGraphEditor({
-  getNodes: () => getNodes.value,
-  getEdges: () => getEdges.value,
+  getNodes: () => getNodes.value as unknown as FlowNode[],
+  getEdges: () => getEdges.value as unknown as FlowEdge[],
   setGraph: (newNodes, newEdges) => {
-    setNodes(newNodes);
-    setEdges(newEdges);
+    setNodes(newNodes as unknown as Node[]);
+    setEdges(newEdges as unknown as Edge[]);
   },
-  getSelectedNodes: () => getSelectedNodes.value,
-  getSelectedEdges: () => getSelectedEdges.value,
+  getSelectedNodes: () => getSelectedNodes.value as unknown as FlowNode[],
+  getSelectedEdges: () => getSelectedEdges.value as unknown as FlowEdge[],
   screenToFlowCoordinate,
 });
 
 // This is the only board, so this editor registers first and becomes the
 // active graph — no BoardInterface changes needed.
-const boardInterface = getCurrentInstance().appContext.config.globalProperties.$boardInterface;
+const boardInterface = getCurrentInstance()!.appContext.config.globalProperties.$boardInterface;
 onMounted(() => boardInterface.addGraphEditor(editor));
 
 watch(getSelectedNodes, () => editor.syncSelection());
@@ -103,7 +112,8 @@ watch(getSelectedNodes, () => editor.syncSelection());
 // clear of the floating panels. fitViewOnInit would instead zoom onto the
 // first nodes added to the empty board and skew every coordinate after that.
 
-function validConnection(connection) {
+// Re-validated edges carry an id on top of the Connection shape (see below).
+function validConnection(connection: Connection & { id?: string }) {
   // Vue Flow ALSO runs this validator over every edge whenever the edge set
   // is replaced (setEdges re-validation). Those edges already carry an id and
   // must pass untouched — otherwise each existing edge is rejected as a
@@ -114,7 +124,7 @@ function validConnection(connection) {
   return !isInvalidConnection(getEdges.value, connection.source, connection.target);
 }
 
-function onConnect(connection) {
+function onConnect(connection: Connection) {
   addEdges([{ ...connection }]);
   editor.commit();
 }
@@ -123,14 +133,15 @@ function commit() {
   editor.commit();
 }
 
-function onDrop(event) {
+function onDrop(event: DragEvent) {
   editor.dropAt(event.clientX, event.clientY);
 }
 
-function onFileChosen(event) {
-  const file = event.target.files[0];
-  if (file) editor.uploadToBoard(event.target);
-  event.target.value = '';
+function onFileChosen(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files![0];
+  if (file) editor.uploadToBoard(input);
+  input.value = '';
 }
 </script>
 

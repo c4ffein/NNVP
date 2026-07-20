@@ -1,0 +1,228 @@
+/**
+ * @license
+ * Copyright 2018 Google LLC. All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * =============================================================================
+ * Modified by c4ffein to enable loading of other datasets than the original MNIST one.
+ * Heavily modified again to allow multiple sprite paths and usage of fetch to verify checksums.
+ */
+
+import { loadTf, getTf } from '../tf/loadTf';
+import LabelEncoder from './label-encoder';
+import type { SpriteEntry } from './datasets-sources';
+
+/**
+ * A class that fetches the sprited MNIST dataset and returns shuffled batches.
+ *
+ * NOTE: This will get much easier. For now, we do data fetching and
+ * manipulation manually.
+ */
+export default class Dataset {
+  imagesSpritePath: string | SpriteEntry[];
+  checksum: string | string[] | null;
+  shape: number[] | null;
+  labelsPath: string;
+  labelsSha256: string | null;
+  numClasses: number;
+  labelSize: number;
+  numDatasetElements: number;
+  numTrainElements: number;
+  numTestElements: number;
+  shuffledTrainIndex: number;
+  shuffledTestIndex: number;
+  imagePixelSize: number;
+  imageByteSize: number;
+  labelEncoder: LabelEncoder;
+
+  // Populated by load(); `declare` keeps them type-only so no own property
+  // exists before load() assigns them (exactly the historical JS behavior).
+  declare datasetImages: Float32Array;
+  declare datasetLabels: Uint8Array;
+  declare trainIndices: Uint32Array;
+  declare testIndices: Uint32Array;
+  declare trainImages: Float32Array;
+  declare testImages: Float32Array;
+  declare trainLabels: Uint8Array;
+  declare testLabels: Uint8Array;
+
+  constructor(
+    imagesSpritePath: string | SpriteEntry[],
+    imagesSpriteChecksum: string | string[] | null = null,
+    shape: number[] | null = null,
+    labelsPath: string,
+    labelsSha256: string | null = null,
+    numClasses: number,
+    numDatasetElements: number,
+    numTrainElements: number,
+    numTestElements?: number,
+  ) {
+    this.imagesSpritePath = imagesSpritePath;
+    this.checksum = imagesSpriteChecksum;
+    this.shape = shape;
+    this.labelsPath = labelsPath;
+    this.labelsSha256 = labelsSha256;
+    this.numClasses = numClasses;
+    this.labelSize = 1;
+    this.numDatasetElements = numDatasetElements;
+    this.numTrainElements = numTrainElements;
+    this.numTestElements = numTestElements || this.numDatasetElements - this.numTrainElements;
+    this.shuffledTrainIndex = 0;
+    this.shuffledTestIndex = 0;
+    this.imagePixelSize = this.shape![0]! * this.shape![1]!;
+    this.imageByteSize = this.shape!.reduce((a, b) => a * b);
+
+    // Create label encoder for this dataset
+    this.labelEncoder = new LabelEncoder(this.numClasses);
+  }
+
+  async load(progressionCallback?: ((fraction: number) => void) | null, isSequential = true) {
+    // Ensure tfjs is loaded before we use it (tf.util below and, later, batching).
+    const tf = await loadTf();
+    let total = 1; // For label request
+    let loaded = 0;
+    const incLoaded = () => {
+      loaded = loaded + 1;
+      if (progressionCallback) progressionCallback(loaded / total);
+    };
+    const datasetBytesBuffer = new ArrayBuffer(this.numDatasetElements * this.imageByteSize * 4);
+    let chain: Promise<unknown> = Promise.resolve(); // Needed for sequential behaviour
+    // Normalize the single-sprite form (a plain path string) to the multi-sprite
+    // form ([[offset, nbElem, path], ...]) so one code path handles both — and
+    // the progress total stays consistent (sprites + the labels request).
+    const singleSprite = typeof(this.imagesSpritePath) === "string";
+    const spriteEntries: SpriteEntry[] = singleSprite
+      ? [[0, this.numDatasetElements, this.imagesSpritePath as string]]
+      : this.imagesSpritePath as SpriteEntry[];
+    const spriteChecksums: string[] | null = singleSprite
+      ? (this.checksum ? [this.checksum as string] : null)
+      : this.checksum as string[] | null;
+    const imgRequests = spriteEntries.map(
+      ([offset, nbElem, currentSpritePath], index) => {
+        total = total + 1;
+        const buildFunc = () => this.buildImgRequest(
+          currentSpritePath, offset, nbElem, spriteChecksums ? spriteChecksums[index]! : null, datasetBytesBuffer
+        )
+        if (isSequential) chain = chain.then(buildFunc).then(incLoaded);
+        else return buildFunc().then(incLoaded);
+      }
+    );
+    this.datasetImages = new Float32Array(datasetBytesBuffer);
+    const labelsRequest = fetch(this.labelsPath, {integrity: this.labelsSha256 as string}).then(
+      async response => {this.datasetLabels = new Uint8Array(await response.arrayBuffer());}
+    ).then(incLoaded);
+    await Promise.all([...imgRequests, labelsRequest, chain]);
+
+    // Create shuffled indices into the train/test set for when we select a
+    // random dataset element for training / validation.
+    this.trainIndices = tf.util.createShuffledIndices(this.numTrainElements);
+    this.testIndices = tf.util.createShuffledIndices(this.numTestElements);
+
+    // Slice the the images and labels into train and test sets.
+    this.trainImages = this.datasetImages.slice(0, this.imageByteSize * this.numTrainElements);
+    this.testImages = this.datasetImages.slice(this.imageByteSize * this.numTrainElements);
+    this.trainLabels = this.datasetLabels.slice(0, this.labelSize * this.numTrainElements);
+    this.testLabels = this.datasetLabels.slice(this.labelSize * this.numTrainElements);
+  }
+
+  buildImgRequest(
+    imagesSpritePath: string,
+    offset: number,
+    nbElem: number,
+    imagesSpriteChecksum: string | null,
+    datasetBytesBuffer: ArrayBuffer,
+  ): Promise<void> {
+    return fetch(
+      imagesSpritePath, imagesSpriteChecksum ? {integrity: imagesSpriteChecksum} : {}
+    ).then(response => {
+      if (!response.ok) throw "Failed GET of " + imagesSpritePath;
+      return response.blob();
+    }).then(async responseBlob => {
+      const img = new Image();
+      await (() => new Promise<void>(resolve => {
+        img.onload = () => resolve();
+        img.src = URL.createObjectURL(responseBlob);
+      }))();
+      return img;
+    }).then(img => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d')!;
+      const chunkLength = 1000;
+      canvas.width = img.width;
+      canvas.height = chunkLength * this.shape![2]!;
+
+      for (let i = 0; i < nbElem / chunkLength; i++) {
+        const viewStart = (i * chunkLength + offset) * this.imageByteSize * 4;
+        const viewLength = Math.min(
+          chunkLength * this.imageByteSize * 4,
+          (nbElem - i * chunkLength) * this.imageByteSize * 4,
+        );
+
+        const datasetBytesView = new Float32Array(datasetBytesBuffer, viewStart, viewLength / 4);
+        ctx.drawImage(img, 0, i * chunkLength, img.width, viewLength, 0, 0, img.width, viewLength);
+
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        if (this.shape![2] == 1) { // All channels hold an equal value since the image is grayscale, just read the red.
+          for (let j = 0; j < imageData.data.length / 4; j++) datasetBytesView[j] = imageData.data[j * 4]! / 255;
+        }
+        else {
+          for (let j = 0; j < imageData.data.length; j++) {
+            if ((j+1)%4 !== 0) datasetBytesView[Math.floor((j + 1) * 3 / 4)] = imageData.data[j]! / 255;
+          }
+        }
+      }
+    });
+  }
+
+  nextTrainBatch(batchSize: number, encoding = 'one-hot-tf') {
+    return this.nextBatch(
+      batchSize, [this.trainImages, this.trainLabels], () => {
+        this.shuffledTrainIndex = (this.shuffledTrainIndex + 1) % this.trainIndices.length;
+        return this.trainIndices[this.shuffledTrainIndex]!;
+      },
+      encoding
+    );
+  }
+
+  nextTestBatch(batchSize: number, encoding = 'one-hot-tf') {
+    return this.nextBatch(batchSize, [this.testImages, this.testLabels], () => {
+      this.shuffledTestIndex = (this.shuffledTestIndex + 1) % this.testIndices.length;
+      return this.testIndices[this.shuffledTestIndex]!;
+    }, encoding);
+  }
+
+  nextBatch(
+    batchSize: number,
+    data: [Float32Array, Uint8Array],
+    index: () => number,
+    encoding = 'one-hot-tf',
+  ) {
+    const tf = getTf();
+    const batchImagesArray = new Float32Array(batchSize * this.imageByteSize);
+    const batchLabelsArray = new Int32Array(batchSize);
+
+    for (let i = 0; i < batchSize; i++) {
+      const idx = index();
+      // set images
+      const image = data[0].slice(idx * this.imageByteSize, (idx + 1) * this.imageByteSize);
+      batchImagesArray.set(image, i * this.imageByteSize);
+      // set labels
+      const label = data[1].slice(idx * this.labelSize, idx * this.labelSize + this.labelSize);
+      batchLabelsArray[i] = label[0]!;
+    }
+
+    const xs = tf.tensor2d(batchImagesArray, [batchSize, this.imageByteSize]);
+    const labels = this.labelEncoder.encode(batchLabelsArray, encoding);
+
+    return { xs, labels };
+  }
+}

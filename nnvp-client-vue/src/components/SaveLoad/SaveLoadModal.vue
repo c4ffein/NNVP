@@ -144,18 +144,64 @@
   </Transition>
 </template>
 
-<script>
+<script lang="ts">
+import { defineComponent } from 'vue';
 import ApiClient, { ERROR_CODES } from '../../lib/Backend/apiClient';
 import {
   getCurrentProject, setCurrentProject, clearCurrentProject,
 } from '../../lib/Backend/currentProject';
+import type { CurrentProject } from '../../lib/Backend/currentProject';
 
 const NODE_W = 108;
 const NODE_H = 26;
 const COL_GAP = 20;
 const ROW_GAP = 10;
 
-export default {
+/** Project rows as the backend returns them (list / get / create). */
+interface ProjectRecord {
+  id: number;
+  name: string;
+  updated_at?: string;
+  tags?: string[];
+  graph?: unknown;
+}
+
+interface LineageNode { id: number; name: string }
+interface LineageEdge { source: number; target: number }
+/** api.projectLineage payload: ancestors/descendants around one save. */
+interface Lineage { focus: number; nodes: LineageNode[]; edges: LineageEdge[] }
+
+interface LayoutNode {
+  id: number;
+  name: string;
+  label: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+interface LayoutEdge { x1: number; y1: number; x2: number; y2: number }
+interface LineageLayout {
+  nodes: LayoutNode[];
+  edges: LayoutEdge[];
+  width: number;
+  height: number;
+}
+
+/** Errors surfaced by ApiClient (ApiError-shaped), read defensively. */
+interface ApiErrorLike {
+  code?: string;
+  status?: number | null;
+  message?: string;
+}
+
+// Non-reactive instance state, assigned in created() (not data()) on purpose.
+// Typed through the `self` cast below — a typing-only view, self === this.
+interface SaveLoadModalInternal {
+  api: ApiClient;
+}
+
+export default defineComponent({
   name: 'SaveLoadModal',
   props: {
     show: { type: Boolean, required: true },
@@ -165,66 +211,66 @@ export default {
   data() {
     return {
       signedIn: false,
-      projects: [],
+      projects: [] as ProjectRecord[],
       search: '',
-      selectedId: null,
-      lineage: null,
+      selectedId: null as number | null,
+      lineage: null as Lineage | null,
       saveName: '',
       saveTags: '',
-      continuationOf: null,
+      continuationOf: null as CurrentProject | null,
       busy: false,
       error: '',
       status: '',
     };
   },
   created() {
-    this.api = new ApiClient();
+    (this as typeof this & SaveLoadModalInternal).api = new ApiClient();
   },
   watch: {
-    show(isOpen) {
+    show(isOpen: boolean) {
       if (isOpen) this.onOpen();
     },
   },
   computed: {
-    filteredProjects() {
+    filteredProjects(): ProjectRecord[] {
       const needle = this.search.trim().toLowerCase();
       if (!needle) return this.projects;
       return this.projects.filter(p => p.name.toLowerCase().includes(needle)
         || (p.tags || []).some(tag => String(tag).toLowerCase().includes(needle)));
     },
     // Columns by generation (-2..+2 relative to the focus), rows within.
-    lineageLayout() {
+    lineageLayout(): LineageLayout {
       if (!this.lineage) return { nodes: [], edges: [], width: 0, height: 0 };
-      const depth = new Map([[this.lineage.focus, 0]]);
-      const parentOf = new Map(this.lineage.edges.map(e => [e.target, e.source]));
-      const childrenOf = new Map();
+      const depth = new Map<number, number>([[this.lineage.focus, 0]]);
+      const parentOf = new Map(this.lineage.edges.map(e => [e.target, e.source] as [number, number]));
+      const childrenOf = new Map<number, number[]>();
       this.lineage.edges.forEach((e) => {
         if (!childrenOf.has(e.source)) childrenOf.set(e.source, []);
-        childrenOf.get(e.source).push(e.target);
+        childrenOf.get(e.source)!.push(e.target);
       });
       // Walk up then down from the focus (the backend guarantees ≤2 each way).
       let cursor = this.lineage.focus;
       for (let d = -1; parentOf.has(cursor); d -= 1) {
-        cursor = parentOf.get(cursor);
+        cursor = parentOf.get(cursor)!;
         depth.set(cursor, d);
       }
-      const walkDown = (id) => {
+      const walkDown = (id: number): void => {
         (childrenOf.get(id) || []).forEach((child) => {
-          if (!depth.has(child)) depth.set(child, depth.get(id) + 1);
+          if (!depth.has(child)) depth.set(child, depth.get(id)! + 1);
           walkDown(child);
         });
       };
       walkDown(this.lineage.focus);
-      if (parentOf.has(this.lineage.focus)) walkDown(parentOf.get(this.lineage.focus));
+      if (parentOf.has(this.lineage.focus)) walkDown(parentOf.get(this.lineage.focus)!);
 
       const depths = [...new Set(depth.values())].sort((a, b) => a - b);
-      const columnIndex = new Map(depths.map((d, i) => [d, i]));
-      const rows = new Map(); // columnIndex -> next row
-      const placed = new Map();
+      const columnIndex = new Map(depths.map((d, i) => [d, i] as [number, number]));
+      const rows = new Map<number, number>(); // columnIndex -> next row
+      const placed = new Map<number, LayoutNode>();
       const nodes = this.lineage.nodes
         .filter(n => depth.has(n.id))
-        .map((n) => {
-          const col = columnIndex.get(depth.get(n.id));
+        .map((n): LayoutNode => {
+          const col = columnIndex.get(depth.get(n.id)!)!;
           const row = rows.get(col) || 0;
           rows.set(col, row + 1);
           const node = {
@@ -241,11 +287,11 @@ export default {
         });
       const edges = this.lineage.edges
         .filter(e => placed.has(e.source) && placed.has(e.target))
-        .map(e => ({
-          x1: placed.get(e.source).x + NODE_W,
-          y1: placed.get(e.source).y + NODE_H / 2,
-          x2: placed.get(e.target).x,
-          y2: placed.get(e.target).y + NODE_H / 2,
+        .map((e): LayoutEdge => ({
+          x1: placed.get(e.source)!.x + NODE_W,
+          y1: placed.get(e.source)!.y + NODE_H / 2,
+          x2: placed.get(e.target)!.x,
+          y2: placed.get(e.target)!.y + NODE_H / 2,
         }));
       return {
         nodes,
@@ -257,6 +303,7 @@ export default {
   },
   methods: {
     async onOpen() {
+      const self = this as typeof this & SaveLoadModalInternal;
       this.error = '';
       this.status = '';
       this.search = '';
@@ -268,36 +315,39 @@ export default {
       this.saveTags = '';
       this.saveName = this.defaultName();
       this.$nextTick(() => {
-        const el = this.$refs.container && this.$refs.container.querySelector('input, button');
+        const container = this.$refs.container as HTMLElement | undefined;
+        const el = container && container.querySelector<HTMLElement>('input, button');
         if (el) el.focus();
       });
-      if (!this.api.isLoggedIn()) return;
+      if (!self.api.isLoggedIn()) return;
       try {
-        const statusData = await this.api.authStatus();
+        const statusData = await self.api.authStatus() as { verified?: boolean };
         this.signedIn = !!statusData.verified;
         if (this.signedIn && this.mode === 'load') {
-          this.projects = (await this.api.listProjects()) || [];
+          this.projects = ((await self.api.listProjects()) || []) as ProjectRecord[];
         }
       } catch {
         this.signedIn = false; // pending/expired token: treat as signed out
       }
     },
-    defaultName() {
+    defaultName(): string {
       const current = getCurrentProject();
       if (current && current.name) return current.name;
       const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
       return `Model ${stamp}`;
     },
-    async select(id) {
+    async select(id: number) {
+      const self = this as typeof this & SaveLoadModalInternal;
       this.selectedId = id;
       try {
-        this.lineage = await this.api.projectLineage(id);
+        this.lineage = await self.api.projectLineage(id) as Lineage;
       } catch (e) {
         this.lineage = null;
         this.handleError(e);
       }
     },
     async saveToCloud() {
+      const self = this as typeof this & SaveLoadModalInternal;
       if (this.busy) return;
       const name = this.saveName.trim();
       if (!name) {
@@ -312,12 +362,12 @@ export default {
       this.busy = true;
       this.error = '';
       try {
-        const created = await this.api.createProject({
+        const created = await self.api.createProject({
           name,
           graph: JSON.parse(graphString),
           tags: this.saveTags.split(',').map(tag => tag.trim()).filter(Boolean),
           parent: this.continuationOf ? this.continuationOf.id : null,
-        });
+        }) as ProjectRecord;
         setCurrentProject(created);
         this.continuationOf = getCurrentProject();
         this.status = `Saved “${created.name}” to the cloud.`;
@@ -328,11 +378,12 @@ export default {
       }
     },
     async openSelected() {
+      const self = this as typeof this & SaveLoadModalInternal;
       if (this.busy || this.selectedId === null) return;
       this.busy = true;
       this.error = '';
       try {
-        const full = await this.api.getProject(this.selectedId);
+        const full = await self.api.getProject(this.selectedId) as ProjectRecord;
         const graph = typeof full.graph === 'string' ? full.graph : JSON.stringify(full.graph);
         if (this.$boardInterface) this.$boardInterface.loadGraphFromJSON(graph);
         setCurrentProject(full);
@@ -358,21 +409,22 @@ export default {
       this.closeModal();
       this.$emit('open-account');
     },
-    formatDate(value) {
+    formatDate(value: string | undefined): string {
       if (!value) return '';
       const d = new Date(value);
       return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleString();
     },
-    handleError(e) {
-      const code = e && e.code;
+    handleError(e: unknown) {
+      const err = e as ApiErrorLike | null | undefined;
+      const code = err && err.code;
       if (code === ERROR_CODES.notLoggedIn) {
         this.error = 'Please sign in first.';
       } else if (code === ERROR_CODES.network) {
         this.error = 'Can\'t reach the server — please check your internet connection and try again.';
-      } else if (code === ERROR_CODES.http && e.status >= 500) {
+      } else if (code === ERROR_CODES.http && (err!.status as number) >= 500) {
         this.error = 'The server isn\'t responding right now — please try again in a moment.';
-      } else if (e && e.message) {
-        this.error = e.message;
+      } else if (err && err.message) {
+        this.error = err.message;
       } else {
         this.error = 'Something went wrong.';
       }
@@ -380,7 +432,7 @@ export default {
     closeModal() {
       this.$emit('close');
     },
-    handleKeydown(event) {
+    handleKeydown(event: KeyboardEvent) {
       if (this.show && event.key === 'Escape') this.closeModal();
     },
   },
@@ -391,7 +443,7 @@ export default {
   beforeUnmount() {
     document.removeEventListener('keydown', this.handleKeydown);
   },
-};
+});
 </script>
 
 <style scoped>

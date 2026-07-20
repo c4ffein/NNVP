@@ -11,29 +11,36 @@
   </div>
 </template>
 
-<script>
-export default {
+<script lang="ts">
+import { defineComponent } from 'vue';
+import type { PropType } from 'vue';
+import type KerasLayer from '../../lib/KerasInterface/KerasLayer';
+
+export default defineComponent({
   name: 'TupleIntParameter',
   props: {
-    name: String,
-    activeLayer: null,
+    name: { type: String, required: true },
+    activeLayer: { type: Object as PropType<KerasLayer>, required: true },
   },
   data() {
     return {
       inputValue: 0,
-      values: this.activeLayer.parameterValues[this.name],
+      // Undefined until created() backfills it; typed as the array the
+      // template iterates (the stored value is a number[] for tuple_int).
+      values: this.activeLayer.parameterValues[this.name] as number[],
     };
   },
   methods: {
     addElementToArray() {
-      if (this.values === undefined) {
+      if ((this.values as number[] | undefined) === undefined) {
         this.values = [];
       }
-      this.values.push(parseInt(1, 10));
+      // Historical quirk: parseInt is called on a number (works, returns 1).
+      this.values.push(parseInt(1 as unknown as string, 10));
       this.updateParamFromKerasLayer();
     },
     removeElementToArray() {
-      if (this.values === undefined) {
+      if ((this.values as number[] | undefined) === undefined) {
         this.values = [];
       }
       this.values.splice(-1);
@@ -44,11 +51,11 @@ export default {
     },
   },
   created() {
-    if (this.values === undefined) {
+    if ((this.values as number[] | undefined) === undefined) {
       this.values = [];
     }
   },
-};
+});
 </script>
 
 <style >

@@ -151,19 +151,34 @@
   </Transition>
 </template>
 
-<script>
+<script lang="ts">
+import { defineComponent } from 'vue';
+import type { ComponentPublicInstance } from 'vue';
 import AssistantActions from '../../lib/Assistant/assistantActions';
 import FloatingWindow from '../FloatingWindow.vue';
 import renderMarkdown from '../../lib/Assistant/markdown';
 import { ASK_EVENT, consumePendingAsk } from '../../lib/Assistant/askAssistant';
+import type { PendingAsk } from '../../lib/Assistant/askAssistant';
 import { chatSession } from '../../lib/Assistant/chatSession';
+import type { ChatMessage } from '../../lib/Assistant/chatSession';
 import AnthropicClient, {
   STORAGE_ALLOW_EDITS,
   readStoredConfig,
   usesBackendProxy,
 } from '../../lib/Assistant/anthropicClient';
+import type { AssistantActivity } from '../../lib/Assistant/anthropicClient';
 
-export default {
+// Non-reactive instance state, assigned in created()/mounted() (not data())
+// on purpose. Typed through the `self` cast below — typing-only, self === this.
+interface ChatBubbleInternal {
+  actions: AssistantActions;
+  client: AnthropicClient;
+  onAuthChanged: () => void;
+  onAskAssistant: (event: Event) => void;
+  blinkTimer?: ReturnType<typeof setTimeout>;
+}
+
+export default defineComponent({
   name: 'ChatBubble',
   components: { FloatingWindow },
   emits: ['open-account', 'close'],
@@ -185,7 +200,7 @@ export default {
       history: chatSession.history,
       hasKey: false,
       // Tappable answers the assistant proposed (propose_choices tool).
-      choices: [],
+      choices: [] as string[],
       // True when requests will go through the NNVP backend proxy (signed in,
       // no user key / custom base URL) — drives the settings hint.
       proxyActive: false,
@@ -194,31 +209,36 @@ export default {
     };
   },
   created() {
+    const self = this as typeof this & ChatBubbleInternal;
     this.refreshHasKey();
     if (typeof localStorage !== 'undefined') {
       this.allowEdits = localStorage.getItem(STORAGE_ALLOW_EDITS) === 'true';
     }
-    this.actions = new AssistantActions(this.$boardInterface, this.$kerasInterface);
-    this.client = new AnthropicClient(this.actions, { allowEdits: this.allowEdits });
+    self.actions = new AssistantActions(this.$boardInterface, this.$kerasInterface);
+    self.client = new AnthropicClient(self.actions, { allowEdits: this.allowEdits });
   },
   mounted() {
+    const self = this as typeof this & ChatBubbleInternal;
     // Sign-in / sign-out elsewhere in the app flips the chat between its two
     // states live (apiClient dispatches this on every token change).
-    this.onAuthChanged = () => this.refreshHasKey();
-    window.addEventListener('nnvp:auth-changed', this.onAuthChanged);
+    self.onAuthChanged = () => this.refreshHasKey();
+    window.addEventListener('nnvp:auth-changed', self.onAuthChanged);
     // The window is visible as soon as it mounts: land focus in the input.
     this.focusInput();
     // "Ask the assistant about X" from a help modal. The pending slot covers
     // the case where App just mounted this component BECAUSE of that ask.
-    this.onAskAssistant = (event) => this.askAbout(event.detail.topic);
-    window.addEventListener(ASK_EVENT, this.onAskAssistant);
+    self.onAskAssistant = (event: Event) => this.askAbout(
+      (event as CustomEvent<PendingAsk>).detail.topic,
+    );
+    window.addEventListener(ASK_EVENT, self.onAskAssistant);
     const pendingAsk = consumePendingAsk();
     if (pendingAsk) this.askAbout(pendingAsk.topic);
   },
   beforeUnmount() {
-    window.removeEventListener('nnvp:auth-changed', this.onAuthChanged);
-    window.removeEventListener(ASK_EVENT, this.onAskAssistant);
-    clearTimeout(this.blinkTimer);
+    const self = this as typeof this & ChatBubbleInternal;
+    window.removeEventListener('nnvp:auth-changed', self.onAuthChanged);
+    window.removeEventListener(ASK_EVENT, self.onAskAssistant);
+    clearTimeout(self.blinkTimer);
   },
   methods: {
     renderMarkdown,
@@ -226,19 +246,21 @@ export default {
     // otherwise the first available control (e.g. Settings).
     focusInput() {
       this.$nextTick(() => {
-        const input = this.$refs.draftInput;
+        const input = this.$refs.draftInput as HTMLInputElement | undefined;
         if (input && !input.disabled) {
           input.focus({ preventScroll: true });
           return;
         }
-        const panel = this.$refs.panel && this.$refs.panel.$el;
+        const panelRef = this.$refs.panel as ComponentPublicInstance | undefined;
+        const panel = panelRef && panelRef.$el;
         const focusable = panel && panel.querySelector('button, input:not([disabled]), [tabindex]');
         if (focusable) focusable.focus({ preventScroll: true });
       });
     },
-    setMode(allowEdits) {
+    setMode(allowEdits: boolean) {
+      const self = this as typeof this & ChatBubbleInternal;
       this.allowEdits = allowEdits;
-      if (this.client) this.client.setAllowEdits(allowEdits);
+      if (self.client) self.client.setAllowEdits(allowEdits);
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(STORAGE_ALLOW_EDITS, allowEdits ? 'true' : 'false');
       }
@@ -254,12 +276,13 @@ export default {
     // A help modal handed the user over: open the panel and let the ASSISTANT
     // open the conversation, so the user just answers. Signed out, the chat
     // shows its sign-in gate instead — blink that button to say "start here".
-    askAbout(topic) {
+    askAbout(topic: string) {
+      const self = this as typeof this & ChatBubbleInternal;
       this.refreshHasKey();
       if (!this.hasKey) {
         this.blinkSignIn = true;
-        clearTimeout(this.blinkTimer);
-        this.blinkTimer = setTimeout(() => { this.blinkSignIn = false; }, 4000);
+        clearTimeout(self.blinkTimer);
+        self.blinkTimer = setTimeout(() => { this.blinkSignIn = false; }, 4000);
         return;
       }
       const question = `What do you want to know about **${topic}**?`;
@@ -272,14 +295,15 @@ export default {
     },
     scrollToBottom() {
       this.$nextTick(() => {
-        const el = this.$refs.messagesEl;
+        const el = this.$refs.messagesEl as HTMLElement | undefined;
         if (el) el.scrollTop = el.scrollHeight;
       });
     },
     // One short human line instead of the technical error: only the two
     // actionable cases keep their meaning, everything else is "difficulties".
-    shortErrorText(error) {
-      const detail = String((error && error.message) || error || '').toLowerCase();
+    shortErrorText(error: unknown): string {
+      const err = error as { message?: string } | null | undefined;
+      const detail = String((err && err.message) || error || '').toLowerCase();
       if (detail.includes('sign in') || detail.includes('401')) {
         return 'Session expired — please sign in again.';
       }
@@ -288,16 +312,17 @@ export default {
       }
       return 'Currently experiencing technical difficulties — please try again soon.';
     },
-    pickChoice(choice) {
+    pickChoice(choice: string) {
       this.choices = [];
       this.draft = choice;
       this.send();
     },
-    pushMessage(role, text, isError = false) {
+    pushMessage(role: ChatMessage['role'], text: string, isError = false) {
       this.messages.push({ role, text, isError });
       this.scrollToBottom();
     },
     async send() {
+      const self = this as typeof this & ChatBubbleInternal;
       const text = this.draft.trim();
       if (text === '' || this.sending || !this.hasKey) return;
       this.draft = '';
@@ -306,16 +331,16 @@ export default {
       this.history.push({ role: 'user', content: text });
       this.sending = true;
       try {
-        const onActivity = (event) => {
+        const onActivity = (event: AssistantActivity) => {
           if (event.type !== 'tool_use') return;
           if (event.name === 'propose_choices') {
-            const proposed = (event.input && event.input.choices) || [];
-            this.choices = proposed.filter(c => typeof c === 'string').slice(0, 4);
+            const proposed = ((event.input && event.input.choices) || []) as unknown[];
+            this.choices = proposed.filter((c): c is string => typeof c === 'string').slice(0, 4);
             return; // a UI affordance, not a board action — no ⚙ line
           }
           this.pushMessage('tool', `⚙ ${event.name}`);
         };
-        const reply = await this.client.send(this.history, onActivity);
+        const reply = await self.client.send(this.history, onActivity);
         if (reply) this.pushMessage('assistant', reply);
       } catch (error) {
         // Full detail goes to the console for debugging; the chat shows a
@@ -328,7 +353,7 @@ export default {
       }
     },
   },
-};
+});
 </script>
 
 <style scoped>

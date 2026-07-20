@@ -22,8 +22,8 @@ make dev      # Start development server
 **Production:**
 ```bash
 cd nnvp-client-vue
-npm install
-npm run build
+bun install
+bun run build
 # Serve the content of nnvp-client-vue/dist
 ```
 

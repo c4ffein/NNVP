@@ -62,11 +62,31 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
+import { defineComponent } from 'vue';
+import type { ComponentPublicInstance, PropType } from 'vue';
 import { markStepReached, markCompleted } from '../../lib/Tutorial/tutorials';
+import type { TutorialDef } from '../../lib/Tutorial/tutorials';
+import type { TutorialStep } from '../../lib/Tutorial/mnistTutorial';
 import FloatingWindow from '../FloatingWindow.vue';
 
-export default {
+interface HighlightRect {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+}
+
+// Non-reactive instance state, assigned in mounted()/startTutorial() (not
+// data()) on purpose. Typed through the `self` cast — typing-only, self === this.
+interface TutorialOverlayInternal {
+  stateChangeHandler: () => void;
+  reposition: () => void;
+  handleKeydown: (event: KeyboardEvent) => void;
+  pollTimer?: ReturnType<typeof setInterval> | null;
+}
+
+export default defineComponent({
   name: 'TutorialOverlay',
   components: { FloatingWindow },
   props: {
@@ -77,7 +97,7 @@ export default {
     // The tutorial definition to play ({ id, title, steps }); the overlay is a
     // generic engine, the definitions live in lib/Tutorial/tutorials.js.
     tutorial: {
-      type: Object,
+      type: Object as PropType<TutorialDef | null>,
       default: null,
     },
   },
@@ -93,38 +113,41 @@ export default {
       },
       currentStep: 0,
       stepComplete: false,
-      highlight: null,
+      highlight: null as HighlightRect | null,
     };
   },
   computed: {
-    steps() {
+    steps(): TutorialStep[] {
       return this.tutorial ? this.tutorial.steps : [];
     },
-    totalSteps() {
+    totalSteps(): number {
       return this.steps.length;
     },
-    step() {
-      return this.steps[this.currentStep];
+    // `!` preserves the original behavior: an out-of-range index was already
+    // possible in JS and consumers guard (try/catch) or render nothing.
+    step(): TutorialStep {
+      return this.steps[this.currentStep]!;
     },
   },
   watch: {
-    active(isActive) {
+    active(isActive: boolean) {
       if (isActive) {
         this.startTutorial();
       } else {
         this.teardown();
       }
     },
-    currentStep(step) {
+    currentStep(step: number) {
       if (this.tutorial) markStepReached(this.tutorial.id, step);
       this.refreshState();
     },
   },
   mounted() {
+    const self = this as typeof this & TutorialOverlayInternal;
     // Bound handlers reused for subscribe/unsubscribe.
-    this.stateChangeHandler = () => this.checkCompletion();
-    this.reposition = () => this.updateHighlight();
-    this.handleKeydown = (event) => {
+    self.stateChangeHandler = () => this.checkCompletion();
+    self.reposition = () => this.updateHighlight();
+    self.handleKeydown = (event: KeyboardEvent) => {
       if (this.active && event.key === 'Escape') this.exit();
     };
     if (this.active) this.startTutorial();
@@ -134,34 +157,37 @@ export default {
   },
   methods: {
     startTutorial() {
+      const self = this as typeof this & TutorialOverlayInternal;
       this.currentStep = 0;
       this.stepComplete = false;
-      this.$boardInterface.on('graph-changed', this.stateChangeHandler);
-      this.$boardInterface.on('selection-changed', this.stateChangeHandler);
-      window.addEventListener('resize', this.reposition);
-      window.addEventListener('scroll', this.reposition, true);
-      document.addEventListener('keydown', this.handleKeydown);
+      this.$boardInterface.on('graph-changed', self.stateChangeHandler);
+      this.$boardInterface.on('selection-changed', self.stateChangeHandler);
+      window.addEventListener('resize', self.reposition);
+      window.addEventListener('scroll', self.reposition, true);
+      document.addEventListener('keydown', self.handleKeydown);
       // Poll as a backup: some state changes (e.g. editing a parameter value)
       // do not necessarily emit graph-changed.
-      this.pollTimer = setInterval(() => this.checkCompletion(), 500);
+      self.pollTimer = setInterval(() => this.checkCompletion(), 500);
       this.$nextTick(() => {
         this.refreshState();
-        if (this.$refs.card && this.$refs.card.$el) {
+        const card = this.$refs.card as ComponentPublicInstance | undefined;
+        if (card && card.$el) {
           // preventScroll: focusing must not scroll the overflow-hidden app
           // container (that would visually shift every absolute panel).
-          this.$refs.card.$el.focus({ preventScroll: true });
+          card.$el.focus({ preventScroll: true });
         }
       });
     },
     teardown() {
-      this.$boardInterface.off('graph-changed', this.stateChangeHandler);
-      this.$boardInterface.off('selection-changed', this.stateChangeHandler);
-      window.removeEventListener('resize', this.reposition);
-      window.removeEventListener('scroll', this.reposition, true);
-      document.removeEventListener('keydown', this.handleKeydown);
-      if (this.pollTimer) {
-        clearInterval(this.pollTimer);
-        this.pollTimer = null;
+      const self = this as typeof this & TutorialOverlayInternal;
+      this.$boardInterface.off('graph-changed', self.stateChangeHandler);
+      this.$boardInterface.off('selection-changed', self.stateChangeHandler);
+      window.removeEventListener('resize', self.reposition);
+      window.removeEventListener('scroll', self.reposition, true);
+      document.removeEventListener('keydown', self.handleKeydown);
+      if (self.pollTimer) {
+        clearInterval(self.pollTimer);
+        self.pollTimer = null;
       }
       this.highlight = null;
     },
@@ -186,7 +212,7 @@ export default {
         markCompleted(this.tutorial.id);
       }
     },
-    resolveTarget() {
+    resolveTarget(): Element | null {
       const { target } = this.step;
       if (!target) return null;
       if (typeof target === 'function') return target(document);
@@ -232,7 +258,7 @@ export default {
       this.$emit('open-menu');
     },
   },
-};
+});
 </script>
 
 <style scoped>

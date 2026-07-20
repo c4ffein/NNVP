@@ -20,29 +20,39 @@
   </div>
 </template>
 
-<script>
-export default {
+<script lang="ts">
+import { defineComponent } from 'vue';
+import type { PropType } from 'vue';
+import type KerasLayer from '../../lib/KerasInterface/KerasLayer';
+import type { ParameterValue } from '../../types/model';
+
+export default defineComponent({
   name: 'ListParameter',
   props: {
-    name: String,
-    valueList: {},
-    activeLayer: null,
+    name: { type: String, required: true },
+    valueList: { type: Array as PropType<string[]>, required: true },
+    activeLayer: { type: Object as PropType<KerasLayer>, required: true },
   },
   data() {
     return {
-      selectedParameterValue: this.activeLayer.parameterValues[this.name],
+      selectedParameterValue:
+        this.activeLayer.parameterValues[this.name] as ParameterValue | undefined,
     };
   },
   methods: {
     updateParamFromKerasLayer() {
-      this.activeLayer.setParameterValue(this.name, this.selectedParameterValue);
+      this.activeLayer.setParameterValue(this.name, this.selectedParameterValue!);
     },
     resetParamFromKerasLayer() {
-      this.activeLayer.deleteParameterValue(this.name, this.selectedParameterValue);
+      // Historical quirk: deleteParameterValue only takes the name; the extra
+      // value argument has always been ignored.
+      (this.activeLayer.deleteParameterValue as (name: string, value?: unknown) => void)(
+        this.name, this.selectedParameterValue,
+      );
       this.selectedParameterValue = undefined;
     },
   },
-};
+});
 </script>
 
 <style>

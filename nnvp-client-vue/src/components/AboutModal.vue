@@ -55,8 +55,14 @@
   </Transition>
 </template>
 
-<script>
-export default {
+<script lang="ts">
+import { defineComponent } from 'vue';
+
+// Non-reactive instance field assigned outside data() (pure typing pass:
+// keeping it out of data() preserves its non-reactive nature).
+interface AboutModalInstanceExtra { previouslyFocused?: Element | null }
+
+export default defineComponent({
   name: 'AboutModal',
   props: {
     show: {
@@ -65,7 +71,7 @@ export default {
     },
   },
   watch: {
-    show(isOpen) {
+    show(isOpen: boolean) {
       if (isOpen) this.onOpen();
       else this.restoreFocus();
     },
@@ -79,21 +85,23 @@ export default {
     },
     onOpen() {
       // Remember what had focus so we can return it when the dialog closes.
-      this.previouslyFocused = document.activeElement;
+      (this as unknown as AboutModalInstanceExtra).previouslyFocused = document.activeElement;
       this.$nextTick(() => {
-        const container = this.$refs.container;
+        const container = this.$refs.container as HTMLElement | undefined;
         if (!container) return;
-        const focusable = container.querySelector('button, a[href]');
+        const focusable = container.querySelector<HTMLElement>('button, a[href]');
         (focusable || container).focus();
       });
     },
     restoreFocus() {
-      if (this.previouslyFocused && typeof this.previouslyFocused.focus === 'function') {
-        this.previouslyFocused.focus();
+      const self = this as unknown as AboutModalInstanceExtra;
+      const previouslyFocused = self.previouslyFocused as HTMLElement | null | undefined;
+      if (previouslyFocused && typeof previouslyFocused.focus === 'function') {
+        previouslyFocused.focus();
       }
-      this.previouslyFocused = null;
+      self.previouslyFocused = null;
     },
-    handleKeydown(event) {
+    handleKeydown(event: KeyboardEvent) {
       if (!this.show) return;
       if (event.key === 'Escape') {
         this.closeModal();
@@ -101,15 +109,15 @@ export default {
         this.trapFocus(event);
       }
     },
-    trapFocus(event) {
-      const container = this.$refs.container;
+    trapFocus(event: KeyboardEvent) {
+      const container = this.$refs.container as HTMLElement | undefined;
       if (!container) return;
-      const focusable = container.querySelectorAll(
+      const focusable = container.querySelectorAll<HTMLElement>(
         'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
       );
       if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
+      const first = focusable[0]!;
+      const last = focusable[focusable.length - 1]!;
       if (event.shiftKey && document.activeElement === first) {
         event.preventDefault();
         last.focus();
@@ -126,7 +134,7 @@ export default {
   beforeUnmount() {
     document.removeEventListener('keydown', this.handleKeydown);
   },
-};
+});
 </script>
 
 <style scoped>

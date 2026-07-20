@@ -2,9 +2,9 @@
 # wheel Pyodide will micropip-install. Usage:
 #   PYTHONPATH=/path/to/unpacked-tinygrad-wheel python3 run_local.py [out-prefix]
 # The optional prefix dumps the emitted (patched) runner and the weights blob
-# as <prefix>.js / <prefix>.safetensors, so check_runner.js can smoke-test
+# as <prefix>.js / <prefix>.safetensors, so check_runner.ts can smoke-test
 # them under bun against a fake WebGPU device:
-#   bun check_runner.js <prefix>
+#   bun check_runner.ts <prefix>
 import os
 
 os.environ["DEV"] = "NULL:WGSL"

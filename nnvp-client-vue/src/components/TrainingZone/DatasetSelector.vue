@@ -6,7 +6,7 @@
         class="DatasetSelector dataset-select"
         aria-label="Select dataset"
         v-bind:value="value"
-        v-on:change="datasetSet($event.target.value)"
+        v-on:change="datasetSet(($event.target as HTMLSelectElement).value)"
       >
         <option v-bind:key="key" v-for="(item, key) in loadableDatasets" v-bind:value="key">
           {{key}}
@@ -49,39 +49,59 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
+import { defineComponent } from 'vue';
+import type { PropType } from 'vue';
 import { loadTf } from '../../lib/tf/loadTf';
+import type { Tensor3D } from '@tensorflow/tfjs';
+import type { DatasetSourceEntry } from '../../lib/JSDatasets/datasets-sources';
+import type Dataset from '../../lib/JSDatasets/google-data-loader';
 
-export default {
+type DebugWindow = Window & { nnvp?: { debug?: { enableDatasets?: boolean } } };
+
+/** TrainingZone.loadDataset as passed down through the dynamic panel props. */
+type LoadDataset = (name: string, progressionCallback?: (fraction: number) => void) => Promise<void>;
+
+/** Instance state kept OFF data() — non-reactive by design. */
+interface DatasetSelectorNonReactive {
+  autoLoadTimer?: ReturnType<typeof setTimeout>;
+}
+
+export default defineComponent({
   name: 'DatasetSelector',
   props: {
     value: {type: String, default: null},
-    loadableDatasets: {type: Object, default: {}},
-    getDatasets: {type: Function, default: () => ({})},
-    loadDataset: {type: Function, default: () => null},
-    getWarningMessage: {type: Function, default: () => null},
+    loadableDatasets: {type: Object as PropType<Record<string, DatasetSourceEntry>>, default: {}},
+    getDatasets: {type: Function as PropType<() => Record<string, Dataset>>, default: () => ({})},
+    // The cast keeps the historical fallback (returns null where the real
+    // prop returns a Promise) without changing it — type-only.
+    loadDataset: {type: Function as PropType<LoadDataset>, default: (() => null) as unknown as LoadDataset},
+    getWarningMessage: {
+      type: Function as PropType<(name: string) => string | null | undefined>,
+      default: () => null,
+    },
   },
   computed: {
-    datasetDescription() { return this.loadableDatasets?.[this.value]?.[1] ?? ''; },
+    datasetDescription(): string { return this.loadableDatasets?.[this.value]?.[1] ?? ''; },
   },
   data() {
     return {
-      newestSelected: null, // Needed to simplify access before propagation
-      neededSamples: null,
+      newestSelected: null as string | null, // Needed to simplify access before propagation
+      neededSamples: null as string | null,
       loadingId: 0, // Incrementing ID to cancel stale loading operations
-      currentLoadingId: null,
+      currentLoadingId: null as number | null,
       loadingPercentage: 0,
       loadingShown: true,
       showWarning: false,
       warningMessage: '',
-      pendingDataset: null,
+      pendingDataset: null as string | null,
       loadError: false, // Whether the last load attempt failed
-      errorDatasetName: null, // Name of the dataset whose load failed (for the retry action)
+      errorDatasetName: null as string | null, // Name of the dataset whose load failed (for the retry action)
     };
   },
   methods: {
-    async datasetSet(name) {
-      const debugEnabled = window.nnvp?.debug?.enableDatasets;
+    async datasetSet(name: string) {
+      const debugEnabled = (window as DebugWindow).nnvp?.debug?.enableDatasets;
       if (debugEnabled) console.log(`[DatasetSelector] datasetSet called with: ${name}`);
 
       const warningMessage = this.getWarningMessage(name);
@@ -89,31 +109,32 @@ export default {
         this.warningMessage = warningMessage;
         this.pendingDataset = name;
         this.showWarning = true;
-        document.getElementById('dataset-selector-selector').value = this.value;
+        (document.getElementById('dataset-selector-selector') as HTMLSelectElement).value = this.value;
         return;
       }
       this.proceedWithDatasetLoad(name);
     },
     confirmWarning() {
-      const debugEnabled = window.nnvp?.debug?.enableDatasets;
+      const debugEnabled = (window as DebugWindow).nnvp?.debug?.enableDatasets;
       this.showWarning = false;
       const datasetName = this.pendingDataset;
       this.pendingDataset = null;
       this.warningMessage = '';
       if (debugEnabled) console.log(`[DatasetSelector] User confirmed warning for: ${datasetName}`);
-      this.proceedWithDatasetLoad(datasetName);
+      // `!` preserves the historical call (pendingDataset is always set here).
+      this.proceedWithDatasetLoad(datasetName!);
     },
     cancelWarning() {
-      const debugEnabled = window.nnvp?.debug?.enableDatasets;
+      const debugEnabled = (window as DebugWindow).nnvp?.debug?.enableDatasets;
       this.showWarning = false;
       const cancelledDataset = this.pendingDataset;
       this.pendingDataset = null;
       this.warningMessage = '';
-      document.getElementById('dataset-selector-selector').value = this.value;
+      (document.getElementById('dataset-selector-selector') as HTMLSelectElement).value = this.value;
       if (debugEnabled) console.log(`[DatasetSelector] User cancelled warning for: ${cancelledDataset}`);
     },
-    async proceedWithDatasetLoad(name) {
-      const debugEnabled = window.nnvp?.debug?.enableDatasets;
+    async proceedWithDatasetLoad(name: string) {
+      const debugEnabled = (window as DebugWindow).nnvp?.debug?.enableDatasets;
       this.newestSelected = name;
       this.$emit('input', name);
       const loadId = ++this.loadingId;
@@ -126,7 +147,7 @@ export default {
 
       if (debugEnabled) console.log(`[DatasetSelector] Starting load for: ${name}, ID: ${loadId}`);
 
-      const updateProgress = (progress, id) => {
+      const updateProgress = (progress: number, id: number) => {
         if (id !== this.currentLoadingId) return;
         this.loadingShown = true;
         this.loadingPercentage = progress;
@@ -160,12 +181,12 @@ export default {
     retryLoad() {
       const name = this.errorDatasetName;
       if (!name) return;
-      const debugEnabled = window.nnvp?.debug?.enableDatasets;
+      const debugEnabled = (window as DebugWindow).nnvp?.debug?.enableDatasets;
       if (debugEnabled) console.log(`[DatasetSelector] Retrying load for: ${name}`);
       this.proceedWithDatasetLoad(name);
     },
     // Mostly from https://storage.googleapis.com/tfjs-vis/mnist/dist/index.html
-    async fillSamples(name) {
+    async fillSamples(name: string) {
       if (this.value !== name) return;
       // tfjs is loaded lazily; ensure it is ready before using tf ops below.
       const tf = await loadTf();
@@ -185,13 +206,16 @@ export default {
       const numExamples = examples.xs.shape[0];
       for (let i = 0; i < numExamples; i += 1) {
         const imageTensor = tf.tidy(
-          () => examples.xs.slice([i, 0], [1, examples.xs.shape[1]]).reshape(dataset.shape),
+          () => examples.xs.slice([i, 0], [1, examples.xs.shape[1]]).reshape(dataset.shape!),
         );
         const canvas = document.createElement('canvas');
-        canvas.width = dataset.shape[0]; // eslint-disable-line prefer-destructuring
-        canvas.height = dataset.shape[1]; // eslint-disable-line prefer-destructuring
-        canvas.style = 'margin: 4px;';
-        await tf.browser.toPixels(imageTensor, canvas); // eslint-disable-line
+        canvas.width = dataset.shape![0]!; // eslint-disable-line prefer-destructuring
+        canvas.height = dataset.shape![1]!; // eslint-disable-line prefer-destructuring
+        // Historical string assignment to .style (works via the cssText attr path).
+        (canvas as unknown as { style: string }).style = 'margin: 4px;';
+        // Type-only cast: reshape's rank generic collapses to Tensor<Rank>,
+        // but the shapes here are [h, w, c] — a 3D tensor as toPixels wants.
+        await tf.browser.toPixels(imageTensor as Tensor3D, canvas); // eslint-disable-line
         drawArea.appendChild(canvas);
       }
     },
@@ -202,17 +226,19 @@ export default {
     },
   },
   mounted() {
+    const self = this as unknown as DatasetSelectorNonReactive; // non-reactive by design
     this.newestSelected = this.value;
     // Auto-load the default dataset after a grace period, unless the user
     // already picked one. Kept as a timer so opening the panel stays instant.
-    this.autoLoadTimer = setTimeout(() => {
+    self.autoLoadTimer = setTimeout(() => {
       if (this.newestSelected === this.value) this.datasetSet(this.newestSelected);
     }, 3000);
   },
   beforeUnmount() {
-    clearTimeout(this.autoLoadTimer);
+    const self = this as unknown as DatasetSelectorNonReactive; // non-reactive by design
+    clearTimeout(self.autoLoadTimer);
   },
-};
+});
 </script>
 
 <style>

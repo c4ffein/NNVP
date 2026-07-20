@@ -53,11 +53,16 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
+import { defineComponent } from 'vue';
 import layerHelp from '../../lib/KerasInterface/layerHelp';
 import { askAssistant } from '../../lib/Assistant/askAssistant';
 
-export default {
+// import.meta.env is Vite-only (absent under bun/unit tests) — typed locally
+// instead of pulling in vite/client types (same choice as BoardInterface.ts).
+type ImportMetaWithEnv = ImportMeta & { env?: { VITE_ENABLE_BACKEND?: string } };
+
+export default defineComponent({
   name: 'ParamsBlock',
   props: {
     title: String,
@@ -68,7 +73,7 @@ export default {
       isClosed: false,
       showModal: false,
       // Same gate as App.vue's ChatBubble mount: no chat, no handoff button.
-      backendEnabled: !!import.meta.env.VITE_ENABLE_BACKEND,
+      backendEnabled: !!(import.meta as ImportMetaWithEnv).env?.VITE_ENABLE_BACKEND,
     };
   },
   methods: {
@@ -82,16 +87,17 @@ export default {
       this.showModal = false;
     },
     askInChat() {
-      askAssistant(this.layerType);
+      // Only reachable from the help button, which requires layerType.
+      askAssistant(this.layerType!);
       this.closeModal();
     },
-    handleEscape(event) {
+    handleEscape(event: KeyboardEvent) {
       if (event.key === 'Escape' && this.showModal) {
         this.closeModal();
       }
     },
-    getLayerHelp() {
-      return layerHelp[this.layerType] || `
+    getLayerHelp(): string {
+      return layerHelp[this.layerType!] || `
         <h2>${this.layerType}</h2>
         <p>This is a ${this.layerType} layer. Documentation coming soon!</p>
         <p>Check the <a href="https://keras.io/api/layers/" target="_blank">Keras documentation</a> for more details.</p>
@@ -104,7 +110,7 @@ export default {
   beforeUnmount() {
     document.removeEventListener('keydown', this.handleEscape);
   },
-};
+});
 </script>
 
 <style >

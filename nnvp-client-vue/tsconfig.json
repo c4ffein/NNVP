@@ -1,12 +1,12 @@
 {
-  // Gradual TypeScript adoption (docs/tasks.md § 6): .ts files are strictly
-  // checked, .js files ride along unchecked (allowJs + checkJs:false) and
-  // convert opportunistically. `bun run typecheck` runs this; note that
-  // neither bun nor vite type-check anything on their own.
-  //
-  // Scope is src/ EXCEPT .vue SFCs: checking those needs vue-tsc, which
-  // requires node (it does not type-check SFC contents under bun) and breaks
-  // with typescript@7 — keep typescript pinned to 5.x if vue-tsc is ever added.
+  // Gradual TypeScript adoption (docs/tasks.md § 6): .ts files and lang="ts"
+  // SFC script blocks are strictly checked; plain-JS files and script blocks
+  // ride along unchecked (allowJs + checkJs:false) and convert
+  // opportunistically. `bun run typecheck` runs vue-tsc through
+  // scripts/vue-tsc-bun.js (vue-tsc's own bin silently skips .vue under bun —
+  // see that script's header); `bun run typecheck:tsc` is the plain-tsc
+  // fallback, which does NOT check .vue contents. Keep typescript pinned to
+  // 5.x — vue-tsc breaks with typescript@7.
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
@@ -14,6 +14,11 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
+    // GeneralMenu.vue's lang="tsx" render function: vue-tsc refuses JSX
+    // without --jsx, and "preserve" + jsxImportSource "vue" is Vue's
+    // recommended pairing (vite's plugin-vue-jsx does the actual transform).
+    "jsx": "preserve",
+    "jsxImportSource": "vue",
     "allowJs": true,
     "checkJs": false,
     "noEmit": true,
@@ -22,5 +27,5 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": true
   },
-  "include": ["src/**/*.ts", "src/**/*.js"]
+  "include": ["src/**/*.ts", "src/**/*.js", "src/**/*.vue", "tests/**/*.ts", "tests/**/*.js"]
 }

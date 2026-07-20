@@ -45,10 +45,18 @@
   </Transition>
 </template>
 
-<script>
+<script lang="ts">
+import { defineComponent } from 'vue';
 import { tutorials, readProgress, completionRatio } from '../../lib/Tutorial/tutorials';
+import type { TutorialDef } from '../../lib/Tutorial/tutorials';
 
-export default {
+// Non-reactive instance state, assigned in mounted() (not data()) on purpose.
+// Typed through the `self` cast below — a typing-only view, self === this.
+interface TutorialMenuInternal {
+  handleEscape: (event: KeyboardEvent) => void;
+}
+
+export default defineComponent({
   name: 'TutorialMenu',
   props: {
     show: { type: Boolean, default: false },
@@ -62,31 +70,33 @@ export default {
   },
   watch: {
     // Progress may have changed while the menu was closed (a tutorial ran).
-    show(isShown) {
+    show(isShown: boolean) {
       if (isShown) this.progress = readProgress();
     },
   },
   mounted() {
-    this.handleEscape = (event) => {
+    const self = this as typeof this & TutorialMenuInternal;
+    self.handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && this.show) this.$emit('close');
     };
-    document.addEventListener('keydown', this.handleEscape);
+    document.addEventListener('keydown', self.handleEscape);
   },
   beforeUnmount() {
-    document.removeEventListener('keydown', this.handleEscape);
+    const self = this as typeof this & TutorialMenuInternal;
+    document.removeEventListener('keydown', self.handleEscape);
   },
   methods: {
-    ratio(tutorial) {
+    ratio(tutorial: TutorialDef): number {
       return completionRatio(tutorial, this.progress);
     },
-    statusLabel(tutorial) {
+    statusLabel(tutorial: TutorialDef): string {
       const ratio = this.ratio(tutorial);
       if (ratio >= 1) return 'Completed';
       if (ratio > 0) return `${Math.round(ratio * 100)}%`;
       return 'Not started';
     },
   },
-};
+});
 </script>
 
 <style>

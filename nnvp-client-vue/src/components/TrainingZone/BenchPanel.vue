@@ -78,7 +78,9 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
+import { defineComponent } from 'vue';
+import type { PropType } from 'vue';
 import { createTfjsEngine } from '../../lib/Training/tfjsEngine';
 import { createTinygradEngine, graphNumClasses } from '../../lib/Training/tinygradEngine';
 import { getSharedRuntime } from '../../lib/TinygradRuntime/runtime';
@@ -86,6 +88,47 @@ import {
   datasetCompatible, describeGraph, makeSyntheticDataset, probeMetrics, summarizeRun,
 } from '../../lib/Training/abBenchmark';
 import { loadTf } from '../../lib/tf/loadTf';
+import type { TrainingDataset, TrainingEngine } from '../../lib/Training/engine';
+import type { NnvpModel } from '../../types/model';
+import type Dataset from '../../lib/JSDatasets/google-data-loader';
+
+// The tfjs namespace stays untyped here, exactly as in abBenchmark.ts:
+// engine.ts keeps @tensorflow/tfjs types off the seam.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Tf = any;
+
+/** TrainingZone.loadDataset as passed down through the dynamic panel props. */
+type LoadDataset = (name: string, progressionCallback?: (fraction: number) => void) => Promise<void>;
+
+/**
+ * What runEngine reads off whichever dataset ran: the engine-seam fields plus
+ * the held-out arrays (real Dataset: test*; synthetic: val*) — each side only
+ * has its own, hence the lookup chains with `!` at the probe calls.
+ */
+interface BenchDataset extends TrainingDataset {
+  readonly valImages?: Float32Array;
+  readonly valLabels?: Int32Array | Uint8Array;
+  readonly testImages?: Float32Array;
+  readonly testLabels?: Int32Array | Uint8Array;
+}
+
+/** One engine's result row; built incrementally, hence the seam cast at creation. */
+interface BenchRow {
+  engineId: string;
+  error?: string;
+  backendInfo?: string;
+  bootMs: number;
+  prepareMs: number;
+  fitMs: number;
+  setupMs: number;
+  samplesPerSec: number;
+  lossFirst: number;
+  lossLast: number;
+  descended: boolean;
+  acc?: number;
+  valLoss?: number;
+  valAcc?: number;
+}
 
 // Options both engines accept (the tinygrad engine refuses anything else);
 // epochs comes from the panel's input.
@@ -99,21 +142,21 @@ const BENCH_OPTS = {
   batchSize: 32,
 };
 
-export default {
+export default defineComponent({
   name: 'BenchPanel',
   // From TrainingZone's dynamic <component> prop set: the selected dataset
   // name and the real loader plumbing — the bench trains on the REAL data.
   props: {
     value: { type: String, default: 'MNIST' },
-    loadDataset: { type: Function, default: null },
-    getDatasets: { type: Function, default: null },
+    loadDataset: { type: Function as PropType<LoadDataset>, default: null },
+    getDatasets: { type: Function as PropType<() => Record<string, Dataset>>, default: null },
   },
   inheritAttrs: false,
   data() {
     return {
       running: false,
       runningLabel: 'Running…',
-      rows: [],
+      rows: [] as BenchRow[],
       note: '',
       modelSummary: '',
       softmaxWarning: '',
@@ -122,28 +165,28 @@ export default {
     };
   },
   methods: {
-    formatSec(ms) {
+    formatSec(ms: number): string {
       return ms >= 1000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms)} ms`;
     },
-    formatMetric(value, digits = 2) {
-      return Number.isFinite(value) ? value.toFixed(digits) : '—';
+    formatMetric(value: number | undefined, digits = 2): string {
+      return Number.isFinite(value) ? value!.toFixed(digits) : '—';
     },
-    graphShapeAndClasses() {
-      const graph = JSON.parse(this.$boardInterface.getGraphJSON());
+    graphShapeAndClasses(): { shape: number[]; numClasses: number } {
+      const graph: NnvpModel = JSON.parse(this.$boardInterface.getGraphJSON()!);
       const input = (graph.layers || []).find(l => l.kerasLayer && l.kerasLayer.name === 'Input');
-      const shape = input && input.kerasLayer.parameterValues && input.kerasLayer.parameterValues.shape;
+      const shape = input && input.kerasLayer!.parameterValues && input.kerasLayer!.parameterValues.shape;
       if (!Array.isArray(shape) || !shape.length) {
         throw new Error('the board needs an Input layer with a shape to benchmark');
       }
       // Both engines (and the synthetic fallback's labels) need the real
       // class count — the graph's final Dense, exactly as the tinygrad
       // engine derives it. Unsupported heads throw their clear error here.
-      return { shape, numClasses: graphNumClasses(graph) };
+      return { shape: shape as number[], numClasses: graphNumClasses(graph) };
     },
     // The REAL selected dataset (the same object regular training fits on);
     // synthetic patterns only when the real one is unavailable or does not
     // fit the board — and the Data line says which one ran.
-    async resolveDataset(shape, numClasses) {
+    async resolveDataset(shape: number[], numClasses: number): Promise<Dataset | null> {
       if (this.loadDataset && this.getDatasets) {
         try {
           await this.loadDataset(this.value);
@@ -157,15 +200,22 @@ export default {
             return null;
           }
         } catch (error) {
-          this.dataNote = `synthetic patterns (loading ${this.value} failed: ${String(error && error.message || error).slice(0, 80)})`;
+          const errorWithMessage = error as { message?: unknown } | null | undefined;
+          this.dataNote = `synthetic patterns (loading ${this.value} failed: ${String(errorWithMessage && errorWithMessage.message || error).slice(0, 80)})`;
           return null;
         }
       }
       this.dataNote = 'synthetic patterns (no dataset plumbing available)';
       return null;
     },
-    async runEngine(engineId, prepareThunk, realDataset) {
-      const row = { engineId };
+    async runEngine(
+      engineId: string,
+      prepareThunk: () => { engine: TrainingEngine; generateCode: () => string | null },
+      realDataset: Dataset | null,
+    ) {
+      // Built incrementally across the run — the cast lets the row start from
+      // just its engineId, exactly as it always has.
+      const row = { engineId } as BenchRow;
       try {
         const { shape, numClasses } = this.graphShapeAndClasses();
         // Both backends' one-time boot, timed apart from prepare (tfjs:
@@ -188,7 +238,7 @@ export default {
           ...BENCH_OPTS, epochs: this.epochs, generateCode,
         });
         const prepareMs = performance.now() - t0;
-        const tf = engineId === 'tfjs' ? window.tf : null;
+        const tf: Tf = engineId === 'tfjs' ? (window as Window & { tf?: Tf }).tf : null;
         // Which math actually runs: tfjs half-float WebGL fallbacks are the
         // classic silent trainer-killer (tiny SGD updates vanish in f16).
         if (tf) {
@@ -203,10 +253,11 @@ export default {
         // The REAL selected dataset whenever it fits the board — the exact
         // object regular training fits on. Synthetic patterns are the
         // labeled fallback, never the silent default.
-        const dataset = realDataset || makeSyntheticDataset({ shape, numClasses, tf });
-        const losses = [];
-        const epochMs = [];
-        const finalLogs = {};
+        const dataset = (realDataset
+          || makeSyntheticDataset({ shape, numClasses, tf })) as unknown as BenchDataset;
+        const losses: number[] = [];
+        const epochMs: number[] = [];
+        const finalLogs: { acc?: number; valLoss?: number; valAcc?: number } = {};
         const t1 = performance.now();
         let epochStart = t1;
         await session.fit(dataset, {
@@ -222,15 +273,15 @@ export default {
         // same samples, the same math, dropout off (tfjs's fit-native val
         // numbers are deliberately NOT used: they come from different
         // samples at different times than the tinygrad probe would).
-        const pixels = dataset.imageByteSize;
+        const pixels = dataset.imageByteSize!;
         const heldOutImages = dataset.valImages || dataset.testImages;
         const heldOutLabels = dataset.valLabels || dataset.testLabels;
         try {
           const train = await probeMetrics(session, {
-            images: dataset.trainImages, labels: dataset.trainLabels, pixels, numClasses,
+            images: dataset.trainImages!, labels: dataset.trainLabels!, pixels, numClasses,
           });
           const val = await probeMetrics(session, {
-            images: heldOutImages, labels: heldOutLabels, pixels, numClasses,
+            images: heldOutImages!, labels: heldOutLabels!, pixels, numClasses,
           });
           finalLogs.acc = train.acc;
           finalLogs.valLoss = val.loss;
@@ -242,7 +293,8 @@ export default {
           engineId, epochs: this.epochs, bootMs, prepareMs, fitMs, epochMs, losses, finalLogs,
         }));
       } catch (error) {
-        row.error = String((error && error.message) || error);
+        const errorWithMessage = error as { message?: unknown } | null | undefined;
+        row.error = String((errorWithMessage && errorWithMessage.message) || error);
       }
       this.rows = [...this.rows.filter(r => r.engineId !== engineId), row];
     },
@@ -251,14 +303,15 @@ export default {
       this.rows = [];
       this.note = '';
       try {
-        const description = describeGraph(this.$boardInterface.getGraphJSON());
+        const description = describeGraph(this.$boardInterface.getGraphJSON()!);
         this.modelSummary = description.summary;
-        let shape;
-        let numClasses;
+        let shape: number[];
+        let numClasses: number;
         try {
           ({ shape, numClasses } = this.graphShapeAndClasses());
         } catch (error) {
-          this.note = `Cannot benchmark this graph: ${String((error && error.message) || error)}`;
+          const errorWithMessage = error as { message?: unknown } | null | undefined;
+          this.note = `Cannot benchmark this graph: ${String((errorWithMessage && errorWithMessage.message) || error)}`;
           return;
         }
         const realDataset = await this.resolveDataset(shape, numClasses);
@@ -288,7 +341,7 @@ export default {
       }
     },
   },
-};
+});
 </script>
 
 <style>

@@ -13,7 +13,7 @@
             <label>Algorithm</label>
             <select
               v-bind:value="selectedOptimizer"
-              v-on:change="$emit('changeSelectedOptimizer', $event.target.value)"
+              v-on:change="$emit('changeSelectedOptimizer', ($event.target as HTMLSelectElement).value)"
             >
               <option
                 v-bind:key="optimizer"
@@ -41,13 +41,13 @@
               v-bind:min="param.min"
               v-bind:max="param.max"
               v-bind:placeholder="param.hint"
-              v-on:input="$emit('changeOptimizerParam', param.name, Number($event.target.value))"
+              v-on:input="$emit('changeOptimizerParam', param.name, Number(($event.target as HTMLInputElement).value))"
             />
             <input
               v-else-if="param.type === 'checkbox'"
               type="checkbox"
               v-bind:checked="optimizerParams[param.name]"
-              v-on:change="$emit('changeOptimizerParam', param.name, $event.target.checked)"
+              v-on:change="$emit('changeOptimizerParam', param.name, ($event.target as HTMLInputElement).checked)"
             />
             <span class="help-icon" @click="openModal('param-' + param.name)">?</span>
           </div>
@@ -67,7 +67,7 @@
               <label>Function</label>
               <select
                 v-bind:value="selectedLoss"
-                v-on:change="$emit('changeSelectedLoss', $event.target.value)"
+                v-on:change="$emit('changeSelectedLoss', ($event.target as HTMLSelectElement).value)"
               >
                 <option
                   v-bind:key="loss"
@@ -93,7 +93,7 @@
               <input
                 type="number"
                 v-bind:value="epochs"
-                v-on:input="$emit('changeEpochs', Number($event.target.value))"
+                v-on:input="$emit('changeEpochs', Number(($event.target as HTMLInputElement).value))"
               />
               <span class="help-icon" @click="openModal('epochs')">?</span>
             </div>
@@ -295,9 +295,26 @@
   </div>
 </template>
 
-<script>
-export default {
+<script lang="ts">
+import { defineComponent } from 'vue';
+
+/** One optimizer parameter row (and its help-modal copy). */
+interface OptimizerParamDef {
+  name: string;
+  label: string;
+  type: 'number' | 'checkbox';
+  step?: number;
+  min?: number;
+  max?: number;
+  hint: string;
+  help: string;
+}
+
+export default defineComponent({
   name: 'CompileOptions',
+  // Array props on purpose (each prop stays `any`): converting them to typed
+  // object declarations would add Vue's runtime type validation/Boolean
+  // casting — a behavior change this typing pass must not make.
   props: [
     'selectedOptimizer',
     'selectableOptimizers',
@@ -309,25 +326,28 @@ export default {
   ],
   data() {
     return {
-      activeModal: null, // Tracks which help modal is open
+      activeModal: null as string | null, // Tracks which help modal is open
     };
   },
   methods: {
-    openModal(topic) {
+    openModal(topic: string) {
       this.activeModal = topic;
     },
     closeModal() {
       this.activeModal = null;
     },
-    getParamHelp(modalId) {
+    getParamHelp(modalId: string): OptimizerParamDef {
       const paramName = modalId.replace('param-', '');
-      return this.currentOptimizerParams.find(p => p.name === paramName);
+      // `!` preserves the historical behavior: the unguarded template branches
+      // (e.g. param-learningRate) would already crash if the param were absent
+      // from the current optimizer's list.
+      return this.currentOptimizerParams.find(p => p.name === paramName)!;
     },
   },
   computed: {
-    currentOptimizerParams() {
+    currentOptimizerParams(): OptimizerParamDef[] {
       // Define parameters for each optimizer
-      const optimizerConfigs = {
+      const optimizerConfigs: Record<string, OptimizerParamDef[]> = {
         sgd: [
           { name: 'learningRate', label: 'Learning Rate', type: 'number', step: 0.001, min: 0.0001, max: 1, hint: 'default: 0.01', help: 'Controls how much to adjust weights. Higher = faster learning but less stable. Start with 0.01.' },
           { name: 'momentum', label: 'Momentum', type: 'number', step: 0.01, min: 0, max: 1, hint: 'default: 0', help: 'Helps accelerate SGD in relevant direction and dampen oscillations. Try 0.9 for faster convergence.' },
@@ -364,7 +384,7 @@ export default {
       return optimizerConfigs[this.selectedOptimizer] || [];
     },
   },
-};
+});
 </script>
 
 <style>

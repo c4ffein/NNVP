@@ -24,9 +24,9 @@ const chromium = {
 
 export default defineConfig({
   testDir: './tests',
-  // Only Playwright specs are *.spec.js; the bun unit suite lives in tests/unit/*.test.js.
+  // Only Playwright specs are *.spec.ts; the bun unit suite lives in tests/unit/*.test.js.
   // Without this, `playwright test` (whole dir) tries to load the bun test files and crashes.
-  testMatch: '**/*.spec.js',
+  testMatch: '**/*.spec.ts',
   fullyParallel: !process.env.CI,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -43,7 +43,7 @@ export default defineConfig({
     {
       name: 'flow',
       use: { ...chromium },
-      testIgnore: '**/tinygradRuntime.spec.js',
+      testIgnore: '**/tinygradRuntime.spec.ts',
     },
     // Opt-in (make test-webgpu): the REAL tinygrad trace pipeline on a real
     // (SwiftShader) WebGPU device. Needs the FULL Chromium build — the
@@ -51,7 +51,7 @@ export default defineConfig({
     // The spec itself also self-skips unless NNVP_WEBGPU_E2E=1.
     {
       name: 'webgpu',
-      testMatch: '**/tinygradRuntime.spec.js',
+      testMatch: '**/tinygradRuntime.spec.ts',
       use: {
         ...devices['Desktop Chrome'],
         channel: 'chromium',

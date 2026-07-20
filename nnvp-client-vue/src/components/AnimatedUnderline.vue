@@ -14,8 +14,18 @@
   </div>
 </template>
 
-<script>
-export default {
+<script lang="ts">
+import { defineComponent } from 'vue';
+
+interface UnderlineLine {
+  id: number;
+  x1: number;
+  x2: number;
+  opacity: number;
+  transition: string;
+}
+
+export default defineComponent({
   name: 'AnimatedUnderline',
   props: {
     isHovered: {
@@ -33,13 +43,13 @@ export default {
   },
   data() {
     return {
-      lines: [],
+      lines: [] as UnderlineLine[],
       nextId: 0,
-      currentLineId: null
+      currentLineId: null as number | null
     };
   },
   watch: {
-    isHovered(newVal) {
+    isHovered(newVal: boolean) {
       if (newVal) {
         this.onHover();
       } else {
@@ -87,7 +97,7 @@ export default {
       if (activeLines.length === 0) return;
 
       // Animate the most recent one from (0,100) to (100,100) while fading out
-      const lineToComplete = activeLines[activeLines.length - 1];
+      const lineToComplete = activeLines[activeLines.length - 1]!;
       lineToComplete.transition = `left ${this.transitionDuration}ms ease-out, right ${this.transitionDuration}ms ease-out, opacity ${this.transitionDuration}ms ease-out`;
       lineToComplete.x1 = 100;
       lineToComplete.x2 = 100;
@@ -99,14 +109,14 @@ export default {
       }, this.transitionDuration + this.cleanupDelay);
     },
 
-    cleanupLine(id) {
+    cleanupLine(id: number) {
       const index = this.lines.findIndex(l => l.id === id);
       if (index !== -1) {
         this.lines.splice(index, 1);
       }
     }
   }
-};
+});
 </script>
 
 <style scoped>

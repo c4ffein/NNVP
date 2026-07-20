@@ -9,20 +9,23 @@
   />
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
+import type { CSSProperties, PropType } from 'vue';
 import { BaseEdge, getBezierPath, useVueFlow } from '@vue-flow/core';
+import type { Position } from '@vue-flow/core';
 import { edgeInCycle } from '../../lib/FlowInterface/adapter';
 import { getEdgeParams } from './floatingEdge';
+import type { FloatingNode } from './floatingEdge';
 
 const props = defineProps({
   id: { type: String, required: true },
   source: { type: String, required: true },
   target: { type: String, required: true },
-  sourceNode: { type: Object, required: true },
-  targetNode: { type: Object, required: true },
+  sourceNode: { type: Object as PropType<FloatingNode>, required: true },
+  targetNode: { type: Object as PropType<FloatingNode>, required: true },
   markerEnd: { type: String, default: undefined },
-  style: { type: Object, default: undefined },
+  style: { type: Object as PropType<CSSProperties>, default: undefined },
 });
 
 const { getEdges } = useVueFlow();
@@ -38,10 +41,12 @@ const path = computed(() => {
   return getBezierPath({
     sourceX: sx,
     sourceY: sy,
-    sourcePosition: sourcePos,
+    // floatingEdge.ts is a pure module: its side names are the same string
+    // literals as Vue Flow's Position enum values, hence the casts.
+    sourcePosition: sourcePos as Position,
     targetX: tx,
     targetY: ty,
-    targetPosition: targetPos,
+    targetPosition: targetPos as Position,
   })[0];
 });
 </script>

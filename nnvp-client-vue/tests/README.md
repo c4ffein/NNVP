@@ -1,7 +1,7 @@
 # Tests
 
 **One test, two modes.** Every test is defined ONCE through the helper in
-`harness/define.js` and executed by TWO runners: headlessly under bun
+`harness/define.ts` and executed by TWO runners: headlessly under bun
 (milliseconds, the inner loop) and click-by-click in a real browser under
 Playwright (the trust anchor). Writing a test any other way is not allowed.
 
@@ -9,7 +9,7 @@ Playwright (the trust anchor). Writing a test any other way is not allowed.
 
 ```
 tests/
-  harness/    the machine: define.js (registry), the worlds, both runners,
+  harness/    the machine: define.ts (registry), the worlds, both runners,
               bun preloads (happy-dom + the .vue loader), the canvas driver
   suites/     the tests — every *.js here is a suite, index.js is the manifest
   contract/   real-HTTP tests against a live Django backend (own script)
@@ -52,9 +52,9 @@ e2eOnly('clicking an edge path selects it',
 
 ## The world (what appTest fns receive)
 
-One helper surface, two implementations — `worldBun.js` (direct JS: the real
+One helper surface, two implementations — `worldBun.ts` (direct JS: the real
 FlowGraphEditor over a fake store, real SFCs mounted via `@vue/test-utils`)
-and `worldBrowser.js` (the same calls as real UI interaction):
+and `worldBrowser.ts` (the same calls as real UI interaction):
 
 - `board.*` — addLayer, connect, select, deleteSelected, undo/redo,
   loadTemplate, clearBoard, moveLayer, layerCount/edgeCount/layerLabels,
@@ -75,16 +75,16 @@ Growing the surface means implementing the helper in BOTH worlds.
    `page.route` mocking, canvas pixels, live tfjs, the a11y tree, console
    cleanliness. The reason string must say WHICH of these — it is reviewed.
 3. Suite files never import `bun:test`/`@playwright/test` (both runners load
-   them), and never import `.vue` files or `worldComponents.js` directly —
+   them), and never import `.vue` files or `worldComponents.ts` directly —
    the Playwright runner cannot parse SFCs; component mounting is reached
    only through the bun world.
-4. Under bun, `.vue` imports work everywhere else via `harness/vue-loader.js`
+4. Under bun, `.vue` imports work everywhere else via `harness/vue-loader.ts`
    (a Bun plugin running vue/compiler-sfc, preloaded from `bunfig.toml`
    together with the happy-dom globals).
 
 ## Gotchas
 
-- `bun test <dir>` also picks up `*.spec.js` — that is why `test:fast` lists
+- `bun test <dir>` also picks up `*.spec.ts` — that is why `test:fast` lists
   the runner FILES explicitly instead of scanning `harness/`.
 - The Playwright runner does `page.goto(home)` + auto-accepts dialogs before
   every app/e2eOnly test; bodies that need their own routes/init-scripts

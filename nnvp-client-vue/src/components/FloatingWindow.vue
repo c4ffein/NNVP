@@ -51,25 +51,51 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
+import { defineComponent } from 'vue';
+import type { PropType } from 'vue';
 import {
   bringToFront, clampToViewport, rememberRect, recallRect,
   registerWindow, unregisterWindow, otherWindowRects, dockedSiblings,
   snapRect, dockZoneAt,
 } from '../lib/windowing';
+import type { DockZone, WindowRect } from '../lib/windowing';
+
+// 'move' is a titlebar drag; the rest are resize directions (compass edges
+// and corners, matched via mode.includes()).
+type DragMode = 'move' | 'w' | 'e' | 's' | 'sw' | 'se';
+
+/** Pointer position + rect captured when a drag/resize starts. */
+interface DragOrigin {
+  mode: DragMode;
+  px: number;
+  py: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+// Tests may dispatch synthetic pointer events without a `button` field, hence
+// the optional typing (startTracking already guarded for that at runtime).
+type PointerDownLike = Pick<PointerEvent, 'clientX' | 'clientY' | 'preventDefault'> & { button?: number };
+
+// Non-reactive instance field assigned outside data() (pure typing pass:
+// keeping it out of data() preserves its non-reactive nature).
+interface FloatingWindowInstanceExtra { snapToken?: number }
 
 // A movable, resizable, closable window over the board: drag by the titlebar,
 // resize by the bottom-right handle (never below minWidth/minHeight), any
 // pointerdown raises it above the other windows. The parent owns visibility
 // (v-if / v-show) and reacts to the titlebar's `close`.
-export default {
+export default defineComponent({
   name: 'FloatingWindow',
   emits: ['close'],
   props: {
     title: { type: String, required: true },
     // Starting rect ({x, y, width, height}); the parent computes it from the
     // viewport so each window opens where its fixed panel used to live.
-    initial: { type: Object, required: true },
+    initial: { type: Object as PropType<WindowRect>, required: true },
     minWidth: { type: Number, default: 220 },
     minHeight: { type: Number, default: 200 },
     // Set to reopen at the last position/size after an unmount (close) —
@@ -78,23 +104,23 @@ export default {
   },
   data() {
     return {
-      rect: { ...(recallRect(this.windowId) || this.initial) },
+      rect: { ...(recallRect(this.windowId) || this.initial) } as WindowRect,
       z: bringToFront(),
-      dragFrom: null,
-      dockPreview: null,
+      dragFrom: null as DragOrigin | null,
+      dockPreview: null as { zone: DockZone; rect: WindowRect } | null,
       // Size before the last dock, restored when dragged away (Windows-like).
-      preDock: null,
+      preDock: null as { width: number; height: number } | null,
       // Which dock zone this window currently occupies (null = free-floating).
-      dockedZone: null,
+      dockedZone: null as DockZone | null,
     };
   },
   created() {
     // Register with the window registry: siblings snap against our rect, and
     // dock layouts may resize us (a bottom bar shortens side-docked windows).
-    this.snapToken = registerWindow({
+    (this as unknown as FloatingWindowInstanceExtra).snapToken = registerWindow({
       getRect: () => ({ ...this.rect }),
       getZone: () => this.dockedZone,
-      applyRect: (partial) => {
+      applyRect: (partial: Partial<WindowRect>) => {
         if (partial.width !== undefined) this.rect.width = Math.max(this.minWidth, partial.width);
         if (partial.height !== undefined) this.rect.height = Math.max(this.minHeight, partial.height);
         if (partial.x !== undefined) this.rect.x = partial.x;
@@ -106,21 +132,21 @@ export default {
   beforeUnmount() {
     this.stopTracking();
     rememberRect(this.windowId, this.rect);
-    unregisterWindow(this.snapToken);
+    unregisterWindow((this as unknown as FloatingWindowInstanceExtra).snapToken!);
   },
   methods: {
     raise() {
       this.z = bringToFront();
     },
-    startDrag(event) {
+    startDrag(event: PointerEvent) {
       this.startTracking(event, 'move');
     },
-    startResize(event, direction) {
+    startResize(event: PointerEvent, direction: Exclude<DragMode, 'move'>) {
       this.raise();
       this.dockedZone = null; // a manual resize opts out of the dock layout
       this.startTracking(event, direction);
     },
-    startTracking(event, mode) {
+    startTracking(event: PointerDownLike, mode: DragMode) {
       if (event.button !== undefined && event.button !== 0) return;
       event.preventDefault();
       this.dragFrom = {
@@ -135,7 +161,7 @@ export default {
       window.addEventListener('pointermove', this.onPointerMove);
       window.addEventListener('pointerup', this.onPointerUp);
     },
-    onPointerMove(event) {
+    onPointerMove(event: PointerEvent) {
       const from = this.dragFrom;
       if (!from) return;
       const dx = event.clientX - from.px;
@@ -157,13 +183,14 @@ export default {
         const next = snapRect(
           clampToViewport({ ...this.rect, x: from.x + dx, y: from.y + dy }, viewport),
           viewport,
-          otherWindowRects(this.snapToken),
+          otherWindowRects((this as unknown as FloatingWindowInstanceExtra).snapToken!),
         );
         this.rect.x = next.x;
         this.rect.y = next.y;
         // Side docks stop above an existing bottom bar, so the ghost preview
         // already shows the exact final rect.
-        const bottomBar = dockedSiblings(this.snapToken).find(sib => sib.zone === 'bottom');
+        const bottomBar = dockedSiblings((this as unknown as FloatingWindowInstanceExtra).snapToken!)
+          .find(sib => sib.zone === 'bottom');
         this.dockPreview = dockZoneAt(
           { x: event.clientX, y: event.clientY },
           viewport,
@@ -201,7 +228,7 @@ export default {
         // A new bottom bar claims the bottom strip: side-docked siblings
         // shorten so they end just above it.
         if (zone === 'bottom') {
-          for (const sibling of dockedSiblings(this.snapToken)) {
+          for (const sibling of dockedSiblings((this as unknown as FloatingWindowInstanceExtra).snapToken!)) {
             if (sibling.zone === 'left' || sibling.zone === 'right') {
               sibling.applyRect({ height: this.rect.y - sibling.rect.y - 6 });
             }
@@ -220,7 +247,7 @@ export default {
       window.removeEventListener('pointerup', this.onPointerUp);
     },
   },
-};
+});
 </script>
 
 <style>

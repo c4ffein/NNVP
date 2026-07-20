@@ -15,23 +15,27 @@
   </div>
 </template>
 
-<script>
-export default {
+<script lang="ts">
+import { defineComponent } from 'vue';
+import type { PropType } from 'vue';
+import type KerasLayer from '../../lib/KerasInterface/KerasLayer';
+
+export default defineComponent({
   name: 'StringParameter',
   props: {
-    name: String,
+    name: { type: String, required: true },
     value: String,
-    activeLayer: null,
+    activeLayer: { type: Object as PropType<KerasLayer>, required: true },
   },
   data() {
     return {
-      valueSet: this.activeLayer.parameterValues[this.name],
+      valueSet: this.activeLayer.parameterValues[this.name] as string | null | undefined,
       errorMessage: '',
     };
   },
 
   computed: {
-    isValid() {
+    isValid(): boolean {
       // Empty values are valid - Keras will use defaults for optional parameters
       if (this.valueSet === null || this.valueSet === undefined || this.valueSet === '') {
         return true;
@@ -58,10 +62,10 @@ export default {
       }
     },
     updateParamFromKerasLayer() {
-      this.activeLayer.setParameterValue(this.name, this.valueSet);
+      this.activeLayer.setParameterValue(this.name, this.valueSet!);
     },
   },
-};
+});
 </script>
 
 <!-- Add "scoped" attribute to limit CSS to this component only -->

@@ -45,7 +45,7 @@
           v-bind:ref="'child'+selectedPanel"
           class="tab"
           v-bind:value="selectedDataset"
-          @input="value => { if (typeof value === 'string') selectedDataset = value; }"
+          @input="(value: unknown) => { if (typeof value === 'string') selectedDataset = value; }"
           v-bind:loadableDatasets="loadableDatasets"
           v-bind:selectedOptimizer="selectedOptimizer"
           @changeSelectedOptimizer="changeSelectedOptimizer"
@@ -72,13 +72,15 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
 /* eslint-disable */
+import { defineComponent } from 'vue';
 import { loadTf } from '../../lib/tf/loadTf';
 import Dataset from '../../lib/JSDatasets/google-data-loader';
 import loadableDatasets from '../../lib/JSDatasets/datasets-sources';
 import watchTraining from '../../lib/ModelTrainer/watchTraining';
 import { TrainingPrepareError } from '../../lib/Training/engine';
+import type { TrainingDataset, TrainingSession } from '../../lib/Training/engine';
 import { createTfjsEngine } from '../../lib/Training/tfjsEngine';
 
 import Charts from './Charts.vue';
@@ -88,7 +90,34 @@ import InspectPanel from './InspectPanel.vue';
 import BenchPanel from './BenchPanel.vue';
 import { benchModeEnabled } from '../../lib/Training/benchMode';
 
-export default {
+type DebugWindow = Window & { nnvp?: { debug?: { enableDatasets?: boolean } } };
+
+/** One chart line; watchTraining reassigns these during a fit. */
+interface ChartSeries {
+  className: string;
+  name: string;
+  data: (number | undefined)[];
+}
+
+interface ChartData {
+  labels: number[];
+  series: ChartSeries[];
+}
+
+/**
+ * Instance state kept OFF data() — non-reactive by design: the tf model (and
+ * the dataset cache holding tf-touching objects) must never be proxied.
+ */
+interface TrainingZoneNonReactive {
+  /** The trained tf model (session.model); Inspect probes it un-proxied. */
+  trainedModel?: unknown;
+  /** The graph JSON snapshot trainedModel was generated from. */
+  trainedGraphJson?: string | null;
+  /** Loaded-dataset cache, lazily created by loadDataset. */
+  datasets?: Record<string, Dataset>;
+}
+
+export default defineComponent({
   name: 'TrainingZone',
   components: {
     BenchPanel,
@@ -107,7 +136,7 @@ export default {
       selectedDataset: 'MNIST',
       loadableDatasets: loadableDatasets(this.cdnDir),
       selectedOptimizer: 'rmsprop',
-      optimizerParams: {},
+      optimizerParams: {} as Record<string, unknown>,
       epochs: 10,
       selectableOptimizers: [
         'sgd', 'adagrad', 'adadelta', 'adam', 'adamax', 'rmsprop'
@@ -129,7 +158,7 @@ export default {
       chartData0: {
         labels: [],
         series: [{ className: 'acc', name: 'acc', data: [] }, { className: 'loss', name: 'loss', data: [] }],
-      },
+      } as ChartData,
       chartData1: {
         labels: [],
         series: [
@@ -138,7 +167,7 @@ export default {
           { className: 'ct-series-loss', name: 'loss', data: [] },
           { className: 'ct-series-val-loss', name: 'val-loss', data: [] },
         ],
-      },
+      } as ChartData,
     };
   },
   mounted() {
@@ -150,7 +179,9 @@ export default {
     datasetClicked() {
       if (this.selectedPanel == "DatasetSelector") return;
       this.selectedPanel = "DatasetSelector";
-      this.$nextTick(() => {this.$refs.childDatasetSelector.refresh();});
+      this.$nextTick(() => {
+        (this.$refs.childDatasetSelector as InstanceType<typeof DatasetSelector>).refresh();
+      });
     },
     compileOptionsClicked() {
       this.selectedPanel = "CompileOptions";
@@ -163,8 +194,9 @@ export default {
     },
     // The model (and the graph JSON it was generated from) the Inspect panel
     // probes. Returned through a function so the tf model stays un-proxied.
-    getTrainedModel() {
-      return { model: this.trainedModel, graphJson: this.trainedGraphJson };
+    getTrainedModel(): { model: unknown; graphJson: string | null | undefined } {
+      const self = this as unknown as TrainingZoneNonReactive; // non-reactive by design
+      return { model: self.trainedModel, graphJson: self.trainedGraphJson };
     },
     async trainClicked() {
       if (this.isTraining) { this.cancelRequested = true; return; }
@@ -176,18 +208,18 @@ export default {
       this.isTraining = false;
       this.$emit('training-stopped');
     },
-    changeSelectedOptimizer(value) {
+    changeSelectedOptimizer(value: string) {
       this.selectedOptimizer = value;
       // Reset optimizer params when switching optimizers
       this.optimizerParams = {};
     },
-    changeOptimizerParam(paramName, paramValue) {
+    changeOptimizerParam(paramName: string, paramValue: unknown) {
       this.optimizerParams = { ...this.optimizerParams, [paramName]: paramValue };
     },
-    changeSelectedLoss(value) {
+    changeSelectedLoss(value: string) {
       this.selectedLoss = value;
     },
-    changeEpochs(value) { this.epochs = value; },
+    changeEpochs(value: number) { this.epochs = value; },
     async startTraining() {
       // The engine (lib/Training) owns model building, compile and fit; this
       // component supplies the options from its UI state and keeps the
@@ -196,7 +228,7 @@ export default {
       // is not user-exposed — it lives behind the ?bench=1 Bench tab and the
       // make test-webgpu harness until it graduates.
       const engine = createTfjsEngine({ loadTf });
-      let session;
+      let session: TrainingSession;
       try {
         session = await engine.prepare(this.$boardInterface.getGraphJSON(), {
           generateCode: () => this.$boardInterface.generateJavascriptNoSave(this.$kerasInterface),
@@ -216,8 +248,9 @@ export default {
           console.error('[TrainingZone] Error creating model:', error.cause);
         }
         else {
+          const cause = error.cause as { message?: unknown } | null | undefined;
           alert("Couldn't build the model from the graph — check that Inputs and Outputs exist "
-            + `and are connected. (${error.cause?.message || error.cause})`);
+            + `and are connected. (${cause?.message || error.cause})`);
           console.error('[TrainingZone] Error generating model:', error.cause);
           console.error('[TrainingZone] Generated code that failed:\n', error.generatedCode);
         }
@@ -229,17 +262,21 @@ export default {
       // seam allows engines without a tf model (session.model null): Inspect
       // then shows its "train a model first" hint instead of probing one.
       this.$boardInterface.setInspection(null);
-      this.trainedModel = session.model;
-      this.trainedGraphJson = session.graphJson;
+      const self = this as unknown as TrainingZoneNonReactive; // non-reactive by design
+      self.trainedModel = session.model;
+      self.trainedGraphJson = session.graphJson;
       this.hasTrainedModel = session.model !== null && session.model !== undefined;
 
       const datasetName = this.selectedDataset;
       await this.loadDataset(datasetName);
-      const data = this.datasets[datasetName];
+      const data = self.datasets![datasetName];
       try {
         await watchTraining(
           this.chartData0, this.chartData1,
-          (callbacks) => session.fit(data, callbacks), () => this.cancelRequested,
+          // Dataset satisfies the engine seam at runtime; only its nullable
+          // `shape` keeps it from typing as TrainingDataset — hence the cast.
+          (callbacks) => session.fit(data as unknown as TrainingDataset, callbacks),
+          () => this.cancelRequested,
           'cancelRequested',
         );
       }
@@ -249,34 +286,35 @@ export default {
         alert(error);
       }
     },
-    async loadDataset(name, progressionCallback) {
-      const debugEnabled = window.nnvp?.debug?.enableDatasets;
+    async loadDataset(name: string, progressionCallback?: (fraction: number) => void) {
+      const self = this as unknown as TrainingZoneNonReactive; // non-reactive by design
+      const debugEnabled = (window as DebugWindow).nnvp?.debug?.enableDatasets;
       if (debugEnabled) console.log(`[TrainingZone] loadDataset called for: ${name}`);
 
-      this.datasets = this.datasets || {};
-      if (!(name in this.datasets)){
+      self.datasets = self.datasets || {};
+      if (!(name in self.datasets)){
         if (debugEnabled) {
           console.log(`[TrainingZone] Dataset ${name} not cached, loading from:`);
-          console.log(`  - Images: ${this.loadableDatasets[name][0].imagesSpritePath}`);
-          console.log(`  - Labels: ${this.loadableDatasets[name][0].labelsPath}`);
+          console.log(`  - Images: ${this.loadableDatasets[name]![0].imagesSpritePath}`);
+          console.log(`  - Labels: ${this.loadableDatasets[name]![0].labelsPath}`);
         }
 
         const newDataset = new Dataset(
-          this.loadableDatasets[name][0].imagesSpritePath,
-          this.loadableDatasets[name][0].imagesSpriteChecksum,
-          this.loadableDatasets[name][0].shape,
-          this.loadableDatasets[name][0].labelsPath,
-          this.loadableDatasets[name][0].labelsChecksum,
+          this.loadableDatasets[name]![0].imagesSpritePath,
+          this.loadableDatasets[name]![0].imagesSpriteChecksum,
+          this.loadableDatasets[name]![0].shape,
+          this.loadableDatasets[name]![0].labelsPath,
+          this.loadableDatasets[name]![0].labelsChecksum,
           10,  // number of classes
-          this.loadableDatasets[name][0].numDatasetElements,
-          this.loadableDatasets[name][0].numTrainElements,
+          this.loadableDatasets[name]![0].numDatasetElements,
+          this.loadableDatasets[name]![0].numTrainElements,
         );
 
         if (debugEnabled) console.log(`[TrainingZone] Starting newDataset.load() for: ${name}`);
 
         try {
           await newDataset.load(progressionCallback);
-          this.datasets[name] = newDataset;
+          self.datasets[name] = newDataset;
           if (debugEnabled) console.log(`[TrainingZone] Dataset ${name} loaded and cached successfully`);
         } catch (error) {
           if (debugEnabled) console.error(`[TrainingZone] Error loading dataset ${name}:`, error);
@@ -286,15 +324,19 @@ export default {
         if (debugEnabled) console.log(`[TrainingZone] Dataset ${name} already cached`);
       }
     },
-    getWarningMessage(name, progressionCallback) {
-      if (this.loadableDatasets[name].length >= 3 && !this.datasets[name]) {
-        return this.loadableDatasets[name][2];
+    getWarningMessage(name: string, progressionCallback?: unknown): string | undefined {
+      const self = this as unknown as TrainingZoneNonReactive; // non-reactive by design
+      // `self.datasets!` preserves the historical behavior: before any load,
+      // datasets is undefined and a warning-carrying entry would throw here.
+      if (this.loadableDatasets[name]!.length >= 3 && !self.datasets![name]) {
+        return this.loadableDatasets[name]![2];
       }
     },
-    getDatasets() {
-      const debugEnabled = window.nnvp?.debug?.enableDatasets;
-      if (debugEnabled) console.log('[TrainingZone] getDatasets called, returning:', Object.keys(this.datasets || {}));
-      return this.datasets || {};
+    getDatasets(): Record<string, Dataset> {
+      const self = this as unknown as TrainingZoneNonReactive; // non-reactive by design
+      const debugEnabled = (window as DebugWindow).nnvp?.debug?.enableDatasets;
+      if (debugEnabled) console.log('[TrainingZone] getDatasets called, returning:', Object.keys(self.datasets || {}));
+      return self.datasets || {};
     },
   },
   props: {
@@ -305,11 +347,11 @@ export default {
     },
   },
   watch: {
-    trainingZoneSize (newVal, oldVal) {
+    trainingZoneSize (newVal: number | undefined, oldVal: number | undefined) {
       window.dispatchEvent(new Event('resize')); // Needed for svg resize
     }
   },
-};
+});
 </script>
 
 <style>

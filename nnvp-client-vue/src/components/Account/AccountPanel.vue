@@ -181,13 +181,69 @@
   </Transition>
 </template>
 
-<script>
+<script lang="ts">
+import { defineComponent } from 'vue';
 import ApiClient, { ERROR_CODES } from '../../lib/Backend/apiClient';
 import { COLOR_SCHEMES, rampGradientCss } from '../../lib/Settings/colorSchemes';
+import type { ColorScheme, ColorSchemeId } from '../../lib/Settings/colorSchemes';
 import { settings } from '../../lib/Settings/settings';
 import { clearCurrentProject } from '../../lib/Backend/currentProject';
 
-export default {
+interface ApiUser { email: string }
+
+/** Project rows as the backend returns them (list / get). */
+interface ProjectRecord {
+  id: number;
+  name: string;
+  updated_at?: string;
+  graph?: unknown;
+}
+
+/** One row of api.getAssistantUsage().days. */
+interface UsageDay {
+  date: string;
+  input_tokens: number;
+  output_tokens: number;
+  requests: number;
+}
+
+interface UsageBar {
+  date: string;
+  tokens: number;
+  requests: number;
+  height: number;
+}
+
+/** Pending login being polled from THIS browser. */
+interface Waiting { email: string; code?: string }
+
+/** State of the approval page (/?magic=<token>). */
+interface Approval {
+  token: string;
+  code: string;
+  requester: string;
+  age: string;
+  same_browser: boolean;
+  done: boolean;
+}
+
+/** Errors surfaced by ApiClient (ApiError-shaped), read defensively. */
+interface ApiErrorLike {
+  code?: string;
+  status?: number | null;
+  message?: string;
+}
+
+// Non-reactive instance state, assigned in created()/onOpen() (not data()) on
+// purpose — see the comments there. Typed through the `self` cast below — a
+// typing-only view, self === this.
+interface AccountPanelInternal {
+  api: ApiClient;
+  pollTimer?: ReturnType<typeof setInterval> | null;
+  previouslyFocused?: HTMLElement | null;
+}
+
+export default defineComponent({
   name: 'AccountPanel',
   props: {
     show: {
@@ -202,16 +258,16 @@ export default {
   },
   data() {
     return {
-      user: null,
-      projects: [],
-      usageDays: [],
+      user: null as ApiUser | null,
+      projects: [] as ProjectRecord[],
+      usageDays: [] as UsageDay[],
       schemes: Object.values(COLOR_SCHEMES),
       colorScheme: settings.get('colorScheme'),
       email: '',
       // { email, code } while this browser has a pending login being polled.
-      waiting: null,
+      waiting: null as Waiting | null,
       // { code, requester, age, same_browser, token, done } on the approval page.
-      approval: null,
+      approval: null as Approval | null,
       busy: false,
       error: '',
       status: '',
@@ -219,18 +275,20 @@ export default {
   },
   created() {
     // Non-reactive client; reads url/token from localStorage on every call.
-    this.api = new ApiClient();
+    (this as typeof this & AccountPanelInternal).api = new ApiClient();
   },
   watch: {
-    show(isOpen) {
+    show(isOpen: boolean) {
       if (isOpen) this.onOpen();
       else this.restoreFocus();
     },
   },
   computed: {
     // Last 14 days, gaps filled, scaled to the busiest day (svg is 70 tall).
-    usageBars() {
-      const byDate = new Map(this.usageDays.map(day => [day.date, day]));
+    // Always exactly 14 entries, so the non-empty tuple type is sound (the
+    // template reads usageBars[0] directly).
+    usageBars(): [UsageBar, ...UsageBar[]] {
+      const byDate = new Map(this.usageDays.map(day => [day.date, day] as [string, UsageDay]));
       const bars = [];
       for (let i = 13; i >= 0; i -= 1) {
         const date = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
@@ -242,18 +300,21 @@ export default {
         });
       }
       const top = Math.max(1, ...bars.map(bar => bar.tokens));
-      return bars.map(bar => ({ ...bar, height: Math.round((bar.tokens / top) * 66) }));
+      return bars.map(
+        bar => ({ ...bar, height: Math.round((bar.tokens / top) * 66) }),
+      ) as [UsageBar, ...UsageBar[]];
     },
   },
   methods: {
     async onOpen() {
+      const self = this as typeof this & AccountPanelInternal;
       this.error = '';
       this.status = '';
-      this.previouslyFocused = document.activeElement;
+      self.previouslyFocused = document.activeElement as HTMLElement | null;
       this.$nextTick(() => {
-        const container = this.$refs.container;
+        const container = this.$refs.container as HTMLElement | undefined;
         if (container) {
-          const focusable = container.querySelector('input, button');
+          const focusable = container.querySelector<HTMLElement>('input, button');
           (focusable || container).focus();
         }
       });
@@ -261,7 +322,7 @@ export default {
         await this.openApprovalFromUrl();
         return;
       }
-      if (this.api.isLoggedIn()) {
+      if (self.api.isLoggedIn()) {
         // The stored token may be a full session OR a pending login from a
         // previous visit — the status poll tells us which and carries the
         // match code so the waiting UI is resumable.
@@ -270,7 +331,8 @@ export default {
         if (this.user) await this.refreshUsage();
         if (this.intent === 'usage' || this.intent === 'settings') {
           this.$nextTick(() => {
-            const section = this.intent === 'usage' ? this.$refs.usageSection : this.$refs.settingsSection;
+            const section = (this.intent === 'usage'
+              ? this.$refs.usageSection : this.$refs.settingsSection) as HTMLElement | undefined;
             if (section) section.scrollIntoView({ block: 'start', behavior: 'smooth' });
           });
         }
@@ -279,7 +341,7 @@ export default {
         this.projects = [];
         if (this.intent === 'settings') {
           this.$nextTick(() => {
-            const section = this.$refs.settingsSection;
+            const section = this.$refs.settingsSection as HTMLElement | undefined;
             if (section) section.scrollIntoView({ block: 'start', behavior: 'smooth' });
           });
         }
@@ -289,6 +351,7 @@ export default {
     // panel with intent 'magic'). Strip the token from the URL before anything
     // else — it is single-use and must not linger in the address bar/history.
     async openApprovalFromUrl() {
+      const self = this as typeof this & AccountPanelInternal;
       const params = new URLSearchParams(window.location.search);
       const token = params.get('magic');
       params.delete('magic');
@@ -299,7 +362,9 @@ export default {
       if (!token) return;
       this.busy = true;
       try {
-        const info = await this.api.magicInfo(token);
+        const info = await self.api.magicInfo(token) as {
+          code: string; requester: string; requested_at: string; same_browser: boolean;
+        };
         this.approval = {
           token,
           code: info.code,
@@ -310,7 +375,8 @@ export default {
         };
       } catch (e) {
         this.handleError(e);
-        if (e && e.code === ERROR_CODES.http && e.status === 401) {
+        const err = e as ApiErrorLike | null | undefined;
+        if (err && err.code === ERROR_CODES.http && err.status === 401) {
           this.error = 'This sign-in link is invalid or has expired. Request a new one.';
         }
       } finally {
@@ -320,11 +386,12 @@ export default {
     // The deliberate click. Signs in the browser that REQUESTED the login;
     // when that is us (same_browser), our own stored token just got verified.
     async approve() {
+      const self = this as typeof this & AccountPanelInternal;
       if (this.busy || !this.approval) return;
       this.busy = true;
       this.error = '';
       try {
-        await this.api.approveMagicLink(this.approval.token);
+        await self.api.approveMagicLink(this.approval.token);
         if (this.approval.same_browser) {
           this.approval = null;
           await this.checkStatus();
@@ -334,7 +401,8 @@ export default {
         }
       } catch (e) {
         this.handleError(e);
-        if (e && e.code === ERROR_CODES.http && e.status === 401) {
+        const err = e as ApiErrorLike | null | undefined;
+        if (err && err.code === ERROR_CODES.http && err.status === 401) {
           this.error = 'This sign-in link is invalid or has expired. Request a new one.';
         }
       } finally {
@@ -342,6 +410,7 @@ export default {
       }
     },
     async sendLink() {
+      const self = this as typeof this & AccountPanelInternal;
       if (this.busy) return;
       const email = this.email.trim();
       if (!email) {
@@ -352,8 +421,8 @@ export default {
       this.error = '';
       this.status = '';
       try {
-        const data = await this.api.requestMagicLink(email);
-        this.waiting = { email, code: data.code };
+        const data = await self.api.requestMagicLink(email);
+        this.waiting = { email, code: data!.code };
         this.startPolling();
       } catch (e) {
         this.handleError(e);
@@ -363,12 +432,15 @@ export default {
     },
     // One status poll; used at panel open and by the waiting loop.
     async checkStatus() {
+      const self = this as typeof this & AccountPanelInternal;
       try {
-        const data = await this.api.authStatus();
+        const data = await self.api.authStatus() as {
+          verified?: boolean; user?: ApiUser; code?: string;
+        };
         if (data.verified) {
           this.stopPolling();
           this.waiting = null;
-          this.user = data.user;
+          this.user = data.user!;
           await this.refreshProjects();
         } else {
           this.waiting = this.waiting || { email: '', code: data.code };
@@ -376,10 +448,11 @@ export default {
           this.startPolling();
         }
       } catch (e) {
-        if (e && e.code === ERROR_CODES.http && e.status === 401) {
+        const err = e as ApiErrorLike | null | undefined;
+        if (err && err.code === ERROR_CODES.http && err.status === 401) {
           // Expired pending login (or revoked session): back to square one.
           this.stopPolling();
-          this.api.clearToken();
+          self.api.clearToken();
           if (this.waiting) {
             this.waiting = null;
             this.error = 'The sign-in link expired. Request a new one.';
@@ -392,51 +465,57 @@ export default {
       }
     },
     startPolling() {
-      if (this.pollTimer) return;
-      this.pollTimer = setInterval(() => {
+      const self = this as typeof this & AccountPanelInternal;
+      if (self.pollTimer) return;
+      self.pollTimer = setInterval(() => {
         if (this.show) this.checkStatus();
       }, 2500);
     },
     stopPolling() {
-      if (this.pollTimer) {
-        clearInterval(this.pollTimer);
-        this.pollTimer = null;
+      const self = this as typeof this & AccountPanelInternal;
+      if (self.pollTimer) {
+        clearInterval(self.pollTimer);
+        self.pollTimer = null;
       }
     },
     async cancelWaiting() {
+      const self = this as typeof this & AccountPanelInternal;
       this.stopPolling();
-      await this.api.logout(); // revokes the pending token; the emailed link dies
+      await self.api.logout(); // revokes the pending token; the emailed link dies
       this.waiting = null;
       this.status = 'Sign-in cancelled.';
     },
-    formatAge(value) {
+    formatAge(value: string): string {
       const then = new Date(value).getTime();
       if (Number.isNaN(then)) return 'just now';
       const minutes = Math.round((Date.now() - then) / 60000);
       if (minutes <= 0) return 'just now';
       return minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`;
     },
-    setColorScheme(id) {
+    setColorScheme(id: ColorSchemeId) {
       settings.set('colorScheme', id);
       this.colorScheme = id;
     },
-    gradientOf(scheme) {
+    gradientOf(scheme: ColorScheme): string {
       return rampGradientCss(scheme);
     },
     async refreshUsage() {
+      const self = this as typeof this & AccountPanelInternal;
       try {
-        const data = await this.api.getAssistantUsage(14);
+        const data = await self.api.getAssistantUsage(14) as { days?: UsageDay[] } | null;
         this.usageDays = (data && data.days) || [];
       } catch {
         this.usageDays = []; // the graph is informational — never block the panel
       }
     },
     async refreshProjects() {
-      this.projects = (await this.api.listProjects()) || [];
+      const self = this as typeof this & AccountPanelInternal;
+      this.projects = ((await self.api.listProjects()) || []) as ProjectRecord[];
     },
     async signOut() {
+      const self = this as typeof this & AccountPanelInternal;
       this.stopPolling();
-      await this.api.logout();
+      await self.api.logout();
       clearCurrentProject(); // the continuation anchor belongs to the account
       this.user = null;
       this.projects = [];
@@ -444,6 +523,7 @@ export default {
       this.error = '';
     },
     async saveToCloud() {
+      const self = this as typeof this & AccountPanelInternal;
       if (this.busy) return;
       const graphString = this.$boardInterface ? this.$boardInterface.getGraphJSON() : null;
       if (graphString === null || graphString === undefined) {
@@ -460,7 +540,7 @@ export default {
       this.status = '';
       try {
         const graph = JSON.parse(graphString);
-        await this.api.createProject({ name: trimmed, graph });
+        await self.api.createProject({ name: trimmed, graph });
         await this.refreshProjects();
         this.status = `Saved “${trimmed}” to the cloud.`;
       } catch (e) {
@@ -469,14 +549,15 @@ export default {
         this.busy = false;
       }
     },
-    async openProject(project) {
+    async openProject(project: ProjectRecord) {
+      const self = this as typeof this & AccountPanelInternal;
       if (this.busy) return;
       this.busy = true;
       this.error = '';
       this.status = '';
       try {
         // Fetch the full project so we always load the latest stored graph.
-        const full = await this.api.getProject(project.id);
+        const full = await self.api.getProject(project.id) as ProjectRecord | null;
         const graph = full && full.graph !== undefined ? full.graph : project.graph;
         const graphString = typeof graph === 'string' ? graph : JSON.stringify(graph);
         if (this.$boardInterface) this.$boardInterface.loadGraphFromJSON(graphString);
@@ -488,14 +569,15 @@ export default {
         this.busy = false;
       }
     },
-    async deleteProject(project) {
+    async deleteProject(project: ProjectRecord) {
+      const self = this as typeof this & AccountPanelInternal;
       // eslint-disable-next-line no-alert
       if (!window.confirm(`Delete “${project.name}”? This cannot be undone.`)) return;
       this.busy = true;
       this.error = '';
       this.status = '';
       try {
-        await this.api.deleteProject(project.id);
+        await self.api.deleteProject(project.id);
         await this.refreshProjects();
         this.status = `Deleted “${project.name}”.`;
       } catch (e) {
@@ -504,29 +586,30 @@ export default {
         this.busy = false;
       }
     },
-    defaultProjectName() {
+    defaultProjectName(): string {
       const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
       return `Model ${stamp}`;
     },
-    formatDate(value) {
+    formatDate(value: string | undefined): string {
       if (!value) return '';
       const d = new Date(value);
       return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleString();
     },
-    handleError(e) {
-      const code = e && e.code;
+    handleError(e: unknown) {
+      const err = e as ApiErrorLike | null | undefined;
+      const code = err && err.code;
       if (code === ERROR_CODES.notLoggedIn) {
         this.error = 'Please sign in first.';
       } else if (code === ERROR_CODES.network) {
         this.error = 'Can\'t reach the server — please check your internet connection and try again.';
-      } else if (code === ERROR_CODES.http && e.status >= 500) {
+      } else if (code === ERROR_CODES.http && (err!.status as number) >= 500) {
         // In dev, vite's /api proxy answers 500 when nothing listens on the
         // backend port (ECONNREFUSED); in prod a reverse proxy answers 502/504.
         this.error = 'The server isn\'t responding right now — please try again in a moment.';
       } else if (code === ERROR_CODES.malformed) {
         this.error = 'The backend returned an unexpected response.';
-      } else if (e && e.message) {
-        this.error = e.message;
+      } else if (err && err.message) {
+        this.error = err.message;
       } else {
         this.error = 'Something went wrong.';
       }
@@ -537,27 +620,30 @@ export default {
     // page (approve or abandon, no limbo). Closing a cross-device approval
     // page touches nothing: that browser holds no token.
     async closeModal() {
+      const self = this as typeof this & AccountPanelInternal;
       if (this.waiting) {
         await this.cancelWaiting();
       } else if (this.approval && !this.approval.done
-          && this.approval.same_browser && this.api.isLoggedIn()) {
-        await this.api.logout();
+          && this.approval.same_browser && self.api.isLoggedIn()) {
+        await self.api.logout();
         this.approval = null;
       }
       this.$emit('close');
     },
     restoreFocus() {
-      if (this.previouslyFocused && typeof this.previouslyFocused.focus === 'function') {
-        this.previouslyFocused.focus();
+      const self = this as typeof this & AccountPanelInternal;
+      if (self.previouslyFocused && typeof self.previouslyFocused.focus === 'function') {
+        self.previouslyFocused.focus();
       }
-      this.previouslyFocused = null;
+      self.previouslyFocused = null;
     },
-    handleKeydown(event) {
+    handleKeydown(event: KeyboardEvent) {
       if (!this.show) return;
       if (event.key === 'Escape') this.closeModal();
     },
   },
   async mounted() {
+    const self = this as typeof this & AccountPanelInternal;
     document.addEventListener('keydown', this.handleKeydown);
     if (this.show) {
       this.onOpen();
@@ -569,13 +655,14 @@ export default {
     // carries ?magic= the approval flow takes precedence (App.vue opens the
     // panel with intent 'magic'; approving is what unblocks us anyway).
     if (new URLSearchParams(window.location.search).get('magic')) return;
-    if (this.api.isLoggedIn()) {
+    if (self.api.isLoggedIn()) {
       try {
-        const data = await this.api.authStatus();
+        const data = await self.api.authStatus() as { verified?: boolean };
         if (!data.verified) this.$emit('pending-login');
       } catch (e) {
-        if (e && e.code === ERROR_CODES.http && e.status === 401) {
-          this.api.clearToken(); // expired pending leftover: clean slate
+        const err = e as ApiErrorLike | null | undefined;
+        if (err && err.code === ERROR_CODES.http && err.status === 401) {
+          self.api.clearToken(); // expired pending leftover: clean slate
         }
       }
     }
@@ -584,7 +671,7 @@ export default {
     document.removeEventListener('keydown', this.handleKeydown);
     this.stopPolling();
   },
-};
+});
 </script>
 
 <style scoped>

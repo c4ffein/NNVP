@@ -22,10 +22,11 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue';
 import { useVueFlow } from '@vue-flow/core';
 import offscreenIndicators from '../../lib/FlowInterface/offscreenIndicators';
+import type { OffscreenIndicator } from '../../lib/FlowInterface/offscreenIndicators';
 
 // Must be rendered INSIDE <VueFlow> so useVueFlow resolves the board's own
 // injected store instead of creating a fresh one.
@@ -39,11 +40,11 @@ const indicators = computed(
 
 // Clicking an arrow brings its layer to the middle of the board, keeping the
 // current zoom (fitView-style zoom jumps are disorienting for one node).
-function extraCount(indicator) {
+function extraCount(indicator: OffscreenIndicator) {
   return indicator.count > 1 ? ` (+${indicator.count - 1} more)` : '';
 }
 
-function panTo(id) {
+function panTo(id: string) {
   const node = findNode(id);
   if (!node) return;
   const position = node.computedPosition || node.position;

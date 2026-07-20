@@ -41,7 +41,7 @@
           v-bind:title="selectedLayer.kerasLayer.parameterDef[1]"
           v-bind:itemList="selectedLayer.inputLayers"
           v-bind:idFunc="e => e"
-          v-bind:nameFunc="e => $boardInterface.findLayerById(e).kerasLayer.name"
+          v-bind:nameFunc="e => $boardInterface.findLayerById(e)!.kerasLayer!.name"
         />
         <div v-if="index != selectedNode.e.length - 1">
           <br>
@@ -51,7 +51,7 @@
       <ParamsBlock title="Model Inputs" v-if="inputInLayersAndMoreThanOneInModel">
         <div class="LayerOptions param">
           <OrderParameter
-            v-bind:itemList="$boardInterface.activeGraph.model.modelInputs"
+            v-bind:itemList="$boardInterface.activeGraph!.model.modelInputs"
             :idFunc="e => e.id"
             :nameFunc="e => e.name"
         />
@@ -61,7 +61,7 @@
       <ParamsBlock title="Model Outputs" v-if="outputInLayers">
         <div class="LayerOptions param">
           <OrderParameter
-            v-bind:itemList="$boardInterface.activeGraph.model.modelOutputs"
+            v-bind:itemList="$boardInterface.activeGraph!.model.modelOutputs"
             :idFunc="e => e.id"
             :nameFunc="e => e.name"
           />
@@ -71,7 +71,8 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
+import { defineComponent } from 'vue';
 import ParamsBlock from './ParamsBlock.vue';
 import ListParameter from '../Parameters/ListParameter.vue';
 import IntParameter from '../Parameters/IntParameter.vue';
@@ -80,9 +81,32 @@ import TupleIntParameter from '../Parameters/TupleIntParameter.vue';
 import FloatParameter from '../Parameters/FloatParameter.vue';
 import StringParameter from '../Parameters/StringParameter.vue';
 import OrderParameter from '../Parameters/OrderParameter.vue';
+import type KerasLayer from '../../lib/KerasInterface/KerasLayer';
+import type { LayerWrapper } from '../../lib/FlowInterface/FlowGraphEditor';
+import type { ParameterDef } from '../../types/model';
 
+// The catalog JSON carries extra editor hints (option lists, range
+// conditions) on top of what types/model.ts's ParameterDef models.
+type EditorParameterDef = ParameterDef & { list?: string[]; conditions?: string[] };
 
-export default {
+/**
+ * A selected LayerWrapper whose kerasLayer is known present — activeLayers
+ * filters Output nodes, and every remaining selection carries a revived live
+ * KerasLayer instance (see types/model.ts's revive contract).
+ */
+type ActiveLayer = LayerWrapper & {
+  kerasLayer: KerasLayer & { parameterDef: Record<string, EditorParameterDef> };
+};
+
+// Non-reactive instance fields assigned outside data() (pure typing pass:
+// keeping them out of data() preserves their non-reactive nature — same
+// pattern as CornerControls.vue).
+interface LayerOptionsInstanceExtra {
+  selectionChangeHandler?: () => void;
+  graphChangeHandler?: () => void;
+}
+
+export default defineComponent({
   name: 'LayerOptions',
   components: {
     ParamsBlock,
@@ -100,28 +124,30 @@ export default {
     };
   },
   mounted() {
+    const self = this as unknown as LayerOptionsInstanceExtra;
     // Subscribe to selection changes from D3GraphEditor
-    this.selectionChangeHandler = () => {
+    self.selectionChangeHandler = () => {
       this.refreshKey++;
     };
-    this.$boardInterface.on('selection-changed', this.selectionChangeHandler);
+    this.$boardInterface.on('selection-changed', self.selectionChangeHandler);
     // Subscribe to graph structure changes (layers added/removed, template loaded, etc.)
-    this.graphChangeHandler = () => {
+    self.graphChangeHandler = () => {
       this.refreshKey++;
     };
-    this.$boardInterface.on('graph-changed', this.graphChangeHandler);
+    this.$boardInterface.on('graph-changed', self.graphChangeHandler);
   },
   beforeUnmount() {
+    const self = this as unknown as LayerOptionsInstanceExtra;
     // Unsubscribe from events
-    if (this.selectionChangeHandler) {
-      this.$boardInterface.off('selection-changed', this.selectionChangeHandler);
+    if (self.selectionChangeHandler) {
+      this.$boardInterface.off('selection-changed', self.selectionChangeHandler);
     }
-    if (this.graphChangeHandler) {
-      this.$boardInterface.off('graph-changed', this.graphChangeHandler);
+    if (self.graphChangeHandler) {
+      this.$boardInterface.off('graph-changed', self.graphChangeHandler);
     }
   },
   computed: {
-    selectedNode() {
+    selectedNode(): { e: LayerWrapper[] } {
       // Force reactivity by accessing refreshKey
       this.refreshKey; // eslint-disable-line
       const container = this.$boardInterface.getActiveElementsContainer();
@@ -130,17 +156,17 @@ export default {
         e: container.e ? [...container.e] : [],
       };
     },
-    activeLayers() {
-      const activeLayers = [];
+    activeLayers(): ActiveLayer[] {
+      const activeLayers: ActiveLayer[] = [];
       for (const d3Layer of this.selectedNode.e) { // eslint-disable-line
-        if (!this.isOutputLayer(d3Layer.kerasLayer)) activeLayers.push(d3Layer);
+        if (!this.isOutputLayer(d3Layer.kerasLayer)) activeLayers.push(d3Layer as ActiveLayer);
       }
       return activeLayers;
     },
-    inputInLayersAndMoreThanOneInModel() {
+    inputInLayersAndMoreThanOneInModel(): boolean {
       for (const layer of this.selectedNode.e) { // eslint-disable-line
         if (this.isInputLayer(layer)) {
-          if (this.$boardInterface.activeGraph.model.modelInputs.length > 1) {
+          if (this.$boardInterface.activeGraph!.model.modelInputs.length > 1) {
             return true;
           }
           return false;
@@ -148,7 +174,7 @@ export default {
       }
       return false;
     },
-    outputInLayers() {
+    outputInLayers(): boolean {
       for (const layer of this.selectedNode.e) { // eslint-disable-line
         if (this.isOutputLayer(layer)) {
           return true;
@@ -156,35 +182,35 @@ export default {
       }
       return false;
     },
-    totalLayers() {
+    totalLayers(): number {
       this.refreshKey; // eslint-disable-line
       if (!this.$boardInterface?.activeGraph?.model?.d3Layers) return 0;
       return this.$boardInterface.activeGraph.model.d3Layers.length;
     },
-    totalInputs() {
+    totalInputs(): number {
       this.refreshKey; // eslint-disable-line
       if (!this.$boardInterface?.activeGraph?.model?.modelInputs) return 0;
       return this.$boardInterface.activeGraph.model.modelInputs.length;
     },
-    totalOutputs() {
+    totalOutputs(): number {
       this.refreshKey; // eslint-disable-line
       if (!this.$boardInterface?.activeGraph?.model?.modelOutputs) return 0;
       return this.$boardInterface.activeGraph.model.modelOutputs.length;
     },
-    totalEdges() {
+    totalEdges(): number {
       this.refreshKey; // eslint-disable-line
       if (!this.$boardInterface?.activeGraph?.model?.d3Edges) return 0;
       return this.$boardInterface.activeGraph.model.d3Edges.length;
     },
   },
   methods: {
-    nodeIsSelected() {
+    nodeIsSelected(): boolean {
       return this.selectedNode !== null
           && this.selectedNode.e !== null
           && this.selectedNode.e.length > 0;
     },
-    parameterToComponentName(parameter) {
-      const typeToName = {
+    parameterToComponentName(parameter: EditorParameterDef): string {
+      const typeToName: Record<ParameterDef['type'], string> = {
         float: 'FloatParameter',
         int: 'IntParameter',
         tuple_int: 'TupleIntParameter',
@@ -195,20 +221,24 @@ export default {
       };
       return typeToName[parameter.type];
     },
-    isMergeLayer(nodeCategory) {
+    isMergeLayer(nodeCategory: string): boolean {
       return nodeCategory === 'Merge';
     },
-    isInputLayer(kerasLayer) {
-      return kerasLayer.name === 'Input';
+    // Both take anything carrying a `name` — activeLayers passes the
+    // kerasLayer while outputInLayers passes the LayerWrapper itself (a
+    // historical inconsistency that happens to work since both have names);
+    // the `!` keeps the historical crash-on-null behavior.
+    isInputLayer(kerasLayer: { name: string } | null): boolean {
+      return kerasLayer!.name === 'Input';
     },
-    isOutputLayer(kerasLayer) {
-      return kerasLayer.name === 'Output';
+    isOutputLayer(kerasLayer: { name: string } | null): boolean {
+      return kerasLayer!.name === 'Output';
     },
-    toggleLayer(id) {
-      document.getElementById(id).classList.toggle('closed');
+    toggleLayer(id: string) {
+      document.getElementById(id)!.classList.toggle('closed');
     },
   },
-};
+});
 </script>
 
 <style >

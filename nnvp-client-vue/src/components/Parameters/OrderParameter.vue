@@ -32,7 +32,7 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
 /**
  * OrderParameter Component
  *
@@ -59,48 +59,57 @@
  * @prop {Function} idFunc - Function to extract ID from each item
  * @prop {Function} nameFunc - Function to extract display name from each item
  */
-export default {
+import { defineComponent } from 'vue';
+import type { PropType } from 'vue';
+
+// The items are heterogeneous by design (nnvp layer ids in one caller,
+// model-input/output wrappers in another) — `any` is the honest seam here.
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+export default defineComponent({
   name: 'OrderParameter',
   props: {
-    title: String,
-    itemList: null,
-    idFunc: Function,
-    nameFunc: Function,
+    // LayerOptions' (dead) Merge branch historically binds a ParameterDef
+    // object here; the runtime validator stays String as it always was.
+    title: { type: String as unknown as PropType<string | object> },
+    itemList: { type: Array as PropType<any[]>, required: true },
+    idFunc: { type: Function as PropType<(item: any) => string | number>, required: true },
+    nameFunc: { type: Function as PropType<(item: any) => string>, required: true },
   },
   computed: {
-    duplicates() {
+    duplicates(): any[] {
       return this.itemList.filter((e, i, a) => a.indexOf(e) === i && a.lastIndexOf(e) !== i);
     },
   },
   data() {
     return {
-      draggedItem: null,
+      draggedItem: null as any,
     };
   },
   methods: {
-    id(item) {
+    id(item: any) {
       if (this.idFunc) return this.idFunc(item);
       return item.id;
     },
-    name(item) {
+    name(item: any) {
       if (this.nameFunc) return this.nameFunc(item);
       return item.name;
     },
-    itemDragStart(item, event) {
+    itemDragStart(item: any, event: DragEvent) {
       this.draggedItem = item;
-      event.dataTransfer.setData('text/html', this.draggedItem);
+      event.dataTransfer!.setData('text/html', this.draggedItem);
     },
-    itemDragOver(targetId, event) {
+    itemDragOver(targetId: any, event: DragEvent) {
       event.preventDefault();
       const sourceId = this.draggedItem;
       this.reorderList(this.itemList, sourceId, targetId);
     },
-    itemDragDrop(targetId, event) {
+    itemDragDrop(targetId: any, event: DragEvent) {
       event.preventDefault();
       const sourceId = this.draggedItem;
       this.reorderList(this.itemList, sourceId, targetId);
     },
-    reorderList(itemList, sourceItem, targetItem) {
+    reorderList(itemList: any[], sourceItem: any, targetItem: any) {
       if (itemList.indexOf(sourceItem) === itemList.indexOf(targetItem)) {
         return;
       } if (itemList.indexOf(sourceItem) > itemList.indexOf(targetItem)) {
@@ -112,7 +121,7 @@ export default {
       }
     },
   },
-};
+});
 </script>
 
 <style >

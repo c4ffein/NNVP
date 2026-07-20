@@ -73,11 +73,11 @@
           </div>
           <div class="viz3d-panel-row">
             <span>slices</span>
-            <select :value="selectedPlacement.slices" @change="setSlices($event.target.value)">
+            <select :value="selectedPlacement.slices" @change="setSlices(($event.target as HTMLSelectElement).value)">
               <option v-for="n in maxSlices" :key="n" :value="n">{{ n }}</option>
             </select>
             <label>
-              <input type="checkbox" :checked="selectedPlacement.sideBySide" @change="setSideBySide($event.target.checked)"/>
+              <input type="checkbox" :checked="selectedPlacement.sideBySide" @change="setSideBySide(($event.target as HTMLInputElement).checked)"/>
               side by side
             </label>
           </div>
@@ -101,27 +101,61 @@
   </FloatingWindow>
 </template>
 
-<script>
+<script lang="ts">
+import { defineComponent } from 'vue';
 import FloatingWindow from '../FloatingWindow.vue';
 import {
   buildActivations, buildScene, pickLayer, MAX_SLICES_OVERRIDE,
 } from '../../lib/Viz3D/sceneBuild';
+import type { LayerPlacement, Scene3D } from '../../lib/Viz3D/sceneBuild';
 import { inspectionToViz3D } from '../../lib/Viz3D/inspectionBridge';
+import type { InspectionSnapshot } from '../../lib/Viz3D/inspectionBridge';
 import { createViz3DRenderer, webgpuAvailable } from '../../lib/Viz3D/renderer';
+import type { Viz3DRenderer } from '../../lib/Viz3D/renderer';
 import {
   applyOrbitDrag, applyOrbitPan, applyOrbitZoom, createOrbitState,
 } from '../../lib/Viz3D/math';
+import type { OrbitState } from '../../lib/Viz3D/math';
 import { colorSchemeOrDefault, rampWgsl } from '../../lib/Settings/colorSchemes';
+import type { ColorSchemeId } from '../../lib/Settings/colorSchemes';
 import { settings } from '../../lib/Settings/settings';
+import type { NnvpLayerId, NnvpModel } from '../../types/model';
 
 // Graph edits arrive in bursts (a drag fires many) — rebuild once they settle.
 const REBUILD_DEBOUNCE_MS = 250;
+
+interface DragPointer {
+  id: number;
+  x: number;
+  y: number;
+  startX: number;
+  startY: number;
+  pan: boolean;
+}
+
+// Non-reactive instance state, assigned in mounted() (not data()) on purpose:
+// the renderer and orbit state are plain objects touched every frame — Vue
+// proxies would only add overhead. Typed through the `self` cast below — a
+// typing-only view, self === this.
+interface Viz3DWindowInternal {
+  renderer: Viz3DRenderer | null;
+  scene: Scene3D | null;
+  orbit: OrbitState;
+  dragPointer: DragPointer | null;
+  rebuildTimer: ReturnType<typeof setTimeout> | null;
+  onGraphChanged: () => void;
+  onInspectionChanged: () => void;
+  onSettingsChanged: () => void;
+  onSelectionChanged: () => void;
+  onVizParamsChanged: () => void;
+  activeScheme: ColorSchemeId;
+}
 
 // Experimental 3D visualization of the active graph: layers become planes of
 // neurons stacked by topological depth, sampled connections drawn between
 // them. All geometry/sampling lives in lib/Viz3D (pure, tested); this
 // component only wires the board model, pointer events and the renderer.
-export default {
+export default defineComponent({
   name: 'Viz3DWindow',
   components: { FloatingWindow },
   emits: ['close', 'open-settings'],
@@ -134,9 +168,9 @@ export default {
       // One-time notice, per device (Settings > viz3dIntroSeen).
       showIntro: !settings.get('viz3dIntroSeen'),
       legendOpen: settings.get('viz3dLegendOpen'),
-      selectedLayerId: null,
+      selectedLayerId: null as NnvpLayerId | null,
       sceneVersion: 0,
-      legendLayers: [],
+      legendLayers: [] as string[],
       legendEdges: '',
       initialRect: {
         x: Math.max(12, Math.round((window.innerWidth - width) / 2)),
@@ -147,89 +181,93 @@ export default {
     };
   },
   computed: {
-    selectedPlacement() {
+    selectedPlacement(): LayerPlacement | null {
+      const self = this as typeof this & Viz3DWindowInternal;
       // sceneVersion ties this to rebuilds (this.scene itself is non-reactive).
-      if (this.sceneVersion < 0 || !this.scene || this.selectedLayerId === null) return null;
-      return this.scene.layers.find(
+      if (this.sceneVersion < 0 || !self.scene || this.selectedLayerId === null) return null;
+      return self.scene.layers.find(
         placement => String(placement.layerId) === String(this.selectedLayerId),
       ) || null;
     },
-    selectedChannels() {
+    selectedChannels(): number {
       const placement = this.selectedPlacement;
       if (!placement || placement.kind !== 'planes') return 1;
       return Math.round(placement.totalUnits / (placement.cols * placement.rows));
     },
-    maxSlices() {
+    maxSlices(): number {
       return Math.min(MAX_SLICES_OVERRIDE, this.selectedChannels);
     },
   },
   mounted() {
+    const self = this as typeof this & Viz3DWindowInternal;
     // Non-reactive: the renderer and orbit state are plain objects touched
     // every frame — Vue proxies would only add overhead.
-    this.renderer = null;
-    this.scene = null;
-    this.orbit = createOrbitState();
-    this.dragPointer = null;
-    this.rebuildTimer = null;
-    this.onGraphChanged = () => {
-      clearTimeout(this.rebuildTimer);
-      this.rebuildTimer = setTimeout(() => this.rebuild(), REBUILD_DEBOUNCE_MS);
+    self.renderer = null;
+    self.scene = null;
+    self.orbit = createOrbitState();
+    self.dragPointer = null;
+    self.rebuildTimer = null;
+    self.onGraphChanged = () => {
+      clearTimeout(self.rebuildTimer as ReturnType<typeof setTimeout>);
+      self.rebuildTimer = setTimeout(() => this.rebuild(), REBUILD_DEBOUNCE_MS);
     };
-    this.onInspectionChanged = () => this.applyInspection();
-    this.activeScheme = settings.get('colorScheme');
-    this.onSettingsChanged = () => {
-      if (settings.get('colorScheme') === this.activeScheme) return;
-      this.activeScheme = settings.get('colorScheme');
+    self.onInspectionChanged = () => this.applyInspection();
+    self.activeScheme = settings.get('colorScheme');
+    self.onSettingsChanged = () => {
+      if (settings.get('colorScheme') === self.activeScheme) return;
+      self.activeScheme = settings.get('colorScheme');
       this.recreateRenderer();
     };
     // Selecting exactly one layer on the 2D board re-targets the camera on it.
-    this.onSelectionChanged = () => {
-      if (!this.renderer || !this.scene) return;
+    self.onSelectionChanged = () => {
+      if (!self.renderer || !self.scene) return;
       const selected = this.$boardInterface.getActiveElementsContainer().e;
       if (selected.length !== 1) return;
-      const placement = this.scene.layers.find(
-        candidate => String(candidate.layerId) === String(selected[0].id),
+      const placement = self.scene.layers.find(
+        candidate => String(candidate.layerId) === String(selected[0]!.id),
       );
       if (!placement) return;
       this.selectedLayerId = placement.layerId;
-      this.orbit = createOrbitState({ ...this.orbit, target: placement.center });
-      this.renderer.setCamera(this.orbit);
+      self.orbit = createOrbitState({ ...self.orbit, target: placement.center });
+      self.renderer.setCamera(self.orbit);
     };
     // Another consumer (or this window) changed a layer's display params.
-    this.onVizParamsChanged = () => this.rebuild();
-    this.$boardInterface.on('graph-changed', this.onGraphChanged);
-    this.$boardInterface.on('inspection-changed', this.onInspectionChanged);
-    this.$boardInterface.on('selection-changed', this.onSelectionChanged);
-    this.$boardInterface.on('viz-params-changed', this.onVizParamsChanged);
-    settings.onChange(this.onSettingsChanged);
+    self.onVizParamsChanged = () => this.rebuild();
+    this.$boardInterface.on('graph-changed', self.onGraphChanged);
+    this.$boardInterface.on('inspection-changed', self.onInspectionChanged);
+    this.$boardInterface.on('selection-changed', self.onSelectionChanged);
+    this.$boardInterface.on('viz-params-changed', self.onVizParamsChanged);
+    settings.onChange(self.onSettingsChanged);
     if (this.supported) this.start();
   },
   beforeUnmount() {
-    clearTimeout(this.rebuildTimer);
-    this.$boardInterface.off('graph-changed', this.onGraphChanged);
-    this.$boardInterface.off('inspection-changed', this.onInspectionChanged);
-    this.$boardInterface.off('selection-changed', this.onSelectionChanged);
-    this.$boardInterface.off('viz-params-changed', this.onVizParamsChanged);
-    settings.offChange(this.onSettingsChanged);
-    if (this.renderer) {
-      this.renderer.destroy();
-      this.renderer = null;
+    const self = this as typeof this & Viz3DWindowInternal;
+    clearTimeout(self.rebuildTimer as ReturnType<typeof setTimeout>);
+    this.$boardInterface.off('graph-changed', self.onGraphChanged);
+    this.$boardInterface.off('inspection-changed', self.onInspectionChanged);
+    this.$boardInterface.off('selection-changed', self.onSelectionChanged);
+    this.$boardInterface.off('viz-params-changed', self.onVizParamsChanged);
+    settings.offChange(self.onSettingsChanged);
+    if (self.renderer) {
+      self.renderer.destroy();
+      self.renderer = null;
     }
   },
   methods: {
-    currentModel() {
+    currentModel(): NnvpModel {
       const json = this.$boardInterface.getGraphJSON();
       return json ? JSON.parse(json) : {
         layers: [], edges: [], inputs: [], outputs: [],
       };
     },
-    buildCurrentScene() {
+    buildCurrentScene(): Scene3D {
       return buildScene(this.currentModel(), {
         perLayer: this.$boardInterface.getLayerVizParams(),
       });
     },
-    applyScene(scene) {
-      this.scene = scene;
+    applyScene(scene: Scene3D): Scene3D {
+      const self = this as typeof this & Viz3DWindowInternal;
+      self.scene = scene;
       this.sceneVersion += 1;
       this.legendLayers = scene.layers.map(layer => (
         `${layer.name}: ${layer.neuronCount}${layer.overflow ? ` of ${layer.totalUnits}` : ''} neurons`
@@ -242,25 +280,31 @@ export default {
     // Live inspection: color neurons with the Inspect tab's activations when
     // a snapshot is published, back to the placeholder gradient when cleared.
     applyInspection() {
-      if (!this.renderer || !this.scene) return;
-      const perLayer = inspectionToViz3D(this.scene, this.$boardInterface.getInspection());
-      this.renderer.setActivations(buildActivations(this.scene, perLayer));
+      const self = this as typeof this & Viz3DWindowInternal;
+      if (!self.renderer || !self.scene) return;
+      const perLayer = inspectionToViz3D(
+        self.scene,
+        this.$boardInterface.getInspection() as InspectionSnapshot | null,
+      );
+      self.renderer.setActivations(buildActivations(self.scene, perLayer));
     },
-    rampForSettings() {
+    rampForSettings(): string {
       return rampWgsl(colorSchemeOrDefault(settings.get('colorScheme')));
     },
     async start() {
+      const self = this as typeof this & Viz3DWindowInternal;
       const scene = this.applyScene(this.buildCurrentScene());
-      this.orbit = createOrbitState({
+      self.orbit = createOrbitState({
         target: scene.bounds.center,
         distance: Math.max(10, scene.bounds.radius * 2.2),
       });
       try {
-        this.renderer = await createViz3DRenderer(
-          this.$refs.canvas, scene, this.orbit, this.rampForSettings(),
+        self.renderer = await createViz3DRenderer(
+          this.$refs.canvas as HTMLCanvasElement, scene, self.orbit, this.rampForSettings(),
         );
       } catch (e) {
-        this.error = e && e.message ? e.message : String(e);
+        const err = e as { message?: string } | null | undefined;
+        this.error = err && err.message ? err.message : String(e);
         return;
       }
       this.applyInspection();
@@ -268,20 +312,22 @@ export default {
     // Color scheme changes rebake the shader: tear the renderer down and
     // rebuild on the same scene, keeping the current orbit.
     async recreateRenderer() {
-      if (!this.renderer || !this.scene) return;
-      this.renderer.destroy();
-      this.renderer = null;
+      const self = this as typeof this & Viz3DWindowInternal;
+      if (!self.renderer || !self.scene) return;
+      self.renderer.destroy();
+      self.renderer = null;
       try {
-        this.renderer = await createViz3DRenderer(
-          this.$refs.canvas, this.scene, this.orbit, this.rampForSettings(),
+        self.renderer = await createViz3DRenderer(
+          this.$refs.canvas as HTMLCanvasElement, self.scene, self.orbit, this.rampForSettings(),
         );
       } catch (e) {
-        this.error = e && e.message ? e.message : String(e);
+        const err = e as { message?: string } | null | undefined;
+        this.error = err && err.message ? err.message : String(e);
         return;
       }
       this.applyInspection();
     },
-    setLegendOpen(open) {
+    setLegendOpen(open: boolean) {
       settings.set('viz3dLegendOpen', open);
       this.legendOpen = open;
     },
@@ -294,17 +340,18 @@ export default {
       this.$emit('open-settings');
     },
     rebuild() {
-      if (!this.renderer) return;
+      const self = this as typeof this & Viz3DWindowInternal;
+      if (!self.renderer) return;
       const scene = this.applyScene(this.buildCurrentScene());
-      this.orbit = createOrbitState({
-        ...this.orbit,
+      self.orbit = createOrbitState({
+        ...self.orbit,
         target: scene.bounds.center,
       });
-      this.renderer.setScene(scene);
-      this.renderer.setCamera(this.orbit);
+      self.renderer.setScene(scene);
+      self.renderer.setCamera(self.orbit);
       this.applyInspection();
     },
-    pageChannels(direction) {
+    pageChannels(direction: number) {
       const placement = this.selectedPlacement;
       if (!placement) return;
       this.$boardInterface.setLayerVizParams(String(placement.layerId), {
@@ -312,14 +359,14 @@ export default {
         slices: placement.slices,
       });
     },
-    setSlices(value) {
+    setSlices(value: string | number) {
       const placement = this.selectedPlacement;
       if (!placement) return;
       this.$boardInterface.setLayerVizParams(String(placement.layerId), {
         slices: Number(value),
       });
     },
-    setSideBySide(checked) {
+    setSideBySide(checked: boolean) {
       const placement = this.selectedPlacement;
       if (!placement) return;
       this.$boardInterface.setLayerVizParams(String(placement.layerId), {
@@ -327,18 +374,20 @@ export default {
       });
     },
     recenter() {
-      if (!this.scene) return;
-      this.orbit = createOrbitState({
-        target: this.scene.bounds.center,
-        distance: Math.max(10, this.scene.bounds.radius * 2.2),
+      const self = this as typeof this & Viz3DWindowInternal;
+      if (!self.scene) return;
+      self.orbit = createOrbitState({
+        target: self.scene.bounds.center,
+        distance: Math.max(10, self.scene.bounds.radius * 2.2),
       });
-      if (this.renderer) this.renderer.setCamera(this.orbit);
+      if (self.renderer) self.renderer.setCamera(self.orbit);
     },
-    onPointerDown(event) {
+    onPointerDown(event: PointerEvent) {
+      const self = this as typeof this & Viz3DWindowInternal;
       // Left drag orbits; shift-left or middle drag pans (big networks need it).
       if (event.button !== 0 && event.button !== 1) return;
       if (event.button === 1) event.preventDefault();
-      this.dragPointer = {
+      self.dragPointer = {
         id: event.pointerId,
         x: event.clientX,
         y: event.clientY,
@@ -346,41 +395,44 @@ export default {
         startY: event.clientY,
         pan: event.shiftKey || event.button === 1,
       };
-      event.target.setPointerCapture?.(event.pointerId);
+      (event.target as Element).setPointerCapture?.(event.pointerId);
     },
-    onPointerMove(event) {
-      const drag = this.dragPointer;
+    onPointerMove(event: PointerEvent) {
+      const self = this as typeof this & Viz3DWindowInternal;
+      const drag = self.dragPointer;
       if (!drag || drag.id !== event.pointerId) return;
       const dx = event.clientX - drag.x;
       const dy = event.clientY - drag.y;
-      this.orbit = drag.pan
-        ? applyOrbitPan(this.orbit, dx, dy)
-        : applyOrbitDrag(this.orbit, dx, dy);
+      self.orbit = drag.pan
+        ? applyOrbitPan(self.orbit, dx, dy)
+        : applyOrbitDrag(self.orbit, dx, dy);
       drag.x = event.clientX;
       drag.y = event.clientY;
-      if (this.renderer) this.renderer.setCamera(this.orbit);
+      if (self.renderer) self.renderer.setCamera(self.orbit);
     },
-    onPointerUp(event) {
-      const drag = this.dragPointer;
+    onPointerUp(event: PointerEvent) {
+      const self = this as typeof this & Viz3DWindowInternal;
+      const drag = self.dragPointer;
       if (!drag || drag.id !== event.pointerId) return;
-      this.dragPointer = null;
+      self.dragPointer = null;
       // A click (no real drag): pick the layer under the pointer.
       if (Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) > 4) return;
-      if (!this.scene) return;
-      const rect = event.target.getBoundingClientRect();
+      if (!self.scene) return;
+      const rect = (event.target as Element).getBoundingClientRect();
       const ndcX = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       const ndcY = 1 - ((event.clientY - rect.top) / rect.height) * 2;
       const placement = pickLayer(
-        this.scene, this.orbit, ndcX, ndcY, rect.width / Math.max(1, rect.height), Math.PI / 4,
+        self.scene, self.orbit, ndcX, ndcY, rect.width / Math.max(1, rect.height), Math.PI / 4,
       );
       this.selectedLayerId = placement ? placement.layerId : null;
     },
-    onWheel(event) {
-      this.orbit = applyOrbitZoom(this.orbit, event.deltaY);
-      if (this.renderer) this.renderer.setCamera(this.orbit);
+    onWheel(event: WheelEvent) {
+      const self = this as typeof this & Viz3DWindowInternal;
+      self.orbit = applyOrbitZoom(self.orbit, event.deltaY);
+      if (self.renderer) self.renderer.setCamera(self.orbit);
     },
   },
-};
+});
 </script>
 
 <style scoped>

@@ -1,12 +1,12 @@
 # The CANONICAL driver (see ./README.md; it grew out of the gitignored
 # experiments/pyodide-tinygrad, whose copies are historical). Runs INSIDE
-# Pyodide (see ../worker.js): traces one SGD training step with tinygrad on
+# Pyodide (see ../worker.ts): traces one SGD training step with tinygrad on
 # the GPU-less NULL:WGSL device, exports it as a WebGPU JS runner via the
 # vendored export_model.py, and builds a safetensors blob with REAL random
 # weights — the NULL device fake-executes, so its weight values come out as
 # zeros, and an all-zeros network cannot train (symmetric gradients).
 #
-# IMPORTANT: os.environ must be set BEFORE tinygrad is imported (worker.js
+# IMPORTANT: os.environ must be set BEFORE tinygrad is imported (worker.ts
 # does it in Pyodide; ./run_local.py shows the CPython way).
 
 import json
