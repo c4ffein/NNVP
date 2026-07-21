@@ -28,8 +28,15 @@ But if you read this and you want to get involved, you can actually create one f
       the Django server in dev, `make backend` runs it), magic-link only login,
       account created on first login
   - [ ] manage from device to account when the user creates an account
+        => training runs + assistant conversations: local records carry client uuids
+        (IndexedDB via `lib/LocalStore`), `lib/Backend/sync.ts` pushes/pulls by uuid
+        set-difference on login and auth changes (projects/settings still device-only)
   - [ ] manage from device to account when the user connects an account
+        => same mechanism (`installSyncOnAuth`, wired in main.ts)
   - [ ] let the user still choose what to keep on the device
+    - [ ] first slice: per-record delete offers exactly where it exists — device,
+          cloud, or both; a cloud-delete marks the local copy `localOnly` so sync
+          never re-pushes it
   - [ ] share between accounts
   - [ ] collaborative mode, live
 
@@ -40,6 +47,11 @@ But if you read this and you want to get involved, you can actually create one f
 
 ### Assistant (chat)
 - [ ] conversation should survive closing/reopening the chat window (module store, like window rects)
+      => superseded: conversations are now persistent records (IndexedDB) — they
+      survive reloads, the latest one restores on page load, and the chat has
+      "new conversation" + a resume list (backend-synced when signed in)
+- [ ] context-limit compaction (for now a full conversation just stops; no
+      auto-compaction, no summarize-into-new-conversation — deliberate)
 - [ ] expose auto-layout as an assistant tool so its built networks arrange themselves
 - [ ] offscreen-layer border arrows: avoid landing under floating windows (direction-aware insets)
 
@@ -74,6 +86,19 @@ converts opportunistically.
       components stay JS and convert opportunistically when touched
 - [ ] Rewrite GeneralMenu.vue from `lang="jsx"` to a template (deletes
       @vitejs/plugin-vue-jsx and the hardest file to type)
+
+### Training run journal
+Every Train click writes an immutable run record (uuid, compile options, graph
+snapshot, per-epoch metrics, outcome) to IndexedDB; the training window's
+History tab lists, re-views (curves), restores (graph + options, undo-able)
+and deletes them; synced to the account by uuid when signed in. Future:
+- [ ] weight snapshots behind an explicit button (`model.save('indexeddb://…')`
+      — deliberately NOT auto-journaled, weights are megabytes)
+- [ ] seeded, bit-identical replay (non-goal for now: restore-and-re-run only)
+- [ ] lineage graph UI — runs → graph snapshots → project lineage rendered with
+      Vue Flow itself
+- [ ] journal the ?bench=1 A/B rows through the same journal (skipped: needs
+      special-casing around BENCH_OPTS)
 
 ## Future Features
 
