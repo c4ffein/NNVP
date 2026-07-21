@@ -56,6 +56,71 @@
           </div>
         </div>
 
+        <!-- Stored conversations: start a new one, or resume from the drawer.
+             Local records — available signed in or out. -->
+        <div class="chat-conv-row">
+          <button
+            type="button"
+            class="chat-conv-toggle"
+            :aria-expanded="showConversations"
+            aria-label="Conversations"
+            @click="toggleConversations"
+          >{{ showConversations ? '▾' : '▸' }} Conversations</button>
+          <button
+            type="button"
+            class="chat-conv-new"
+            aria-label="New conversation"
+            title="Start a new conversation"
+            @click="newConversation"
+          >+ New</button>
+        </div>
+        <div v-if="showConversations" class="chat-conv-list">
+          <div v-if="conversations.length === 0" class="chat-conv-empty">
+            No saved conversations yet.
+          </div>
+          <div
+            v-for="conversation in conversations"
+            :key="conversation.uuid"
+            class="chat-conv-entry"
+          >
+            <!-- Two-step delete: the × swaps the row for one button per
+                 location that actually holds the record (device / cloud /
+                 both — see deleteChoicesFor in Backend/sync.ts). -->
+            <template v-if="pendingDelete && pendingDelete.uuid === conversation.uuid">
+              <span class="chat-conv-del-question">Delete from</span>
+              <button
+                v-for="where in pendingDelete.choices"
+                :key="where"
+                type="button"
+                class="chat-conv-del-choice"
+                @click="confirmDelete(where)"
+              >{{ whereLabel(where) }}</button>
+              <button
+                type="button"
+                class="chat-conv-del-cancel"
+                @click="cancelDelete"
+              >Cancel</button>
+            </template>
+            <template v-else>
+              <button
+                type="button"
+                :class="['chat-conv-item', { active: conversation.uuid === activeConversationUuid }]"
+                @click="resumeStored(conversation.uuid)"
+              >
+                <span class="chat-conv-title">{{ conversation.title }}</span>
+                <span class="chat-conv-date">{{ shortDate(conversation.updatedAt) }}</span>
+              </button>
+              <button
+                type="button"
+                class="chat-conv-delete"
+                :aria-label="`Delete conversation ${conversation.title}`"
+                title="Delete conversation"
+                @click="requestDelete(conversation.uuid)"
+              >&times;</button>
+            </template>
+          </div>
+        </div>
+
         <!-- Mode help modal (reuses the app-wide help modal styling) -->
         <Teleport to="body">
           <Transition name="modal">
@@ -159,8 +224,20 @@ import FloatingWindow from '../FloatingWindow.vue';
 import renderMarkdown from '../../lib/Assistant/markdown';
 import { ASK_EVENT, consumePendingAsk } from '../../lib/Assistant/askAssistant';
 import type { PendingAsk } from '../../lib/Assistant/askAssistant';
-import { chatSession } from '../../lib/Assistant/chatSession';
-import type { ChatMessage } from '../../lib/Assistant/chatSession';
+import {
+  chatSession,
+  listConversations,
+  persistActiveConversation,
+  resetChatSession,
+  restoreLatestConversation,
+  resumeConversation,
+  startNewConversation,
+} from '../../lib/Assistant/chatSession';
+import type { ChatMessage, ConversationSummary } from '../../lib/Assistant/chatSession';
+import ApiClient from '../../lib/Backend/apiClient';
+import { deleteChoicesFor, deleteEverywhere, kindApiFrom } from '../../lib/Backend/sync';
+import type { DeleteWhere } from '../../lib/Backend/sync';
+import { getRecordStore } from '../../lib/LocalStore/db';
 import AnthropicClient, {
   STORAGE_ALLOW_EDITS,
   readStoredConfig,
@@ -173,10 +250,17 @@ import type { AssistantActivity } from '../../lib/Assistant/anthropicClient';
 interface ChatBubbleInternal {
   actions: AssistantActions;
   client: AnthropicClient;
+  api: ApiClient;
   onAuthChanged: () => void;
   onAskAssistant: (event: Event) => void;
   blinkTimer?: ReturnType<typeof setTimeout>;
 }
+
+// Once per PAGE LOAD, not per mount: closing the chat window unmounts this
+// component while the session survives in memory — remounting must rebind to
+// that live session, never re-clobber it with the stored copy. Only a fresh
+// page load restores from the record store.
+let restoredThisPageLoad = false;
 
 export default defineComponent({
   name: 'ChatBubble',
@@ -206,7 +290,18 @@ export default defineComponent({
       proxyActive: false,
       allowEdits: false,
       blinkSignIn: false,
+      // The stored-conversations drawer (list fetched on open).
+      showConversations: false,
+      conversations: [] as ConversationSummary[],
+      // The row awaiting delete confirmation, with the locations on offer.
+      pendingDelete: null as { uuid: string; choices: DeleteWhere[] } | null,
     };
+  },
+  computed: {
+    // Marks the active conversation's row in the drawer.
+    activeConversationUuid(): string {
+      return chatSession.uuid;
+    },
   },
   created() {
     const self = this as typeof this & ChatBubbleInternal;
@@ -216,9 +311,22 @@ export default defineComponent({
     }
     self.actions = new AssistantActions(this.$boardInterface, this.$kerasInterface);
     self.client = new AnthropicClient(self.actions, { allowEdits: this.allowEdits });
+    // The backend boundary for record sync/delete (same pattern as
+    // SaveLoadModal / AccountPanel — token lives in localStorage).
+    self.api = new ApiClient();
   },
   mounted() {
     const self = this as typeof this & ChatBubbleInternal;
+    // Reload restores the most recent stored conversation (see the module
+    // flag above for why this is once per page load, not per mount).
+    if (!restoredThisPageLoad) {
+      restoredThisPageLoad = true;
+      restoreLatestConversation()
+        .then(() => this.scrollToBottom())
+        .catch((error) => {
+          console.warn('[assistant] could not restore the conversation:', error); // eslint-disable-line no-console
+        });
+    }
     // Sign-in / sign-out elsewhere in the app flips the chat between its two
     // states live (apiClient dispatches this on every token change).
     self.onAuthChanged = () => this.refreshHasKey();
@@ -291,6 +399,9 @@ export default defineComponent({
       this.history.push({ role: 'user', content: `(I opened the in-app help for "${topic}".)` });
       this.history.push({ role: 'assistant', content: question });
       this.pushMessage('assistant', question);
+      // A seeded exchange is a real conversation turn: it must survive a
+      // reload just like a sent one.
+      this.persistSoon();
       this.focusInput();
     },
     scrollToBottom() {
@@ -350,7 +461,104 @@ export default defineComponent({
       } finally {
         this.sending = false;
         this.scrollToBottom();
+        // The narrowest point that is downstream of EVERY outcome of a turn:
+        // the reply bubble, any ⚙ tool lines pushed during the loop, and the
+        // error notice have all landed by the time the finally runs. One
+        // upsert per exchange — never mid-stream. Fire-and-forget: local
+        // persistence must not block or break the chat itself.
+        this.persistSoon();
       }
+    },
+    // --- Stored conversations -------------------------------------------
+    persistSoon() {
+      persistActiveConversation().catch((error) => {
+        console.warn('[assistant] could not persist the conversation:', error); // eslint-disable-line no-console
+      });
+    },
+    async refreshConversations() {
+      this.conversations = await listConversations();
+    },
+    async toggleConversations() {
+      this.showConversations = !this.showConversations;
+      this.pendingDelete = null;
+      if (this.showConversations) await this.refreshConversations();
+    },
+    // --- Deleting (PLAN Phase 6: offer exactly the locations that hold it) --
+    whereLabel(where: DeleteWhere): string {
+      return where === 'local' ? 'device' : where;
+    },
+    /** Step 1 — the row's ×: work out which locations hold the record.
+     *  Signed out there is no cloud to ask (no network call); signed in the
+     *  cloud uuid set decides; an unreachable API degrades to device-only. */
+    async requestDelete(uuid: string) {
+      const self = this as typeof this & ChatBubbleInternal;
+      let choices: DeleteWhere[] = ['local'];
+      if (self.api.isLoggedIn()) {
+        try {
+          const listed = await self.api.listConversations();
+          const cloudUuids = new Set(
+            (Array.isArray(listed) ? listed : [])
+              .map(entry => (entry as { uuid?: unknown } | null)?.uuid)
+              .filter((cloudUuid): cloudUuid is string => typeof cloudUuid === 'string'),
+          );
+          choices = deleteChoicesFor({ uuid }, cloudUuids);
+        } catch {
+          choices = ['local']; // cloud unreachable: only the device copy is certain
+        }
+      }
+      this.pendingDelete = { uuid, choices };
+    },
+    cancelDelete() {
+      this.pendingDelete = null;
+    },
+    /** Step 2 — a location button. After a cloud-only delete the row stays
+     *  (the surviving local copy is flagged localOnly by deleteEverywhere);
+     *  after 'local'/'both' it disappears. */
+    async confirmDelete(where: DeleteWhere) {
+      const self = this as typeof this & ChatBubbleInternal;
+      const pending = this.pendingDelete;
+      if (!pending) return;
+      this.pendingDelete = null;
+      try {
+        await deleteEverywhere({
+          api: kindApiFrom(self.api, 'conversations'),
+          store: getRecordStore(),
+          kind: 'conversations',
+          uuid: pending.uuid,
+          where,
+        });
+      } catch (error) {
+        console.warn('[assistant] could not delete the conversation:', error); // eslint-disable-line no-console
+        return;
+      }
+      if (where !== 'cloud' && pending.uuid === chatSession.uuid) {
+        // The ACTIVE conversation's local copy is gone: reset the live session
+        // to a fresh empty one. Deliberately resetChatSession(), NOT
+        // startNewConversation() — the latter persists a non-empty session
+        // first, which would resurrect the record we just deleted.
+        resetChatSession();
+        this.choices = [];
+      }
+      await this.refreshConversations();
+    },
+    async newConversation() {
+      await startNewConversation();
+      this.choices = [];
+      if (this.showConversations) await this.refreshConversations();
+      this.focusInput();
+    },
+    async resumeStored(uuid: string) {
+      await resumeConversation(uuid);
+      this.choices = [];
+      this.showConversations = false;
+      this.scrollToBottom();
+    },
+    // Compact date for the drawer: time of day today, date otherwise.
+    shortDate(iso: string): string {
+      const date = new Date(iso);
+      return date.toDateString() === new Date().toDateString()
+        ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        : date.toLocaleDateString();
     },
   },
 });
@@ -433,6 +641,151 @@ export default defineComponent({
 
 .chat-btn {
   cursor: pointer;
+}
+
+/* Stored conversations: the slim header row and the resume drawer. */
+.chat-conv-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.chat-conv-toggle,
+.chat-conv-new {
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.chat-conv-toggle:hover,
+.chat-conv-new:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.chat-conv-list {
+  max-height: 160px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-bottom: 1px solid var(--panel-border);
+  padding: 4px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.chat-conv-empty {
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+  padding: 6px 0;
+}
+
+.chat-conv-entry {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.chat-conv-item {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-size: 12px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+/* The per-row × and the inline two-step confirm it swaps the row for. */
+.chat-conv-delete {
+  flex: none;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.chat-conv-delete:hover {
+  background-color: var(--bg-hover);
+  color: #b91c1c;
+}
+
+.chat-conv-del-question {
+  flex: 1;
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 0 6px;
+  white-space: nowrap;
+}
+
+.chat-conv-del-choice,
+.chat-conv-del-cancel {
+  flex: none;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--input-border);
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.chat-conv-del-choice {
+  border-color: #b91c1c;
+  color: #b91c1c;
+}
+
+.chat-conv-del-choice:hover {
+  background-color: #b91c1c;
+  color: #ffffff;
+}
+
+.chat-conv-del-cancel:hover {
+  background-color: var(--bg-hover);
+}
+
+.chat-conv-item:hover {
+  background-color: var(--bg-hover);
+}
+
+.chat-conv-item.active {
+  background-color: var(--fill-strong);
+  color: var(--fill-strong-text);
+}
+
+.chat-conv-item.active .chat-conv-date {
+  color: inherit;
+}
+
+.chat-conv-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-conv-date {
+  flex: none;
+  font-size: 11px;
+  color: var(--text-muted);
 }
 
 /* Draws the eye to the sign-in gate when a help modal hands over a question

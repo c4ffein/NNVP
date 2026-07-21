@@ -5,6 +5,9 @@ import KerasInterface from './lib/KerasInterface/KerasInterface';
 import BoardInterface from './lib/BoardInterface/BoardInterface';
 import jsonLayersFile from './lib/KerasInterface/generatedKerasLayers.json';
 import KeyboardListener from './lib/KeyboardListener/KeyboardListener';
+import ApiClient from './lib/Backend/apiClient';
+import { installSyncOnAuth } from './lib/Backend/sync';
+import { getRecordStore } from './lib/LocalStore/db';
 import type { KerasLayerCatalog } from './types/model';
 
 // import.meta.env is Vite-only (absent under bun/unit tests) — typed locally
@@ -34,6 +37,13 @@ type DebugWindow = Window & {
   const boardInterface = new BoardInterface();
   app.config.globalProperties.$boardInterface = boardInterface;
   app.config.globalProperties.$keyboardListener = new KeyboardListener(boardInterface, kerasInterface);
+
+  // Local↔cloud record sync (runs, conversations): syncs now when a token is
+  // already stored, and again on every auth change. Progressive enhancement —
+  // failures only warn, and logged-out is a no-op.
+  installSyncOnAuth({
+    target: window, apiClient: new ApiClient(), store: getRecordStore(),
+  });
 
   // Initialize debug namespace
   const win = window as DebugWindow;

@@ -37,6 +37,13 @@
       >
         Inspect
       </div>
+      <div
+        class="TrainingZone bar-button"
+        :class="{ active: selectedPanel === 'HistoryPanel' }"
+        v-on:click="selectedPanel = 'HistoryPanel'"
+      >
+        History
+      </div>
     </div>
     <div id="training-zone-selector">
       <keep-alive>
@@ -66,6 +73,10 @@
           v-bind:epochData="chartData1"
           v-bind:hasTrainedModel="hasTrainedModel"
           v-bind:getTrainedModel="getTrainedModel"
+          v-bind:listRuns="listRuns"
+          v-bind:deleteRun="deleteRun"
+          v-bind:deleteChoices="deleteRunChoices"
+          v-bind:restoreRun="restoreRun"
         ></component>
       </keep-alive>
     </div>
@@ -82,12 +93,22 @@ import watchTraining from '../../lib/ModelTrainer/watchTraining';
 import { TrainingPrepareError } from '../../lib/Training/engine';
 import type { TrainingDataset, TrainingSession } from '../../lib/Training/engine';
 import { createTfjsEngine } from '../../lib/Training/tfjsEngine';
+import { trainingConfig, snapshotTrainingConfig } from '../../lib/Training/trainingConfig';
+import {
+  startRun, listRuns as journalListRuns,
+} from '../../lib/Training/runJournal';
+import type { RunRecord, RunHandle } from '../../lib/Training/runJournal';
+import ApiClient from '../../lib/Backend/apiClient';
+import { deleteEverywhere, deleteChoicesFor, kindApiFrom } from '../../lib/Backend/sync';
+import type { DeleteWhere } from '../../lib/Backend/sync';
+import { getRecordStore } from '../../lib/LocalStore/db';
 
 import Charts from './Charts.vue';
 import CompileOptions from './CompileOptions.vue';
 import DatasetSelector from './DatasetSelector.vue';
 import InspectPanel from './InspectPanel.vue';
 import BenchPanel from './BenchPanel.vue';
+import HistoryPanel from './HistoryPanel.vue';
 import { benchModeEnabled } from '../../lib/Training/benchMode';
 
 type DebugWindow = Window & { nnvp?: { debug?: { enableDatasets?: boolean } } };
@@ -115,6 +136,8 @@ interface TrainingZoneNonReactive {
   trainedGraphJson?: string | null;
   /** Loaded-dataset cache, lazily created by loadDataset. */
   datasets?: Record<string, Dataset>;
+  /** Backend client for the History tab's cloud-delete plumbing. */
+  api?: ApiClient;
 }
 
 export default defineComponent({
@@ -124,6 +147,7 @@ export default defineComponent({
     Charts,
     CompileOptions,
     DatasetSelector,
+    HistoryPanel,
     InspectPanel,
   },
   data() {
@@ -133,15 +157,10 @@ export default defineComponent({
       // kept OFF data() (this.trainedModel) so Vue never proxies it.
       hasTrainedModel: false,
       cancelRequested: false,
-      selectedDataset: 'MNIST',
       loadableDatasets: loadableDatasets(this.cdnDir),
-      selectedOptimizer: 'rmsprop',
-      optimizerParams: {} as Record<string, unknown>,
-      epochs: 10,
       selectableOptimizers: [
         'sgd', 'adagrad', 'adadelta', 'adam', 'adamax', 'rmsprop'
       ],
-      selectedLoss: 'categoricalCrossentropy',
       selectableLosses: [
         'categoricalCrossentropy',
         'sparseCategoricalCrossentropy',
@@ -170,10 +189,41 @@ export default defineComponent({
       } as ChartData,
     };
   },
+  created() {
+    // Components build their own ApiClient (the SaveLoadModal/AccountPanel
+    // pattern); kept OFF data() like trainedModel — never proxied.
+    (this as unknown as TrainingZoneNonReactive).api = new ApiClient();
+  },
   mounted() {
     // Warm up the lazy tfjs load as soon as the Training zone opens, so it is
     // ready by the time the user selects a dataset or starts training.
     loadTf();
+  },
+  computed: {
+    // The compile options live in the trainingConfig module singleton (they
+    // must survive closing/reopening this window, and Phase 3 journals them
+    // into run records). These get/set proxies keep the existing prop/v-model
+    // plumbing to CompileOptions / DatasetSelector untouched.
+    selectedDataset: {
+      get(): string { return trainingConfig.selectedDataset; },
+      set(value: string) { trainingConfig.selectedDataset = value; },
+    },
+    selectedOptimizer: {
+      get(): string { return trainingConfig.selectedOptimizer; },
+      set(value: string) { trainingConfig.selectedOptimizer = value; },
+    },
+    optimizerParams: {
+      get(): Record<string, unknown> { return trainingConfig.optimizerParams; },
+      set(value: Record<string, unknown>) { trainingConfig.optimizerParams = value; },
+    },
+    epochs: {
+      get(): number { return trainingConfig.epochs; },
+      set(value: number) { trainingConfig.epochs = value; },
+    },
+    selectedLoss: {
+      get(): string { return trainingConfig.selectedLoss; },
+      set(value: string) { trainingConfig.selectedLoss = value; },
+    },
   },
   methods: {
     datasetClicked() {
@@ -191,6 +241,51 @@ export default defineComponent({
     },
     inspectClicked() {
       this.selectedPanel = "InspectPanel";
+    },
+    // --- History tab plumbing (HistoryPanel gets everything via props, the
+    // BenchPanel pattern — it never imports the journal itself).
+    listRuns(): Promise<RunRecord[]> {
+      return journalListRuns();
+    },
+    /**
+     * The locations this record can be deleted from (PLAN.md Phase 6): only
+     * the ones actually holding it. Progressive enhancement — logged out or
+     * any API failure degrades to ['local'] and never throws.
+     */
+    async deleteRunChoices(record: RunRecord): Promise<DeleteWhere[]> {
+      const api = (this as unknown as TrainingZoneNonReactive).api!;
+      if (!api.isLoggedIn()) return ['local'];
+      try {
+        const listed = await api.listRuns();
+        const cloudUuids = new Set<string>();
+        if (Array.isArray(listed)) {
+          for (const entry of listed) {
+            const uuid = (entry as { uuid?: unknown } | null)?.uuid;
+            if (typeof uuid === 'string' && uuid) cloudUuids.add(uuid);
+          }
+        }
+        return deleteChoicesFor(record, cloudUuids);
+      } catch {
+        return ['local'];
+      }
+    },
+    deleteRun(uuid: string, where: DeleteWhere): Promise<void> {
+      const api = (this as unknown as TrainingZoneNonReactive).api!;
+      return deleteEverywhere({
+        api: kindApiFrom(api, 'runs'), store: getRecordStore(), kind: 'runs', uuid, where,
+      });
+    },
+    restoreRun(run: RunRecord): void {
+      // The exact File>Load path (migrate + saveState first, so restore is
+      // undo-able — that saveState IS the safety, no confirm dialog needed).
+      this.$boardInterface.loadGraphFromJSON(run.graphJson);
+      // Journal snapshots use dataset/optimizer/loss; the config store keys
+      // are the selected* names — this mapping is load-bearing.
+      trainingConfig.selectedDataset = run.config.dataset;
+      trainingConfig.selectedOptimizer = run.config.optimizer;
+      trainingConfig.optimizerParams = { ...run.config.optimizerParams };
+      trainingConfig.epochs = run.config.epochs;
+      trainingConfig.selectedLoss = run.config.loss;
     },
     // The model (and the graph JSON it was generated from) the Inspect panel
     // probes. Returned through a function so the tf model stays un-proxied.
@@ -227,10 +322,26 @@ export default defineComponent({
       // Always tfjs for now: the tinygrad engine (lib/Training/tinygradEngine)
       // is not user-exposed — it lives behind the ?bench=1 Bench tab and the
       // make test-webgpu harness until it graduates.
+      // Journal the run before anything can fail: every Train click leaves a
+      // record, prepare failures included. Journaling itself must never break
+      // training — a failed startRun (e.g. IndexedDB denied) degrades to no
+      // record, and finish() is idempotent so tangled paths can double-call.
+      const graphJson = this.$boardInterface.getGraphJSON();
+      const runHandle: RunHandle | null = await startRun({
+        engineId: 'tfjs',
+        config: snapshotTrainingConfig(),
+        graphJson: graphJson || '',
+      }).catch((journalError) => {
+        console.warn('[TrainingZone] run journal unavailable:', journalError);
+        return null;
+      });
+      const finishRun = (outcome: 'completed' | 'cancelled' | 'error', message?: string) => (
+        runHandle?.finish(outcome, message).catch(() => {}) || Promise.resolve()
+      );
       const engine = createTfjsEngine({ loadTf });
       let session: TrainingSession;
       try {
-        session = await engine.prepare(this.$boardInterface.getGraphJSON(), {
+        session = await engine.prepare(graphJson, {
           generateCode: () => this.$boardInterface.generateJavascriptNoSave(this.$kerasInterface),
           optimizer: this.selectedOptimizer,
           optimizerParams: this.optimizerParams,
@@ -241,7 +352,11 @@ export default defineComponent({
       catch (error) {
         // Errors the engine did not tag (tfjs load, compile) used to escape
         // startTraining untouched — keep letting them propagate.
-        if (!(error instanceof TrainingPrepareError)) throw error;
+        if (!(error instanceof TrainingPrepareError)) {
+          await finishRun('error', String(error));
+          throw error;
+        }
+        await finishRun('error', String(error.cause ?? error));
         if (error.stage === 'create') {
           // Param errors
           alert(error.cause);
@@ -268,7 +383,15 @@ export default defineComponent({
       this.hasTrainedModel = session.model !== null && session.model !== undefined;
 
       const datasetName = this.selectedDataset;
-      await this.loadDataset(datasetName);
+      try {
+        await this.loadDataset(datasetName);
+      }
+      catch (error) {
+        // A dataset-load failure keeps escaping startTraining untouched, but
+        // must not strand the journal record as 'running' forever.
+        await finishRun('error', String(error));
+        throw error;
+      }
       const data = self.datasets![datasetName];
       try {
         await watchTraining(
@@ -278,10 +401,14 @@ export default defineComponent({
           (callbacks) => session.fit(data as unknown as TrainingDataset, callbacks),
           () => this.cancelRequested,
           'cancelRequested',
+          // onEpochEnd is sync — persist fire-and-forget, never blocking a fit.
+          (m) => { runHandle?.epoch(m).catch(() => {}); },
         );
+        await finishRun('completed');
       }
       catch (error) {
-        if (error == "cancelRequested") return;
+        if (error == "cancelRequested") { await finishRun('cancelled'); return; }
+        await finishRun('error', String(error));
         console.error('[TrainingZone] Training error:', error);
         alert(error);
       }

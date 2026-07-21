@@ -9,16 +9,18 @@
  * faked.
  */
 import { defineComponent } from 'vue';
-import { mount, type VueWrapper } from '@vue/test-utils';
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import ChatBubble from '../../src/components/Assistant/ChatBubble.vue';
 import LayerCatalog from '../../src/components/LayerCatalog/LayerCatalog.vue';
 import FloatingWindow from '../../src/components/FloatingWindow.vue';
 import Charts from '../../src/components/TrainingZone/Charts.vue';
+import TrainingZone from '../../src/components/TrainingZone/TrainingZone.vue';
 import { resetWindowRects } from '../../src/lib/windowing';
 import { resetChatSession } from '../../src/lib/Assistant/chatSession';
+import { resetTrainingConfig } from '../../src/lib/Training/trainingConfig';
 import { askAssistant } from '../../src/lib/Assistant/askAssistant';
 import type {
-  CatalogDriver, ChartsDriver, ChatDriver, WindowsDriver, WindowName,
+  CatalogDriver, ChartsDriver, ChatDriver, TrainingDriver, WindowsDriver, WindowName,
 } from './define';
 
 // The mounted-wrapper seam: each driver hosts one arbitrary component, so the
@@ -63,6 +65,52 @@ export function makeChartsDriver(): ChartsDriver & Teardown {
     },
     async teardown() {
       if (wrapper) wrapper.unmount();
+    },
+  };
+}
+
+// The Training window's Options tab: mounts the REAL TrainingZone (mounting
+// IS opening — App renders it under v-if, so close/reopen is unmount/remount,
+// which is exactly what the persistence tests exercise). The browser world
+// reaches the same contract through the real Panels > Training window.
+export function makeTrainingDriver(): TrainingDriver & Teardown {
+  let wrapper: Wrapper | null = null;
+  const optimizerSelect = () => wrapper!.find('.optimizer-section select');
+  const epochsInput = () => wrapper!.find('.training-params-section input[type="number"]');
+  return {
+    async open() {
+      wrapper = mount(TrainingZone, {
+        // startTraining is the only $boardInterface consumer; these tests
+        // never train, so inert stubs are enough (same pattern as ChatBubble).
+        global: { mocks: { $boardInterface: {}, $kerasInterface: {} } },
+        attachTo: document.body,
+      });
+      // Land on the Options tab, where the compile options form lives.
+      const tabs = wrapper.findAll('.TrainingZone.bar-button');
+      await tabs.find(tab => tab.text() === 'Options')!.trigger('click');
+      await wrapper.vm.$nextTick();
+    },
+    async close() {
+      wrapper!.unmount();
+      wrapper = null;
+    },
+    async setOptimizer(name) {
+      await optimizerSelect().setValue(name);
+      await wrapper!.vm.$nextTick();
+    },
+    async setEpochs(value) {
+      await epochsInput().setValue(String(value));
+      await wrapper!.vm.$nextTick();
+    },
+    async optimizer() {
+      return (optimizerSelect().element as HTMLSelectElement).value;
+    },
+    async epochs() {
+      return Number((epochsInput().element as HTMLInputElement).value);
+    },
+    async teardown() {
+      if (wrapper) wrapper.unmount();
+      resetTrainingConfig(); // module state must not leak between tests
     },
   };
 }
@@ -284,6 +332,41 @@ export function makeChatDriver(): ChatDriver & Teardown {
       await wrapper!.find('.chat-panel .floating-window-close').trigger('click');
       wrapper!.unmount();
       wrapper = null;
+    },
+    /** The record-store round-trips are promises: flush them, then re-render. */
+    async startNewConversation() {
+      await wrapper!.find('.chat-conv-new').trigger('click');
+      await flushPromises();
+    },
+    async conversationTitles() {
+      const toggle = wrapper!.find('.chat-conv-toggle');
+      if (toggle.attributes('aria-expanded') !== 'true') {
+        await toggle.trigger('click');
+        await flushPromises();
+      }
+      return wrapper!.findAll('.chat-conv-title').map(node => node.text());
+    },
+    async resumeConversation(index) {
+      await wrapper!.findAll('.chat-conv-item')[index]!.trigger('click');
+      await flushPromises();
+    },
+    async visibleMessageCount() {
+      return wrapper!.findAll('.chat-messages .chat-message').length;
+    },
+    async requestDeleteConversation(index) {
+      const toggle = wrapper!.find('.chat-conv-toggle');
+      if (toggle.attributes('aria-expanded') !== 'true') {
+        await toggle.trigger('click');
+        await flushPromises();
+      }
+      await wrapper!.findAll('.chat-conv-delete')[index]!.trigger('click');
+      await flushPromises();
+      return wrapper!.findAll('.chat-conv-del-choice').map(node => node.text());
+    },
+    async confirmDeleteConversation(label) {
+      const buttons = wrapper!.findAll('.chat-conv-del-choice, .chat-conv-del-cancel');
+      await buttons.find(button => button.text() === label)!.trigger('click');
+      await flushPromises();
     },
     async teardown() {
       if (wrapper) wrapper.unmount();

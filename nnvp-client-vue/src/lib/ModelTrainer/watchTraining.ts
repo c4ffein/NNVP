@@ -37,6 +37,10 @@ export default async (
   train: (callbacks: TrainingCallbacks) => Promise<unknown>,
   cancelRequestedAccessor: () => boolean,
   stopError: unknown,
+  // Run-journal hook, fired only for epochs that made it past the cancel
+  // check — a cancel-interrupted epoch is dropped from charts and journal
+  // alike. Structural type: this module stays decoupled from runJournal.
+  onEpoch?: (m: { epoch: number; acc?: number; loss?: number; valAcc?: number; valLoss?: number }) => void,
 ): Promise<unknown> => {
   const batchLabels: number[] = [];
   const batchMetrics: { loss: number[]; acc: (number | undefined)[] } = { loss: [], acc: [] };
@@ -77,6 +81,9 @@ export default async (
         { className: 'ct-series-val-loss', name: 'val_loss', data: [...epochMetrics.val_loss] },
       ];
       debugLogChartUpdate('Epoch', chartData1);
+      onEpoch?.({
+        epoch: epochNumber, acc: s.acc, loss: s.loss, valAcc: s.val_acc, valLoss: s.val_loss,
+      });
     },
   };
   return train(callbacks);

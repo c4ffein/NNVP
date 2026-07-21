@@ -10,8 +10,8 @@ import type { Page } from '@playwright/test';
 import type FlowGraphEditor from '../../src/lib/FlowInterface/FlowGraphEditor';
 import type { CanvasDriver } from './canvas';
 import type {
-  BoardDriver, CatalogDriver, ChartsDriver, ChatDriver, E2EWorld, Expect, WindowName,
-  WindowsDriver, World,
+  BoardDriver, CatalogDriver, ChartsDriver, ChatDriver, E2EWorld, Expect, TrainingDriver,
+  WindowName, WindowsDriver, World,
 } from './define';
 
 // Dev-only debug handle main.ts installs (same local-typing pattern).
@@ -213,6 +213,39 @@ export function makeBrowserWorld(
     },
   };
 
+  // Same contract as worldComponents.makeTrainingDriver, via the real app:
+  // Panels > Training opens the window (v-if mounts TrainingZone), the
+  // titlebar close button unmounts it.
+  const training: TrainingDriver = {
+    async open() {
+      await page.click('#GeneralMenu .menuTitle:has-text("Panels")');
+      await page.click('#GeneralMenu .menuItem:has-text("Training")');
+      await page.click('.TrainingZone.bar-button:has-text("Options")');
+      await settle();
+    },
+    async close() {
+      await page.click('#trainingZone .floating-window-close');
+      await settle();
+    },
+    async setOptimizer(name) {
+      await page.selectOption('.optimizer-section select', name);
+      await settle();
+    },
+    async setEpochs(value) {
+      await page.fill('.training-params-section input[type="number"]', String(value));
+      await settle();
+    },
+    async optimizer() {
+      return page.$eval('.optimizer-section select', el => (el as HTMLSelectElement).value);
+    },
+    async epochs() {
+      return page.$eval(
+        '.training-params-section input[type="number"]',
+        el => Number((el as HTMLInputElement).value),
+      );
+    },
+  };
+
   // Same contract as worldComponents.makeCatalogDriver, on the real catalog.
   const catalog: CatalogDriver = {
     async open() {}, // always mounted in the app
@@ -299,10 +332,47 @@ export function makeBrowserWorld(
       await page.click('#chat-panel .floating-window-close');
       await settle();
     },
+    async startNewConversation() {
+      await page.click('#chat-panel .chat-conv-new');
+      await settle();
+    },
+    async conversationTitles() {
+      const toggle = page.locator('#chat-panel .chat-conv-toggle');
+      if (await toggle.getAttribute('aria-expanded') !== 'true') {
+        await toggle.click();
+        await settle();
+      }
+      return page.locator('#chat-panel .chat-conv-title').allTextContents();
+    },
+    async resumeConversation(index) {
+      await page.locator('#chat-panel .chat-conv-item').nth(index).click();
+      await settle();
+    },
+    async visibleMessageCount() {
+      return page.locator('#chat-panel .chat-messages .chat-message').count();
+    },
+    async requestDeleteConversation(index) {
+      const toggle = page.locator('#chat-panel .chat-conv-toggle');
+      if (await toggle.getAttribute('aria-expanded') !== 'true') {
+        await toggle.click();
+        await settle();
+      }
+      await page.locator('#chat-panel .chat-conv-delete').nth(index).click();
+      await settle();
+      return page.locator('#chat-panel .chat-conv-del-choice').allTextContents();
+    },
+    async confirmDeleteConversation(label) {
+      await page
+        .locator('#chat-panel .chat-conv-del-choice, #chat-panel .chat-conv-del-cancel')
+        .filter({ hasText: label })
+        .first()
+        .click();
+      await settle();
+    },
   };
 
   const world: World & { page?: Page; canvas?: CanvasDriver } = {
-    expect, board, chat, catalog, windows, charts, dispose: async () => {},
+    expect, board, chat, catalog, windows, charts, training, dispose: async () => {},
   };
   if (exposePage) {
     world.page = page;

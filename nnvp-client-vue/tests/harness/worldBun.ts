@@ -12,7 +12,7 @@ import { isInvalidConnection } from '../../src/lib/FlowInterface/adapter';
 import KerasInterface from '../../src/lib/KerasInterface/KerasInterface';
 import generatedKerasLayers from '../../src/lib/KerasInterface/generatedKerasLayers.json';
 import {
-  makeChatDriver, makeCatalogDriver, makeWindowsDriver, makeChartsDriver,
+  makeChatDriver, makeCatalogDriver, makeWindowsDriver, makeChartsDriver, makeTrainingDriver,
 } from './worldComponents';
 import type {
   FlowEdge, FlowNode, KerasLayerCatalog, NnvpLayerId, NnvpModel,
@@ -132,6 +132,7 @@ export function makeBunWorld(expect: Expect): World {
   const catalog = makeCatalogDriver();
   const windows = makeWindowsDriver();
   const charts = makeChartsDriver();
+  const training = makeTrainingDriver();
   return {
     expect,
     board: makeBoardDriver(),
@@ -139,11 +140,13 @@ export function makeBunWorld(expect: Expect): World {
     catalog,
     windows,
     charts,
+    training,
     async dispose() {
       await chat.teardown();
       await catalog.teardown();
       await windows.teardown();
       await charts.teardown();
+      await training.teardown();
     },
   };
 }

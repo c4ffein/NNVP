@@ -56,6 +56,19 @@ function notifyAuthChanged() {
   }
 }
 
+/**
+ * Server RecordOut → the client-shaped record: the payload verbatim with the
+ * uuid re-stamped from the envelope (defensive — an uploaded record always
+ * carries its own uuid, but the envelope is the authority).
+ */
+function unwrapRecord(response: unknown): Record<string, unknown> | null {
+  const envelope = response as { uuid?: unknown; payload?: unknown } | null;
+  if (!envelope || typeof envelope !== 'object') return null;
+  const payload = (envelope.payload && typeof envelope.payload === 'object')
+    ? envelope.payload as Record<string, unknown> : {};
+  return typeof envelope.uuid === 'string' ? { ...payload, uuid: envelope.uuid } : { ...payload };
+}
+
 export class ApiError extends Error {
   code: string;
   status: number | null;
@@ -321,5 +334,57 @@ export default class ApiClient {
 
   async deleteProject(id: number | string) {
     return this.request(`/projects/${id}`, { method: 'DELETE', auth: true });
+  }
+
+  // --- runs (immutable journal records, client-generated uuids) ---------------
+  // The server wraps record payloads (django-ninja RecordOut/RecordIn house
+  // style): GET /{uuid} answers { uuid, created_at, updated_at, payload } and
+  // PUT expects { payload: <record> }. Wrapping/unwrapping happens HERE so
+  // sync.ts and every other consumer only ever sees the client-shaped record.
+
+  /** Uuid+summary projections of the owner's runs (never the full payloads). */
+  async listRuns() {
+    return this.request('/runs', { auth: true });
+  }
+
+  /** The full run record as it was uploaded (unwrapped from the server's RecordOut). */
+  async getRun(uuid: string) {
+    return unwrapRecord(await this.request(`/runs/${uuid}`, { auth: true }));
+  }
+
+  /**
+   * Upsert by client uuid. Runs are immutable: an already-known uuid is a
+   * server-side no-op (dedupe), so re-pushing is always safe.
+   */
+  async putRun(uuid: string, payload: unknown) {
+    return this.request(`/runs/${uuid}`, { method: 'PUT', auth: true, body: { payload } });
+  }
+
+  async deleteRun(uuid: string) {
+    return this.request(`/runs/${uuid}`, { method: 'DELETE', auth: true });
+  }
+
+  // --- conversations (mutable records, upsert on updatedAt) -------------------
+
+  /** Uuid+summary projections of the owner's conversations. */
+  async listConversations() {
+    return this.request('/conversations', { auth: true });
+  }
+
+  /** The full conversation record as it was uploaded (unwrapped from RecordOut). */
+  async getConversation(uuid: string) {
+    return unwrapRecord(await this.request(`/conversations/${uuid}`, { auth: true }));
+  }
+
+  /**
+   * Upsert by client uuid. Unlike runs, conversations mutate: an existing
+   * uuid is OVERWRITTEN (sync decides who wins by comparing updatedAt).
+   */
+  async putConversation(uuid: string, payload: unknown) {
+    return this.request(`/conversations/${uuid}`, { method: 'PUT', auth: true, body: { payload } });
+  }
+
+  async deleteConversation(uuid: string) {
+    return this.request(`/conversations/${uuid}`, { method: 'DELETE', auth: true });
   }
 }

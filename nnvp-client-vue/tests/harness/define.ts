@@ -103,6 +103,21 @@ export interface ChartsDriver {
   helpText(which: 'batch' | 'epoch'): Promise<string | null>;
 }
 
+/**
+ * The Training window's compile options (Options tab). open() opens the
+ * Training window ON its Options tab; close() closes the whole window (which
+ * unmounts TrainingZone, exactly like the app's v-if). Reads return what the
+ * rendered form shows.
+ */
+export interface TrainingDriver {
+  open(): Promise<void>;
+  close(): Promise<void>;
+  setOptimizer(name: string): Promise<void>;
+  setEpochs(value: number): Promise<void>;
+  optimizer(): Promise<string>;
+  epochs(): Promise<number>;
+}
+
 /** The layer catalog's collapse/expand surface. */
 export interface CatalogDriver {
   open(): Promise<void>;
@@ -129,6 +144,19 @@ export interface ChatDriver {
   windowPosition(): Promise<{ x: number; y: number }>;
   dragWindowBy(dx: number, dy: number): Promise<void>;
   closeWindow(): Promise<void>;
+  /** Click the "+ New" control: persist the current conversation, start fresh. */
+  startNewConversation(): Promise<void>;
+  /** Open the conversations drawer (if closed) and return its titles, newest first. */
+  conversationTitles(): Promise<string[]>;
+  /** Click the drawer row at `index` (same order conversationTitles returned). */
+  resumeConversation(index: number): Promise<void>;
+  /** How many message rows the panel currently renders. */
+  visibleMessageCount(): Promise<number>;
+  /** Click the × on the drawer row at `index` (opening the drawer if needed);
+   *  returns the offered delete-location labels ("device"/"cloud"/"both"). */
+  requestDeleteConversation(index: number): Promise<string[]>;
+  /** Click the inline confirm button with that exact label (or "Cancel"). */
+  confirmDeleteConversation(label: string): Promise<void>;
 }
 
 /** What appTest fns receive (in BOTH modes). */
@@ -138,6 +166,7 @@ export interface World extends LogicWorld {
   catalog: CatalogDriver;
   windows: WindowsDriver;
   charts: ChartsDriver;
+  training: TrainingDriver;
   /** Bun world only (unmount + reset between tests); the runner calls it, suites never do. */
   dispose?: () => Promise<void>;
 }
