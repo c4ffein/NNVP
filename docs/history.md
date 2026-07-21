@@ -21,6 +21,8 @@ The backend has been shut down. Thanks to TensorFlow.js, it's now possible to tr
 
 A new closed-source backend may become available in the future, enabling accelerated compute on remote GPUs.
 
+The app has since grown an offline-first persistence layer: every training run is journaled locally (IndexedDB) with its full compile options, graph snapshot and per-epoch metrics — browsable, restorable and deletable from a History tab — and assistant conversations survive reloads with the same machinery. When signed in, both record kinds sync to the backend by client-generated uuid (append-only push/pull, so there is no merge logic to get wrong), and each record can be deleted from the device, the cloud, or both.
+
 ## Contributors
 
 ### People who worked on it at the university
