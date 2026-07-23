@@ -189,9 +189,9 @@ export default defineComponent({
             [`${tick(this.views.chat)} Chat`]: () => this.$emit('toggle-view', 'showChat'),
           } : {}),
         },
+        // Settings and About moved off the menubar: the corner controls'
+        // gear and ? buttons open them as tabs of the account panel.
         Tutorial: () => { this.$emit('open-tutorial'); },
-        Settings: () => { this.$emit('open-settings'); },
-        About: () => { this.$emit('open-about'); },
       };
     },
     templatesMenu(): MenuSubtree {

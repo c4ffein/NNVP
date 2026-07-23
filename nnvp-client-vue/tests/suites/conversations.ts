@@ -247,26 +247,23 @@ appTest('chat: resuming a stored conversation re-renders its messages', async ({
 
 // --- Deleting (PLAN Phase 6) ---------------------------------------------------
 
-appTest('chat: signed out, deleting a conversation offers the device copy only', async ({ chat, expect }) => {
+appTest('chat: signed out, deleting a conversation offers the device copy only', async ({ chat, records, expect }) => {
   consumePendingAsk(); // never let a leftover ask replay on mount
-  const store = new MemoryRecordStore();
-  await store.put('conversations', record('stored-1', '2026-01-01T00:00:00.000Z', 'stored talk'));
-  setRecordStoreForTests(store);
-  try {
-    await chat.setSignedIn(false);
-    await chat.open();
+  // Through the world's records driver, NOT setRecordStoreForTests: the seed
+  // must land in the store the APP reads — the injected memory store under
+  // bun, the page's real store in the browser.
+  await records.seed('conversations', [record('stored-1', '2026-01-01T00:00:00.000Z', 'stored talk')]);
+  await chat.setSignedIn(false);
+  await chat.open();
 
-    // Signed out there is no cloud location to offer (and nothing to ask).
-    const offered = await chat.requestDeleteConversation(0);
-    expect(offered).toEqual(['device']);
+  // Signed out there is no cloud location to offer (and nothing to ask).
+  const offered = await chat.requestDeleteConversation(0);
+  expect(offered).toEqual(['device']);
 
-    // Cancel is a real exit: the row comes back untouched.
-    await chat.confirmDeleteConversation('Cancel');
-    expect((await chat.conversationTitles()).length).toBe(1);
-    expect((await listConversations(store)).length).toBe(1);
-  } finally {
-    setRecordStoreForTests(null);
-  }
+  // Cancel is a real exit: the row comes back untouched, on screen and in store.
+  await chat.confirmDeleteConversation('Cancel');
+  expect((await chat.conversationTitles()).length).toBe(1);
+  expect((await records.list('conversations')).length).toBe(1);
 });
 
 appTest('chat: deleting a non-active conversation from the device removes its row', async ({ chat, expect }) => {

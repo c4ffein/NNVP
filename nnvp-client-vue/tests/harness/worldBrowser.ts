@@ -8,14 +8,19 @@
  */
 import type { Page } from '@playwright/test';
 import type FlowGraphEditor from '../../src/lib/FlowInterface/FlowGraphEditor';
+import type { RecordStore, RecordStoreName, StoredRecord } from '../../src/lib/LocalStore/recordStore';
+import { createFakeBackend } from './fakeBackend';
+import type { FakeBackend } from './fakeBackend';
 import type { CanvasDriver } from './canvas';
 import type {
-  BoardDriver, CatalogDriver, ChartsDriver, ChatDriver, E2EWorld, Expect, TrainingDriver,
-  WindowName, WindowsDriver, World,
+  BackendDriver, BoardDriver, CatalogDriver, ChartsDriver, ChatDriver, E2EWorld, Expect,
+  HistoryDriver, RecordsDriver, TrainingDriver, WindowName, WindowsDriver, World,
 } from './define';
 
 // Dev-only debug handle main.ts installs (same local-typing pattern).
-type NnvpDebugWindow = Window & { nnvp: { debug: { graphEditor: FlowGraphEditor } } };
+type NnvpDebugWindow = Window & {
+  nnvp: { debug: { graphEditor: FlowGraphEditor; recordStore: RecordStore } };
+};
 
 export function makeBrowserWorld(page: Page, canvas: CanvasDriver, expect: Expect, options: { exposePage: true }): E2EWorld;
 export function makeBrowserWorld(page: Page, canvas: CanvasDriver, expect: Expect, options?: { exposePage?: boolean }): World;
@@ -371,8 +376,113 @@ export function makeBrowserWorld(
     },
   };
 
+  // Seed/read the app's REAL store through the dev-only debug handle — the
+  // same instance every component reaches via getRecordStore(). Records cross
+  // into the page as structured clones, which their JSON-safety guarantees.
+  const records: RecordsDriver = {
+    async seed(store, recordList) {
+      await page.evaluate(async ({ storeName, list }) => {
+        const appStore = (window as unknown as NnvpDebugWindow).nnvp.debug.recordStore;
+        for (const record of list) await appStore.put(storeName, record);
+      }, { storeName: store, list: recordList });
+    },
+    async list<T extends StoredRecord>(store: RecordStoreName) {
+      return page.evaluate(
+        storeName => (window as unknown as NnvpDebugWindow).nnvp.debug.recordStore
+          .list(storeName),
+        store,
+      ) as Promise<T[]>;
+    },
+  };
+
+  // The fake /api lives in the RUNNER process; page.route hands it every
+  // request before the network (so before vite's /api proxy). Requests the
+  // router disowns continue to the real (absent) backend and fail exactly
+  // like a missing server.
+  let fakeBackend: FakeBackend | null = null;
+  let backendRouted = false;
+  const backend: BackendDriver = {
+    async serve(data) {
+      fakeBackend = createFakeBackend(data);
+      if (backendRouted) return; // re-serve just swaps the state behind the route
+      backendRouted = true;
+      await page.route('**/api/**', async (route) => {
+        const request = route.request();
+        const answer = fakeBackend!.handle(request.method(), request.url(), request.postData());
+        if (!answer) return route.continue();
+        return route.fulfill({
+          status: answer.status,
+          body: answer.body ?? undefined,
+          contentType: answer.body === null ? undefined : 'application/json',
+        });
+      });
+    },
+    async uuids(kind) {
+      return fakeBackend ? [...fakeBackend.state[kind].keys()] : [];
+    },
+  };
+
+  // Same contract as worldComponents.makeHistoryDriver, via the real app:
+  // Panels > Training opens the window, the History tab bar-button lands on
+  // the panel.
+  const history: HistoryDriver = {
+    async open() {
+      await page.click('#GeneralMenu .menuTitle:has-text("Panels")');
+      await page.click('#GeneralMenu .menuItem:has-text("Training")');
+      await page.click('.TrainingZone.bar-button:has-text("History")');
+      await settle();
+    },
+    async close() {
+      await page.click('#trainingZone .floating-window-close');
+      await settle();
+    },
+    async rowCount() {
+      return page.locator('.history-row').count();
+    },
+    async rowText(index) {
+      return (await page.locator('.history-row').nth(index).textContent()) ?? '';
+    },
+    async emptyText() {
+      const empty = page.locator('.history-empty');
+      return (await empty.count()) ? empty.first().textContent() : null;
+    },
+    async view(index) {
+      await page.locator('.history-view').nth(index).click();
+      await settle();
+    },
+    async curvesVisible() {
+      return (await page.locator('.history-curves').count()) > 0;
+    },
+    async curveSeriesCount() {
+      return page.locator('.history-curves .lines path').count();
+    },
+    async curvesText() {
+      return (await page.locator('.history-curves').textContent()) ?? '';
+    },
+    async restore(index) {
+      await page.locator('.history-restore').nth(index).click();
+      await settle();
+    },
+    async requestDelete(index) {
+      await page.locator('.history-delete').nth(index).click();
+      // The offered buttons appear once the deleteChoices promise lands —
+      // there is always at least one (the panel degrades to ['local']).
+      await page.waitForSelector('.history-confirm-delete');
+      return page.locator('.history-confirm-delete').allTextContents();
+    },
+    async confirmDelete(label) {
+      await page
+        .locator('.history-confirm-delete, .history-cancel-delete')
+        .filter({ hasText: label })
+        .first()
+        .click();
+      await settle();
+    },
+  };
+
   const world: World & { page?: Page; canvas?: CanvasDriver } = {
-    expect, board, chat, catalog, windows, charts, training, dispose: async () => {},
+    expect, board, chat, catalog, windows, charts, training, history, records, backend,
+    dispose: async () => {},
   };
   if (exposePage) {
     world.page = page;

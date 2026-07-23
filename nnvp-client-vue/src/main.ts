@@ -59,6 +59,9 @@ type DebugWindow = Window & {
     // New structured debug namespace
     win.nnvp.debug.kerasInterface = kerasInterface;
     win.nnvp.debug.boardInterface = boardInterface;
+    // The app's RecordStore singleton, for the browser test world's records
+    // driver (seed/read runs and conversations through the app's own store).
+    win.nnvp.debug.recordStore = getRecordStore();
   }
 
   app.mount('#app');

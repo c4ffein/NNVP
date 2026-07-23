@@ -75,7 +75,11 @@ e2eOnly(
     expect(fileMenuItems).toContain('File');
     expect(fileMenuItems).toContain('Edit');
     expect(fileMenuItems).toContain('Panels'); // Training lives under Panels now
-    expect(fileMenuItems).toContain('About');
+    expect(fileMenuItems).toContain('Tutorial');
+    // Settings and About left the menubar for the corner controls' gear and
+    // ? buttons (tabs of the account panel).
+    expect(fileMenuItems).not.toContain('Settings');
+    expect(fileMenuItems).not.toContain('About');
     expect(consoleErrors.length).toBe(0);
   },
 );

@@ -1,16 +1,20 @@
 import { describe, it, expect } from 'bun:test';
 import { mount } from '@vue/test-utils';
-import AboutModal from '../../src/components/AboutModal.vue';
+import AccountPanel from '../../src/components/Account/AccountPanel.vue';
 import TutorialMenu from '../../src/components/Tutorial/TutorialMenu.vue';
 
 // Smoke tests for tests/harness/vue-loader.ts (the bun .vue loader): real SFCs
 // mount under bun + happy-dom, render their templates, react to props and emit.
 describe('vue single-file components under bun', () => {
-  it('mounts AboutModal and reacts to props', async () => {
-    const wrapper = mount(AboutModal, { props: { show: true } });
-    expect(wrapper.find('#about-modal-title').text()).toBe('NNVP');
+  it('mounts AccountPanel and reacts to props', async () => {
+    const wrapper = mount(AccountPanel, {
+      props: { show: true },
+      global: { mocks: { $boardInterface: {} } },
+    });
+    expect(wrapper.find('#account-modal-title').exists()).toBe(true);
     await wrapper.setProps({ show: false });
-    expect(wrapper.find('#about-modal-title').exists()).toBe(false);
+    expect(wrapper.find('#account-modal-title').exists()).toBe(false);
+    wrapper.unmount();
   });
 
   it('mounts TutorialMenu and emits start on item click', async () => {

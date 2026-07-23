@@ -12,119 +12,119 @@
       >
         <button class="modal-close" @click="closeModal" aria-label="Close">&times;</button>
 
+        <!-- Left nav: one entry per category. Cloud categories render locked
+             (not hidden) while signed out — discoverability is the point of
+             optional accounts. Without a backend build only the device-local
+             categories exist. -->
+        <nav class="account-nav" aria-label="Sections">
+          <button
+            v-for="tab in tabs"
+            :key="tab.id"
+            type="button"
+            class="account-tab"
+            :class="{ active: tab.id === effectiveTab }"
+            :disabled="tab.locked"
+            :title="tab.locked ? 'Sign in to use' : undefined"
+            :aria-current="tab.id === effectiveTab ? 'page' : undefined"
+            @click="selectTab(tab.id)"
+          >{{ tab.label }}</button>
+          <p v-if="backendEnabled && !user" class="account-nav-hint">
+            Sign in to unlock Projects &amp; Usage.
+          </p>
+          <div v-if="user" class="account-nav-foot">
+            <span class="user-email">{{ user.email }}</span>
+          </div>
+        </nav>
+
         <div class="account-content">
-          <h1 id="account-modal-title">Cloud</h1>
-          <p class="subtitle">Optional accounts &amp; saved projects</p>
+          <h1 id="account-modal-title">{{ activeTitle }}</h1>
 
           <p v-if="error" class="msg msg-error" role="alert">{{ error }}</p>
           <p v-else-if="status" class="msg msg-ok" role="status">{{ status }}</p>
 
-          <!-- Approval page: the emailed link landed here (/?magic=<token>).
-               A deliberate click approves the browser that REQUESTED the
-               login; this browser gets signed in only if it is that browser. -->
-          <section v-if="approval" class="section">
-            <h2>Approve sign-in</h2>
-            <template v-if="approval.done">
+          <!-- ============ Account (auth flows live here) ============ -->
+          <template v-if="effectiveTab === 'account'">
+            <p class="subtitle">Optional accounts &amp; saved projects</p>
+
+            <!-- Approval page: the emailed link landed here (/?magic=<token>).
+                 A deliberate click approves the browser that REQUESTED the
+                 login; this browser gets signed in only if it is that browser. -->
+            <section v-if="approval" class="section">
+              <h2>Approve sign-in</h2>
+              <template v-if="approval.done">
+                <p class="hint sign-in-hint">
+                  Done — the browser showing code
+                  <strong class="match-code-inline">{{ approval.code }}</strong>
+                  is now signed in. You can close this tab.
+                </p>
+              </template>
+              <template v-else>
+                <p v-if="approval.same_browser" class="hint sign-in-hint">
+                  Approving will sign in <strong>this browser</strong>.
+                </p>
+                <p v-else class="hint sign-in-hint">
+                  Approving will sign in the browser showing code
+                  <strong class="match-code-inline">{{ approval.code }}</strong>
+                  — {{ approval.requester }}, requested {{ approval.age }}.
+                  <br/>Check that the codes match; if you did not request this,
+                  just close this tab.
+                </p>
+                <div class="row">
+                  <button class="btn btn-primary" :disabled="busy" @click="approve">
+                    Approve sign-in
+                  </button>
+                </div>
+              </template>
+            </section>
+
+            <!-- Waiting: a link was requested from THIS browser; poll until the
+                 emailed link is clicked (anywhere) and our token is verified. -->
+            <section v-else-if="!user && waiting" class="section">
+              <h2>Check your inbox</h2>
               <p class="hint sign-in-hint">
-                Done — the browser showing code
-                <strong class="match-code-inline">{{ approval.code }}</strong>
-                is now signed in. You can close this tab.
+                We emailed a sign-in link to <strong>{{ waiting.email || 'you' }}</strong>.
+                Open it on any device and check it shows this code:
               </p>
-            </template>
-            <template v-else>
-              <p v-if="approval.same_browser" class="hint sign-in-hint">
-                Approving will sign in <strong>this browser</strong>.
-              </p>
-              <p v-else class="hint sign-in-hint">
-                Approving will sign in the browser showing code
-                <strong class="match-code-inline">{{ approval.code }}</strong>
-                — {{ approval.requester }}, requested {{ approval.age }}.
-                <br/>Check that the codes match; if you did not request this,
-                just close this tab.
-              </p>
+              <p class="match-code" data-testid="match-code">{{ waiting.code }}</p>
               <div class="row">
-                <button class="btn btn-primary" :disabled="busy" @click="approve">
-                  Approve sign-in
+                <span class="hint">Waiting for you to click the link…</span>
+                <button class="btn" :disabled="busy" @click="cancelWaiting">Cancel</button>
+              </div>
+            </section>
+
+            <!-- Auth: magic-link only. No password, no registration — the
+                 account is created on the first verified login. -->
+            <section v-else-if="!user" class="section">
+              <h2>Sign in</h2>
+              <p class="hint sign-in-hint">
+                No password needed: we email you a single-use sign-in link.
+                Your account is created on first login.
+              </p>
+              <label class="field">
+                <span>Email</span>
+                <input
+                  v-model="email" type="email" autocomplete="email"
+                  @keydown.enter="sendLink"
+                />
+              </label>
+              <div class="row">
+                <button class="btn btn-primary" :disabled="busy" @click="sendLink">
+                  Email me a sign-in link
                 </button>
               </div>
-            </template>
-          </section>
+            </section>
 
-          <!-- Waiting: a link was requested from THIS browser; poll until the
-               emailed link is clicked (anywhere) and our token is verified. -->
-          <section v-else-if="!user && waiting" class="section">
-            <h2>Check your inbox</h2>
-            <p class="hint sign-in-hint">
-              We emailed a sign-in link to <strong>{{ waiting.email || 'you' }}</strong>.
-              Open it on any device and check it shows this code:
-            </p>
-            <p class="match-code" data-testid="match-code">{{ waiting.code }}</p>
-            <div class="row">
-              <span class="hint">Waiting for you to click the link…</span>
-              <button class="btn" :disabled="busy" @click="cancelWaiting">Cancel</button>
-            </div>
-          </section>
-
-          <!-- Auth: magic-link only. No password, no registration — the
-               account is created on the first verified login. -->
-          <section v-else-if="!user" class="section">
-            <h2>Sign in</h2>
-            <p class="hint sign-in-hint">
-              No password needed: we email you a single-use sign-in link.
-              Your account is created on first login.
-            </p>
-            <label class="field">
-              <span>Email</span>
-              <input
-                v-model="email" type="email" autocomplete="email"
-                @keydown.enter="sendLink"
-              />
-            </label>
-            <div class="row">
-              <button class="btn btn-primary" :disabled="busy" @click="sendLink">
-                Email me a sign-in link
-              </button>
-            </div>
-          </section>
-
-          <!-- Signed-in: current user + projects -->
-          <template v-if="user">
-            <section class="section">
+            <section v-else class="section">
               <h2>Account</h2>
-              <div class="row account-row">
-                <span class="user-email">{{ user.email }}</span>
+              <p class="hint sign-in-hint">Signed in on this browser.</p>
+              <div class="row">
                 <button class="btn" @click="signOut">Sign out</button>
               </div>
             </section>
+          </template>
 
-            <section class="section" ref="usageSection">
-              <h2>Credits usage</h2>
-              <p class="hint">Assistant tokens used per day, last 14 days.</p>
-              <svg
-                v-if="usageBars.some(bar => bar.tokens > 0)"
-                class="usage-chart"
-                viewBox="0 0 280 84"
-                role="img"
-                aria-label="Daily assistant token usage"
-              >
-                <g v-for="(bar, index) in usageBars" :key="bar.date">
-                  <rect
-                    class="usage-bar"
-                    :x="index * 20 + 3"
-                    :y="70 - bar.height"
-                    width="14"
-                    :height="Math.max(bar.height, bar.tokens > 0 ? 2 : 0)"
-                    rx="2"
-                  >
-                    <title>{{ bar.date }}: {{ bar.tokens }} tokens ({{ bar.requests }} requests)</title>
-                  </rect>
-                </g>
-                <text class="usage-label" x="3" y="82">{{ usageBars[0].date.slice(5) }}</text>
-                <text class="usage-label" x="277" y="82" text-anchor="end">today</text>
-              </svg>
-              <p v-else class="hint">No assistant usage yet.</p>
-            </section>
-
+          <!-- ============ Projects (signed-in only) ============ -->
+          <template v-else-if="effectiveTab === 'projects'">
             <section class="section">
               <div class="section-head">
                 <h2>My Projects</h2>
@@ -152,29 +152,62 @@
             </section>
           </template>
 
-          <!-- Device-local settings: available signed-in or not. -->
-          <section class="section" ref="settingsSection">
-            <h2>Settings</h2>
-            <p class="hint">Stored on this device.</p>
-            <h3 class="settings-subtitle">Activation colors</h3>
-            <p class="hint">The color ramp used wherever activations are shown —
-            the inspect overlays on the board and the 3D view. Viridis is the
-            colorblind-safe choice.</p>
-            <label v-for="scheme in schemes" :key="scheme.id" class="settings-scheme">
-              <input
-                type="radio"
-                name="colorScheme"
-                :value="scheme.id"
-                :checked="scheme.id === colorScheme"
-                @change="setColorScheme(scheme.id)"
-              />
-              <span class="settings-scheme-body">
-                <span class="settings-scheme-label">{{ scheme.label }}</span>
-                <span class="settings-scheme-swatch" :style="{ background: gradientOf(scheme) }"></span>
-                <span class="settings-scheme-description">{{ scheme.description }}</span>
-              </span>
-            </label>
-          </section>
+          <!-- ============ Usage (signed-in only) ============ -->
+          <template v-else-if="effectiveTab === 'usage'">
+            <section class="section" ref="usageSection">
+              <h2>Credits usage</h2>
+              <p class="hint">Assistant tokens used per day, last 14 days.</p>
+              <svg
+                v-if="usageBars.some(bar => bar.tokens > 0)"
+                class="usage-chart"
+                viewBox="0 0 280 84"
+                role="img"
+                aria-label="Daily assistant token usage"
+              >
+                <g v-for="(bar, index) in usageBars" :key="bar.date">
+                  <rect
+                    class="usage-bar"
+                    :x="index * 20 + 3"
+                    :y="70 - bar.height"
+                    width="14"
+                    :height="Math.max(bar.height, bar.tokens > 0 ? 2 : 0)"
+                    rx="2"
+                  >
+                    <title>{{ bar.date }}: {{ bar.tokens }} tokens ({{ bar.requests }} requests)</title>
+                  </rect>
+                </g>
+                <text class="usage-label" x="3" y="82">{{ usageBars[0].date.slice(5) }}</text>
+                <text class="usage-label" x="277" y="82" text-anchor="end">today</text>
+              </svg>
+              <p v-else class="hint">No assistant usage yet.</p>
+            </section>
+          </template>
+
+          <!-- ============ Settings (device-local, account or not) ============ -->
+          <template v-else-if="effectiveTab === 'settings'">
+            <section class="section" ref="settingsSection">
+              <p class="hint">Stored on this device.</p>
+              <h3 class="settings-subtitle">Activation colors</h3>
+              <p class="hint">The color ramp used wherever activations are shown —
+              the inspect overlays on the board and the 3D view. Viridis is the
+              colorblind-safe choice.</p>
+              <label v-for="scheme in schemes" :key="scheme.id" class="settings-scheme">
+                <input
+                  type="radio"
+                  name="colorScheme"
+                  :value="scheme.id"
+                  :checked="scheme.id === colorScheme"
+                  @change="setColorScheme(scheme.id)"
+                />
+                <span class="settings-scheme-body">
+                  <span class="settings-scheme-label">{{ scheme.label }}</span>
+                  <span class="settings-scheme-swatch" :style="{ background: gradientOf(scheme) }"></span>
+                  <span class="settings-scheme-description">{{ scheme.description }}</span>
+                </span>
+              </label>
+            </section>
+          </template>
+
         </div>
       </div>
     </div>
@@ -189,7 +222,22 @@ import type { ColorScheme, ColorSchemeId } from '../../lib/Settings/colorSchemes
 import { settings } from '../../lib/Settings/settings';
 import { clearCurrentProject } from '../../lib/Backend/currentProject';
 
+// import.meta.env is Vite-only (absent under bun/unit tests) — typed locally
+// instead of pulling in vite/client types (same choice as CornerControls.vue).
+type ImportMetaWithEnv = ImportMeta & { env?: { VITE_ENABLE_BACKEND?: string } };
+
 interface ApiUser { email: string }
+
+/** The left-nav categories. Cloud tabs need a backend build; projects/usage
+ *  additionally need a session (they render locked while signed out). */
+type TabId = 'account' | 'projects' | 'usage' | 'settings';
+
+interface TabDef {
+  id: TabId;
+  label: string;
+  title: string;
+  locked: boolean;
+}
 
 /** Project rows as the backend returns them (list / get). */
 interface ProjectRecord {
@@ -250,7 +298,8 @@ export default defineComponent({
       type: Boolean,
       required: true,
     },
-    // Optional intent when opened, e.g. 'save' to immediately save the board.
+    // Optional intent when opened: 'save' | 'usage' | 'settings' | 'about' |
+    // 'magic' — picks the tab (and for 'save', immediately saves the board).
     intent: {
       type: String,
       default: '',
@@ -258,6 +307,10 @@ export default defineComponent({
   },
   data() {
     return {
+      // Without a backend build the panel still exists — it is where the
+      // device-local Settings and About categories live.
+      backendEnabled: !!(import.meta as ImportMetaWithEnv).env?.VITE_ENABLE_BACKEND,
+      selectedTab: 'account' as TabId,
       user: null as ApiUser | null,
       projects: [] as ProjectRecord[],
       usageDays: [] as UsageDay[],
@@ -284,6 +337,33 @@ export default defineComponent({
     },
   },
   computed: {
+    tabs(): TabDef[] {
+      const needsUser = !this.user;
+      const cloud: TabDef[] = [
+        { id: 'account', label: 'Account', title: 'Cloud', locked: false },
+        { id: 'projects', label: 'Projects', title: 'Projects', locked: needsUser },
+        { id: 'usage', label: 'Usage', title: 'Usage', locked: needsUser },
+      ];
+      const local: TabDef[] = [
+        { id: 'settings', label: 'Settings', title: 'Settings', locked: false },
+      ];
+      return this.backendEnabled ? [...cloud, ...local] : local;
+    },
+    // The tab actually shown: auth flows pin the Account tab, a locked or
+    // unavailable selection falls back to the nearest sensible tab (so e.g. a
+    // sign-out from the Projects tab cannot strand an empty panel).
+    effectiveTab(): TabId {
+      if (!this.backendEnabled) return 'settings';
+      if (this.approval || this.waiting) return 'account';
+      if ((this.selectedTab === 'projects' || this.selectedTab === 'usage') && !this.user) {
+        return 'account';
+      }
+      return this.selectedTab;
+    },
+    activeTitle(): string {
+      const tab = this.tabs.find(entry => entry.id === this.effectiveTab);
+      return tab ? tab.title : 'Cloud';
+    },
     // Last 14 days, gaps filled, scaled to the busiest day (svg is 70 tall).
     // Always exactly 14 entries, so the non-empty tuple type is sound (the
     // template reads usageBars[0] directly).
@@ -306,6 +386,20 @@ export default defineComponent({
     },
   },
   methods: {
+    selectTab(id: TabId) {
+      this.selectedTab = id;
+    },
+    /** The tab an open-intent lands on; 'save'/'usage' degrade through
+     *  effectiveTab to Account while signed out. */
+    intentTab(): TabId {
+      if (this.intent === 'settings') return 'settings';
+      if (this.intent === 'usage') return 'usage';
+      if (this.intent === 'save') return 'projects';
+      if (this.intent === 'magic') return 'account';
+      // The plain person-button open: your stuff when signed in, sign-in
+      // otherwise.
+      return this.user ? 'projects' : 'account';
+    },
     async onOpen() {
       const self = this as typeof this & AccountPanelInternal;
       this.error = '';
@@ -318,7 +412,12 @@ export default defineComponent({
           (focusable || container).focus();
         }
       });
+      if (!this.backendEnabled) {
+        this.selectedTab = this.intentTab();
+        return;
+      }
       if (this.intent === 'magic') {
+        this.selectedTab = 'account';
         await this.openApprovalFromUrl();
         return;
       }
@@ -329,23 +428,11 @@ export default defineComponent({
         await this.checkStatus();
         if (this.intent === 'save' && this.user) await this.saveToCloud();
         if (this.user) await this.refreshUsage();
-        if (this.intent === 'usage' || this.intent === 'settings') {
-          this.$nextTick(() => {
-            const section = (this.intent === 'usage'
-              ? this.$refs.usageSection : this.$refs.settingsSection) as HTMLElement | undefined;
-            if (section) section.scrollIntoView({ block: 'start', behavior: 'smooth' });
-          });
-        }
       } else {
         this.user = null;
         this.projects = [];
-        if (this.intent === 'settings') {
-          this.$nextTick(() => {
-            const section = this.$refs.settingsSection as HTMLElement | undefined;
-            if (section) section.scrollIntoView({ block: 'start', behavior: 'smooth' });
-          });
-        }
       }
+      this.selectedTab = this.intentTab();
     },
     // The emailed link lands on the SPA as /?magic=<token> (App.vue opens this
     // panel with intent 'magic'). Strip the token from the URL before anything
@@ -396,6 +483,8 @@ export default defineComponent({
           this.approval = null;
           await this.checkStatus();
           this.status = this.user ? `Signed in as ${this.user.email}.` : '';
+          // A fresh interactive sign-in lands on your stuff.
+          if (this.user) this.selectedTab = 'projects';
         } else {
           this.approval.done = true;
         }
@@ -433,6 +522,7 @@ export default defineComponent({
     // One status poll; used at panel open and by the waiting loop.
     async checkStatus() {
       const self = this as typeof this & AccountPanelInternal;
+      const wasWaiting = Boolean(this.waiting);
       try {
         const data = await self.api.authStatus() as {
           verified?: boolean; user?: ApiUser; code?: string;
@@ -442,6 +532,8 @@ export default defineComponent({
           this.waiting = null;
           this.user = data.user!;
           await this.refreshProjects();
+          // The waited-for sign-in just completed: land on your stuff.
+          if (wasWaiting) this.selectedTab = 'projects';
         } else {
           this.waiting = this.waiting || { email: '', code: data.code };
           this.waiting.code = data.code || this.waiting.code;
@@ -640,6 +732,26 @@ export default defineComponent({
     handleKeydown(event: KeyboardEvent) {
       if (!this.show) return;
       if (event.key === 'Escape') this.closeModal();
+      else if (event.key === 'Tab') this.trapFocus(event);
+    },
+    // Keep Tab/Shift+Tab cycling inside the dialog (the same focus-trap
+    // contract as AboutModal).
+    trapFocus(event: KeyboardEvent) {
+      const container = this.$refs.container as HTMLElement | undefined;
+      if (!container) return;
+      const focusable = container.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0]!;
+      const last = focusable[focusable.length - 1]!;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     },
   },
   async mounted() {
@@ -649,6 +761,7 @@ export default defineComponent({
       this.onOpen();
       return;
     }
+    if (!this.backendEnabled) return;
     // A pending login must survive a page refresh AND block the app: if the
     // stored token turns out to be unverified, ask App.vue to force this
     // panel open (the waiting state + polling resume in onOpen). When the URL
@@ -676,10 +789,72 @@ export default defineComponent({
 
 <style scoped>
 /* Chrome (overlay / surface / close) comes from the global modal skin in
-   App.vue; only sizing and content styles live here. */
+   App.vue; only sizing and content styles live here. The surface is a
+   nav+content row: the CONTENT column scrolls, the surface itself must not. */
 .account-container {
-  max-width: 460px;
-  padding: 28px 32px 32px;
+  max-width: 680px;
+  padding: 0;
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  /* One stable height for every tab (no jumping when content changes):
+     560px preferred, never below 65% nor above 90% of the viewport — the
+     content column scrolls to absorb the difference. Overrides the global
+     modal-surface 85vh cap. */
+  height: clamp(65vh, 560px, 90vh);
+  max-height: 90vh;
+}
+
+.account-nav {
+  flex: none;
+  width: 148px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 22px 12px 16px;
+  border-right: 1px solid var(--panel-border);
+  background-color: var(--bg-elevated);
+  box-sizing: border-box;
+}
+.account-tab {
+  text-align: left;
+  padding: 7px 12px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-primary);
+  font-family: var(--font-regular);
+  font-weight: var(--font-weight-medium);
+  font-size: 13px;
+  cursor: pointer;
+}
+.account-tab:hover:not(:disabled):not(.active) { background-color: var(--bg-hover); }
+.account-tab.active {
+  background-color: var(--fill-strong);
+  color: var(--fill-strong-text);
+}
+.account-tab:disabled { color: var(--text-muted); opacity: 0.55; cursor: default; }
+.account-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.account-nav-hint {
+  margin: 8px 4px 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.account-nav-foot {
+  margin-top: auto;
+  padding: 10px 4px 0;
+  border-top: 1px solid var(--panel-border);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.account-content {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 24px 30px 30px;
+  box-sizing: border-box;
 }
 
 .account-content h1 {
@@ -793,7 +968,6 @@ export default defineComponent({
   gap: 10px;
   flex-wrap: wrap;
 }
-.account-row { justify-content: space-between; }
 .user-email {
   font-weight: var(--font-weight-medium);
   overflow-wrap: anywhere;

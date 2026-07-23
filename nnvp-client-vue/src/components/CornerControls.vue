@@ -38,6 +38,20 @@
       </svg>
     </button>
     <button
+      type="button"
+      class="corner-btn settings-btn"
+      title="Settings"
+      aria-label="Settings"
+      @click="$emit('open-settings')"
+    >
+      <svg class="corner-icon" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+        <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </g>
+      </svg>
+    </button>
+    <button
       v-if="backendEnabled"
       type="button"
       class="corner-btn account-btn"
@@ -52,6 +66,23 @@
       </svg>
       <span v-if="!loggedIn" class="account-status" aria-hidden="true">?</span>
       <span class="visually-hidden">Account</span>
+    </button>
+    <!-- The help spot: About sits at the extreme right of the top bar. -->
+    <button
+      type="button"
+      class="corner-btn about-btn"
+      title="About NNVP"
+      aria-label="About NNVP"
+      @click="$emit('open-about')"
+    >
+      <svg class="corner-icon" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path
+          d="M9.6 9.4a2.5 2.5 0 1 1 3.4 2.9c-.8.3-1 .9-1 1.7"
+          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+        />
+        <circle cx="12" cy="16.8" r="0.6" fill="currentColor" stroke="currentColor" stroke-width="1"/>
+      </svg>
     </button>
   </div>
 </template>
@@ -69,7 +100,7 @@ interface CornerControlsInstanceExtra { readLogged?: () => void }
 
 export default defineComponent({
   name: 'CornerControls',
-  emits: ['open-account', 'open-viz3d'],
+  emits: ['open-about', 'open-account', 'open-settings', 'open-viz3d'],
   data() {
     return {
       backendEnabled: !!(import.meta as ImportMetaWithEnv).env?.VITE_ENABLE_BACKEND,

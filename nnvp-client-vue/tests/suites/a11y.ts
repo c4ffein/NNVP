@@ -14,7 +14,10 @@ e2eOnly(
     await expect(page.getByRole('menuitem', { name: 'File' })).toBeVisible();
     await expect(page.getByRole('menuitem', { name: 'Edit' })).toBeVisible();
     await expect(page.getByRole('menuitem', { name: 'Panels' })).toBeVisible();
-    await expect(page.getByRole('menuitem', { name: 'About' })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: 'Tutorial' })).toBeVisible();
+    // Settings and About live in the corner controls now, as named buttons.
+    await expect(page.getByRole('button', { name: 'Settings' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'About NNVP' })).toBeVisible();
   },
 );
 
@@ -79,7 +82,9 @@ e2eOnly(
   'a11y: About dialog: role, focus trap, Esc close and focus return',
   'Verifies modal focus management end to end: focus lands on the close button, Tab/Shift+Tab stay trapped inside the dialog, Esc closes and returns focus to the trigger — real focus order only exists in a browser.',
   async ({ page, expect }) => {
-    const aboutItem = page.getByRole('menuitem', { name: 'About' });
+    // About is its own modal, opened by the ? button at the far right of the
+    // top bar.
+    const aboutItem = page.getByRole('button', { name: 'About NNVP' });
     await aboutItem.focus();
     await page.keyboard.press('Enter');
 

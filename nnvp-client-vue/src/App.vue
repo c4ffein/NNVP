@@ -2,7 +2,7 @@
   <div id="canvas-background" class="canvas-background">
     <FlowBoard :isTraining="isTraining"/>
   </div>
-  <div id="generalMenu" class="floating-panel general-menu"><GeneralMenu @open-trainer="openTrainer" @open-about="openAboutModal" @open-tutorial="openTutorialMenu" @open-account="openAccount" @open-save-load="openSaveLoad" @open-settings="openAccount('settings')" :views="{ left: showLeftPanel, right: showRightPanel, training: trainerHeight > 0, chat: backendEnabled && showChat, chatAvailable: backendEnabled }" @toggle-view="togglePanel"/><CornerControls @open-account="openAccount()" @open-viz3d="showViz3D = !showViz3D"/></div>
+  <div id="generalMenu" class="floating-panel general-menu"><GeneralMenu @open-trainer="openTrainer" @open-tutorial="openTutorialMenu" @open-account="openAccount" @open-save-load="openSaveLoad" :views="{ left: showLeftPanel, right: showRightPanel, training: trainerHeight > 0, chat: backendEnabled && showChat, chatAvailable: backendEnabled }" @toggle-view="togglePanel"/><CornerControls @open-account="openAccount()" @open-settings="openAccount('settings')" @open-about="showAboutModal = true" @open-viz3d="showViz3D = !showViz3D"/></div>
   <FloatingWindow
     id="layerCatalog"
     v-show="showLeftPanel"
@@ -36,9 +36,11 @@
     <TrainingZone @close-trainer="closeTrainer" :trainingZoneSize="trainerHeight" @training-started="isTraining = true" @training-stopped="isTraining = false"/>
   </FloatingWindow>
   <Viz3DWindow v-if="showViz3D" @close="showViz3D = false" @open-settings="openAccount('settings')"/>
-  <AboutModal :show="showAboutModal" @close="closeAboutModal" @open-tutorials="openTutorialsFromAbout"/>
+  <AboutModal :show="showAboutModal" @close="showAboutModal = false" @open-tutorials="openTutorialsFromAbout"/>
   <TutorialMenu :show="showTutorialMenu" @close="showTutorialMenu = false" @start="startTutorial"/>
-  <AccountPanel v-if="backendEnabled" :show="showAccount" :intent="accountIntent" @close="closeAccount" @pending-login="openAccount()"/>
+  <!-- Always rendered: without a backend build it still hosts the
+       device-local Settings tab. -->
+  <AccountPanel :show="showAccount" :intent="accountIntent" @close="closeAccount" @pending-login="openAccount()"/>
   <SaveLoadModal v-if="backendEnabled" :show="showSaveLoad" :mode="saveLoadMode" @close="showSaveLoad = false" @open-account="openAccount()"/>
   <ChatBubble v-if="backendEnabled && showChat" @open-account="openAccount($event)" @close="togglePanel('showChat')"/>
   <TutorialOverlay :active="tutorialActive" :tutorial="activeTutorial" @exit="stopTutorial" @open-menu="openMenuFromTutorial"/>
@@ -150,12 +152,6 @@ export default defineComponent({
     },
     closeTrainer() {
       this.trainerHeight = 0;
-    },
-    openAboutModal() {
-      this.showAboutModal = true;
-    },
-    closeAboutModal() {
-      this.showAboutModal = false;
     },
     togglePanel(key: PanelKey | 'training') {
       // The training zone is not a boolean flag but a height; toggling it
@@ -455,6 +451,11 @@ body,html {
   margin: 0;
   padding: 0;
   overflow: hidden;
+  /* Never bounce the page itself, and paint the root the canvas color so
+     anything the browser DOES reveal during elastic overscroll is themed
+     instead of the default (white/transparent) document background. */
+  overscroll-behavior: none;
+  background-color: var(--bg-canvas);
 }
 
 #app {
@@ -510,6 +511,9 @@ body,html {
   width: 90%;
   max-height: 85vh;
   overflow-y: auto;
+  /* Reaching the top/bottom must not chain the scroll to what's behind the
+     dialog (the same containment #training-zone-selector uses). */
+  overscroll-behavior: contain;
   position: relative;
   color: var(--text-primary);
   font-family: var(--font-regular);

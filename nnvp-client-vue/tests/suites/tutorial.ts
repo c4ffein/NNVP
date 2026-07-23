@@ -109,7 +109,9 @@ e2eOnly(
   'tutorial: the About modal links to the tutorial menu',
   'Drives the About modal UI into the tutorial menu and asserts one modal replaces the other in the rendered DOM (shared .modal-overlay chrome disambiguated by content).',
   async ({ page, expect }) => {
-    await page.click('text=About');
+    // About is its own modal, opened by the ? button at the far right of the
+    // top bar.
+    await page.click('[aria-label="About NNVP"]');
     await page.waitForTimeout(300);
     await expect(page.locator('.modal-container')).toContainText('Tutorials');
     await page.click('.about-tutorials-button');

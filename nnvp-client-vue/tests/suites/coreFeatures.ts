@@ -735,10 +735,11 @@ e2eOnly(
   'Exercises the About modal as UI: content, close via X, Esc and overlay-coordinate clicks, each waiting out the ~1s close animation — modal chrome, keyboard and boundingBox hit-testing.',
   async ({ page, expect }) => {
     console.log('\n=== ABOUT MODAL TEST ===');
-    // Click About in the menu
-    const aboutMenu = await page.$('text=About');
+    // About is its own modal, opened by the ? button at the far right of the
+    // top bar.
+    const aboutMenu = await page.$('[aria-label="About NNVP"]');
     expect(aboutMenu).not.toBeNull();
-    console.log('Clicking About menu...');
+    console.log('Clicking the corner ? button...');
     await aboutMenu!.click();
     await page.waitForTimeout(50);
     // Verify modal is visible

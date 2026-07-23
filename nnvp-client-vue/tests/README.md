@@ -60,6 +60,15 @@ and `worldBrowser.ts` (the same calls as real UI interaction):
   loadTemplate, clearBoard, moveLayer, layerCount/edgeCount/layerLabels,
   graphJSON/loadJSON
 - `chat.*` — setSignedIn, open, connectPromptVisible, inputEnabled, …
+- `history.*` — the Training window's History tab: open/close, rowCount/
+  rowText/emptyText, view + curves reads, restore, requestDelete/confirmDelete
+- `records.*` — seed/list the app's record store (runs, conversations): the
+  injected memory store under bun, the page's REAL store (via the dev-only
+  `window.nnvp.debug.recordStore` handle) in the browser
+- `backend.*` — a fake same-origin `/api` (`harness/fakeBackend.ts`): a
+  `globalThis.fetch` stub under bun, `page.route` in the browser. Call
+  `serve()` BEFORE the `open()` that mounts the component talking to it —
+  ApiClients bind fetch at construction.
 - `expect`, `dispose`
 
 Growing the surface means implementing the helper in BOTH worlds.

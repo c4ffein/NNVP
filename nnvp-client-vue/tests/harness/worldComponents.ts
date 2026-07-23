@@ -19,8 +19,13 @@ import { resetWindowRects } from '../../src/lib/windowing';
 import { resetChatSession } from '../../src/lib/Assistant/chatSession';
 import { resetTrainingConfig } from '../../src/lib/Training/trainingConfig';
 import { askAssistant } from '../../src/lib/Assistant/askAssistant';
+import { MemoryRecordStore } from '../../src/lib/LocalStore/recordStore';
+import { setRecordStoreForTests } from '../../src/lib/LocalStore/db';
+import { createFakeBackend } from './fakeBackend';
+import type { FakeBackend } from './fakeBackend';
 import type {
-  CatalogDriver, ChartsDriver, ChatDriver, TrainingDriver, WindowsDriver, WindowName,
+  BackendDriver, CatalogDriver, ChartsDriver, ChatDriver, HistoryDriver, RecordsDriver,
+  TrainingDriver, WindowsDriver, WindowName,
 } from './define';
 
 // The mounted-wrapper seam: each driver hosts one arbitrary component, so the
@@ -254,6 +259,138 @@ export function makeCatalogDriver(): CatalogDriver & Teardown {
     },
     async teardown() {
       if (wrapper) wrapper.unmount();
+    },
+  };
+}
+
+/**
+ * The RecordsDriver under bun: install a FRESH MemoryRecordStore as the app
+ * singleton for this test (so every component sees it via getRecordStore),
+ * seed/read against it, restore the real singleton on teardown. Suites that
+ * still inject their own store afterwards simply win — last set wins.
+ */
+export function makeRecordsDriver(): RecordsDriver & Teardown {
+  const store = new MemoryRecordStore();
+  setRecordStoreForTests(store);
+  return {
+    async seed(name, records) {
+      for (const record of records) await store.put(name, record);
+    },
+    async list(name) {
+      return store.list(name);
+    },
+    async teardown() {
+      setRecordStoreForTests(null);
+    },
+  };
+}
+
+/**
+ * The BackendDriver under bun: swap globalThis.fetch for the fake /api
+ * router. Components bind fetch when they construct their ApiClient (on
+ * mount), so serve() must run before the driver open() that mounts them —
+ * the contract define.ts documents. Non-/api requests fall through to the
+ * real fetch.
+ */
+export function makeBackendDriver(): BackendDriver & Teardown {
+  const originalFetch = globalThis.fetch;
+  let fake: FakeBackend | null = null;
+  return {
+    async serve(data) {
+      fake = createFakeBackend(data);
+      globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === 'string' || input instanceof URL
+          ? String(input) : input.url;
+        const method = init?.method
+          || (input instanceof Request ? input.method : 'GET');
+        const body = typeof init?.body === 'string' ? init.body : null;
+        const answer = fake!.handle(method, url, body);
+        if (!answer) return originalFetch(input as RequestInfo, init);
+        return new Response(answer.body, {
+          status: answer.status,
+          headers: answer.body === null ? undefined : { 'Content-Type': 'application/json' },
+        });
+      }) as typeof fetch;
+    },
+    async uuids(kind) {
+      return fake ? [...fake.state[kind].keys()] : [];
+    },
+    async teardown() {
+      globalThis.fetch = originalFetch;
+    },
+  };
+}
+
+/** What the history driver needs from the board: TrainingZone.restoreRun's
+ *  one $boardInterface call. The bun world wires it to the world's editor so
+ *  a Restore lands on the same board the suite asserts through. */
+export interface HistoryBoardSeam {
+  loadGraphFromJSON(json: string): void;
+}
+
+/**
+ * The Training window's History tab: mounts the REAL TrainingZone (mounting
+ * IS opening, the makeTrainingDriver pattern) and lands on the History tab.
+ * The browser world reaches the same contract through Panels > Training.
+ */
+export function makeHistoryDriver(boardSeam: HistoryBoardSeam): HistoryDriver & Teardown {
+  let wrapper: Wrapper | null = null;
+  const rows = () => wrapper!.findAll('.history-row');
+  return {
+    async open() {
+      wrapper = mount(TrainingZone, {
+        global: { mocks: { $boardInterface: boardSeam, $kerasInterface: {} } },
+        attachTo: document.body,
+      });
+      const tabs = wrapper.findAll('.TrainingZone.bar-button');
+      await tabs.find(tab => tab.text() === 'History')!.trigger('click');
+      // The panel's mounted() listRuns round-trip is a promise: let it land.
+      await flushPromises();
+    },
+    async close() {
+      wrapper!.unmount();
+      wrapper = null;
+    },
+    async rowCount() {
+      return rows().length;
+    },
+    async rowText(index) {
+      return rows()[index]!.text();
+    },
+    async emptyText() {
+      const empty = wrapper!.find('.history-empty');
+      return empty.exists() ? empty.text() : null;
+    },
+    async view(index) {
+      await wrapper!.findAll('.history-view')[index]!.trigger('click');
+      await flushPromises();
+    },
+    async curvesVisible() {
+      return wrapper!.find('.history-curves').exists();
+    },
+    async curveSeriesCount() {
+      return wrapper!.findAll('.history-curves .lines path').length;
+    },
+    async curvesText() {
+      return wrapper!.find('.history-curves').text();
+    },
+    async restore(index) {
+      await wrapper!.findAll('.history-restore')[index]!.trigger('click');
+      await flushPromises();
+    },
+    async requestDelete(index) {
+      await wrapper!.findAll('.history-delete')[index]!.trigger('click');
+      await flushPromises(); // the deleteChoices promise decides the buttons
+      return wrapper!.findAll('.history-confirm-delete').map(button => button.text());
+    },
+    async confirmDelete(label) {
+      const buttons = wrapper!.findAll('.history-confirm-delete, .history-cancel-delete');
+      await buttons.find(button => button.text() === label)!.trigger('click');
+      await flushPromises();
+    },
+    async teardown() {
+      if (wrapper) wrapper.unmount();
+      resetTrainingConfig(); // module state must not leak between tests
     },
   };
 }

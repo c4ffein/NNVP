@@ -348,13 +348,16 @@ e2eOnly(
     console.log('Clicking Train button to trigger training...');
     const trainButton = await page.$('.train-button');
     await trainButton!.click();
-    // Poll for compiled model config AND training start message (check every 0.5s, timeout after 10s)
-    console.log('Polling for compiled model config and training start (checking every 0.5s, max 10s)...');
+    // Poll for compiled model config AND training start message (check every
+    // 0.5s). The deadline covers the lazy tfjs load + the real MNIST download
+    // on a loaded machine (parallel suite workers, dev servers) — fast
+    // environments still exit the poll in ~1s.
+    console.log('Polling for compiled model config and training start (checking every 0.5s, max 30s)...');
     let compiledModel: ExposedCompiledModel | null = null;
     let trainingConfig: ExposedTrainingConfig | null = null;
     let trainingStarted = false;
     const startTime = Date.now();
-    const timeout = 10000; // 10 seconds
+    const timeout = 30000; // 30 seconds
     const pollInterval = 500; // 0.5 seconds
     while (Date.now() - startTime < timeout) {
       // Check for both configs
@@ -449,4 +452,6 @@ e2eOnly(
     console.log('✅ VERIFIED: TensorFlow.js is ACTUALLY using our configuration during training!');
     // Note: Chart rendering errors are expected with only 1 epoch (not enough data points)
   },
+  // Setup + the 30s exposure poll + one real epoch must fit comfortably.
+  { timeoutMs: 90000 },
 );

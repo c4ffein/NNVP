@@ -12,7 +12,8 @@ import { isInvalidConnection } from '../../src/lib/FlowInterface/adapter';
 import KerasInterface from '../../src/lib/KerasInterface/KerasInterface';
 import generatedKerasLayers from '../../src/lib/KerasInterface/generatedKerasLayers.json';
 import {
-  makeChatDriver, makeCatalogDriver, makeWindowsDriver, makeChartsDriver, makeTrainingDriver,
+  makeBackendDriver, makeChatDriver, makeCatalogDriver, makeHistoryDriver, makeRecordsDriver,
+  makeChartsDriver, makeTrainingDriver, makeWindowsDriver,
 } from './worldComponents';
 import type {
   FlowEdge, FlowNode, KerasLayerCatalog, NnvpLayerId, NnvpModel,
@@ -133,20 +134,37 @@ export function makeBunWorld(expect: Expect): World {
   const windows = makeWindowsDriver();
   const charts = makeChartsDriver();
   const training = makeTrainingDriver();
+  const board = makeBoardDriver();
+  // A history Restore must land on the SAME board the suite asserts through —
+  // the seam replicates worldBun's own loadJSON contract.
+  const history = makeHistoryDriver({
+    loadGraphFromJSON(json: string) {
+      board.editor.model.loadJSON(json);
+      board.editor.updateGraph();
+    },
+  });
+  const records = makeRecordsDriver();
+  const backend = makeBackendDriver();
   return {
     expect,
-    board: makeBoardDriver(),
+    board,
     chat,
     catalog,
     windows,
     charts,
     training,
+    history,
+    records,
+    backend,
     async dispose() {
       await chat.teardown();
       await catalog.teardown();
       await windows.teardown();
       await charts.teardown();
       await training.teardown();
+      await history.teardown();
+      await records.teardown();
+      await backend.teardown();
     },
   };
 }

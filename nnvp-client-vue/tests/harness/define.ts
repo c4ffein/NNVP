@@ -27,6 +27,7 @@
  */
 import type { Page } from '@playwright/test';
 import type { NnvpLayerId, NnvpModel } from '../../src/types/model';
+import type { RecordStoreName, StoredRecord } from '../../src/lib/LocalStore/recordStore';
 import type { CanvasDriver } from './canvas';
 
 // --- The world contract ------------------------------------------------------
@@ -159,6 +160,60 @@ export interface ChatDriver {
   confirmDeleteConversation(label: string): Promise<void>;
 }
 
+/**
+ * The app's record store, as tests reach it: seed state the UI should find,
+ * read back what the UI left. The bun world injects a fresh MemoryRecordStore
+ * per test (setRecordStoreForTests); the browser world goes through the app's
+ * REAL store via the dev-only window.nnvp.debug.recordStore handle — records
+ * must therefore stay JSON-safe (they are by contract).
+ */
+export interface RecordsDriver {
+  seed(store: RecordStoreName, records: StoredRecord[]): Promise<void>;
+  list<T extends StoredRecord>(store: RecordStoreName): Promise<T[]>;
+}
+
+/** The Training window's History tab, as the user works it. open() opens the
+ *  Training window ON its History tab; close() closes the whole window. */
+export interface HistoryDriver {
+  open(): Promise<void>;
+  close(): Promise<void>;
+  rowCount(): Promise<number>;
+  rowText(index: number): Promise<string>;
+  /** The muted empty-journal line, or null when the table is showing. */
+  emptyText(): Promise<string | null>;
+  /** Click the row's View/Hide toggle. */
+  view(index: number): Promise<void>;
+  curvesVisible(): Promise<boolean>;
+  /** SVG series lines in the expanded curves chart. */
+  curveSeriesCount(): Promise<number>;
+  curvesText(): Promise<string>;
+  restore(index: number): Promise<void>;
+  /** Click the row's Delete; returns the offered location labels
+   *  ("device"/"cloud"/"both") once they have loaded. */
+  requestDelete(index: number): Promise<string[]>;
+  /** Click the inline confirm button with that exact label (or "Cancel"). */
+  confirmDelete(label: string): Promise<void>;
+}
+
+/** What the fake backend holds, full records per kind (lists serve uuid
+ *  projections of these, exactly like the real server). */
+export interface BackendFakeData {
+  runs?: StoredRecord[];
+  conversations?: StoredRecord[];
+}
+
+/**
+ * A fake same-origin /api. serve() must be called BEFORE open()ing any UI
+ * that talks to it (components bind fetch when they mount). The bun world
+ * swaps globalThis.fetch; the browser world intercepts with page.route —
+ * either way the app's own ApiClient does the talking.
+ */
+export interface BackendDriver {
+  serve(data: BackendFakeData): Promise<void>;
+  /** The uuids the fake currently holds for a kind (deletes shrink it). */
+  uuids(kind: RecordStoreName): Promise<string[]>;
+}
+
 /** What appTest fns receive (in BOTH modes). */
 export interface World extends LogicWorld {
   board: BoardDriver;
@@ -167,6 +222,9 @@ export interface World extends LogicWorld {
   windows: WindowsDriver;
   charts: ChartsDriver;
   training: TrainingDriver;
+  history: HistoryDriver;
+  records: RecordsDriver;
+  backend: BackendDriver;
   /** Bun world only (unmount + reset between tests); the runner calls it, suites never do. */
   dispose?: () => Promise<void>;
 }
