@@ -25,17 +25,20 @@ appTest('connects layers', async ({ board, expect }) => {
   expect(await board.edgeCount()).toBe(1);
 });
 
-appTest('refuses self, duplicate and cycle-closing connections', async ({ board, expect }) => {
+appTest('refuses self and duplicate connections, allows cycle-closing ones', async ({ board, expect }) => {
   await board.addLayer('Dense');
   await board.addLayer('Dense');
   await board.addLayer('Dense');
   await board.connect(0, 1);
   await board.connect(1, 2);
   expect(await board.edgeCount()).toBe(2);
-  await board.connect(0, 0); // self
-  await board.connect(0, 1); // duplicate
-  await board.connect(2, 0); // would close 0 -> 1 -> 2 -> 0
+  await board.connect(0, 0); // self — refused
+  await board.connect(0, 1); // duplicate — refused
   expect(await board.edgeCount()).toBe(2);
+  // Closing 0 -> 1 -> 2 -> 0 is allowed since Phase D: the loop renders red
+  // (edgeInCycle) and codegen refuses the cyclic graph explicitly instead.
+  await board.connect(2, 0);
+  expect(await board.edgeCount()).toBe(3);
 });
 
 appTest('deleting a layer removes its edges', async ({ board, expect }) => {

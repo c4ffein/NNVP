@@ -1,13 +1,19 @@
 /**
  * The Training window's History tab, driven through the whole app: seeded
- * journal records (world.records), the real TrainingZone plumbing —
- * listRuns/deleteRun/deleteChoices/restoreRun as the app wires them — and,
- * for the cloud-delete choices, the app's own ApiClient against the world's
- * fake backend (world.backend). Under bun the drivers mount the real SFCs;
- * in the browser the same calls click Panels > Training.
+ * legacy journal records (world.records — they explode into events on first
+ * read), the real TrainingZone plumbing — listRuns (folds!) / deleteRun /
+ * deleteChoices / restoreRun as the app wires them — and, for the cloud
+ * choices, the app's own ApiClient against the world's fake backend
+ * (world.backend, /events endpoints). Under bun the drivers mount the real
+ * SFCs; in the browser the same calls click Panels > Training.
+ *
+ * Delete semantics since the event-sourced journal: 'hide' (a reversible
+ * run.hidden event — events survive), 'cloud' (purge the stream server-side,
+ * survivors flagged localOnly), 'both'.
  */
 import { appTest } from '../harness/define';
 import type { RunRecord } from '../../src/lib/Training/runJournal';
+import type { StoredDomainEvent } from '../../src/lib/Events/domainEvent';
 
 function makeRun(overrides: Partial<RunRecord>): RunRecord {
   return {
@@ -82,6 +88,24 @@ appTest('historyPanel: lists runs newest-first with formatted metrics', async ({
   expect(second).toContain('—'); // no epoch metrics → both cells em-dashed
 });
 
+appTest('historyPanel: a legacy stale-running record shows last-event, never "running"', async ({ history, records, expect }) => {
+  // THE bug this refactor kills: a run frozen as outcome:'running'. Its fold
+  // has no finish event, so the row must show when the stream last spoke —
+  // the word 'running' must be gone from the outcome column forever.
+  await records.seed('runs', [makeRun({
+    uuid: 'run-stale',
+    outcome: 'running',
+    finishedAt: undefined,
+    durationMs: undefined,
+    startedAt: '2026-07-01T08:00:00.000Z', // weeks old: stale by any threshold
+  })]);
+  await history.open();
+  expect(await history.rowCount()).toBe(1);
+  const row = await history.rowText(0);
+  expect(row).not.toContain('running');
+  expect(row).toContain('last event');
+});
+
 appTest('historyPanel: View expands the row and shows the training curves', async ({ history, records, expect }) => {
   await records.seed('runs', [olderRun(), newerRun()]);
   await history.open();
@@ -124,63 +148,130 @@ appTest('historyPanel: Restore loads the graph and compile options back into the
   expect(await training.epochs()).toBe(7);
 });
 
-appTest('historyPanel: signed out, Delete offers device+Cancel; Cancel keeps, device removes', async ({ chat, history, records, expect }) => {
+appTest('historyPanel: signed out, Delete offers hide+Cancel; Cancel keeps, hide removes the row but keeps the events', async ({ chat, history, records, expect }) => {
   await records.seed('runs', [olderRun(), newerRun()]);
   await chat.setSignedIn(false);
   await history.open();
   // Inline confirmation, and only the locations that hold the record:
-  // signed out there is no cloud copy to offer.
+  // signed out there is no cloud stream to purge — hide is the one offer.
   const offered = await history.requestDelete(0);
-  expect(offered).toEqual(['device']);
-  // Cancel is a real exit: both rows survive, on screen and in the store.
+  expect(offered).toEqual(['hide']);
+  // Cancel is a real exit: both rows survive.
   await history.confirmDelete('Cancel');
   expect(await history.rowCount()).toBe(2);
-  expect((await records.list('runs')).length).toBe(2);
-  // Picking device removes the row AND the stored record.
+  // Picking hide removes the row — but NOTHING is deleted: the legacy record
+  // survives untouched and the run's events (now + run.hidden) are all there.
   await history.requestDelete(0);
-  await history.confirmDelete('device');
+  await history.confirmDelete('hide');
   expect(await history.rowCount()).toBe(1);
   expect(await history.rowText(0)).toContain('Fashion MNIST');
-  const left = await records.list('runs');
-  expect(left.length).toBe(1);
-  expect(left[0]!.uuid).toBe('run-older');
+  expect((await records.list('runs')).length).toBe(2); // legacy store read-only
+  const events = await records.list<StoredDomainEvent & { uuid: string }>('events');
+  const hiddenEvents = events.filter(
+    event => event.streamId === 'run-newer' && event.type === 'run.hidden',
+  );
+  expect(hiddenEvents.length).toBe(1);
 });
 
-appTest('historyPanel: signed in with no reachable backend degrades to the device-only prompt', async ({ chat, history, records, expect }) => {
+appTest('historyPanel: signed in with no reachable backend degrades to the hide-only prompt', async ({ chat, history, records, expect }) => {
   // The deleteChoices plumbing must swallow the API failure (progressive
-  // enhancement) and fall back to the local copy — never throw, never block.
+  // enhancement) and fall back to the local hide — never throw, never block.
   await records.seed('runs', [newerRun()]);
   await chat.setSignedIn(true);
   await history.open();
   const offered = await history.requestDelete(0);
-  expect(offered).toEqual(['device']);
+  expect(offered).toEqual(['hide']);
   await history.confirmDelete('Cancel');
   expect(await history.rowCount()).toBe(1);
 });
 
-appTest('historyPanel: cloud-held records offer all three; cloud keeps the row, both removes it', async ({ backend, chat, history, records, expect }) => {
+appTest('historyPanel: cloud-held streams offer all three; cloud purges + detaches, both also hides', async ({ backend, chat, history, records, expect }) => {
   await records.seed('runs', [olderRun(), newerRun()]);
-  await backend.serve({ runs: [olderRun(), newerRun()] });
+  // The cloud holds one event of each stream (uuids must differ from what the
+  // local explosion mints — the fake backend serves them by stream_id).
+  await backend.serve({
+    events: [
+      {
+        uuid: 'cloud-evt-newer', type: 'run.hidden', streamId: 'run-newer',
+        deviceId: 'other-device', instanceId: 'other-instance', seq: 1,
+        dependsOn: [], wallTime: '2026-07-20T11:00:00.000Z', payload: {},
+      },
+      {
+        uuid: 'cloud-evt-older', type: 'run.hidden', streamId: 'run-older',
+        deviceId: 'other-device', instanceId: 'other-instance', seq: 2,
+        dependsOn: [], wallTime: '2026-07-20T11:00:00.000Z', payload: {},
+      },
+    ],
+  });
   await chat.setSignedIn(true);
   await history.open();
-  // All three locations hold row 0 → all three buttons, in the offered order.
+  // The cloud holds row 0's stream → all three choices, in the offered order.
   const offered = await history.requestDelete(0);
-  expect(offered).toEqual(['device', 'cloud', 'both']);
-  // A cloud-only delete detaches the local copy but keeps it: the row STAYS,
-  // the cloud copy is gone, and the survivor is flagged never-push-again.
+  expect(offered).toEqual(['hide', 'cloud', 'both']);
+  // A cloud-only purge detaches the local copy but keeps it: the row STAYS,
+  // the cloud stream is gone, and the local events are flagged never-push.
   await history.confirmDelete('cloud');
   expect(await history.rowCount()).toBe(2);
-  expect(await backend.uuids('runs')).toEqual(['run-older']);
-  const survivor = (await records.list('runs')).find(r => r.uuid === 'run-newer') as RunRecord & { localOnly?: boolean } | undefined;
-  expect(survivor?.localOnly).toBe(true);
-  // 'both' on the still-cloud-held row removes every copy — the row disappears.
+  const cloudUuids = await backend.uuids('events');
+  expect(cloudUuids).toEqual(['cloud-evt-older']);
+  const events = await records.list<StoredDomainEvent & { uuid: string }>('events');
+  const newerEvents = events.filter(event => event.streamId === 'run-newer');
+  expect(newerEvents.length).toBeGreaterThan(0);
+  expect(newerEvents.every(event => event.localOnly === true)).toBe(true);
+  // 'both' on the still-cloud-held row purges its stream AND hides the row.
   const offeredOlder = await history.requestDelete(1);
-  expect(offeredOlder).toEqual(['device', 'cloud', 'both']);
+  expect(offeredOlder).toEqual(['hide', 'cloud', 'both']);
   await history.confirmDelete('both');
   expect(await history.rowCount()).toBe(1);
   expect(await history.rowText(0)).toContain('MNIST');
-  expect(await backend.uuids('runs')).toEqual([]);
-  expect((await records.list('runs')).map(r => r.uuid)).toEqual(['run-newer']);
+  expect(await backend.uuids('events')).toEqual([]);
+  // Hidden, not deleted: run-older's events survive locally, its hidden event
+  // is device-private (localOnly) so it can never recreate the purged stream.
+  const olderEvents = (await records.list<StoredDomainEvent & { uuid: string }>('events'))
+    .filter(event => event.streamId === 'run-older');
+  expect(olderEvents.some(event => event.type === 'run.hidden')).toBe(true);
+  expect(olderEvents.filter(event => event.type === 'run.hidden')
+    .every(event => event.localOnly === true)).toBe(true);
+});
+
+appTest('historyPanel: a run that arrived as raw events (synced from another device) folds into a row', async ({ history, records, expect }) => {
+  // No RunRecord anywhere: this run exists ONLY as events, the way sync v2
+  // delivers another device's training history.
+  const base = {
+    streamId: 'run-foreign',
+    deviceId: 'their-device',
+    instanceId: 'their-instance',
+    wallTime: '2026-07-21T09:00:00.000Z',
+    payload: {} as Record<string, unknown>,
+  };
+  await records.seed('events', [
+    {
+      ...base, uuid: 'fe-start', type: 'run.started', seq: 1, dependsOn: [],
+      payload: {
+        engineId: 'tfjs',
+        config: {
+          dataset: 'CIFAR-10', optimizer: 'adam', optimizerParams: {}, epochs: 2,
+          loss: 'categoricalCrossentropy',
+        },
+        graphJson: '{"layers":[]}',
+      },
+    },
+    {
+      ...base, uuid: 'fe-epoch', type: 'run.epoch', seq: 2, dependsOn: ['fe-start'],
+      wallTime: '2026-07-21T09:01:00.000Z', payload: { epoch: 1, acc: 0.66, loss: 0.44 },
+    },
+    {
+      ...base, uuid: 'fe-finish', type: 'run.finished', seq: 3, dependsOn: ['fe-epoch'],
+      wallTime: '2026-07-21T09:02:00.000Z', payload: { outcome: 'completed', durationMs: 120000 },
+    },
+  ] as StoredDomainEvent[]);
+  await history.open();
+  expect(await history.rowCount()).toBe(1);
+  const row = await history.rowText(0);
+  expect(row).toContain('CIFAR-10');
+  expect(row).toContain('completed');
+  expect(row).toContain('1 / 2');
+  expect(row).toContain('0.66');
 });
 
 appTest('historyPanel: empty journal shows the muted empty line', async ({ history, expect }) => {

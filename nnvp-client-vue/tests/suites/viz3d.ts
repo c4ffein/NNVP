@@ -8,6 +8,7 @@
 import { logicTest } from '../harness/define';
 import type { Expect } from '../harness/define';
 import BoardTemplates from '../../src/lib/BoardInterface/BoardTemplates';
+import { edgeInCycle } from '../../src/lib/FlowInterface/adapter';
 import {
   mat4Identity, mat4Multiply, mat4Perspective, mat4LookAt, mat4InvertRigid, mat4TransformPoint,
   createOrbitState, orbitEye, orbitViewMatrix, applyOrbitDrag, applyOrbitPan, applyOrbitZoom,
@@ -47,9 +48,9 @@ const expectMat4CloseTo = (
 // A minimal NnvpModel with the given Dense layer sizes chained in order.
 const denseChain = (...unitCounts: number[]): NnvpModel => ({
   layers: unitCounts.map((units, i) => ({
-    class: 'D3Layer' as const,
+    class: 'Layer' as const,
     id: i,
-    htmlID: `d3-layer-${i}`,
+    htmlID: `layer-${i}`,
     name: `Dense_${i}`,
     x: 0,
     y: 0,
@@ -222,10 +223,15 @@ logicTest('viz3d scene: z-layering follows the template topology', ({ expect }) 
     const model = templateModel(name);
     const scene = buildScene(model);
     const byId = new Map(scene.layers.map(l => [String(l.layerId), l]));
+    const ends = model.edges.map(e => ({ source: String(e.source), target: String(e.target) }));
     for (const edge of model.edges) {
+      // Loop edges (the Elman char-RNN template's feedback pair, Phase D2)
+      // legitimately point backwards in z — forward layering is only asserted
+      // for the acyclic wiring.
+      if (edgeInCycle(ends, { source: String(edge.source), target: String(edge.target) })) continue;
       const source = byId.get(String(edge.source))!;
       const target = byId.get(String(edge.target))!;
-      expect(target.depth).toBe(source.depth + 1); // templates are chains
+      expect(target.depth).toBe(source.depth + 1); // acyclic template wiring is chains
       const zSource = scene.neurons[source.firstNeuron * NEURON_STRIDE + 2]!;
       const zTarget = scene.neurons[target.firstNeuron * NEURON_STRIDE + 2]!;
       expect(zTarget).toBeGreaterThan(zSource);
@@ -538,9 +544,9 @@ logicTest('viz3d scene: gap tiers — full for transforms, close for same shape,
     inputLayers: number[],
     outputLayers: number[],
   ): NnvpLayer => ({
-    class: 'D3Layer',
+    class: 'Layer',
     id,
-    htmlID: `d3-layer-${id}`,
+    htmlID: `layer-${id}`,
     name,
     x: 0,
     y: 0,

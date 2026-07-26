@@ -15,16 +15,14 @@ import steps, {
 import type { TutorialBoardLike, TutorialLayerLike } from '../../src/lib/Tutorial/mnistTutorial';
 
 // Build a fake $boardInterface exposing only what the tutorial predicates read:
-// activeGraph.model.d3Layers, each layer with a kerasLayer { name, parameterValues }.
+// getLayers(), each layer with a kerasLayer { name, parameterValues }.
 function makeLayer(name: string, parameterValues: Record<string, unknown> = {}): TutorialLayerLike {
   return { kerasLayer: { name, parameterValues } };
 }
 
 function makeBoardInterface(layers: TutorialLayerLike[]): TutorialBoardLike {
   return {
-    activeGraph: {
-      model: { d3Layers: layers },
-    },
+    getLayers: () => layers,
   };
 }
 
@@ -75,11 +73,11 @@ logicTest('mnistTutorial: getStep looks up by id', ({ expect }) => {
 
 // --- helpers tolerate an unready interface ------------------------------------------
 
-logicTest('mnistTutorial: placedLayers returns [] for missing graph/model', ({ expect }) => {
+logicTest('mnistTutorial: placedLayers returns [] for an unready interface', ({ expect }) => {
   expect(placedLayers(undefined)).toEqual([]);
   expect(placedLayers({})).toEqual([]);
-  expect(placedLayers({ activeGraph: {} })).toEqual([]);
-  expect(placedLayers({ activeGraph: { model: {} } })).toEqual([]);
+  expect(placedLayers({ getLayers: () => null })).toEqual([]);
+  expect(placedLayers({ getLayers: () => undefined })).toEqual([]);
 });
 
 logicTest('mnistTutorial: predicates return false for an unready interface', ({ expect }) => {

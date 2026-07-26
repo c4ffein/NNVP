@@ -343,6 +343,47 @@ logicTest('kerasImport: subclassed models are rejected with a clear error', ({ e
   expect(String(error!.message)).toContain('Sequential');
 });
 
+logicTest('kerasImport: a cyclic layer graph is refused with the same user-facing error as before', ({ expect }) => {
+  // dense_a and dense_b feed each other — a config no real Keras save can
+  // produce, but a crafted file must fail loudly, not hang or half-import.
+  // Import keeps its throw policy on top of the shared orderGraph ordering.
+  const config = {
+    module: 'keras',
+    class_name: 'Functional',
+    config: {
+      name: 'functional',
+      layers: [
+        {
+          module: 'keras.layers',
+          class_name: 'InputLayer',
+          config: { batch_shape: [null, 4], dtype: 'float32', name: 'input_layer' },
+          inbound_nodes: [],
+        },
+        {
+          ...denseEntry('dense_a', 4, 'relu', [null, 4]),
+          inbound_nodes: [{
+            args: [[kerasTensor([null, 4], 'input_layer'), kerasTensor([null, 4], 'dense_b')]],
+            kwargs: {},
+          }],
+        },
+        {
+          ...denseEntry('dense_b', 4, 'relu', [null, 4]),
+          inbound_nodes: [{ args: [kerasTensor([null, 4], 'dense_a')], kwargs: {} }],
+        },
+      ],
+      output_layers: [['dense_b', 0, 0]],
+    },
+  };
+  let error: Error | null = null;
+  try {
+    kerasConfigToNnvp(config);
+  } catch (caught) {
+    error = caught as Error;
+  }
+  expect(error).not.toBeNull();
+  expect(String(error!.message)).toBe('keras import: the layer graph contains a cycle');
+});
+
 logicTest('kerasImport: alias class names map to their canonical layer (MaxPool2D → MaxPooling2D)', ({ expect }) => {
   const config = {
     class_name: 'Sequential',

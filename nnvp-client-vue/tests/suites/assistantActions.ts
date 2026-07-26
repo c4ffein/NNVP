@@ -25,6 +25,7 @@ import type {
 import type BoardInterface from '../../src/lib/BoardInterface/BoardInterface';
 import type KerasInterface from '../../src/lib/KerasInterface/KerasInterface';
 import type { NnvpLayerId, ParameterValue } from '../../src/types/model';
+import { bus } from '../../src/lib/Events/bus';
 
 // One queued fake response: { ok, status, json, text, throwErr, jsonThrows }.
 interface FakeResponseSpec {
@@ -129,21 +130,26 @@ interface FakeEdge {
 }
 
 interface FakeModel {
-  d3Layers: FakeLayerEntry[];
-  d3Edges: FakeEdge[];
+  layers: FakeLayerEntry[];
+  edges: FakeEdge[];
   modelInputs: FakeLayerEntry[];
   modelOutputs: FakeLayerEntry[];
 }
 
-// A fake $boardInterface mirroring the real add/find/model structure closely
-// enough to exercise the actions (activeGraph.model.d3Layers, findLayerById...).
-// Deliberately partial: cast to BoardInterface only at the constructor seam.
+// A fake $boardInterface mirroring the real facade structure closely enough
+// to exercise the actions (the getLayers/getEdges/... read getters,
+// findLayerById...). Deliberately partial: cast to BoardInterface only at the
+// constructor seam.
 interface FakeBoardInterface {
   activeGraph: {
     model: FakeModel;
     toJSON(): string;
     findLayerById(id: NnvpLayerId): FakeLayerEntry | null;
   };
+  getLayers(): FakeLayerEntry[];
+  getEdges(): FakeEdge[];
+  getModelInputs(): FakeLayerEntry[];
+  getModelOutputs(): FakeLayerEntry[];
   calls: {
     deleteSelected: number;
     undo: number;
@@ -165,8 +171,8 @@ interface FakeBoardInterface {
 
 function makeFakeBoardInterface(): FakeBoardInterface {
   const model: FakeModel = {
-    d3Layers: [],
-    d3Edges: [],
+    layers: [],
+    edges: [],
     modelInputs: [],
     modelOutputs: [],
   };
@@ -174,21 +180,25 @@ function makeFakeBoardInterface(): FakeBoardInterface {
   const activeGraph = {
     model,
     toJSON() {
-      return JSON.stringify({ layers: model.d3Layers.map(l => l.id) });
+      return JSON.stringify({ layers: model.layers.map(l => l.id) });
     },
     findLayerById(id: NnvpLayerId) {
-      return model.d3Layers.find(layer => layer.id === id) || null;
+      return model.layers.find(layer => layer.id === id) || null;
     },
   };
   return {
     activeGraph,
+    getLayers() { return model.layers; },
+    getEdges() { return model.edges; },
+    getModelInputs() { return model.modelInputs; },
+    getModelOutputs() { return model.modelOutputs; },
     calls: {
       deleteSelected: 0, undo: 0, redo: 0, autoLayout: 0, loadedTemplates: [],
     },
     addLayer(kerasLayer) {
       const id = nextId;
       nextId += 1;
-      model.d3Layers.push({ id, name: kerasLayer.name, kerasLayer });
+      model.layers.push({ id, name: kerasLayer.name, kerasLayer });
     },
     findLayerById(id) {
       return activeGraph.findLayerById(id);
@@ -210,21 +220,21 @@ function makeFakeBoardInterface(): FakeBoardInterface {
     },
     loadTemplate(name) {
       this.calls.loadedTemplates.push(name);
-      model.d3Layers.push({ id: nextId, name: 'FromTemplate', kerasLayer: null });
+      model.layers.push({ id: nextId, name: 'FromTemplate', kerasLayer: null });
       nextId += 1;
     },
     connectLayers(sourceId, targetId) {
       if (sourceId === targetId) return false;
-      if (model.d3Edges.some(e => e.source === sourceId && e.target === targetId)) return false;
-      model.d3Edges.push({ source: sourceId, target: targetId });
+      if (model.edges.some(e => e.source === sourceId && e.target === targetId)) return false;
+      model.edges.push({ source: sourceId, target: targetId });
       return true;
     },
     disconnectLayers(sourceId, targetId) {
-      const before = model.d3Edges.length;
-      model.d3Edges = model.d3Edges.filter(
+      const before = model.edges.length;
+      model.edges = model.edges.filter(
         e => !(e.source === sourceId && e.target === targetId),
       );
-      return model.d3Edges.length < before;
+      return model.edges.length < before;
     },
   };
 }
@@ -308,8 +318,8 @@ logicTest('assistantActions: summarizes the model with counts and a compact laye
   const { d3, actions } = setup();
   actions.addLayer('Input');
   actions.addLayer('Dense');
-  d3.activeGraph.model.modelInputs.push(d3.activeGraph.model.d3Layers[0]!);
-  d3.activeGraph.model.d3Edges.push({});
+  d3.getModelInputs().push(d3.getLayers()[0]!);
+  d3.getEdges().push({});
 
   const summary = actions.getModelSummary();
   expect(summary.layerCount).toBe(2);
@@ -343,44 +353,41 @@ logicTest('assistantActions: reports a friendly error when no graph is active', 
   expect(() => bare.listLayers()).toThrow(/No active graph/);
 });
 
-logicTest('assistantActions: startTutorial dispatches the app-level event', ({ expect }) => {
+logicTest('assistantActions: startTutorial emits the app-level bus event', ({ expect }) => {
   const { actions } = setup();
   const received: unknown[] = [];
-  const listener = (event: Event) => received.push((event as CustomEvent).detail);
-  window.addEventListener('nnvp:start-tutorial', listener);
+  const off = bus.on('ui.start-tutorial', payload => received.push(payload));
   try {
     const result = actions.startTutorial('connect-layers');
     expect(result.started).toBe('connect-layers');
     expect(typeof result.title).toBe('string');
     expect(received).toEqual([{ id: 'connect-layers' }]);
   } finally {
-    window.removeEventListener('nnvp:start-tutorial', listener);
+    off();
   }
 });
 
-logicTest('assistantActions: openTrainingPanel dispatches the app-level event', ({ expect }) => {
+logicTest('assistantActions: openTrainingPanel emits the app-level bus event', ({ expect }) => {
   const { actions } = setup();
   let received = 0;
-  const listener = () => { received += 1; };
-  window.addEventListener('nnvp:open-training', listener);
+  const off = bus.on('ui.open-training', () => { received += 1; });
   try {
     expect(actions.openTrainingPanel()).toEqual({ opened: true });
     expect(received).toBe(1);
   } finally {
-    window.removeEventListener('nnvp:open-training', listener);
+    off();
   }
 });
 
-logicTest('assistantActions: startTutorial rejects unknown ids without dispatching', ({ expect }) => {
+logicTest('assistantActions: startTutorial rejects unknown ids without emitting', ({ expect }) => {
   const { actions } = setup();
   const received: unknown[] = [];
-  const listener = (event: Event) => received.push((event as CustomEvent).detail);
-  window.addEventListener('nnvp:start-tutorial', listener);
+  const off = bus.on('ui.start-tutorial', payload => received.push(payload));
   try {
     expect(() => actions.startTutorial('ghost-tutorial')).toThrow(/Available ids: /);
     expect(received).toEqual([]);
   } finally {
-    window.removeEventListener('nnvp:start-tutorial', listener);
+    off();
   }
 });
 
@@ -390,7 +397,7 @@ logicTest('assistantActions: connects two layers and reports the pair', ({ expec
   const b = actions.addLayer('Dense');
   const result = actions.connectLayers(a.id!, b.id!);
   expect(result).toEqual({ connected: true, source: a.id, target: b.id });
-  expect(d3.activeGraph.model.d3Edges).toEqual([{ source: a.id, target: b.id }]);
+  expect(d3.getEdges()).toEqual([{ source: a.id, target: b.id }]);
 });
 
 logicTest('assistantActions: edge tools name the missing layer id', ({ expect }) => {
@@ -406,7 +413,7 @@ logicTest('assistantActions: surfaces refused connections and missing edges as e
   const a = actions.addLayer('Input');
   const b = actions.addLayer('Dense');
   actions.connectLayers(a.id!, b.id!);
-  expect(() => actions.connectLayers(a.id!, b.id!)).toThrow(/already exists.*self-loop.*cycle/);
+  expect(() => actions.connectLayers(a.id!, b.id!)).toThrow(/already exists.*self-loop/);
   expect(() => actions.disconnectLayers(b.id!, a.id!)).toThrow(/no .* connection to remove/);
   const gone = actions.disconnectLayers(a.id!, b.id!);
   expect(gone).toEqual({ disconnected: true, source: a.id, target: b.id });

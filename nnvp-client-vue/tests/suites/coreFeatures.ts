@@ -8,11 +8,16 @@
  * mouse drags, SVG edge hit-testing, downloads/choosers), or preserve the
  * original beforeEach assertion that the browser console stayed clean —
  * which only a live browser can evaluate. The pure graph substance that IS
- * world-expressible (cycle refusal) runs in both modes as appTest.
+ * world-expressible (cycle drawing/marking/codegen refusal) runs in both
+ * modes as appTest.
  */
 import type { ElementHandle, Page } from '@playwright/test';
 import { appTest, e2eOnly } from '../harness/define';
 import type { CanvasDriver } from '../harness/canvas';
+import { edgeInCycle } from '../../src/lib/FlowInterface/adapter';
+import KerasGenerator from '../../src/lib/KerasInterface/KerasGenerator';
+import { CyclicGraphError } from '../../src/lib/KerasInterface/orderGraph';
+import type { NnvpModel } from '../../src/types/model';
 
 // Replicates the original spec's beforeEach: attach console/pageerror
 // collectors, then (re)load the app so load-time errors are captured too —
@@ -442,8 +447,8 @@ e2eOnly(
     await denseLayer!.click();
     await page.waitForTimeout(10);
     // Click on the layer to select it
-    const firstD3Layer = await page.$(canvas.layer);
-    const box = (await firstD3Layer!.boundingBox())!;
+    const firstLayerNode = await page.$(canvas.layer);
+    const box = (await firstLayerNode!.boundingBox())!;
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
     await page.waitForTimeout(10);
     layerOptions = (await page.textContent('#layerOptions'))!;
@@ -800,11 +805,14 @@ e2eOnly(
 );
 
 // Substance is pure graph behavior (the board's isValidConnection contract),
-// so this one runs in BOTH modes through the world surface. The original's
-// assertions — 3 layers, 2 edges, still 2 after the cycle attempt — survive
-// unchanged; under the browser runner the connections are real anchor drags.
-appTest('core: should refuse connections that would close a cycle', async ({ board, expect }) => {
-  console.log('\n=== CYCLE DETECTION TEST ===');
+// so this one runs in BOTH modes through the world surface; under the browser
+// runner the connections are real anchor drags. Spec changed in Phase D
+// (PLAN decision 9): the board no longer REFUSES a cycle-closing edge — the
+// edge is created, every edge on the loop gets the red edgeInCycle marking,
+// and code generation refuses the cyclic graph with a typed CyclicGraphError
+// instead of silently truncating.
+appTest('core: allows drawing a cycle edge, marks the loop, and codegen refuses it explicitly', async ({ board, expect }) => {
+  console.log('\n=== CYCLE HANDLING TEST ===');
   // Step 1: Create a simple valid DAG first (no cycle)
   console.log('Step 1: Creating valid DAG (A -> B -> C)');
   // Add 3 layers
@@ -824,15 +832,33 @@ appTest('core: should refuse connections that would close a cycle', async ({ boa
   await board.connect(1, 2);
   expect(await board.edgeCount()).toBe(2);
   console.log('✓ Created 2 edges in valid DAG');
-  // Step 2: Try to close the cycle by connecting layer 2 back to layer 0.
-  // The board's isValidConnection refuses to create the edge at all.
-  // (Cyclic graphs loaded from old D3-made files render their cycle edges
-  // in red instead — see FloatingEdge.vue / edgeInCycle.)
-  console.log('Step 2: Attempting cycle by connecting C -> A');
+  // Step 2: Close the cycle by connecting layer 2 back to layer 0 — the
+  // edge is CREATED now (Phase D re-enabled drawing cycles).
+  console.log('Step 2: Closing the cycle by connecting C -> A');
   await board.connect(2, 0);
-  expect(await board.edgeCount()).toBe(2);
-  console.log('✓ Cycle-closing connection was refused (edge count still 2)');
-  console.log('✅ CYCLE DETECTION TEST PASSED');
+  expect(await board.edgeCount()).toBe(3);
+  console.log('✓ Cycle-closing connection was created (edge count 3)');
+  // Step 3: every edge of the loop is flagged by the same live derived query
+  // FloatingEdge.vue renders red.
+  const json = await board.graphJSON();
+  const model = JSON.parse(json) as NnvpModel;
+  const ends = model.edges.map(edge => ({
+    source: String(edge.source), target: String(edge.target),
+  }));
+  expect(ends.length).toBe(3);
+  ends.forEach(edge => expect(edgeInCycle(ends, edge)).toBe(true));
+  console.log('✓ All three loop edges are marked cyclic');
+  // Step 4: codegen refuses the cyclic graph with the typed error — never a
+  // silently truncated model. (KerasGenerator mutates its input: fresh parse.)
+  let error: unknown;
+  try {
+    new KerasGenerator(JSON.parse(json) as NnvpModel, true).generateJavascriptFromGraph();
+  } catch (thrown) {
+    error = thrown;
+  }
+  expect(error).toBeInstanceOf(CyclicGraphError);
+  console.log('✓ Code generation threw CyclicGraphError');
+  console.log('✅ CYCLE HANDLING TEST PASSED');
 });
 
 e2eOnly(

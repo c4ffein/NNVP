@@ -49,7 +49,7 @@ logicTest('tutorials: step predicates never throw on a not-ready editor', ({ exp
 // --- editor-state helpers ------------------------------------------------------------
 
 const fake$d3: TutorialBoardLike = {
-  activeGraph: { model: { d3Edges: [{}, {}] } },
+  getEdges: () => [{}, {}],
   getActiveElements: () => [{ id: 0 }],
 };
 
@@ -57,7 +57,8 @@ logicTest('tutorials: placedEdgeCount reads the model edges', ({ expect }) => {
   setup();
   expect(placedEdgeCount(fake$d3)).toBe(2);
   expect(placedEdgeCount(null)).toBe(0);
-  expect(placedEdgeCount({ activeGraph: {} })).toBe(0);
+  expect(placedEdgeCount({})).toBe(0);
+  expect(placedEdgeCount({ getEdges: () => null })).toBe(0);
 });
 
 logicTest('tutorials: selectedLayerCount reads the selection', ({ expect }) => {
@@ -71,7 +72,7 @@ logicTest('tutorials: connect-layers completes through its predicates', ({ expec
   setup();
   const steps = getTutorial('connect-layers')!.steps;
   const dense = { kerasLayer: { name: 'Dense' } };
-  const $d3: TutorialBoardLike = { activeGraph: { model: { d3Layers: [dense, dense], d3Edges: [{}] } } };
+  const $d3: TutorialBoardLike = { getLayers: () => [dense, dense], getEdges: () => [{}] };
   steps.forEach(step => expect(step.isComplete($d3)).toBe(true));
 });
 

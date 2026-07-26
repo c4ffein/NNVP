@@ -2,10 +2,11 @@
  * Chat states: one definition, both modes. Under bun the REAL ChatBubble
  * component is mounted (tests/harness/worldComponents.js); in the browser the
  * real app is clicked. Both implementations control the same two boundaries:
- * localStorage auth + the nnvp:auth-changed event.
+ * localStorage auth + the 'auth.changed' bus event.
  */
 import { appTest, logicTest } from '../harness/define';
 import { askAssistant, consumePendingAsk } from '../../src/lib/Assistant/askAssistant';
+import { bus } from '../../src/lib/Events/bus';
 
 appTest('chat asks to sign in when signed out', async ({ chat, expect }) => {
   await chat.setSignedIn(false);
@@ -35,18 +36,17 @@ appTest('the chat connect prompt leads to the account flow', async ({ chat, expe
 
 // --- Help-modal handoff: "Ask the assistant about X" ------------------------
 
-logicTest('askAssistant bridge: dispatches the event and stores one pending ask', ({ expect }) => {
+logicTest('askAssistant bridge: emits the bus event and stores one pending ask', ({ expect }) => {
   consumePendingAsk(); // drain whatever an earlier test left behind
   const received: unknown[] = [];
-  const listener = (event: Event) => received.push((event as CustomEvent).detail);
-  window.addEventListener('nnvp:ask-assistant', listener);
+  const off = bus.on('ui.ask-assistant', payload => received.push(payload));
   try {
     askAssistant('Dense');
     expect(received).toEqual([{ topic: 'Dense' }]);
     expect(consumePendingAsk()).toEqual({ topic: 'Dense' });
     expect(consumePendingAsk()).toBe(null); // consumed exactly once
   } finally {
-    window.removeEventListener('nnvp:ask-assistant', listener);
+    off();
   }
 });
 

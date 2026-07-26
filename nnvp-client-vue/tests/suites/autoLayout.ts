@@ -112,10 +112,10 @@ logicTest('autoLayout: deterministic — input order does not matter', ({ expect
   expect(Object.fromEntries(autoLayout(diamond()))).toEqual(Object.fromEntries(positions));
 });
 
-logicTest('autoLayout: cyclic legacy graphs terminate, back-edge ignored', ({ expect }) => {
+logicTest('autoLayout: cyclic graphs terminate, back-edge ignored', ({ expect }) => {
   const graph: LayoutGraph = {
     nodes: ['a', 'b', 'c', 'd'].map(id => node(id)),
-    // a -> b -> c -> a is a cycle (only loadable from old D3 files); d floats.
+    // a -> b -> c -> a is a cycle (drawable since Phase D); d floats.
     edges: [edge('a', 'b'), edge('b', 'c'), edge('c', 'a'), edge('d', 'd')],
   };
   const positions = autoLayout(graph);

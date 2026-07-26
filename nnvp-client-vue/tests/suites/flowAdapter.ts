@@ -6,6 +6,7 @@
 import { logicTest } from '../harness/define';
 import BoardTemplates from '../../src/lib/BoardInterface/BoardTemplates';
 import KerasGenerator from '../../src/lib/KerasInterface/KerasGenerator';
+import { orderGraph, CyclicGraphError } from '../../src/lib/KerasInterface/orderGraph';
 import {
   nnvpToFlow, flowToNnvp, isInvalidConnection, edgeInCycle, nextLayerId, newLayerNode,
   groupSelected, LAYER_NODE, COMPOSITE_NODE,
@@ -19,8 +20,9 @@ const javascriptOf = (json: string): string => new KerasGenerator(JSON.parse(jso
 
 const templates = new BoardTemplates().templates;
 
-// A graph with a composite (grouped) layer, in D3Model.toJSON shape: children
-// carry ABSOLUTE coordinates and a parentID pointing at the composite.
+// A graph with a composite (grouped) layer, in the persisted v2 shape (the
+// same shape D3Model.toJSON emitted, honest names): children carry ABSOLUTE
+// coordinates and a parentID pointing at the composite.
 // (Intentionally minimal kerasLayer — no searchTerms — hence the cast.)
 const kl = (name: string): KerasLayerJSON => ({
   name, category: 'test', parameterDef: {}, parameterValues: {}, customUserLayer: false,
@@ -28,20 +30,20 @@ const kl = (name: string): KerasLayerJSON => ({
 const compositeFixture = () => JSON.stringify({
   layers: [
     {
-      class: 'D3Layer', x: 20, y: 20, width: 90, height: 40, id: 0, htmlID: 'd3-layer-0',
+      class: 'Layer', x: 20, y: 20, width: 90, height: 40, id: 0, htmlID: 'layer-0',
       name: 'Input', inputLayers: [], outputLayers: [1], children: null,
       kerasLayer: { ...kl('Input'), parameterValues: { shape: [8] } }, parentID: null,
     },
     {
-      class: 'D3LayerComposite', x: 150, y: 40, width: 300, height: 150, id: 10,
-      htmlID: 'd3-layer-10', name: 'Group', inputLayers: [], outputLayers: [], children: [
+      class: 'Group', x: 150, y: 40, width: 300, height: 150, id: 10,
+      htmlID: 'layer-10', name: 'Group', inputLayers: [], outputLayers: [], children: [
         {
-          class: 'D3Layer', x: 170, y: 60, width: 90, height: 40, id: 1, htmlID: 'd3-layer-1',
+          class: 'Layer', x: 170, y: 60, width: 90, height: 40, id: 1, htmlID: 'layer-1',
           name: 'Dense', inputLayers: [0], outputLayers: [2], children: null,
           kerasLayer: { ...kl('Dense'), parameterValues: { units: 4 } }, parentID: 10,
         },
         {
-          class: 'D3Layer', x: 300, y: 60, width: 90, height: 40, id: 2, htmlID: 'd3-layer-2',
+          class: 'Layer', x: 300, y: 60, width: 90, height: 40, id: 2, htmlID: 'layer-2',
           name: 'Dense', inputLayers: [1], outputLayers: [3], children: null,
           kerasLayer: { ...kl('Dense'), parameterValues: { units: 2 } }, parentID: 10,
         },
@@ -49,7 +51,7 @@ const compositeFixture = () => JSON.stringify({
       kerasLayer: null, parentID: null,
     },
     {
-      class: 'D3Layer', x: 520, y: 20, width: 90, height: 40, id: 3, htmlID: 'd3-layer-3',
+      class: 'Layer', x: 520, y: 20, width: 90, height: 40, id: 3, htmlID: 'layer-3',
       name: 'Output', inputLayers: [2], outputLayers: [], children: null,
       kerasLayer: kl('Output'), parentID: null,
     },
@@ -94,7 +96,6 @@ logicTest('flowAdapter: nnvpToFlow maps composite children to nested nodes with 
 logicTest('flowAdapter: round-trip is lossless for a flat template (structure)', ({ expect }) => {
   const original = templates['2D Dense for MNIST']!;
   const { nodes, edges } = nnvpToFlow(original);
-  // Saving stamps the (previously unversioned) model with the current format.
   expect(JSON.parse(flowToNnvp(nodes, edges)))
     .toEqual({ ...JSON.parse(original), formatVersion: CURRENT_FORMAT_VERSION });
 });
@@ -110,9 +111,75 @@ logicTest('flowAdapter: round-trip preserves generated Python and JavaScript for
   Object.values(templates).forEach((original) => {
     const { nodes, edges } = nnvpToFlow(original);
     const roundTripped = flowToNnvp(nodes, edges);
+    // Python generates for every template — the cyclic Elman one takes the
+    // imperative (subclassing) route, and the round-trip must preserve it
+    // (which pins that unrollSteps rides through the converters).
     expect(pythonOf(roundTripped)).toBe(pythonOf(original));
-    expect(javascriptOf(roundTripped)).toBe(javascriptOf(original));
+    if (orderGraph(JSON.parse(original) as NnvpModel).cycles.length > 0) {
+      // JavaScript keeps the typed refusal for cycles — on both sides.
+      expect(() => javascriptOf(original)).toThrow(CyclicGraphError);
+      expect(() => javascriptOf(roundTripped)).toThrow(CyclicGraphError);
+    } else {
+      expect(javascriptOf(roundTripped)).toBe(javascriptOf(original));
+    }
   });
+});
+
+// --- unrollSteps passthrough (Phase D2: k lives on the cycle-closing edge) ----------
+
+// Input(0) -> Dense(1) -> Dense(2) with the feedback edge 2 -> 1 carrying
+// unrollSteps. Additive field, so NO format version bump: files without it
+// read as before, and the converters keep it lossless like everything else.
+const feedbackFixture = () => JSON.stringify({
+  layers: [
+    {
+      class: 'Layer', x: 20, y: 20, width: 90, height: 40, id: 0, htmlID: 'layer-0',
+      name: 'Input', inputLayers: [], outputLayers: [1], children: null,
+      kerasLayer: { ...kl('Input'), parameterValues: { shape: [8] } }, parentID: null,
+    },
+    {
+      class: 'Layer', x: 150, y: 20, width: 90, height: 40, id: 1, htmlID: 'layer-1',
+      name: 'Dense', inputLayers: [0, 2], outputLayers: [2], children: null,
+      kerasLayer: { ...kl('Dense'), parameterValues: { units: 4 } }, parentID: null,
+    },
+    {
+      class: 'Layer', x: 280, y: 20, width: 90, height: 40, id: 2, htmlID: 'layer-2',
+      name: 'Dense', inputLayers: [1], outputLayers: [1], children: null,
+      kerasLayer: { ...kl('Dense'), parameterValues: { units: 4 } }, parentID: null,
+    },
+  ],
+  edges: [
+    { source: 0, target: 1, id: 's0_t1', htmlID: 's0_t1' },
+    { source: 1, target: 2, id: 's1_t2', htmlID: 's1_t2' },
+    { source: 2, target: 1, id: 's2_t1', htmlID: 's2_t1', unrollSteps: 5 },
+  ],
+  inputs: [0],
+  outputs: [],
+});
+
+logicTest('flowAdapter: unrollSteps on a cycle edge rides through the converters losslessly (additive, no version bump)', ({ expect }) => {
+  const original = feedbackFixture();
+  const { nodes, edges } = nnvpToFlow(original);
+  // The field survives into the flow edge's nnvp stash...
+  expect(edges.find(e => e.id === 's2_t1')!.data!.nnvp.unrollSteps).toBe(5);
+  // ...and comes back out byte-losslessly, still stamped the CURRENT version
+  // (adding the field bumped nothing).
+  const roundTripped: NnvpModel = JSON.parse(flowToNnvp(nodes, edges));
+  expect(roundTripped).toEqual({ ...JSON.parse(original), formatVersion: CURRENT_FORMAT_VERSION });
+  // Edges without the field stay clean: no `unrollSteps: undefined` noise.
+  expect('unrollSteps' in (roundTripped.edges[0] as object)).toBe(false);
+  expect(roundTripped.edges[2]!.unrollSteps).toBe(5);
+});
+
+logicTest('flowAdapter: the Elman template loads with exactly its feedback loop cycle-marked and unrollSteps intact', ({ expect }) => {
+  const { nodes, edges } = nnvpToFlow(templates['Elman char-RNN']!);
+  expect(nodes.length).toBe(7);
+  expect(edges.length).toBe(7);
+  const ends = edges.map(e => ({ source: e.source, target: e.target }));
+  // Only the Concatenate(3) <-> Dense(4) loop renders in the error color.
+  const marked = edges.filter(e => edgeInCycle(ends, e)).map(e => String(e.id)).sort();
+  expect(marked).toEqual(['s3_t4', 's4_t3']);
+  expect(edges.find(e => String(e.id) === 's4_t3')!.data!.nnvp.unrollSteps).toBe(3);
 });
 
 logicTest('flowAdapter: round-trip preserves generated code for the composite fixture', ({ expect }) => {
@@ -139,17 +206,37 @@ const connectionEdges = [
   { source: '1', target: '2' },
 ];
 
-logicTest('flowAdapter: isInvalidConnection rejects self-connections, duplicates and cycles', ({ expect }) => {
+logicTest('flowAdapter: isInvalidConnection rejects self-connections and duplicates', ({ expect }) => {
   const edges = connectionEdges;
   expect(isInvalidConnection(edges, '1', '1')).toBe(true);
   expect(isInvalidConnection(edges, '0', '1')).toBe(true);
-  expect(isInvalidConnection(edges, '2', '0')).toBe(true); // would close 0->1->2->0
 });
 
 logicTest('flowAdapter: isInvalidConnection accepts a new forward or branching connection', ({ expect }) => {
   const edges = connectionEdges;
   expect(isInvalidConnection(edges, '0', '2')).toBe(false);
   expect(isInvalidConnection(edges, '2', '3')).toBe(false);
+});
+
+logicTest('flowAdapter: isInvalidConnection allows a cycle-closing connection (cycles are drawable since Phase D)', ({ expect }) => {
+  // Closing 0 -> 1 -> 2 -> 0 is a legitimate edit now: the loop gets the red
+  // edgeInCycle marking and codegen refuses it explicitly (CyclicGraphError)
+  // until imperative emission ships — but the BOARD no longer refuses it.
+  const edges = connectionEdges;
+  expect(isInvalidConnection(edges, '2', '0')).toBe(false);
+});
+
+logicTest('flowAdapter: edgeInCycle marks a freshly drawn cycle edge and the loop it closes', ({ expect }) => {
+  // The same wiring a user can now draw live: 0 -> 1 -> 2 plus the new 2 -> 0.
+  const edges = [
+    ...connectionEdges,
+    { source: '2', target: '0' },
+    { source: '1', target: '3' }, // a branch off the loop stays unmarked
+  ];
+  expect(edgeInCycle(edges, edges[0]!)).toBe(true);
+  expect(edgeInCycle(edges, edges[1]!)).toBe(true);
+  expect(edgeInCycle(edges, edges[2]!)).toBe(true);
+  expect(edgeInCycle(edges, edges[3]!)).toBe(false);
 });
 
 logicTest('flowAdapter: edgeInCycle flags every edge of a loaded cycle, but not branches off it', ({ expect }) => {
@@ -195,12 +282,12 @@ logicTest('flowAdapter: groupSelected wraps the selection in a composite at the 
   expect(grouped.length).toBe(nodes.length + 1);
 });
 
-logicTest('flowAdapter: groupSelected round-trips through the converters as a D3LayerComposite with absolute coords', ({ expect }) => {
+logicTest('flowAdapter: groupSelected round-trips through the converters as a Group with absolute coords', ({ expect }) => {
   const { nodes, edges } = nnvpToFlow(templates['2D Dense for MNIST']!);
   const grouped = groupSelected(nodes, ['1', '2'])!;
   const model: NnvpModel = JSON.parse(flowToNnvp(grouped, edges));
   const composite = model.layers.find(l => l.id === 5)!;
-  expect(composite.class).toBe('D3LayerComposite');
+  expect(composite.class).toBe('Group');
   expect(composite.children!.map(c => c.id).sort()).toEqual([1, 2]);
   expect(composite.children!.find(c => c.id === 1)).toMatchObject({ x: 262, y: 60, parentID: 5 });
   // Wiring through the group is untouched.
@@ -220,9 +307,9 @@ logicTest('flowAdapter: groupSelected can group an existing composite with a pla
   const grouped = groupSelected(nodes, ['0', '10'])!;
   const model: NnvpModel = JSON.parse(flowToNnvp(grouped, edges));
   const outer = model.layers.find(l => l.id === 11)!;
-  expect(outer.class).toBe('D3LayerComposite');
+  expect(outer.class).toBe('Group');
   const inner = outer.children!.find(c => c.id === 10)!;
-  expect(inner.class).toBe('D3LayerComposite');
+  expect(inner.class).toBe('Group');
   // Grandchildren keep their absolute positions.
   expect(inner.children!.find(c => c.id === 1)).toMatchObject({ x: 170, y: 60 });
 });
@@ -237,7 +324,7 @@ logicTest('flowAdapter: newLayerNode builds a node the converters can round-trip
   const node = newLayerNode(7, { ...kl('Dense'), parameterValues: { units: 3 } }, { x: 5, y: 6 });
   const model: NnvpModel = JSON.parse(flowToNnvp([node], []));
   expect(model.layers[0]).toMatchObject({
-    class: 'D3Layer', id: 7, htmlID: 'd3-layer-7', name: 'Dense', x: 5, y: 6, parentID: null,
+    class: 'Layer', id: 7, htmlID: 'layer-7', name: 'Dense', x: 5, y: 6, parentID: null,
   });
   expect(model.layers[0]!.kerasLayer!.parameterValues).toEqual({ units: 3 });
 });

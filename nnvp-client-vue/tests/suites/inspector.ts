@@ -20,6 +20,7 @@ import {
 import type { ProbeLayer, ProbeSourceModel, ProbeTf } from '../../src/lib/Inspector/probe';
 import { buildClassIndex, sampleAt } from '../../src/lib/Inspector/datasetSamples';
 import KerasGenerator from '../../src/lib/KerasInterface/KerasGenerator';
+import { CyclicGraphError } from '../../src/lib/KerasInterface/orderGraph';
 import BoardTemplates from '../../src/lib/BoardInterface/BoardTemplates';
 import BoardInterface from '../../src/lib/BoardInterface/BoardInterface';
 import FlowGraphEditor from '../../src/lib/FlowInterface/FlowGraphEditor';
@@ -208,6 +209,23 @@ logicTest('inspector: orderedRealLayerIds does not mutate a caller-owned graph o
   const json = denseChainJson();
   orderedRealLayerIds(json);
   expect(json.layers[1]!.kerasLayer).toBeDefined();
+});
+
+logicTest('inspector: orderedRealLayerIds refuses a cyclic graph with the typed CyclicGraphError', ({ expect }) => {
+  // A cyclic graph cannot practically reach the probe (training refuses to
+  // build it first), but if one ever does the mapping must fail typed and
+  // legible — never silently pair layers against a truncated order.
+  const cyclic = denseChainJson();
+  // Close a loop: Dense 3 feeds back into Dense 2.
+  cyclic.layers[1]!.inputLayers.push('3');
+  cyclic.layers[2]!.outputLayers.push('2');
+  let error: unknown;
+  try {
+    orderedRealLayerIds(cyclic);
+  } catch (thrown) {
+    error = thrown;
+  }
+  expect(error).toBeInstanceOf(CyclicGraphError);
 });
 
 logicTest('inspector: matchLayersToIds pairs non-input layers with ids by creation order', ({ expect }) => {

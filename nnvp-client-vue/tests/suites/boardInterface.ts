@@ -9,6 +9,8 @@ import BoardInterface from '../../src/lib/BoardInterface/BoardInterface';
 import FlowGraphEditor from '../../src/lib/FlowInterface/FlowGraphEditor';
 import type { CodeGenerator, FlowStore } from '../../src/lib/FlowInterface/FlowGraphEditor';
 import KerasLayer from '../../src/lib/KerasInterface/KerasLayer';
+import KerasGenerator from '../../src/lib/KerasInterface/KerasGenerator';
+import { edgeInCycle } from '../../src/lib/FlowInterface/adapter';
 import type { FlowEdge, FlowNode } from '../../src/types/model';
 
 interface FakeStoreState {
@@ -147,7 +149,7 @@ logicTest('BoardInterface: findLayerById delegates to the active graph', ({ expe
   const { editor } = makeEditor();
   iface.addGraphEditor(editor);
   editor.addLayer(new KerasLayer('Dense', 'Core'));
-  const layer = editor.model.d3Layers[0]!;
+  const layer = editor.model.layers[0]!;
   expect(iface.findLayerById(layer.id)).toBe(layer);
   expect(iface.findLayerById(9999)).toBe(null);
 });
@@ -158,15 +160,15 @@ logicTest('BoardInterface: addLayer / deleteSelectedElements / undo delegate to 
   iface.addGraphEditor(editor);
 
   iface.addLayer(new KerasLayer('Dense', 'Core'));
-  expect(editor.model.d3Layers).toHaveLength(1);
+  expect(editor.model.layers).toHaveLength(1);
 
   store.state.selectedNodes = [store.state.nodes[0]!];
   editor.syncSelection();
   iface.deleteSelectedElements();
-  expect(editor.model.d3Layers).toHaveLength(0);
+  expect(editor.model.layers).toHaveLength(0);
 
   iface.undo();
-  expect(editor.model.d3Layers).toHaveLength(1);
+  expect(editor.model.layers).toHaveLength(1);
 });
 
 // --- BoardInterface.debugGetBoardState -------------------------------------------------
@@ -179,9 +181,11 @@ logicTest('BoardInterface: debugGetBoardState returns empty counters when there 
   });
 });
 
-// Regression: debugGetBoardState read model.layers / model.edges, but the
-// model shim exposes those as d3Layers / d3Edges. With a populated graph the
-// getter threw "Cannot read properties of undefined (reading 'map')".
+// Regression: debugGetBoardState once read model fields the shim didn't have
+// (it read model.layers/model.edges while the shim still spelled them
+// d3Layers/d3Edges — the shim uses the honest names itself since format v2).
+// With a populated graph the getter threw
+// "Cannot read properties of undefined (reading 'map')".
 logicTest('BoardInterface: debugGetBoardState reports the real board state for a populated graph', ({ expect }) => {
   const iface = new BoardInterface();
   const { editor } = makeEditor();
@@ -189,8 +193,31 @@ logicTest('BoardInterface: debugGetBoardState reports the real board state for a
   editor.loadTemplate('2D Dense for MNIST');
 
   const state = iface.debugGetBoardState();
-  expect(state.layers.map(l => l.id)).toEqual(editor.model.d3Layers.map(l => l.id));
+  expect(state.layers.map(l => l.id)).toEqual(editor.model.layers.map(l => l.id));
   expect(state.edges).toBe(4);
   expect(state.inputs).toBe(editor.model.modelInputs);
   expect(state.outputs).toBe(editor.model.modelOutputs);
+});
+
+// --- The Elman char-RNN template through the real editor seam (Phase D2) --------------
+
+logicTest('BoardInterface: the Elman template loads, marks only its feedback loop, and generates subclass Python', ({ expect }) => {
+  const iface = new BoardInterface();
+  const { store, editor } = makeEditor();
+  iface.addGraphEditor(editor);
+  editor.loadTemplate('Elman char-RNN');
+
+  // Loads: 7 layers (Input, Embedding, Flatten, Concatenate, 2x Dense, Output)
+  // and 7 edges including the feedback edge Dense(4) -> Concatenate(3).
+  expect(store.state.nodes.length).toBe(7);
+  expect(store.state.edges.length).toBe(7);
+  const ends = store.state.edges.map(e => ({ source: e.source, target: e.target }));
+  const marked = store.state.edges.filter(e => edgeInCycle(ends, e)).map(e => e.id).sort();
+  expect(marked).toEqual(['s3_t4', 's4_t3']); // exactly the loop renders red
+
+  // The cyclic graph generates the imperative Python form through the same
+  // JSON seam the menu download uses.
+  const code = new KerasGenerator(JSON.parse(editor.toJSON()), false).generatePythonFromGraph();
+  expect(code).toContain('class NnvpUnrolledModel(keras.Model):');
+  expect(code).toContain('for _ in range(3):');
 });

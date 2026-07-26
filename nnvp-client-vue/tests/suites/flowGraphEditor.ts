@@ -76,8 +76,8 @@ logicTest('flowGraphEditor: keeps the exact array instances captured by setActiv
     selectedNodes: editor.selectedNodes,
     undoStack: editor.undoStack,
     redoStack: editor.redoStack,
-    d3Layers: editor.model.d3Layers,
-    d3Edges: editor.model.d3Edges,
+    layers: editor.model.layers,
+    edges: editor.model.edges,
     modelInputs: editor.model.modelInputs,
     modelOutputs: editor.model.modelOutputs,
   };
@@ -92,8 +92,8 @@ logicTest('flowGraphEditor: keeps the exact array instances captured by setActiv
   expect(editor.selectedNodes).toBe(captured.selectedNodes);
   expect(editor.undoStack).toBe(captured.undoStack);
   expect(editor.redoStack).toBe(captured.redoStack);
-  expect(editor.model.d3Layers).toBe(captured.d3Layers);
-  expect(editor.model.d3Edges).toBe(captured.d3Edges);
+  expect(editor.model.layers).toBe(captured.layers);
+  expect(editor.model.edges).toBe(captured.edges);
   expect(editor.model.modelInputs).toBe(captured.modelInputs);
   expect(editor.model.modelOutputs).toBe(captured.modelOutputs);
 });
@@ -105,10 +105,10 @@ logicTest('flowGraphEditor: exposes templates with a list()', ({ expect }) => {
 
 // --- model shim derivations ------------------------------------------------------
 
-logicTest('flowGraphEditor: mirrors D3Model: d3Layers, d3Edges, modelInputs, modelOutputs, inputLayers', ({ expect }) => {
+logicTest('flowGraphEditor: mirrors the old D3Model shim: layers, edges, modelInputs, modelOutputs, inputLayers', ({ expect }) => {
   const { editor } = loadedEditor();
-  expect(editor.model.d3Layers.length).toBe(5);
-  expect(editor.model.d3Edges.length).toBe(4);
+  expect(editor.model.layers.length).toBe(5);
+  expect(editor.model.edges.length).toBe(4);
   expect(editor.model.modelInputs.map(l => l.id)).toEqual([0]);
   // Outputs are the layers FEEDING an Output node, in edge order.
   expect(editor.model.modelOutputs.map(l => l.id)).toEqual([3]);
@@ -122,8 +122,8 @@ logicTest('flowGraphEditor: counts a composite as ONE top-level layer but still 
   const { store, editor } = loadedEditor();
   store.state.selectedNodes = [store.state.nodes[1]!, store.state.nodes[2]!];
   editor.model.createComposite();
-  expect(editor.model.d3Layers.length).toBe(4);
-  const composite = editor.model.d3Layers.find(l => l.class === 'D3LayerComposite')!;
+  expect(editor.model.layers.length).toBe(4);
+  const composite = editor.model.layers.find(l => l.class === 'Group')!;
   expect(composite.id).toBe(5);
   expect(editor.findLayerById(1)!.name).toBe('Flatten');
 });
@@ -164,10 +164,10 @@ logicTest('flowGraphEditor: loadTemplate is undoable back to the previous board'
   editor.loadTemplate(DENSE_MNIST);
   expect(editor.undoStack.length).toBe(1);
   editor.undo();
-  expect(editor.model.d3Layers.length).toBe(0);
+  expect(editor.model.layers.length).toBe(0);
   expect(editor.redoStack.length).toBe(1);
   editor.redo();
-  expect(editor.model.d3Layers.length).toBe(5);
+  expect(editor.model.layers.length).toBe(5);
   expect(editor.redoStack.length).toBe(0);
 });
 
@@ -203,21 +203,21 @@ logicTest('flowGraphEditor: a new change after undo clears the redo stack', asyn
 
 logicTest('flowGraphEditor: addLayer appends a node with a fresh id (assistant-style before/after diff)', ({ expect }) => {
   const { editor } = loadedEditor();
-  const beforeIds = new Set(editor.model.d3Layers.map(l => l.id));
+  const beforeIds = new Set(editor.model.layers.map(l => l.id));
   editor.addLayer(kl('Dense'));
-  const created = editor.model.d3Layers.find(l => !beforeIds.has(l.id))!;
+  const created = editor.model.layers.find(l => !beforeIds.has(l.id))!;
   expect(created.id).toBe(5);
   expect(created.kerasLayer!.name).toBe('Dense');
   editor.undo();
-  expect(editor.model.d3Layers.length).toBe(5);
+  expect(editor.model.layers.length).toBe(5);
 });
 
 logicTest('flowGraphEditor: deleteSelectedElements removes selected nodes with their edges, and composites with their children', ({ expect }) => {
   const { store, editor } = loadedEditor();
   store.state.selectedNodes = [store.state.nodes[1]!]; // Flatten
   editor.deleteSelectedElements();
-  expect(editor.model.d3Layers.length).toBe(4);
-  expect(editor.model.d3Edges.length).toBe(2); // 0->1 and 1->2 are gone
+  expect(editor.model.layers.length).toBe(4);
+  expect(editor.model.edges.length).toBe(2); // 0->1 and 1->2 are gone
   editor.undo();
   // Group Flatten + Dense, then delete the composite: children must go too.
   store.state.selectedNodes = [store.state.nodes[1]!, store.state.nodes[2]!];
@@ -225,9 +225,9 @@ logicTest('flowGraphEditor: deleteSelectedElements removes selected nodes with t
   const composite = store.state.nodes.find(n => n.type === 'composite')!;
   store.state.selectedNodes = [composite];
   editor.deleteSelectedElements();
-  expect(editor.model.d3Layers.map(l => l.id).sort()).toEqual([0, 3, 4]);
+  expect(editor.model.layers.map(l => l.id).sort()).toEqual([0, 3, 4]);
   expect(editor.findLayerById(1)).toBeNull();
-  expect(editor.model.d3Edges.length).toBe(1); // only 3 -> 4 survives
+  expect(editor.model.edges.length).toBe(1); // only 3 -> 4 survives
 });
 
 logicTest('flowGraphEditor: moveLayerTo repositions a node in board coordinates without touching undo', ({ expect }) => {
@@ -244,7 +244,7 @@ logicTest('flowGraphEditor: deleteSelectedElements removes selected edges', ({ e
   const { store, editor } = loadedEditor();
   store.state.selectedEdges = [store.state.edges[0]!];
   editor.deleteSelectedElements();
-  expect(editor.model.d3Edges.length).toBe(3);
+  expect(editor.model.edges.length).toBe(3);
   expect(editor.findLayerById(1)!.inputLayers).toEqual([]);
 });
 
@@ -263,7 +263,7 @@ logicTest('flowGraphEditor: createComposite clears the selection and is undoable
   editor.model.createComposite();
   expect(editor.selectedNodes.length).toBe(0);
   editor.undo();
-  expect(editor.model.d3Layers.length).toBe(5);
+  expect(editor.model.layers.length).toBe(5);
 });
 
 // --- selection sync ---------------------------------------------------------------------
@@ -302,7 +302,7 @@ logicTest('flowGraphEditor: supports the loadGraphFromJSON sequence (saveState, 
   editor.clearBoard(true);
   editor.model.loadJSON(templates['2D Conv for MNIST']!);
   editor.updateGraph();
-  expect(editor.model.d3Layers.length).toBe(9);
+  expect(editor.model.layers.length).toBe(9);
   expect(graphChanges).toBeGreaterThan(0);
   editor.undo();
   expect(editor.toJSON()).toBe(original);
@@ -329,8 +329,10 @@ logicTest('flowGraphEditor: connectLayers wires two layers with board rules', ({
   // Same rules as dragging on the board:
   expect(editor.connectLayers(a, b)).toBe(false); // duplicate
   expect(editor.connectLayers(a, a)).toBe(false); // self-loop
-  expect(editor.connectLayers(b, a)).toBe(false); // would close a cycle
-  expect(store.state.edges).toHaveLength(1);
+  // Closing a cycle is allowed since Phase D (the loop renders red and
+  // codegen refuses it explicitly instead of the board blocking the edit).
+  expect(editor.connectLayers(b, a)).toBe(true);
+  expect(store.state.edges).toHaveLength(2);
 });
 
 logicTest('flowGraphEditor: connectLayers is undoable', ({ expect }) => {
