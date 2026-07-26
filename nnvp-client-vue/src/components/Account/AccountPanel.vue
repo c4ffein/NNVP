@@ -205,6 +205,24 @@
                   <span class="settings-scheme-description">{{ scheme.description }}</span>
                 </span>
               </label>
+              <h3 class="settings-subtitle">Training engine</h3>
+              <p class="hint">Where the in-browser trainer runs. The Web Worker
+              engine keeps the page responsive while training and runs the
+              generated model code off the main thread; the Inspect tab's
+              activation probes are not available with it yet.</p>
+              <label v-for="engine in trainingEngines" :key="engine.id" class="settings-scheme">
+                <input
+                  type="radio"
+                  name="trainingEngine"
+                  :value="engine.id"
+                  :checked="engine.id === trainingEngine"
+                  @change="setTrainingEngine(engine.id)"
+                />
+                <span class="settings-scheme-body">
+                  <span class="settings-scheme-label">{{ engine.label }}</span>
+                  <span class="settings-scheme-description">{{ engine.description }}</span>
+                </span>
+              </label>
             </section>
           </template>
 
@@ -220,6 +238,7 @@ import ApiClient, { ERROR_CODES } from '../../lib/Backend/apiClient';
 import { COLOR_SCHEMES, rampGradientCss } from '../../lib/Settings/colorSchemes';
 import type { ColorScheme, ColorSchemeId } from '../../lib/Settings/colorSchemes';
 import { settings } from '../../lib/Settings/settings';
+import type { TrainingEngineChoice } from '../../lib/Settings/settings';
 import { clearCurrentProject } from '../../lib/Backend/currentProject';
 
 // import.meta.env is Vite-only (absent under bun/unit tests) — typed locally
@@ -316,6 +335,19 @@ export default defineComponent({
       usageDays: [] as UsageDay[],
       schemes: Object.values(COLOR_SCHEMES),
       colorScheme: settings.get('colorScheme'),
+      trainingEngine: settings.get('trainingEngine'),
+      trainingEngines: [
+        {
+          id: 'tfjs' as TrainingEngineChoice,
+          label: 'Main thread (default)',
+          description: 'The historical in-page trainer. Needed for the Inspect tab\'s activation views.',
+        },
+        {
+          id: 'tfjs-worker' as TrainingEngineChoice,
+          label: 'Web Worker (experimental)',
+          description: 'Trains in a background worker: the page stays responsive and generated code runs isolated from it.',
+        },
+      ],
       email: '',
       // { email, code } while this browser has a pending login being polled.
       waiting: null as Waiting | null,
@@ -587,6 +619,10 @@ export default defineComponent({
     setColorScheme(id: ColorSchemeId) {
       settings.set('colorScheme', id);
       this.colorScheme = id;
+    },
+    setTrainingEngine(id: TrainingEngineChoice) {
+      settings.set('trainingEngine', id);
+      this.trainingEngine = id;
     },
     gradientOf(scheme: ColorScheme): string {
       return rampGradientCss(scheme);

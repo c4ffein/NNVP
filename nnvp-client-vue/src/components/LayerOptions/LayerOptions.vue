@@ -158,15 +158,15 @@ export default defineComponent({
     },
     activeLayers(): ActiveLayer[] {
       const activeLayers: ActiveLayer[] = [];
-      for (const d3Layer of this.selectedNode.e) { // eslint-disable-line
-        if (!this.isOutputLayer(d3Layer.kerasLayer)) activeLayers.push(d3Layer as ActiveLayer);
+      for (const layer of this.selectedNode.e) { // eslint-disable-line
+        if (!this.isOutputLayer(layer.kerasLayer)) activeLayers.push(layer as ActiveLayer);
       }
       return activeLayers;
     },
     inputInLayersAndMoreThanOneInModel(): boolean {
       for (const layer of this.selectedNode.e) { // eslint-disable-line
         if (this.isInputLayer(layer)) {
-          if (this.$boardInterface.activeGraph!.model.modelInputs.length > 1) {
+          if (this.$boardInterface.getModelInputs().length > 1) {
             return true;
           }
           return false;
@@ -184,23 +184,19 @@ export default defineComponent({
     },
     totalLayers(): number {
       this.refreshKey; // eslint-disable-line
-      if (!this.$boardInterface?.activeGraph?.model?.d3Layers) return 0;
-      return this.$boardInterface.activeGraph.model.d3Layers.length;
+      return this.$boardInterface ? this.$boardInterface.getLayers().length : 0;
     },
     totalInputs(): number {
       this.refreshKey; // eslint-disable-line
-      if (!this.$boardInterface?.activeGraph?.model?.modelInputs) return 0;
-      return this.$boardInterface.activeGraph.model.modelInputs.length;
+      return this.$boardInterface ? this.$boardInterface.getModelInputs().length : 0;
     },
     totalOutputs(): number {
       this.refreshKey; // eslint-disable-line
-      if (!this.$boardInterface?.activeGraph?.model?.modelOutputs) return 0;
-      return this.$boardInterface.activeGraph.model.modelOutputs.length;
+      return this.$boardInterface ? this.$boardInterface.getModelOutputs().length : 0;
     },
     totalEdges(): number {
       this.refreshKey; // eslint-disable-line
-      if (!this.$boardInterface?.activeGraph?.model?.d3Edges) return 0;
-      return this.$boardInterface.activeGraph.model.d3Edges.length;
+      return this.$boardInterface ? this.$boardInterface.getEdges().length : 0;
     },
   },
   methods: {

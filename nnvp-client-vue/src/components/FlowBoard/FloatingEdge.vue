@@ -30,8 +30,9 @@ const props = defineProps({
 
 const { getEdges } = useVueFlow();
 
-// Cyclic edges (only possible in graphs loaded from D3-made files) get the
-// same error color as the D3 board's linkCycle marking.
+// Cyclic edges (freshly drawn loops — allowed since Phase D — or graphs
+// loaded from D3-made files) get the same error color as the D3 board's
+// linkCycle marking. Live derived query, recomputed per render.
 const cyclic = computed(() => edgeInCycle(getEdges.value, { source: props.source, target: props.target }));
 
 const path = computed(() => {

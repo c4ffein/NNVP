@@ -110,13 +110,15 @@ import type { RunPhase } from '../../lib/Training/runController';
 import generateText from '../../lib/Inspector/generateText';
 import type { GenerateModel, GenerateTf } from '../../lib/Inspector/generateText';
 import { createTfjsEngine } from '../../lib/Training/tfjsEngine';
+import { createWorkerEngine } from '../../lib/Training/workerEngine';
+import { settings } from '../../lib/Settings/settings';
 import { trainingConfig, snapshotTrainingConfig } from '../../lib/Training/trainingConfig';
 import {
-  startRun, listRuns as journalListRuns,
+  startRun, hideRun, listRuns as journalListRuns,
 } from '../../lib/Training/runJournal';
-import type { RunRecord, RunHandle } from '../../lib/Training/runJournal';
+import type { FoldedRun, RunHandle } from '../../lib/Training/runJournal';
+import { setStreamLocalOnly } from '../../lib/Events/store';
 import ApiClient from '../../lib/Backend/apiClient';
-import { deleteEverywhere, deleteChoicesFor, kindApiFrom } from '../../lib/Backend/sync';
 import type { DeleteWhere } from '../../lib/Backend/sync';
 import { getRecordStore } from '../../lib/LocalStore/db';
 
@@ -301,38 +303,52 @@ export default defineComponent({
     },
     // --- History tab plumbing (HistoryPanel gets everything via props, the
     // BenchPanel pattern — it never imports the journal itself).
-    listRuns(): Promise<RunRecord[]> {
+    listRuns(): Promise<FoldedRun[]> {
       return journalListRuns();
     },
     /**
-     * The locations this record can be deleted from (PLAN.md Phase 6): only
-     * the ones actually holding it. Progressive enhancement — logged out or
-     * any API failure degrades to ['local'] and never throws.
+     * The locations this run can be removed from: only the ones actually
+     * holding its event stream. 'local' (offered always) is a reversible
+     * run.hidden event; 'cloud' appears when the server holds any event of
+     * the stream (a one-uuid page probe). Progressive enhancement — logged
+     * out or any API failure degrades to ['local'] and never throws.
      */
-    async deleteRunChoices(record: RunRecord): Promise<DeleteWhere[]> {
+    async deleteRunChoices(run: FoldedRun): Promise<DeleteWhere[]> {
       const api = (this as unknown as TrainingZoneNonReactive).api!;
       if (!api.isLoggedIn()) return ['local'];
       try {
-        const listed = await api.listRuns();
-        const cloudUuids = new Set<string>();
-        if (Array.isArray(listed)) {
-          for (const entry of listed) {
-            const uuid = (entry as { uuid?: unknown } | null)?.uuid;
-            if (typeof uuid === 'string' && uuid) cloudUuids.add(uuid);
-          }
-        }
-        return deleteChoicesFor(record, cloudUuids);
+        const { uuids } = await api.listEventUuids({ streamId: run.uuid, limit: 1 });
+        return uuids.length ? ['local', 'cloud', 'both'] : ['local'];
       } catch {
         return ['local'];
       }
     },
-    deleteRun(uuid: string, where: DeleteWhere): Promise<void> {
+    /**
+     * 'local'  hides the run (run.hidden — reversible, and it syncs, so the
+     *          run hides on every device).
+     * 'cloud'  purges the stream server-side (the rare destructive
+     *          primitive) and flags the surviving local events localOnly so
+     *          sync never re-uploads them behind the user's back.
+     * 'both'   purge + hide; the hidden event stays device-private
+     *          (localOnly) so pushing it cannot recreate the purged stream.
+     * Local events are never destroyed here — hidden, not deleted (PLAN.md
+     * decision 6); a local purge UX is deliberately parked.
+     */
+    async deleteRun(uuid: string, where: DeleteWhere): Promise<void> {
       const api = (this as unknown as TrainingZoneNonReactive).api!;
-      return deleteEverywhere({
-        api: kindApiFrom(api, 'runs'), store: getRecordStore(), kind: 'runs', uuid, where,
-      });
+      const store = getRecordStore();
+      if (where === 'cloud' || where === 'both') {
+        await api.purgeEventStream(uuid);
+        await setStreamLocalOnly(uuid, store);
+      }
+      if (where === 'local' || where === 'both') {
+        await hideRun(uuid, store, { localOnly: where === 'both' });
+      }
     },
-    restoreRun(run: RunRecord): void {
+    restoreRun(run: FoldedRun): void {
+      // Orphan folds (no run.started here yet) have nothing to restore; the
+      // panel hides the button, this guard keeps the contract airtight.
+      if (!run.graphJson || !run.config) return;
       // The exact File>Load path (migrate + saveState first, so restore is
       // undo-able — that saveState IS the safety, no confirm dialog needed).
       this.$boardInterface.loadGraphFromJSON(run.graphJson);
@@ -415,16 +431,18 @@ export default defineComponent({
       // The engine (lib/Training) owns model building, compile and fit; this
       // component supplies the options from its UI state and keeps the
       // chart + cancellation wiring (watchTraining) and the error surfaces.
-      // Always tfjs for now: the tinygrad engine (lib/Training/tinygradEngine)
-      // is not user-exposed — it lives behind the ?bench=1 Bench tab and the
-      // make test-webgpu harness until it graduates.
+      // Engine choice is the device-local `trainingEngine` setting (Account
+      // panel → Settings): the historical main-thread tfjs engine (default)
+      // or the Web Worker one. The tinygrad engine stays un-exposed — it
+      // lives behind the ?bench=1 Bench tab until it graduates.
       // Journal the run before anything can fail: every Train click leaves a
       // record, prepare failures included. Journaling itself must never break
       // training — a failed startRun (e.g. IndexedDB denied) degrades to no
       // record, and finish() is idempotent so tangled paths can double-call.
+      const engineChoice = settings.get('trainingEngine');
       const graphJson = this.$boardInterface.getGraphJSON();
       const runHandle: RunHandle | null = await startRun({
-        engineId: 'tfjs',
+        engineId: engineChoice,
         config: snapshotTrainingConfig(),
         graphJson: graphJson || '',
       }).catch((journalError) => {
@@ -434,7 +452,9 @@ export default defineComponent({
       const finishRun = (outcome: 'completed' | 'cancelled' | 'error', message?: string) => (
         runHandle?.finish(outcome, message).catch(() => {}) || Promise.resolve()
       );
-      const engine = createTfjsEngine({ loadTf });
+      const engine = engineChoice === 'tfjs-worker'
+        ? createWorkerEngine()
+        : createTfjsEngine({ loadTf });
       let session: TrainingSession;
       try {
         session = await engine.prepare(graphJson, {

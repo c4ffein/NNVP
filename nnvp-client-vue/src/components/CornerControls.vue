@@ -89,14 +89,18 @@
 
 <script lang="ts">
 import { defineComponent } from 'vue';
+import { bus } from '../lib/Events/bus';
 
 // import.meta.env is Vite-only (absent under bun/unit tests) — typed locally
 // instead of pulling in vite/client types (same choice as BoardInterface.ts).
 type ImportMetaWithEnv = ImportMeta & { env?: { VITE_ENABLE_BACKEND?: string } };
 
-// Non-reactive instance field assigned outside data() (pure typing pass:
-// keeping it out of data() preserves its non-reactive nature).
-interface CornerControlsInstanceExtra { readLogged?: () => void }
+// Non-reactive instance fields assigned outside data() (pure typing pass:
+// keeping them out of data() preserves their non-reactive nature).
+interface CornerControlsInstanceExtra {
+  readLogged?: () => void;
+  offAuthChanged?: () => void;
+}
 
 export default defineComponent({
   name: 'CornerControls',
@@ -122,7 +126,7 @@ export default defineComponent({
   mounted() {
     const self = this as unknown as CornerControlsInstanceExtra;
     // Person-icon state: token presence now + on every auth change
-    // (apiClient dispatches nnvp:auth-changed on token set/clear).
+    // (apiClient emits 'auth.changed' on the bus on token set/clear).
     self.readLogged = () => {
       try {
         this.loggedIn = !!localStorage.getItem('nnvp_backend_token');
@@ -131,11 +135,11 @@ export default defineComponent({
       }
     };
     self.readLogged();
-    window.addEventListener('nnvp:auth-changed', self.readLogged);
+    self.offAuthChanged = bus.on('auth.changed', self.readLogged);
   },
   beforeUnmount() {
     const self = this as unknown as CornerControlsInstanceExtra;
-    window.removeEventListener('nnvp:auth-changed', self.readLogged!);
+    self.offAuthChanged!();
   },
   methods: {
     toggleTheme() {

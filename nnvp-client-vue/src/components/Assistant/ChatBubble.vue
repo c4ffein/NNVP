@@ -222,8 +222,8 @@ import type { ComponentPublicInstance } from 'vue';
 import AssistantActions from '../../lib/Assistant/assistantActions';
 import FloatingWindow from '../FloatingWindow.vue';
 import renderMarkdown from '../../lib/Assistant/markdown';
-import { ASK_EVENT, consumePendingAsk } from '../../lib/Assistant/askAssistant';
-import type { PendingAsk } from '../../lib/Assistant/askAssistant';
+import { consumePendingAsk } from '../../lib/Assistant/askAssistant';
+import { bus } from '../../lib/Events/bus';
 import {
   chatSession,
   listConversations,
@@ -251,8 +251,8 @@ interface ChatBubbleInternal {
   actions: AssistantActions;
   client: AnthropicClient;
   api: ApiClient;
-  onAuthChanged: () => void;
-  onAskAssistant: (event: Event) => void;
+  offAuthChanged: () => void;
+  offAskAssistant: () => void;
   blinkTimer?: ReturnType<typeof setTimeout>;
 }
 
@@ -328,24 +328,20 @@ export default defineComponent({
         });
     }
     // Sign-in / sign-out elsewhere in the app flips the chat between its two
-    // states live (apiClient dispatches this on every token change).
-    self.onAuthChanged = () => this.refreshHasKey();
-    window.addEventListener('nnvp:auth-changed', self.onAuthChanged);
+    // states live (apiClient emits this bus event on every token change).
+    self.offAuthChanged = bus.on('auth.changed', () => this.refreshHasKey());
     // The window is visible as soon as it mounts: land focus in the input.
     this.focusInput();
     // "Ask the assistant about X" from a help modal. The pending slot covers
     // the case where App just mounted this component BECAUSE of that ask.
-    self.onAskAssistant = (event: Event) => this.askAbout(
-      (event as CustomEvent<PendingAsk>).detail.topic,
-    );
-    window.addEventListener(ASK_EVENT, self.onAskAssistant);
+    self.offAskAssistant = bus.on('ui.ask-assistant', ({ topic }) => this.askAbout(topic));
     const pendingAsk = consumePendingAsk();
     if (pendingAsk) this.askAbout(pendingAsk.topic);
   },
   beforeUnmount() {
     const self = this as typeof this & ChatBubbleInternal;
-    window.removeEventListener('nnvp:auth-changed', self.onAuthChanged);
-    window.removeEventListener(ASK_EVENT, self.onAskAssistant);
+    self.offAuthChanged();
+    self.offAskAssistant();
     clearTimeout(self.blinkTimer);
   },
   methods: {

@@ -117,9 +117,10 @@ function validConnection(connection: Connection & { id?: string }) {
   // Vue Flow ALSO runs this validator over every edge whenever the edge set
   // is replaced (setEdges re-validation). Those edges already carry an id and
   // must pass untouched — otherwise each existing edge is rejected as a
-  // "duplicate" of itself, and reloaded graphs keep D3 parity (a cyclic saved
-  // graph loads instead of silently losing edges). Only fresh interactive
-  // connections (no id yet) are checked.
+  // "duplicate" of itself. Only fresh interactive connections (no id yet)
+  // are checked, and only for self-loops and duplicates: cycle-closing
+  // connections are allowed (Phase D) — the loop renders red (edgeInCycle)
+  // and codegen refuses the cyclic graph with a typed error instead.
   if (connection.id !== undefined) return true;
   return !isInvalidConnection(getEdges.value, connection.source, connection.target);
 }
