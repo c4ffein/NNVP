@@ -16,6 +16,11 @@ import type {
   TrainingPrepareOptions, TrainingSession,
 } from './engine';
 import { TrainingPrepareError } from './engine';
+import { buildOptimizer, buildOptimizerConfig, filterOptimizerParams } from './optimizers';
+
+// The positional optimizer construction moved to ./optimizers.ts (shared with
+// the worker engine's host); the historical import surface stays.
+export { buildOptimizer };
 
 // The tfjs runtime surface (namespace, tensors, models, optimizers) is
 // deliberately loose: engine.ts keeps @tensorflow/tfjs types out of the seam
@@ -40,37 +45,6 @@ type DebugWindow = Window & {
     };
   };
 };
-
-// tf.train factories take POSITIONAL arguments — handing them the params
-// OBJECT (the historical code) silently made the object the learning rate,
-// i.e. NaN: sgd/adam "trained" without moving a single weight. The tables
-// map the UI's named params onto each factory's signature; a param the UI
-// leaves empty stays undefined so the tfjs default applies.
-const OPTIMIZER_SIGNATURES: Record<string, string[]> = {
-  sgd: ['learningRate'],
-  momentum: ['learningRate', 'momentum', 'useNesterov'],
-  rmsprop: ['learningRate', 'decay', 'momentum', 'epsilon', 'centered'],
-  adam: ['learningRate', 'beta1', 'beta2', 'epsilon'],
-  adamax: ['learningRate', 'beta1', 'beta2', 'epsilon', 'decay'],
-  adagrad: ['learningRate', 'initialAccumulatorValue'],
-  adadelta: ['learningRate', 'rho', 'epsilon'],
-};
-
-/** Positional tf.train construction; sgd with momentum routes to tf.train.momentum. */
-export function buildOptimizer(tf: Tf, optimizer: string, params: Record<string, unknown>): unknown {
-  let name = optimizer;
-  if (name === 'sgd' && Number(params.momentum) > 0) name = 'momentum';
-  const signature = OPTIMIZER_SIGNATURES[name];
-  if (!signature) return tf.train[optimizer](params.learningRate);
-  const args: unknown[] = signature.map(key => (params[key] !== undefined ? params[key] : undefined));
-  if (name === 'momentum') {
-    // tf.train.momentum REQUIRES lr and momentum (no defaults).
-    args[0] = args[0] !== undefined ? args[0] : 0.01;
-    args[1] = args[1] !== undefined ? args[1] : Number(params.momentum) || 0;
-    args[2] = !!params.nesterov || !!params.useNesterov;
-  }
-  return tf.train[name](...args);
-}
 
 // Historical constants of the in-browser demo trainer: a fixed batch size and
 // fixed train/test slice sizes per fit (unchanged in the extraction).
@@ -233,14 +207,9 @@ export function createTfjsEngine({ loadTf }: { loadTf(): Promise<Tf> }): Trainin
         // Param errors
         throw new TrainingPrepareError('create', error);
       }
-      // Build optimizer config with parameters
-      let optimizerConfig: unknown = optimizer;
-      const filteredParams = Object.fromEntries(
-        Object.entries(opts.optimizerParams).filter(([, v]) => v !== undefined && v !== null && v !== '')
-      );
-      if (Object.keys(filteredParams).length > 0) {
-        optimizerConfig = buildOptimizer(tf, optimizer, filteredParams);
-      }
+      // Build optimizer config with parameters (shared with the worker host).
+      const filteredParams = filterOptimizerParams(opts.optimizerParams);
+      const optimizerConfig = buildOptimizerConfig(tf, optimizer, opts.optimizerParams);
       if (debugWindow.nnvp?.debug?.enableTraining) {
         console.log('[TrainingZone] Compiling model with optimizer:', optimizer, 'params:', opts.optimizerParams);
       }

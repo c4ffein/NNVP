@@ -1,7 +1,8 @@
 // NNVP graph JSON <-> Vue Flow nodes/edges.
 //
-// The NNVP side is exactly what D3Model.toJSON emitted (and .nnvp files
-// contain) — see src/types/model.ts:
+// The NNVP side is the format-v2 spelling of what D3Model.toJSON emitted
+// historically (v1 files are renamed by migrateModel on load) — see
+// src/types/model.ts:
 //   { layers: [...], edges: [{source, target, id, htmlID}], inputs: [ids], outputs: [ids] }
 // with composite layers carrying their children recursively and children using
 // ABSOLUTE board coordinates. Vue Flow children instead use coordinates
@@ -21,7 +22,7 @@ import { CURRENT_FORMAT_VERSION, migrateModel } from '../ModelFormat/migrations'
 export const LAYER_NODE = 'layer';
 export const COMPOSITE_NODE = 'composite';
 
-const isComposite = (layer: NnvpLayer) => layer.class === 'D3LayerComposite';
+const isComposite = (layer: NnvpLayer) => layer.class === 'Group';
 
 // --- NNVP -> Vue Flow --------------------------------------------------------
 
@@ -76,7 +77,17 @@ export function nnvpToFlow(nnvp: string | NnvpModel): { nodes: FlowNode[]; edges
     id: String(edge.id),
     source: String(edge.source),
     target: String(edge.target),
-    data: { nnvp: { id: edge.id, htmlID: edge.htmlID, source: edge.source, target: edge.target } },
+    data: {
+      nnvp: {
+        id: edge.id,
+        htmlID: edge.htmlID,
+        source: edge.source,
+        target: edge.target,
+        // Feedback unroll count (Phase D2) — additive, kept only when present
+        // so files without it round-trip byte-identically.
+        ...(edge.unrollSteps === undefined ? {} : { unrollSteps: edge.unrollSteps }),
+      },
+    },
   }));
   return { nodes, edges };
 }
@@ -104,7 +115,7 @@ function nodeToLayer(
     nnvp.id,
   ));
   return {
-    class: children.length > 0 || node.type === COMPOSITE_NODE ? 'D3LayerComposite' : 'D3Layer',
+    class: children.length > 0 || node.type === COMPOSITE_NODE ? 'Group' : 'Layer',
     x: absolute.x,
     y: absolute.y,
     width: nnvp.width,
@@ -179,6 +190,10 @@ export function flowToNnvp(nodes: FlowNode[], edges: FlowEdge[]): string {
       target: edge.targetNnvpId,
       id: edge.data && edge.data.nnvp ? edge.data.nnvp.id : `s${edge.sourceNnvpId}_t${edge.targetNnvpId}`,
       htmlID: edge.data && edge.data.nnvp ? edge.data.nnvp.htmlID : `s${edge.sourceNnvpId}_t${edge.targetNnvpId}`,
+      // unrollSteps (Phase D2) rides through like everything the board does
+      // not model — emitted only when present, keeping old saves byte-stable.
+      ...(edge.data && edge.data.nnvp && edge.data.nnvp.unrollSteps !== undefined
+        ? { unrollSteps: edge.data.nnvp.unrollSteps } : {}),
     })),
     inputs,
     outputs,
@@ -209,22 +224,24 @@ function reaches(edges: EdgeEnds[], from: string, to: string): boolean {
 }
 
 /**
- * True if adding source -> target would close a directed cycle (i.e. source is
- * already reachable FROM target), or if it duplicates an existing edge, or
+ * True if the source -> target connection duplicates an existing edge or
  * connects a node to itself. Used by the board's isValidConnection.
+ * Cycle-closing edges are NOT invalid (since Phase D): drawing a feedback
+ * loop is a legitimate edit — the loop renders in the error color
+ * (edgeInCycle) and code generation refuses the cyclic graph with a typed
+ * CyclicGraphError until imperative emission supports it.
  */
 export function isInvalidConnection(edges: EdgeEnds[], source: string, target: string): boolean {
   if (source === target) return true;
-  if (edges.some(edge => edge.source === source && edge.target === target)) return true;
-  return reaches(edges, target, source);
+  return edges.some(edge => edge.source === source && edge.target === target);
 }
 
 /**
  * True if an EXISTING edge lies on a directed cycle: its target reaches back
- * to its source (that path plus the edge itself closes the loop). Interactive
- * connections can't create cycles (isInvalidConnection refuses them), but
- * cyclic graphs saved on the old D3 board still load — the board marks such
- * edges with the error color (see FloatingEdge.vue).
+ * to its source (that path plus the edge itself closes the loop). Covers
+ * both freshly drawn loops (cycle-closing connections are allowed) and
+ * cyclic graphs saved on the old D3 board — the board marks such edges with
+ * the error color (see FloatingEdge.vue).
  */
 export function edgeInCycle(edges: EdgeEnds[], edge: EdgeEnds): boolean {
   return reaches(edges, edge.target, edge.source);
@@ -316,7 +333,7 @@ export function newLayerNode(
       label: kerasLayer.name,
       nnvp: {
         id,
-        htmlID: `d3-layer-${id}`,
+        htmlID: `layer-${id}`,
         name: kerasLayer.name,
         width: 90,
         height: 40,

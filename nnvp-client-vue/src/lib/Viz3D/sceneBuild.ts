@@ -104,7 +104,7 @@ export interface Scene3D {
 /** Composites are unwrapped: only concrete layers get geometry. */
 function flattenLayers(layers: NnvpLayer[], out: NnvpLayer[] = []): NnvpLayer[] {
   for (const layer of layers) {
-    if (layer.class === 'D3LayerComposite') flattenLayers(layer.children || [], out);
+    if (layer.class === 'Group') flattenLayers(layer.children || [], out);
     else out.push(layer);
   }
   return out;

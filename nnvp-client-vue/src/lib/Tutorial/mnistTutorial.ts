@@ -5,8 +5,9 @@
 // `isComplete` predicate inspects the real editor state exposed through the
 // `$boardInterface` (see src/lib/BoardInterface/BoardInterface.ts).
 //
-// Editor-state contract used here (verified against BoardInterface / D3Model / D3Layer):
-//   $boardInterface.activeGraph.model.d3Layers  -> array of placed layers
+// Editor-state contract used here (the facade's typed read getters — see
+// BoardInterface.getLayers/getEdges):
+//   $boardInterface.getLayers()              -> array of placed layers (live view)
 //   layer.kerasLayer.name                    -> Keras layer type, e.g. "Conv2D"
 //   layer.kerasLayer.parameterValues         -> object of set parameter values
 //
@@ -21,12 +22,8 @@ export interface TutorialLayerLike {
 }
 
 export interface TutorialBoardLike {
-  activeGraph?: {
-    model?: {
-      d3Layers?: unknown;
-      d3Edges?: unknown;
-    } | null;
-  } | null;
+  getLayers?: () => unknown;
+  getEdges?: () => unknown;
   getActiveElements?: () => unknown;
 }
 
@@ -48,9 +45,9 @@ export interface TutorialStep {
  * @returns placed layers
  */
 export function placedLayers($d3: TutorialBoard): TutorialLayerLike[] {
-  const graph = $d3 && $d3.activeGraph;
-  if (!graph || !graph.model || !Array.isArray(graph.model.d3Layers)) return [];
-  return graph.model.d3Layers;
+  if (!$d3 || typeof $d3.getLayers !== 'function') return [];
+  const layers = $d3.getLayers();
+  return Array.isArray(layers) ? layers : [];
 }
 
 /**

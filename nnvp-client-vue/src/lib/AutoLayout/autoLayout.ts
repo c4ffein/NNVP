@@ -2,9 +2,9 @@
 //
 // Pure function, no dependencies: FlowGraphEditor.autoLayout() feeds it plain
 // {nodes, edges} (top level first, then one sub-layout per composite) and
-// applies the returned positions itself. The board only produces DAGs, but
-// legacy files saved on the old D3 canvas may contain cycles — back-edges
-// found by DFS are ignored so layering always terminates.
+// applies the returned positions itself. Graphs may contain cycles (drawable
+// on the board since Phase D, and present in legacy D3-era files) —
+// back-edges found by DFS are ignored so layering always terminates.
 //
 // Deterministic: nodes are processed in id order and every tie breaks by id,
 // so the same graph lays out identically regardless of input array order.

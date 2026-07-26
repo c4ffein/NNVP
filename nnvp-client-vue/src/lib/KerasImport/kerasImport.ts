@@ -17,6 +17,7 @@ import type {
   NnvpModel, NnvpLayer, NnvpEdge, KerasLayerJSON, ParameterDef, ParameterValue,
 } from '../../types/model';
 import generatedKerasLayers from '../KerasInterface/generatedKerasLayers.json';
+import { orderGraph, type OrderableGraph } from '../KerasInterface/orderGraph';
 import { readZipText, type Inflate } from './zip';
 
 interface LayerDefJSON { category: string; parameters: Record<string, ParameterDef> }
@@ -280,30 +281,39 @@ function importFunctional(
 function layoutModel(imported: ImportedLayer[]): NnvpModel {
   const idByName = new Map(imported.map((layer, index) => [layer.kerasName, index]));
   const byName = new Map(imported.map(layer => [layer.kerasName, layer]));
+  // Ordering/cycle detection through the shared orderGraph (the same module
+  // codegen uses); the import KEEPS its own policy: any cycle refuses the
+  // whole file with the historical user-facing error.
+  const orderable: OrderableGraph = {};
+  imported.forEach((layer) => {
+    orderable[layer.kerasName] = { sources: [...layer.sources], targets: [] };
+  });
+  imported.forEach((layer) => {
+    layer.sources.forEach(source => orderable[source]?.targets.push(layer.kerasName));
+  });
+  const ordered = orderGraph(orderable);
+  if (ordered.cycles.length > 0) {
+    throw new Error('keras import: the layer graph contains a cycle');
+  }
+  // Depth = longest source chain, computable in one pass since `order` is
+  // topological (every source precedes its consumers).
   const depths = new Map<string, number>();
-  const visiting = new Set<string>();
-  const depthOf = (name: string): number => {
-    const memo = depths.get(name);
-    if (memo !== undefined) return memo;
-    if (visiting.has(name)) throw new Error('keras import: the layer graph contains a cycle');
-    visiting.add(name);
-    const layer = byName.get(name);
-    const depth = layer === undefined || layer.sources.length === 0
+  ordered.order.forEach((name) => {
+    const layer = byName.get(String(name))!;
+    const depth = layer.sources.length === 0
       ? 0
-      : 1 + Math.max(...layer.sources.map(depthOf));
-    visiting.delete(name);
-    depths.set(name, depth);
-    return depth;
-  };
+      : 1 + Math.max(...layer.sources.map(source => depths.get(source) ?? 0));
+    depths.set(String(name), depth);
+  });
   const rows = new Map<number, number>();
   const layers: NnvpLayer[] = imported.map((layer, index) => {
-    const depth = depthOf(layer.kerasName);
+    const depth = depths.get(layer.kerasName) ?? 0;
     const row = rows.get(depth) ?? 0;
     rows.set(depth, row + 1);
     return {
-      class: 'D3Layer',
+      class: 'Layer',
       id: index,
-      htmlID: `d3-layer-${index}`,
+      htmlID: `layer-${index}`,
       name: layer.kerasLayer.name,
       x: X_ORIGIN + depth * X_STEP,
       y: Y_ORIGIN + row * Y_STEP,

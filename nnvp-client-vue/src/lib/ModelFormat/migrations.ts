@@ -3,21 +3,63 @@
 // Every load entry point funnels through adapter.nnvpToFlow, which calls
 // migrateModel; every save funnels through adapter.flowToNnvp, which stamps
 // `formatVersion: CURRENT_FORMAT_VERSION`. A model with no `formatVersion` is
-// version 1 — everything that exists in the wild today (D3-era saves, the
-// shipped BoardTemplates), whose keys (`"class":"D3Layer"`, `d3-layer-*`, ...)
-// must remain readable forever.
+// version 1 — everything saved before versioning existed (D3-era saves, the
+// originally shipped BoardTemplates), whose D3-flavored names
+// (`"class":"D3Layer"`, `htmlID:"d3-layer-*"`, ...) must remain readable
+// forever: the 1->2 migration below renames them to the honest v2 names.
 
 import type { NnvpModel } from '../../types/model';
 
 /** One migration step: rewrites a version-N model into a version-N+1 model. */
 export type NnvpMigration = (model: NnvpModel) => NnvpModel;
 
+// --- 1 -> 2: honest names ----------------------------------------------------
+//
+// Format v1 kept the D3-era spellings; v2 renames them, changing nothing else:
+//   layer.class  "D3Layer"          -> "Layer"
+//   layer.class  "D3LayerComposite" -> "Group"
+//   layer.htmlID "d3-layer-<n>"     -> "layer-<n>"
+// (Applied recursively through composite children. Edge ids/htmlIDs, layer
+// ids, wiring and kerasLayer payloads carry no D3-flavored names — audited
+// against src/types/model.ts, the shipped templates and the D3-era saves.)
+
+/** A layer as a version-1 file spells it (superset of the v2 spelling). */
+type NnvpLayerV1 = Omit<NnvpModel['layers'][number], 'class' | 'children'> & {
+  class: 'Layer' | 'Group' | 'D3Layer' | 'D3LayerComposite';
+  children?: NnvpLayerV1[] | null;
+};
+
+const V1_CLASS_RENAMES = { D3Layer: 'Layer', D3LayerComposite: 'Group' } as const;
+const V1_HTML_ID = /^d3-layer-(\d+)$/;
+
+function renameLayerV1(layer: NnvpLayerV1): NnvpLayerV1 {
+  const renamedClass = layer.class in V1_CLASS_RENAMES
+    ? V1_CLASS_RENAMES[layer.class as keyof typeof V1_CLASS_RENAMES]
+    : layer.class;
+  const htmlID = typeof layer.htmlID === 'string'
+    ? layer.htmlID.replace(V1_HTML_ID, 'layer-$1')
+    : layer.htmlID;
+  return {
+    ...layer,
+    class: renamedClass,
+    htmlID,
+    children: layer.children ? layer.children.map(renameLayerV1) : layer.children,
+  };
+}
+
+const migrateV1toV2: NnvpMigration = model => ({
+  ...model,
+  layers: ((model.layers || []) as NnvpLayerV1[]).map(renameLayerV1) as NnvpModel['layers'],
+});
+
 /**
  * The ordered migration ladder: MIGRATIONS[i] takes a version i+1 model to
  * version i+2. Append-only — never reorder, edit or remove entries, or old
- * files stop loading. Empty today: the current format IS version 1.
+ * files stop loading.
  */
-export const MIGRATIONS: readonly NnvpMigration[] = [];
+export const MIGRATIONS: readonly NnvpMigration[] = [
+  migrateV1toV2,
+];
 
 export const CURRENT_FORMAT_VERSION = MIGRATIONS.length + 1;
 

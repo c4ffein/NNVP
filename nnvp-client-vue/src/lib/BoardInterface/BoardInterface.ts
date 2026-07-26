@@ -1,6 +1,9 @@
 // App-wide facade over the active graph editor: the components and the
 // keyboard/assistant tools talk to the board exclusively through this class
-// (installed as $boardInterface), which delegates to `activeGraph`.
+// (installed as $boardInterface), which delegates to `activeGraph`. Reads of
+// the derived model go through the getLayers/getEdges/getModelInputs/
+// getModelOutputs getters below — nothing outside this class and
+// FlowGraphEditor touches `activeGraph.model` directly.
 
 import { migrateModel } from '../ModelFormat/migrations';
 import type { LayerVizParams } from '../Viz3D/sceneBuild';
@@ -8,7 +11,7 @@ import type FlowGraphEditor from '../FlowInterface/FlowGraphEditor';
 import type {
   CodeGenerator, KerasLayerInstance, LayerWrapper,
 } from '../FlowInterface/FlowGraphEditor';
-import type { NnvpLayerId, NnvpModel } from '../../types/model';
+import type { FlowEdge, NnvpLayerId, NnvpModel } from '../../types/model';
 
 /** Listener on the framework-agnostic event bus (on/off/emit). */
 type BoardListener = (data?: unknown) => void;
@@ -27,6 +30,10 @@ type ImportMetaWithEnv = ImportMeta & { env?: { DEV?: boolean } };
 
 // Dev-only debug handle, shared with main.js and TrainingZone.
 type DebugWindow = Window & { nnvp?: { debug?: Record<string, unknown> } };
+
+// Shared frozen fallbacks for the read getters when no graph is active yet.
+const EMPTY_LAYERS: readonly LayerWrapper[] = Object.freeze([]);
+const EMPTY_EDGES: readonly FlowEdge[] = Object.freeze([]);
 
 export default class BoardInterface {
   graphEditors: FlowGraphEditor[];
@@ -59,7 +66,7 @@ export default class BoardInterface {
     // Only warn about unsaved data if graph is not empty
     // Future improvement: track dirty state (modified but not saved) instead of just checking emptiness
     window.onbeforeunload = () => {
-      if (this.activeGraph && this.activeGraph.model.d3Layers.length > 0) {
+      if (this.getLayers().length > 0) {
         return 'Warning : all unsaved data will be lost';
       }
       // Return undefined to allow navigation without warning
@@ -116,6 +123,30 @@ export default class BoardInterface {
   // Find the layer corresponding to the id on the active graph
   findLayerById(id: NnvpLayerId): LayerWrapper | null {
     return this.activeGraph!.findLayerById(id);
+  }
+
+  // --- Typed read views of the derived model ---------------------------------
+  //
+  // These return the active graph's LIVE arrays by reference (they are only
+  // ever mutated in place — see the contract in FlowGraphEditor.ts), typed
+  // readonly so callers can watch them but never mutate. When no graph is
+  // active they return a frozen empty array: re-call the getter per read
+  // rather than caching the result across graph activation.
+
+  getLayers(): readonly LayerWrapper[] {
+    return this.activeGraph === null ? EMPTY_LAYERS : this.activeGraph.model.layers;
+  }
+
+  getEdges(): readonly FlowEdge[] {
+    return this.activeGraph === null ? EMPTY_EDGES : this.activeGraph.model.edges;
+  }
+
+  getModelInputs(): readonly LayerWrapper[] {
+    return this.activeGraph === null ? EMPTY_LAYERS : this.activeGraph.model.modelInputs;
+  }
+
+  getModelOutputs(): readonly LayerWrapper[] {
+    return this.activeGraph === null ? EMPTY_LAYERS : this.activeGraph.model.modelOutputs;
   }
 
   setActiveGraphEditor(graphEditor: FlowGraphEditor) {
@@ -336,10 +367,10 @@ export default class BoardInterface {
       };
     }
     return {
-      layers: this.activeGraph.model.d3Layers.map(l => ({ id: l.id, type: l.type })),
+      layers: this.activeGraph.model.layers.map(l => ({ id: l.id, type: l.type })),
       inputs: this.activeGraph.model.modelInputs,
       outputs: this.activeGraph.model.modelOutputs,
-      edges: this.activeGraph.model.d3Edges.length,
+      edges: this.activeGraph.model.edges.length,
       undoStack: this.undoStackContainer.e.length,
       redoStack: this.redoStackContainer.e.length,
     };

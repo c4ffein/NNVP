@@ -183,30 +183,52 @@ export default class Dataset {
     });
   }
 
+  // The shuffled-cursor advance shared by the tensor and raw draw paths —
+  // both walk the SAME cursor, so mixing them never replays a sample.
+  private nextTrainIndex(): number {
+    this.shuffledTrainIndex = (this.shuffledTrainIndex + 1) % this.trainIndices.length;
+    return this.trainIndices[this.shuffledTrainIndex]!;
+  }
+
+  private nextTestIndex(): number {
+    this.shuffledTestIndex = (this.shuffledTestIndex + 1) % this.testIndices.length;
+    return this.testIndices[this.shuffledTestIndex]!;
+  }
+
   nextTrainBatch(batchSize: number, encoding = 'one-hot-tf') {
     return this.nextBatch(
-      batchSize, [this.trainImages, this.trainLabels], () => {
-        this.shuffledTrainIndex = (this.shuffledTrainIndex + 1) % this.trainIndices.length;
-        return this.trainIndices[this.shuffledTrainIndex]!;
-      },
-      encoding
+      batchSize, [this.trainImages, this.trainLabels], () => this.nextTrainIndex(), encoding
     );
   }
 
   nextTestBatch(batchSize: number, encoding = 'one-hot-tf') {
-    return this.nextBatch(batchSize, [this.testImages, this.testLabels], () => {
-      this.shuffledTestIndex = (this.shuffledTestIndex + 1) % this.testIndices.length;
-      return this.testIndices[this.shuffledTestIndex]!;
-    }, encoding);
+    return this.nextBatch(
+      batchSize, [this.testImages, this.testLabels], () => this.nextTestIndex(), encoding
+    );
   }
 
-  nextBatch(
+  /**
+   * Tensor-less draws for the worker training engine (TrainingDataset seam):
+   * the exact nextBatch sampling, returning freshly allocated raw arrays
+   * (safe to transfer) — xs flat sample-major, labels as class indices.
+   */
+  nextTrainBatchRaw(batchSize: number): { xs: Float32Array; labels: Int32Array } {
+    return this.nextBatchRaw(
+      batchSize, [this.trainImages, this.trainLabels], () => this.nextTrainIndex()
+    );
+  }
+
+  nextTestBatchRaw(batchSize: number): { xs: Float32Array; labels: Int32Array } {
+    return this.nextBatchRaw(
+      batchSize, [this.testImages, this.testLabels], () => this.nextTestIndex()
+    );
+  }
+
+  nextBatchRaw(
     batchSize: number,
     data: [Float32Array, Uint8Array],
     index: () => number,
-    encoding = 'one-hot-tf',
-  ) {
-    const tf = getTf();
+  ): { xs: Float32Array; labels: Int32Array } {
     const batchImagesArray = new Float32Array(batchSize * this.imageByteSize);
     const batchLabelsArray = new Int32Array(batchSize);
 
@@ -219,6 +241,18 @@ export default class Dataset {
       const label = data[1].slice(idx * this.labelSize, idx * this.labelSize + this.labelSize);
       batchLabelsArray[i] = label[0]!;
     }
+
+    return { xs: batchImagesArray, labels: batchLabelsArray };
+  }
+
+  nextBatch(
+    batchSize: number,
+    data: [Float32Array, Uint8Array],
+    index: () => number,
+    encoding = 'one-hot-tf',
+  ) {
+    const tf = getTf();
+    const { xs: batchImagesArray, labels: batchLabelsArray } = this.nextBatchRaw(batchSize, data, index);
 
     const xs = tf.tensor2d(batchImagesArray, [batchSize, this.imageByteSize]);
     const labels = this.labelEncoder.encode(batchLabelsArray, encoding);

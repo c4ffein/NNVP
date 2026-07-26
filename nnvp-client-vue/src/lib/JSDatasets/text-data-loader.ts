@@ -85,27 +85,44 @@ export default class TextDataset {
     if (progressionCallback) progressionCallback(1);
   }
 
+  // The shuffled-cursor advance shared by the tensor and raw draw paths —
+  // both walk the SAME cursor, so mixing them never replays a window.
+  private nextTrainIndex(): number {
+    this.shuffledTrainIndex = (this.shuffledTrainIndex + 1) % this.trainIndices.length;
+    return this.trainIndices[this.shuffledTrainIndex]!;
+  }
+
+  private nextTestIndex(): number {
+    this.shuffledTestIndex = (this.shuffledTestIndex + 1) % this.testIndices.length;
+    return this.testIndices[this.shuffledTestIndex]!;
+  }
+
   nextTrainBatch(batchSize: number, encoding = 'one-hot-tf') {
-    return this.nextBatch(batchSize, this.trainStart, () => {
-      this.shuffledTrainIndex = (this.shuffledTrainIndex + 1) % this.trainIndices.length;
-      return this.trainIndices[this.shuffledTrainIndex]!;
-    }, encoding);
+    return this.nextBatch(batchSize, this.trainStart, () => this.nextTrainIndex(), encoding);
   }
 
   nextTestBatch(batchSize: number, encoding = 'one-hot-tf') {
-    return this.nextBatch(batchSize, this.testStart, () => {
-      this.shuffledTestIndex = (this.shuffledTestIndex + 1) % this.testIndices.length;
-      return this.testIndices[this.shuffledTestIndex]!;
-    }, encoding);
+    return this.nextBatch(batchSize, this.testStart, () => this.nextTestIndex(), encoding);
   }
 
-  nextBatch(
+  /**
+   * Tensor-less draws for the worker training engine (TrainingDataset seam):
+   * the exact nextBatch windowing, returning freshly allocated raw arrays
+   * (safe to transfer) — xs as encoded char windows, labels the next char.
+   */
+  nextTrainBatchRaw(batchSize: number): { xs: Float32Array; labels: Int32Array } {
+    return this.nextBatchRaw(batchSize, this.trainStart, () => this.nextTrainIndex());
+  }
+
+  nextTestBatchRaw(batchSize: number): { xs: Float32Array; labels: Int32Array } {
+    return this.nextBatchRaw(batchSize, this.testStart, () => this.nextTestIndex());
+  }
+
+  nextBatchRaw(
     batchSize: number,
     regionStart: number,
     index: () => number,
-    encoding = 'one-hot-tf',
-  ) {
-    const tf = getTf();
+  ): { xs: Float32Array; labels: Int32Array } {
     const batchXs = new Float32Array(batchSize * this.seqLen);
     const batchLabels = new Int32Array(batchSize);
     for (let i = 0; i < batchSize; i += 1) {
@@ -115,6 +132,17 @@ export default class TextDataset {
       }
       batchLabels[i] = this.corpus[start + this.seqLen]!;
     }
+    return { xs: batchXs, labels: batchLabels };
+  }
+
+  nextBatch(
+    batchSize: number,
+    regionStart: number,
+    index: () => number,
+    encoding = 'one-hot-tf',
+  ) {
+    const tf = getTf();
+    const { xs: batchXs, labels: batchLabels } = this.nextBatchRaw(batchSize, regionStart, index);
     const xs = tf.tensor2d(batchXs, [batchSize, this.seqLen]);
     const labels = this.labelEncoder.encode(batchLabels, encoding);
     return { xs, labels };

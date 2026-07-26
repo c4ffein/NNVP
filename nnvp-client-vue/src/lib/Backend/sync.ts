@@ -1,20 +1,25 @@
 /**
- * sync.ts — local <-> cloud reconciliation for uuid-keyed records (runs,
- * conversations), PLAN.md Phase 6.
+ * sync.ts — local <-> cloud reconciliation, PLAN.md Phase 6 + Phase C v2.
  *
- * The model is deliberately merge-free:
- *   - Pull what the server has and the client lacks (uuid set difference).
- *   - Push what the client has and the server lacks — unless the record is
- *     flagged `localOnly` (the ONE mutable flag: set by a cloud-delete so the
- *     surviving local copy is never re-uploaded behind the user's back).
- *   - Runs are immutable: a uuid on both sides means nothing to do.
- *   - Conversations mutate: a uuid on both sides is resolved by `updatedAt`
- *     (ISO strings — lexicographic order IS chronological order) and the
- *     newer side is copied over the older one, whole-record, no merging.
+ * Two sync surfaces now live here:
+ *   - EVENTS (sync v2, Phase C): the domain event log syncs by pure uuid
+ *     set-difference — paginate the remote uuid listing fully, batch-get
+ *     what the client lacks (appended through the event store, so folds and
+ *     live subscribers update), batch-put what the server lacks. Events are
+ *     immutable and puts are per-item idempotent, so both-sides is always a
+ *     no-op and re-push is always safe; LWW does not exist here. `localOnly`
+ *     events (post-purge survivors, exploded copies of detached legacy
+ *     records) never push.
+ *   - RECORDS (Phase 6): conversations only, as before — pull the missing,
+ *     push the non-localOnly missing, resolve both-sides by `updatedAt`
+ *     whole-record LWW. RUNS RECORDS NO LONGER SYNC: run history rides the
+ *     event log now; the legacy 'runs' store is read-only local data. The
+ *     syncRecords guard against pushing outcome:'running' snapshots stays,
+ *     pinned, for the generic record path's integrity.
  *
  * Everything is injectable: `api` is a minimal structural interface over the
- * four per-kind endpoints, `store` is the RecordStore seam. The app wires the
- * real ApiClient (which satisfies SyncApiClient structurally) through
+ * endpoints, `store` is the RecordStore seam. The app wires the real
+ * ApiClient (which satisfies the interfaces structurally) through
  * syncAll() / installSyncOnAuth(); tests inject fakes.
  *
  * Delete semantics (decided, exact — see PLAN.md Phase 6):
@@ -28,18 +33,26 @@
  * deleteChoicesFor() is that pure helper.
  */
 
-import { AUTH_CHANGED_EVENT } from './apiClient';
-import type { RecordStore, RecordStoreName, StoredRecord } from '../LocalStore/recordStore';
+import { bus } from '../Events/bus';
+import type { RecordStore, StoredRecord } from '../LocalStore/recordStore';
+import type { DomainEvent } from '../Events/domainEvent';
+import { appendEvent, listAllEvents } from '../Events/store';
+import { ensureLegacyRunsExploded } from '../Training/runJournal';
 
-/** The two synced record kinds; identical to the local store names on purpose. */
-export type SyncKind = RecordStoreName;
+/** The record kinds syncRecords understands. Only 'conversations' still
+ *  syncs as records ('runs' moved to the event log); the 'runs' path stays
+ *  supported and pinned so the generic mechanism keeps its contract. */
+export type SyncKind = 'runs' | 'conversations';
 
-/** A stored record as sync sees it: the uuid plus the two fields it reads. */
+/** A stored record as sync sees it: the uuid plus the three fields it reads. */
 export interface SyncableRecord extends StoredRecord {
   /** Set by a cloud-delete: this record must never be pushed again. */
   localOnly?: boolean;
   /** ISO timestamp; conversations only — decides who wins a both-sides conflict. */
   updatedAt?: string;
+  /** Runs only: 'running' means in-flight — pushing it would freeze a stale
+   * snapshot in the cloud forever, since runs are immutable on both sides. */
+  outcome?: string;
 }
 
 /**
@@ -57,7 +70,9 @@ export interface KindApi {
   delete(uuid: string): Promise<unknown>;
 }
 
-/** The slice of ApiClient that syncAll needs — satisfied structurally. */
+/** The record-kind slice of ApiClient — satisfied structurally. The run
+ *  quartet remains for kindApiFrom completeness even though syncAll no
+ *  longer syncs runs records. */
 export interface SyncApiClient {
   listRuns(): Promise<unknown>;
   getRun(uuid: string): Promise<unknown>;
@@ -69,8 +84,20 @@ export interface SyncApiClient {
   deleteConversation(uuid: string): Promise<unknown>;
 }
 
+/** The three event endpoints sync v2 consumes (ApiClient satisfies it). */
+export interface EventsApi {
+  listEventUuids(params?: { cursor?: number; limit?: number; streamId?: string }):
+    Promise<{ uuids: string[]; nextCursor: number | null }>;
+  batchGetEvents(uuids: string[]): Promise<DomainEvent[]>;
+  batchPutEvents(events: DomainEvent[]):
+    Promise<{ uuid: string; status: string; error?: string | null }[]>;
+}
+
+/** Everything syncAll drives: conversations records + the event log. */
+export interface SyncV2ApiClient extends SyncApiClient, EventsApi {}
+
 /** What installSyncOnAuth additionally needs: the auth boundary. */
-export interface AuthedSyncApiClient extends SyncApiClient {
+export interface AuthedSyncApiClient extends SyncV2ApiClient {
   isLoggedIn(): boolean;
 }
 
@@ -84,8 +111,14 @@ export interface SyncSummary {
   updated: number;
 }
 
+/** The event half's outcome: pure set-difference, so no 'updated' exists. */
+export interface EventSyncSummary {
+  pulled: number;
+  pushed: number;
+}
+
 export interface SyncAllSummary {
-  runs: SyncSummary;
+  events: EventSyncSummary;
   conversations: SyncSummary;
 }
 
@@ -177,9 +210,11 @@ export async function syncRecords({ api, store, kind }: {
     // kind === 'runs' with a local copy: immutable, both-sides = no-op.
   }
 
-  // Push what we have and the server lacks — never localOnly records.
+  // Push what we have and the server lacks — never localOnly records, and
+  // never in-flight runs (immutable remotely: an early push could never be
+  // corrected once the run finishes).
   for (const record of locals) {
-    if (!remoteSet.has(record.uuid) && !record.localOnly) {
+    if (!remoteSet.has(record.uuid) && !record.localOnly && record.outcome !== 'running') {
       await api.put(record.uuid, record);
       summary.pushed += 1;
     }
@@ -188,16 +223,79 @@ export async function syncRecords({ api, store, kind }: {
   return summary;
 }
 
-/** Run both kinds; the real ApiClient satisfies SyncApiClient structurally. */
+// --- sync v2: the event log (uuid set-difference, immutable both ways) -----------
+
+/** The server's batch cap — chunk size for batch-get and batch-put alike. */
+export const EVENT_BATCH_LIMIT = 500;
+
+function* chunksOf<T>(items: T[], size: number): Generator<T[]> {
+  for (let start = 0; start < items.length; start += size) {
+    yield items.slice(start, start + size);
+  }
+}
+
+/**
+ * Reconcile the local event log with the cloud:
+ *   1. legacy RunRecords explode first (deterministic uuids — see runJournal),
+ *      so pre-event history takes part in the very first sync;
+ *   2. the remote uuid listing is paginated to exhaustion (nextCursor null);
+ *   3. events the server has and we lack are batch-fetched and APPENDED
+ *      through the event store — persisted, deduped, emitted on the bus;
+ *   4. events we have (and not localOnly) that the server lacks are
+ *      batch-put — per-item idempotent, so racing devices cannot conflict.
+ * Nothing is ever updated or merged: events are immutable, the diff is the
+ * whole algorithm.
+ */
+export async function syncEvents({ api, store }: {
+  api: EventsApi;
+  store: RecordStore;
+}): Promise<EventSyncSummary> {
+  await ensureLegacyRunsExploded(store);
+
+  const remote = new Set<string>();
+  let cursor: number | undefined;
+  do {
+    const page = await api.listEventUuids(cursor === undefined ? {} : { cursor });
+    for (const uuid of page.uuids) remote.add(uuid);
+    cursor = page.nextCursor ?? undefined;
+  } while (cursor !== undefined);
+
+  const locals = await listAllEvents(store);
+  const localUuids = new Set(locals.map(event => event.uuid));
+
+  let pulled = 0;
+  const missingLocally = [...remote].filter(uuid => !localUuids.has(uuid));
+  for (const batch of chunksOf(missingLocally, EVENT_BATCH_LIMIT)) {
+    for (const event of await api.batchGetEvents(batch)) {
+      if (await appendEvent(event, { store })) pulled += 1;
+    }
+  }
+
+  let pushed = 0;
+  const missingRemotely = locals
+    .filter(event => !remote.has(event.uuid) && !event.localOnly)
+    // The localOnly flag is device-private state, not part of the event.
+    .map(({ localOnly: _localOnly, ...event }) => event as DomainEvent);
+  for (const batch of chunksOf(missingRemotely, EVENT_BATCH_LIMIT)) {
+    const results = await api.batchPutEvents(batch);
+    // 'exists' is also success (someone raced us there) — count real writes.
+    pushed += results.filter(result => result.status === 'created').length;
+  }
+
+  return { pulled, pushed };
+}
+
+/** Run the event log + conversations; ApiClient satisfies this structurally.
+ *  Runs RECORDS deliberately absent — run history is the event log now. */
 export async function syncAll({ apiClient, store }: {
-  apiClient: SyncApiClient;
+  apiClient: SyncV2ApiClient;
   store: RecordStore;
 }): Promise<SyncAllSummary> {
-  const runs = await syncRecords({ api: kindApiFrom(apiClient, 'runs'), store, kind: 'runs' });
+  const events = await syncEvents({ api: apiClient, store });
   const conversations = await syncRecords({
     api: kindApiFrom(apiClient, 'conversations'), store, kind: 'conversations',
   });
-  return { runs, conversations };
+  return { events, conversations };
 }
 
 /**
@@ -240,25 +338,27 @@ export function deleteChoicesFor(
   return cloudUuids.has(record.uuid) ? ['local', 'cloud', 'both'] : ['local'];
 }
 
-/** The addEventListener surface installSyncOnAuth needs (window-ish, injectable). */
-export interface AuthEventTarget {
-  addEventListener(type: string, listener: () => void): void;
-  removeEventListener(type: string, listener: () => void): void;
+/** The subscription surface installSyncOnAuth needs: 'auth.changed' on an
+ *  emitter (the app bus by default; tests inject their own Emitter). */
+export interface AuthEventSource {
+  on(type: 'auth.changed', handler: () => void): () => void;
 }
 
 /**
- * Wire "sync when signed in" to the auth boundary: listens for
- * AUTH_CHANGED_EVENT on `target` (the app passes window; main.ts calls this
- * once at startup) and runs syncAll whenever the client is logged in — which
- * covers login. Sign-out fires the same event but is a no-op here. By default
- * it also syncs immediately when already logged in at install time (a stored
- * token fires no event on page load). Overlapping triggers are coalesced:
- * a sync already in flight is not doubled. Returns the uninstaller.
+ * Wire "sync when signed in" to the auth boundary: subscribes to the bus's
+ * 'auth.changed' (emitted by ApiClient on every token change; main.ts calls
+ * this once at startup) and runs syncAll — events AND conversations, one
+ * coalesced pass — whenever the client is logged in —
+ * which covers login. Sign-out fires the same event but is a no-op here. By
+ * default it also syncs immediately when already logged in at install time
+ * (a stored token fires no event on page load). Overlapping triggers are
+ * coalesced: a sync already in flight is not doubled. Returns the uninstaller.
  */
 export function installSyncOnAuth({
-  target, apiClient, store, immediate = true, onSynced, onError,
+  events = bus, apiClient, store, immediate = true, onSynced, onError,
 }: {
-  target: AuthEventTarget;
+  /** The bus to listen on; defaults to the app-wide one. Tests inject theirs. */
+  events?: AuthEventSource;
   apiClient: AuthedSyncApiClient;
   store: RecordStore;
   /** Also sync right away when a token is already present (default true). */
@@ -283,8 +383,7 @@ export function installSyncOnAuth({
     }
   };
 
-  const listener = () => { void run(); };
-  target.addEventListener(AUTH_CHANGED_EVENT, listener);
+  const off = events.on('auth.changed', () => { void run(); });
   if (immediate) void run();
-  return () => target.removeEventListener(AUTH_CHANGED_EVENT, listener);
+  return off;
 }

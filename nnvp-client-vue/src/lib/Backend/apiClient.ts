@@ -20,7 +20,67 @@
  * `code` so the UI can react without string-matching messages.
  */
 
+import { bus } from '../Events/bus';
+import type { DomainEvent } from '../Events/domainEvent';
+
 export const DEFAULT_BASE_URL = '/api';
+
+// --- domain events: the wire mapping (snake_case) ---------------------------
+// The backend speaks snake_case envelopes; everything client-side speaks the
+// camelCase DomainEvent. THIS is the one boundary where the two shapes meet —
+// exported so the fake backend can mirror the exact same wire format.
+
+/** The server's event envelope (created_at is output-only). */
+export interface WireEvent {
+  uuid: string;
+  event_type: string;
+  stream_id: string | null;
+  device_id: string;
+  instance_id: string;
+  seq: number;
+  depends_on: string[];
+  wall_time: string;
+  payload: Record<string, unknown>;
+  created_at?: string;
+}
+
+/** One batch-put result line: per-item, idempotent server-side. */
+export interface EventPutResult {
+  uuid: string;
+  status: 'created' | 'exists' | 'invalid';
+  error?: string | null;
+}
+
+/** DomainEvent -> wire envelope. localOnly (device-private) never leaves. */
+export function eventToWire(event: DomainEvent): WireEvent {
+  return {
+    uuid: event.uuid,
+    event_type: event.type,
+    stream_id: event.streamId ?? null,
+    device_id: event.deviceId,
+    instance_id: event.instanceId,
+    seq: event.seq,
+    depends_on: event.dependsOn,
+    wall_time: event.wallTime,
+    payload: (event.payload && typeof event.payload === 'object'
+      ? event.payload : {}) as Record<string, unknown>,
+  };
+}
+
+/** Wire envelope -> DomainEvent (created_at, a server detail, is dropped). */
+export function eventFromWire(wire: WireEvent): DomainEvent {
+  return {
+    uuid: wire.uuid,
+    type: wire.event_type,
+    streamId: wire.stream_id ?? null,
+    deviceId: wire.device_id,
+    instanceId: wire.instance_id,
+    seq: wire.seq,
+    dependsOn: Array.isArray(wire.depends_on) ? wire.depends_on : [],
+    wallTime: typeof wire.wall_time === 'string' ? wire.wall_time : '',
+    payload: (wire.payload && typeof wire.payload === 'object') ? wire.payload : {},
+  };
+}
 
 export const STORAGE_KEYS = {
   token: 'nnvp_backend_token',
@@ -44,16 +104,12 @@ export interface StorageLike {
 }
 
 /**
- * Fired on window whenever the stored token changes (sign-in, sign-out,
- * expiry cleanup) so header icons / the chat bubble can re-read auth state
- * without a store or polling.
+ * Emitted on the app bus (lib/Events) whenever the stored token changes
+ * (sign-in, sign-out, expiry cleanup) so header icons / the chat bubble can
+ * re-read auth state without a store or polling.
  */
-export const AUTH_CHANGED_EVENT = 'nnvp:auth-changed';
-
 function notifyAuthChanged() {
-  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
-    window.dispatchEvent(new CustomEvent(AUTH_CHANGED_EVENT));
-  }
+  bus.emit('auth.changed');
 }
 
 /**
@@ -362,6 +418,67 @@ export default class ApiClient {
 
   async deleteRun(uuid: string) {
     return this.request(`/runs/${uuid}`, { method: 'DELETE', auth: true });
+  }
+
+  // --- events (append-only domain events, uuid set-difference sync) -----------
+  // Server contract: paginated uuid listing (ascending (created_at, id)),
+  // batch-get/batch-put capped at 500 per call (422 above), per-item
+  // idempotent puts (stored events are never touched), and purge-by-stream as
+  // the one destructive primitive. All snake_case on the wire — mapped to the
+  // client DomainEvent shape HERE and nowhere else.
+
+  /**
+   * One page of the owner's event uuids: { uuids, nextCursor } — nextCursor
+   * null means last page. Optional streamId narrows to one stream (the
+   * cloud-presence probe for the purge choices).
+   */
+  async listEventUuids({ cursor, limit, streamId }: {
+    cursor?: number;
+    limit?: number;
+    streamId?: string;
+  } = {}): Promise<{ uuids: string[]; nextCursor: number | null }> {
+    const params = new URLSearchParams();
+    if (cursor !== undefined) params.set('cursor', String(cursor));
+    if (limit !== undefined) params.set('limit', String(limit));
+    if (streamId !== undefined) params.set('stream_id', streamId);
+    const query = params.toString();
+    const data = await this.request(`/events/uuids${query ? `?${query}` : ''}`, { auth: true }) as
+      { uuids?: unknown; next_cursor?: unknown } | null;
+    const uuids = Array.isArray(data?.uuids)
+      ? data!.uuids.filter((uuid): uuid is string => typeof uuid === 'string' && !!uuid)
+      : [];
+    return { uuids, nextCursor: typeof data?.next_cursor === 'number' ? data.next_cursor : null };
+  }
+
+  /** The full events for a uuid batch (≤500); unknown/foreign uuids are
+   *  silently omitted by the server — the caller just gets fewer events. */
+  async batchGetEvents(uuids: string[]): Promise<DomainEvent[]> {
+    const data = await this.request('/events/batch-get', {
+      method: 'POST', auth: true, body: { uuids },
+    }) as { events?: unknown } | null;
+    if (!Array.isArray(data?.events)) return [];
+    return data!.events
+      .filter((wire): wire is WireEvent => !!wire && typeof wire === 'object'
+        && typeof (wire as WireEvent).uuid === 'string')
+      .map(eventFromWire);
+  }
+
+  /** Idempotent batch upload (≤500): per-item results, 'exists' is success. */
+  async batchPutEvents(events: DomainEvent[]): Promise<EventPutResult[]> {
+    const data = await this.request('/events/batch-put', {
+      method: 'POST', auth: true, body: { events: events.map(eventToWire) },
+    }) as { results?: unknown } | null;
+    return Array.isArray(data?.results) ? data!.results as EventPutResult[] : [];
+  }
+
+  /** Purge one stream's events from the cloud (privacy-grade destruction —
+   *  deliberately NOT an event). Returns how many were deleted (0 for
+   *  empty/foreign streams). */
+  async purgeEventStream(streamId: string): Promise<number> {
+    const data = await this.request(`/events/by-stream/${streamId}`, {
+      method: 'DELETE', auth: true,
+    }) as { deleted?: unknown } | null;
+    return typeof data?.deleted === 'number' ? data.deleted : 0;
   }
 
   // --- conversations (mutable records, upsert on updatedAt) -------------------

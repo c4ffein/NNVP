@@ -9,6 +9,13 @@ import { DEFAULT_COLOR_SCHEME } from './colorSchemes';
 
 const STORAGE_KEY = 'nnvp_settings';
 
+/**
+ * Where the tfjs demo trainer runs: the historical main-thread engine
+ * (lib/Training/tfjsEngine) or the Web Worker one (lib/Training/workerEngine
+ * — generated-code eval and fit off the main thread).
+ */
+export type TrainingEngineChoice = 'tfjs' | 'tfjs-worker';
+
 export interface SettingsValues {
   /** Activation color ramp shared by the 2D inspect overlays and the 3D view. */
   colorScheme: ColorSchemeId;
@@ -16,12 +23,15 @@ export interface SettingsValues {
   viz3dIntroSeen: boolean;
   /** The 3D view's help legend is expanded (collapses to a "?" button). */
   viz3dLegendOpen: boolean;
+  /** Training engine choice (TrainingZone.startTraining reads it per run). */
+  trainingEngine: TrainingEngineChoice;
 }
 
 export const SETTINGS_DEFAULTS: SettingsValues = {
   colorScheme: DEFAULT_COLOR_SCHEME,
   viz3dIntroSeen: false,
   viz3dLegendOpen: true,
+  trainingEngine: 'tfjs', // the worker engine is opt-in
 };
 
 type Listener = () => void;

@@ -92,6 +92,17 @@ export interface TrainingDataset {
   readonly trainLabels?: Uint8Array | Int32Array;
   /** Floats per sample (= product of shape). */
   readonly imageByteSize?: number;
+  /**
+   * Raw per-fit draws for engines that ship batches across a boundary (the
+   * worker engine): same sampling discipline as nextTrainBatch/nextTestBatch
+   * (they advance the SAME shuffled-index cursor) but no tensors — xs is the
+   * flat sample-major slice, labels are class indices. MUST return freshly
+   * allocated arrays: the caller may transfer (detach) their buffers.
+   */
+  nextTrainBatchRaw?(batchSize: number): { xs: Float32Array; labels: Int32Array };
+  nextTestBatchRaw?(batchSize: number): { xs: Float32Array; labels: Int32Array };
+  /** Label class count (the one-hot depth), where the loader knows it. */
+  readonly numClasses?: number;
 }
 
 /** Weights by variable name, flattened to raw values. */

@@ -66,6 +66,10 @@ export function orderedRealLayerIds(graphJson: string | NnvpModel): NnvpLayerId[
   const json: NnvpModel = typeof graphJson === 'string'
     ? JSON.parse(graphJson) : JSON.parse(JSON.stringify(graphJson));
   const generator = new KerasGenerator(json, true);
+  // A cyclic graph can't normally get here (training refuses to build it),
+  // but if one does, fail typed instead of pairing layers against a
+  // truncated order — that mismatch would misattribute activations.
+  generator.assertAcyclic('Inspect mode');
   return generator.list.filter((id) => {
     const { name } = generator.graph[id]!.keras_data!;
     return name !== 'Input' && name !== 'Output';

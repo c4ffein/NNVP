@@ -8,23 +8,32 @@
                                                                 "jsonToGraph"] }] */
 
 import KerasGeneratorPythonHelper from './KerasGeneratorPythonHelper';
+import type { GeneratorParamDef } from './KerasGeneratorPythonHelper';
 import KerasGeneratorJavascriptHelper from './KerasGeneratorJavascriptHelper';
 import KerasGeneratorPyTorchHelper from './KerasGeneratorPyTorchHelper';
 import KerasGeneratorTinygradHelper from './KerasGeneratorTinygradHelper';
+import generateImperativePython from './KerasGeneratorImperativePythonHelper';
+import { planUnroll } from './unrollPlan';
+import { orderGraph, CyclicGraphError } from './orderGraph';
+import { assertKnownIdentifier } from './codegenSafety';
+import { isKnownLayerName, knownParameterNames } from './catalogMembership';
 import type { KerasLayerJSON, NnvpLayer, NnvpLayerId, NnvpModel } from '../../types/model';
+
+export { CyclicGraphError };
 
 /**
  * The generator moves each layer's `kerasLayer` to the node's `keras_data`
- * and deletes it from the stashed `d3_data`, hence the optional override.
+ * and deletes it from the stashed `boardData`, hence the optional override.
  */
-export type GeneratorLayerData = Omit<NnvpLayer, 'kerasLayer'> & { kerasLayer?: KerasLayerJSON | null };
+export type BoardLayerData = Omit<NnvpLayer, 'kerasLayer'> & { kerasLayer?: KerasLayerJSON | null };
 
 /** One node of the generator's working graph (also what the helpers consume). */
 export interface GeneratorGraphNode {
   sources: NnvpLayerId[];
   targets: NnvpLayerId[];
   keras_data: KerasLayerJSON | null;
-  d3_data: GeneratorLayerData | null;
+  /** The board-side layer entry (position, wiring, ...) as stored in the file. */
+  boardData: BoardLayerData | null;
   treated: boolean;
 }
 
@@ -36,6 +45,11 @@ export default class KerasGenerator {
   inputs: NnvpLayerId[];
   outputs: NnvpLayerId[];
   list: NnvpLayerId[];
+  /** Cycle members + nodes starved by a cycle — see orderGraph. Non-empty
+   *  makes every generate* entry point throw CyclicGraphError. */
+  excluded: NnvpLayerId[];
+  /** The actual cycle node groups (orderGraph's Tarjan SCCs). */
+  cycles: NnvpLayerId[][];
   sequential: boolean;
   helper: KerasGeneratorJavascriptHelper | KerasGeneratorPythonHelper;
 
@@ -44,7 +58,18 @@ export default class KerasGenerator {
     this.graph = this.jsonToGraph(json);
     this.inputs = this.findInputs();
     this.outputs = this.findOutputs();
-    this.list = this.createTreatmentList();
+    // The shared topological ordering (orderGraph, also used by the .keras
+    // import): same treatment-list semantics the generator always had for
+    // acyclic graphs. Cyclic graphs no longer truncate silently — the
+    // excluded set is kept and every generate* refuses on it (decision 9:
+    // cyclic models route to imperative emission, not yet implemented).
+    const ordered = orderGraph(this.graph, this.inputs);
+    this.list = ordered.order;
+    this.excluded = ordered.excluded;
+    this.cycles = ordered.cycles;
+    for (const id of this.list) { // eslint-disable-line
+      this.graph[id]!.treated = true;
+    }
     this.sequential = this.isSequential();
     // Too bad we can't easily and cleanly heritate those classes from this one while doing mutual
     // inclusion, we'll have to use composition instead
@@ -71,12 +96,12 @@ export default class KerasGenerator {
       const nodeId = layer.id;
       if (!Object.prototype.hasOwnProperty.call(result, nodeId)) {
         result[nodeId] = {
-          sources: [], targets: [], keras_data: null, d3_data: null, treated: false,
+          sources: [], targets: [], keras_data: null, boardData: null, treated: false,
         };
       }
-      result[nodeId]!.d3_data = layer;
+      result[nodeId]!.boardData = layer;
       result[nodeId]!.keras_data = layer.kerasLayer;
-      delete result[nodeId]!.d3_data!.kerasLayer;
+      delete result[nodeId]!.boardData!.kerasLayer;
       result[nodeId]!.sources = layer.inputLayers;
       result[nodeId]!.targets = layer.outputLayers;
     } else {
@@ -104,40 +129,46 @@ export default class KerasGenerator {
     return outputs;
   }
 
-  // Build a treatment array from a graph
-  // The array contains the nodes that will be used to generate Python code in the
-  // right order so that every input of a Keras layer is already defined.
-  createTreatmentList(): NnvpLayerId[] {
-    const list: NnvpLayerId[] = [];
-    // Adds the node and his targets to the array.
-    // Adds the node only if all his sources are already added. Otherwise,
-    // it waits for another call of this function to add the node. That way,
-    // each node is added only once, and the Keras layers will be generated in
-    // the correct order.
-    const addNodeToList = (node: NnvpLayerId): boolean => {
-      // Guard against cycles (and diamond/converging DAGs): never treat a node
-      // twice. Without this, a graph whose targets loop back to an already
-      // treated node would recurse infinitely / blow the stack, and a node
-      // reachable through several paths could be added more than once.
-      if (this.graph[node]!.treated) {
-        return false;
-      }
-      for (const s of this.graph[node]!.sources) { // eslint-disable-line
-        if (!this.graph[s]!.treated) {
-          return false;
-        }
-      }
-      list.push(node);
-      this.graph[node]!.treated = true;
-      for (const t of this.graph[node]!.targets) { // eslint-disable-line
-        addNodeToList(t);
-      }
-      return true;
-    };
-    for (const i of this.findInputs()) { // eslint-disable-line
-      addNodeToList(i);
-    }
-    return list;
+  /** Renders one node id as a user-legible label ("Dense (id 4)"). */
+  labelFor = (id: NnvpLayerId): string => {
+    const node = this.graph[id];
+    const name = node?.keras_data?.name ?? node?.boardData?.name;
+    return name ? `${name} (id ${id})` : `id ${id}`;
+  };
+
+  /**
+   * Refuse cyclic graphs loudly (never silently truncated): for targets
+   * without imperative emission (JavaScript/PyTorch/tinygrad — Python has it
+   * since Phase D2), a feedback loop throws a typed, user-legible
+   * CyclicGraphError naming the target that DOES support cycles.
+   * @param activity user-facing activity label ("PyTorch code generation", ...)
+   */
+  assertAcyclic(activity: string): void {
+    if (this.excluded.length === 0) return;
+    throw new CyclicGraphError(activity, this.excluded, this.cycles, this.labelFor);
+  }
+
+  /**
+   * Membership hardening (Phase D2): pattern-valid names are not enough —
+   * every layer name must exist in the merged catalog (generated + NNVP text
+   * layers, aliases included) and every parameter name in that layer's
+   * catalog parameters. Params flagged skipInGeneration (a code-defined
+   * GeneratorParamDef escape hatch) never reach the output, so their names
+   * are exempt.
+   */
+  assertCatalogMembership(ids: NnvpLayerId[]): void {
+    ids.forEach((id) => {
+      const data = this.graph[id]?.keras_data;
+      if (!data) return;
+      assertKnownIdentifier(data.name, 'layer type name', isKnownLayerName);
+      const known = knownParameterNames(data.name);
+      Object.keys(data.parameterValues ?? {}).forEach((param) => {
+        const def = (data.parameterDef ? data.parameterDef[param] : undefined) as
+          GeneratorParamDef | undefined;
+        if (def && def.skipInGeneration === true) return;
+        assertKnownIdentifier(param, 'parameter name', name => known.has(name));
+      });
+    });
   }
 
   // Return true if we can generate a sequential layer, false otherwise
@@ -162,24 +193,53 @@ export default class KerasGenerator {
   }
 
   generatePythonFromGraph() {
+    // Phase D2: a cyclic graph routes to imperative (subclassing) emission
+    // instead of throwing — acyclic graphs keep the functional/sequential
+    // emission byte-identical (pinned by tests).
+    if (this.excluded.length > 0) return this.generateImperativePython();
+    this.assertCatalogMembership(this.list);
     return new KerasGeneratorPythonHelper(
       this.graph, this.inputs, this.outputs, this.list, this.sequential,
     ).generate();
   }
 
+  /** The Keras subclassing form for graphs with feedback loops (decision 9). */
+  private generateImperativePython(): string {
+    // Membership first, over everything the plan may emit (order + excluded =
+    // all nodes reachable from the inputs), so a hostile rename inside a loop
+    // surfaces as the membership error, not a confusing plan failure.
+    this.assertCatalogMembership([...this.list, ...this.excluded]);
+    const steps = planUnroll({
+      graph: this.graph,
+      inputs: this.inputs,
+      cycles: this.cycles,
+      excluded: this.excluded,
+      edges: this.json.edges,
+      activity: 'Python code generation',
+      label: this.labelFor,
+    });
+    return generateImperativePython(this.graph, this.inputs, this.outputs, steps);
+  }
+
   generateJavascriptFromGraph() {
+    this.assertAcyclic('JavaScript code generation');
+    this.assertCatalogMembership(this.list);
     return new KerasGeneratorJavascriptHelper(
       this.graph, this.inputs, this.outputs, this.list, this.sequential,
     ).generate();
   }
 
   generatePyTorchFromGraph() {
+    this.assertAcyclic('PyTorch code generation');
+    this.assertCatalogMembership(this.list);
     return new KerasGeneratorPyTorchHelper(
       this.graph, this.inputs, this.outputs, this.list, this.sequential,
     ).generate();
   }
 
   generateTinygradFromGraph() {
+    this.assertAcyclic('tinygrad code generation');
+    this.assertCatalogMembership(this.list);
     return new KerasGeneratorTinygradHelper(
       this.graph, this.inputs, this.outputs, this.list, this.sequential,
     ).generate();

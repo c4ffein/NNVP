@@ -10,10 +10,14 @@
  * records (conversations) just rewrite themselves under the same uuid.
  */
 
-export type RecordStoreName = 'runs' | 'conversations';
+export type RecordStoreName = 'runs' | 'conversations' | 'events';
 
-/** Every objectStore the database holds; bump DB_VERSION in indexedDbStore when this grows. */
-export const RECORD_STORE_NAMES: RecordStoreName[] = ['runs', 'conversations'];
+/** Every objectStore the database holds; bump DB_VERSION in indexedDbStore when this grows.
+ *  'events' (v2) is the append-only domain-event log (lib/Events/store.ts);
+ *  'runs' is read-only legacy since the run journal became event-sourced —
+ *  existing records stay untouched and explode into synthetic events on first
+ *  use (lib/Training/runJournal.ts). */
+export const RECORD_STORE_NAMES: RecordStoreName[] = ['runs', 'conversations', 'events'];
 
 export interface StoredRecord {
   uuid: string;

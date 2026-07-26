@@ -21,9 +21,9 @@ export interface TutorialDef {
 
 /** Edge count on the active graph, 0 when the editor is not ready. */
 export function placedEdgeCount($d3: TutorialBoard): number {
-  const graph = $d3 && $d3.activeGraph;
-  if (!graph || !graph.model || !Array.isArray(graph.model.d3Edges)) return 0;
-  return graph.model.d3Edges.length;
+  if (!$d3 || typeof $d3.getEdges !== 'function') return 0;
+  const edges = $d3.getEdges();
+  return Array.isArray(edges) ? edges.length : 0;
 }
 
 /** Number of currently selected layers, 0 when the editor is not ready. */

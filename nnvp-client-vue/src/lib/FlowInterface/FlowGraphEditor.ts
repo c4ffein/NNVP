@@ -13,14 +13,16 @@
 //
 // ⚠️ Contract: BoardInterface.setActiveGraphEditor captures `selectedNodes`,
 // `undoStack` and `redoStack` BY REFERENCE (containers keep `.e` pointing at
-// the same array forever). Same for the `model` arrays read live by the
-// panels. These arrays must only ever be mutated in place (push/pop/splice),
-// never reassigned.
+// the same array forever). Same for the `model` arrays (`layers`, `edges`,
+// `modelInputs`, `modelOutputs`) read live through BoardInterface's getters.
+// These arrays must only ever be mutated in place (push/pop/splice), never
+// reassigned.
 
 import { saveAs } from 'file-saver';
 import BoardTemplates from '../BoardInterface/BoardTemplates';
 import { importKerasArchive } from '../KerasImport/kerasImport';
 import KerasLayerUntyped from '../KerasInterface/KerasLayer';
+import { CyclicGraphError } from '../KerasInterface/orderGraph';
 import autoLayout from '../AutoLayout/autoLayout';
 import { FormatVersionError, migrateModel } from '../ModelFormat/migrations';
 import type { KerasLayerJSON, NnvpLayerId, NnvpModel, FlowNode, FlowEdge } from '../../types/model';
@@ -61,14 +63,15 @@ export interface FlowStore {
 }
 
 /**
- * Stable D3Layer-shaped view of one flow node, handed to the panels through
- * `model.d3Layers` / `selectedNodes`. One instance per node id, mutated in
- * place by syncDerived so components can hold references across graph changes.
+ * Stable layer-shaped view of one flow node (the shape the old D3 board's
+ * panels were written against), handed to the panels through `model.layers` /
+ * `selectedNodes`. One instance per node id, mutated in place by syncDerived
+ * so components can hold references across graph changes.
  */
 export interface LayerWrapper {
   id: NnvpLayerId;
   name: string;
-  class: 'D3Layer' | 'D3LayerComposite';
+  class: 'Layer' | 'Group';
   kerasLayer: KerasLayerJSON | null;
   /** nnvp ids of the layers feeding this one — spliced in place, never reassigned. */
   inputLayers: NnvpLayerId[];
@@ -77,12 +80,13 @@ export interface LayerWrapper {
 }
 
 /**
- * D3Model-shaped shim read live by the panels. The four arrays are captured
- * by reference (see the contract above) — mutate in place only.
+ * Derived model shim read live by the panels (shaped like the old D3Model,
+ * with honest names since format v2). The four arrays are captured by
+ * reference (see the contract above) — mutate in place only.
  */
 export interface BoardModel {
-  d3Layers: LayerWrapper[];
-  d3Edges: FlowEdge[];
+  layers: LayerWrapper[];
+  edges: FlowEdge[];
   modelInputs: LayerWrapper[];
   modelOutputs: LayerWrapper[];
   createComposite: () => void;
@@ -149,8 +153,8 @@ export default class FlowGraphEditor {
     this.graphChangedCallback = null;
     this.wrappers = new Map();
     this.model = {
-      d3Layers: [],
-      d3Edges: [],
+      layers: [],
+      edges: [],
       modelInputs: [],
       modelOutputs: [],
       createComposite: () => this.groupSelectedNodes(),
@@ -261,8 +265,9 @@ export default class FlowGraphEditor {
 
   /**
    * Programmatic connect (the assistant's tool): same result and same rules
-   * as dragging an edge on the board — self-loops, duplicates and cycles are
-   * refused. Returns whether the edge was created.
+   * as dragging an edge on the board — self-loops and duplicates are
+   * refused; cycle-closing edges are allowed (the loop renders red and
+   * codegen refuses it explicitly). Returns whether the edge was created.
    */
   connectLayers(sourceId: NnvpLayerId, targetId: NnvpLayerId): boolean {
     const source = String(sourceId);
@@ -569,20 +574,37 @@ export default class FlowGraphEditor {
     this.updateGraph();
   }
 
+  // The menu's Generate downloads: a cyclic graph makes the generator throw
+  // CyclicGraphError (never a silently truncated model) — surface its
+  // user-legible message instead of letting the click handler blow up.
+  private generateDownload(name: string, generate: () => string) {
+    let code: string;
+    try {
+      code = generate();
+    } catch (error) {
+      if (error instanceof CyclicGraphError) {
+        warn(error.message);
+        return;
+      }
+      throw error;
+    }
+    saveAs(new Blob([code]), name);
+  }
+
   generatePythonInBrowser(kerasInterface: CodeGenerator) {
-    saveAs(new Blob([kerasInterface.generatePython(this.toJSON())]), 'myModel.py');
+    this.generateDownload('myModel.py', () => kerasInterface.generatePython(this.toJSON()));
   }
 
   generateJavascriptInBrowser(kerasInterface: CodeGenerator) {
-    saveAs(new Blob([kerasInterface.generateJavascript(this.toJSON())]), 'myModel.js');
+    this.generateDownload('myModel.js', () => kerasInterface.generateJavascript(this.toJSON()));
   }
 
   generatePyTorchInBrowser(kerasInterface: CodeGenerator) {
-    saveAs(new Blob([kerasInterface.generatePyTorch(this.toJSON())]), 'myModel.py');
+    this.generateDownload('myModel.py', () => kerasInterface.generatePyTorch(this.toJSON()));
   }
 
   generateTinygradInBrowser(kerasInterface: CodeGenerator) {
-    saveAs(new Blob([kerasInterface.generateTinygrad(this.toJSON())]), 'myModel.py');
+    this.generateDownload('myModel.py', () => kerasInterface.generateTinygrad(this.toJSON()));
   }
 
   generateJavascriptNoSave(kerasInterface: CodeGenerator): string {
@@ -600,9 +622,9 @@ export default class FlowGraphEditor {
   }
 
   /**
-   * Rebuild the derived, D3Model-shaped views of the flow graph: the wrapper
-   * per node, model.d3Layers (top-level only — composites count as one),
-   * model.d3Edges, model.modelInputs (Input-typed nodes in node order) and
+   * Rebuild the derived views of the flow graph (shaped like the old D3Model):
+   * the wrapper per node, model.layers (top-level only — composites count as
+   * one), model.edges, model.modelInputs (Input-typed nodes in node order) and
    * model.modelOutputs (sources of edges into Output nodes, in edge order —
    * mirroring D3LayerComponent.addInputLayer and adapter.flowToNnvp).
    * Wrapper instances are stable per node id and mutated in place.
@@ -625,10 +647,10 @@ export default class FlowGraphEditor {
       // Fresh wrappers get placeholder fields; every field except inputLayers
       // (spliced below to keep the array instance) is overwritten right after.
       const wrapper: LayerWrapper = previous.get(node.id)
-        || { id: nnvp.id, name: nnvp.name, class: 'D3Layer', kerasLayer: null, inputLayers: [] };
+        || { id: nnvp.id, name: nnvp.name, class: 'Layer', kerasLayer: null, inputLayers: [] };
       wrapper.id = nnvp.id;
       wrapper.name = nnvp.name;
-      wrapper.class = node.type === COMPOSITE_NODE ? 'D3LayerComposite' : 'D3Layer';
+      wrapper.class = node.type === COMPOSITE_NODE ? 'Group' : 'Layer';
       wrapper.kerasLayer = nnvp.kerasLayer || null;
       const inputs = inputsByTarget.get(node.id) || [];
       wrapper.inputLayers.splice(0, wrapper.inputLayers.length, ...inputs);
@@ -638,8 +660,8 @@ export default class FlowGraphEditor {
     const topLevel = nodes
       .filter(node => node.parentNode === undefined)
       .map(node => this.wrappers.get(node.id)!);
-    this.model.d3Layers.splice(0, this.model.d3Layers.length, ...topLevel);
-    this.model.d3Edges.splice(0, this.model.d3Edges.length, ...edges);
+    this.model.layers.splice(0, this.model.layers.length, ...topLevel);
+    this.model.edges.splice(0, this.model.edges.length, ...edges);
     const inputs = nodes
       .filter(node => layerName(node) === 'Input')
       .map(node => this.wrappers.get(node.id)!);

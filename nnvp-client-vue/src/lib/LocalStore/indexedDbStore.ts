@@ -14,8 +14,34 @@ import { RECORD_STORE_NAMES } from './recordStore';
 import type { RecordStore, RecordStoreName, StoredRecord } from './recordStore';
 
 const DB_NAME = 'nnvp';
-/** Bump when RECORD_STORE_NAMES grows so onupgradeneeded re-runs. */
-const DB_VERSION = 1;
+/** Bump when RECORD_STORE_NAMES grows so onupgradeneeded re-runs.
+ *  v1: runs + conversations. v2: + events (the domain-event log). */
+export const DB_VERSION = 2;
+
+/** The structural slice of IDBDatabase the upgrade touches — so the upgrade
+ *  logic is unit-testable under bun, where happy-dom has no IndexedDB. */
+export interface UpgradableDb {
+  objectStoreNames: { contains(name: string): boolean };
+  createObjectStore(name: string, options?: { keyPath: string }): unknown;
+}
+
+/**
+ * The whole migration ladder, additive by construction: create whatever
+ * objectStores RECORD_STORE_NAMES declares and the database lacks. A fresh db
+ * gets all of them; a v1 db (runs, conversations) gains exactly 'events' —
+ * existing stores and their records are never touched. Returns what was
+ * created (for tests/logging).
+ */
+export function createMissingRecordStores(db: UpgradableDb): string[] {
+  const created: string[] = [];
+  RECORD_STORE_NAMES.forEach((name) => {
+    if (!db.objectStoreNames.contains(name)) {
+      db.createObjectStore(name, { keyPath: 'uuid' });
+      created.push(name);
+    }
+  });
+  return created;
+}
 
 /** Promise-wrap a single IDBRequest (get/getAll style reads). */
 function promisifyRequest<T>(request: IDBRequest<T>): Promise<T> {
@@ -48,12 +74,7 @@ export class IndexedDbRecordStore implements RecordStore {
       this.dbPromise = new Promise((resolve, reject) => {
         const request = this.factory.open(DB_NAME, DB_VERSION);
         request.onupgradeneeded = () => {
-          const db = request.result;
-          RECORD_STORE_NAMES.forEach((name) => {
-            if (!db.objectStoreNames.contains(name)) {
-              db.createObjectStore(name, { keyPath: 'uuid' });
-            }
-          });
+          createMissingRecordStores(request.result);
         };
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error ?? new Error(`IndexedDB open of '${DB_NAME}' failed`));
