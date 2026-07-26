@@ -97,6 +97,42 @@
               />
               <span class="help-icon" @click="openModal('epochs')">?</span>
             </div>
+            <div class="option-row">
+              <label for="phase2-enabled">Fine-tune</label>
+              <input
+                id="phase2-enabled"
+                type="checkbox"
+                v-bind:checked="phase2Enabled"
+                v-on:change="$emit('changePhase2', 'enabled', ($event.target as HTMLInputElement).checked)"
+              />
+              <span class="help-icon" @click="openModal('phase2')">?</span>
+            </div>
+            <template v-if="phase2Enabled">
+              <div class="option-row">
+                <label for="phase2-dataset">…on</label>
+                <select
+                  id="phase2-dataset"
+                  aria-label="Fine-tuning dataset"
+                  v-bind:value="phase2Dataset"
+                  v-on:change="$emit('changePhase2', 'dataset', ($event.target as HTMLSelectElement).value)"
+                >
+                  <option v-bind:key="name" v-for="(entry, name) in loadableDatasets" v-bind:value="name">
+                    {{ name }}
+                  </option>
+                </select>
+              </div>
+              <div class="option-row">
+                <label for="phase2-epochs">…for</label>
+                <input
+                  id="phase2-epochs"
+                  type="number"
+                  aria-label="Fine-tuning epochs"
+                  v-bind:value="phase2Epochs"
+                  v-on:input="$emit('changePhase2', 'epochs', Number(($event.target as HTMLInputElement).value))"
+                />
+                <span class="phase2-epochs-suffix">epochs</span>
+              </div>
+            </template>
           </div>
         </div>
       </div>
@@ -217,6 +253,26 @@
             <p><em>💡 Tip: More epochs ≠ better model. Find the sweet spot!</em></p>
           </div>
 
+          <div v-else-if="activeModal === 'phase2'">
+            <h2>Fine-tuning (two-phase training)</h2>
+            <p>This is how large language models are really built, in miniature:
+            first <strong>pretrain</strong> on a broad dataset, then <strong>continue
+            training the same model</strong> on a smaller, specific one — the model
+            keeps its general knowledge and adopts the new style.</p>
+            <h3>Try the classic:</h3>
+            <ul>
+              <li>Load the <strong>GPT-Mini Poetry</strong> template</li>
+              <li>Phase 1: <strong>GutenbergPoetryXL</strong> (broad poetry) for ~20 epochs</li>
+              <li>Fine-tune on <strong>ShakespeareSonnets</strong> (tiny, distinctive) for ~10</li>
+            </ul>
+            <p>Watch the Charts tab: a marker shows the switch, and a text sample is
+            taken at each phase boundary — same seed, before vs after fine-tuning.
+            Notice validation loss on the sonnets improving while the model slowly
+            forgets general poetry: that's <em>catastrophic forgetting</em>, live.</p>
+            <p><em>⚠ The fine-tuning dataset must share the model's input: text
+            datasets with the same window (e.g. both 96 characters wide).</em></p>
+          </div>
+
           <div v-else-if="activeModal.startsWith('param-')">
             <!-- Learning Rate -->
             <div v-if="activeModal === 'param-learningRate'">
@@ -323,6 +379,11 @@ export default defineComponent({
     'selectableLosses',
     'epochs',
     'isTraining',
+    // Curriculum (pretrain → fine-tune) fields + the dataset list to pick from.
+    'phase2Enabled',
+    'phase2Dataset',
+    'phase2Epochs',
+    'loadableDatasets',
   ],
   data() {
     return {
@@ -778,5 +839,10 @@ export default defineComponent({
 
 .train-button.is-training:hover {
   background: #e53935;
+}
+
+.phase2-epochs-suffix {
+  font-size: 13px;
+  color: var(--text-muted);
 }
 </style>

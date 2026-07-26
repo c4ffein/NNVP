@@ -66,6 +66,18 @@
           @changeEpochs="changeEpochs"
           v-bind:isTraining="isTraining"
           @trainClicked="trainClicked"
+          v-bind:trainingState="trainingState"
+          v-bind:pausedBy="pausedBy"
+          v-bind:canPause="canPause"
+          v-bind:pauseTraining="pauseTraining"
+          v-bind:resumeTraining="resumeTraining"
+          v-bind:phase2Enabled="phase2Enabled"
+          v-bind:phase2Dataset="phase2Dataset"
+          v-bind:phase2Epochs="phase2Epochs"
+          @changePhase2="changePhase2"
+          v-bind:phaseBoundaries="phaseBoundaries"
+          v-bind:phaseSamples="phaseSamples"
+          v-bind:phaseProgress="phaseProgress"
           v-bind:loadDataset="loadDataset"
           v-bind:getDatasets="getDatasets"
           v-bind:getWarningMessage="getWarningMessage"
@@ -88,10 +100,15 @@
 import { defineComponent } from 'vue';
 import { loadTf } from '../../lib/tf/loadTf';
 import Dataset from '../../lib/JSDatasets/google-data-loader';
+import TextDataset from '../../lib/JSDatasets/text-data-loader';
 import loadableDatasets from '../../lib/JSDatasets/datasets-sources';
-import watchTraining from '../../lib/ModelTrainer/watchTraining';
+import type { DatasetSourceConfig } from '../../lib/JSDatasets/datasets-sources';
 import { TrainingPrepareError } from '../../lib/Training/engine';
 import type { TrainingDataset, TrainingSession } from '../../lib/Training/engine';
+import RunController from '../../lib/Training/runController';
+import type { RunPhase } from '../../lib/Training/runController';
+import generateText from '../../lib/Inspector/generateText';
+import type { GenerateModel, GenerateTf } from '../../lib/Inspector/generateText';
 import { createTfjsEngine } from '../../lib/Training/tfjsEngine';
 import { trainingConfig, snapshotTrainingConfig } from '../../lib/Training/trainingConfig';
 import {
@@ -112,6 +129,13 @@ import HistoryPanel from './HistoryPanel.vue';
 import { benchModeEnabled } from '../../lib/Training/benchMode';
 
 type DebugWindow = Window & { nnvp?: { debug?: { enableDatasets?: boolean } } };
+
+// import.meta.env is Vite-only (absent under bun/unit tests) — typed locally,
+// the main.ts pattern. VITE_DATASETS_CDN is the v0 dataset-source override
+// (docs/tasks.md "Dataset registry & sources"): a dev .env.local points it at
+// the same-origin /datasets/ to serve corpora locally; unset means production
+// CDN. Superseded later by the multi-source registry.
+type ImportMetaWithEnv = ImportMeta & { env?: { VITE_DATASETS_CDN?: string } };
 
 /** One chart line; watchTraining reassigns these during a fit. */
 interface ChartSeries {
@@ -135,9 +159,15 @@ interface TrainingZoneNonReactive {
   /** The graph JSON snapshot trainedModel was generated from. */
   trainedGraphJson?: string | null;
   /** Loaded-dataset cache, lazily created by loadDataset. */
-  datasets?: Record<string, Dataset>;
+  datasets?: Record<string, Dataset | TextDataset>;
   /** Backend client for the History tab's cloud-delete plumbing. */
   api?: ApiClient;
+  /**
+   * The in-flight run's controller (pause/resume/cancel). ONE local run at a
+   * time by design — a future multi-run manager would hold remote controllers
+   * beside this single local slot (docs/tasks.md "Dataset registry"/journal).
+   */
+  activeRun?: RunController;
 }
 
 export default defineComponent({
@@ -153,6 +183,21 @@ export default defineComponent({
   data() {
     return {
       isTraining: false,
+      // Pause/resume surface: mirrors the RunController state ('idle' when no
+      // run), plus which tab initiated the pause (its Resume button renders
+      // there) and whether the session's engine can pause at all.
+      trainingState: 'idle' as 'idle' | 'running' | 'paused',
+      pausedBy: null as string | null,
+      canPause: false,
+      // Curriculum surface: epoch indices where a phase ended (chart markers)
+      // and the fixed-seed text sample taken at each phase boundary.
+      phaseBoundaries: [] as number[],
+      phaseSamples: [] as { label: string; text: string }[],
+      // Live "where are we" line for the Charts strip: phase + absolute epoch.
+      phaseProgress: null as null | {
+        phaseIndex: number; phaseCount: number; label: string;
+        epochsDone: number; epochsTotal: number;
+      },
       // Reactive availability flag for Inspect mode; the tf model itself is
       // kept OFF data() (this.trainedModel) so Vue never proxies it.
       hasTrainedModel: false,
@@ -224,6 +269,18 @@ export default defineComponent({
       get(): string { return trainingConfig.selectedLoss; },
       set(value: string) { trainingConfig.selectedLoss = value; },
     },
+    phase2Enabled: {
+      get(): boolean { return trainingConfig.phase2Enabled; },
+      set(value: boolean) { trainingConfig.phase2Enabled = value; },
+    },
+    phase2Dataset: {
+      get(): string { return trainingConfig.phase2Dataset; },
+      set(value: string) { trainingConfig.phase2Dataset = value; },
+    },
+    phase2Epochs: {
+      get(): number { return trainingConfig.phase2Epochs; },
+      set(value: number) { trainingConfig.phase2Epochs = value; },
+    },
   },
   methods: {
     datasetClicked() {
@@ -286,6 +343,17 @@ export default defineComponent({
       trainingConfig.optimizerParams = { ...run.config.optimizerParams };
       trainingConfig.epochs = run.config.epochs;
       trainingConfig.selectedLoss = run.config.loss;
+      // Curriculum fields journal only when enabled; absent = single-phase.
+      trainingConfig.phase2Enabled = run.config.phase2Dataset !== undefined;
+      if (run.config.phase2Dataset !== undefined) {
+        trainingConfig.phase2Dataset = run.config.phase2Dataset;
+        trainingConfig.phase2Epochs = run.config.phase2Epochs ?? 10;
+      }
+    },
+    changePhase2(field: 'enabled' | 'dataset' | 'epochs', value: unknown) {
+      if (field === 'enabled') this.phase2Enabled = !!value;
+      else if (field === 'dataset') this.phase2Dataset = String(value);
+      else this.phase2Epochs = Number(value) || 0;
     },
     // The model (and the graph JSON it was generated from) the Inspect panel
     // probes. Returned through a function so the tf model stays un-proxied.
@@ -294,14 +362,42 @@ export default defineComponent({
       return { model: self.trainedModel, graphJson: self.trainedGraphJson };
     },
     async trainClicked() {
-      if (this.isTraining) { this.cancelRequested = true; return; }
+      if (this.isTraining) {
+        // Stop: between batches while running (the historical flag), through
+        // the controller when the run is sitting paused (no batches to check).
+        this.cancelRequested = true;
+        (this as unknown as TrainingZoneNonReactive).activeRun?.cancel();
+        return;
+      }
       this.chartsClicked();
       this.isTraining = true;
       this.$emit('training-started');
       await this.startTraining();
       this.cancelRequested = false;
       this.isTraining = false;
+      this.trainingState = 'idle';
+      this.pausedBy = null;
       this.$emit('training-stopped');
+    },
+    /**
+     * Pause the in-flight run (engine finishes the batch in flight first).
+     * `by` names the tab that asked — its Resume button renders there.
+     * Resolves true once actually paused; false when there was nothing to
+     * pause or the run finished before the stop landed.
+     */
+    async pauseTraining(by: string): Promise<boolean> {
+      const run = (this as unknown as TrainingZoneNonReactive).activeRun;
+      if (!run || this.trainingState !== 'running' || !this.canPause) return false;
+      this.pausedBy = by;
+      const state = await run.pause();
+      if (state !== 'paused') {
+        this.pausedBy = null;
+        return false;
+      }
+      return true;
+    },
+    resumeTraining() {
+      (this as unknown as TrainingZoneNonReactive).activeRun?.resume();
     },
     changeSelectedOptimizer(value: string) {
       this.selectedOptimizer = value;
@@ -382,9 +478,12 @@ export default defineComponent({
       self.trainedGraphJson = session.graphJson;
       this.hasTrainedModel = session.model !== null && session.model !== undefined;
 
-      const datasetName = this.selectedDataset;
+      // Curriculum: phase 1 is the classic run; an enabled phase 2 continues
+      // the SAME warm model on another dataset (pretrain → fine-tune).
+      const phaseNames = [this.selectedDataset];
+      if (this.phase2Enabled && this.phase2Epochs > 0) phaseNames.push(this.phase2Dataset);
       try {
-        await this.loadDataset(datasetName);
+        for (const name of phaseNames) await this.loadDataset(name);
       }
       catch (error) {
         // A dataset-load failure keeps escaping startTraining untouched, but
@@ -392,25 +491,88 @@ export default defineComponent({
         await finishRun('error', String(error));
         throw error;
       }
-      const data = self.datasets![datasetName];
+      const phaseEpochs = [this.epochs, this.phase2Epochs];
+      const phases: RunPhase[] = phaseNames.map((name, index) => ({
+        // Dataset satisfies the engine seam at runtime; only its nullable
+        // `shape` keeps it from typing as TrainingDataset — hence the cast.
+        dataset: self.datasets![name] as unknown as TrainingDataset,
+        epochs: phaseEpochs[index]!,
+        label: name,
+      }));
+      // The controller owns the segment loop (pause splits one run into
+      // several fits); this component keeps the journal and error surfaces.
+      this.canPause = session.capabilities.canPause;
+      this.trainingState = 'running';
+      this.phaseBoundaries = [];
+      this.phaseSamples = [];
+      const controller = new RunController({
+        session,
+        phases,
+        chartData0: this.chartData0,
+        chartData1: this.chartData1,
+        cancelRequested: () => this.cancelRequested,
+        stopError: 'cancelRequested',
+        // onEpochEnd is sync — persist fire-and-forget, never blocking a fit.
+        onEpoch: (m) => {
+          runHandle?.epoch(m).catch(() => {});
+          const phaseIndex = controller.currentPhaseIndex;
+          this.phaseProgress = {
+            phaseIndex,
+            phaseCount: phases.length,
+            label: phases[phaseIndex]!.label,
+            epochsDone: controller.epochsCompleted,
+            epochsTotal: controller.epochsTotal,
+          };
+        },
+        onStateChange: (state) => {
+          this.trainingState = state === 'done' ? 'idle' : state;
+          if (state !== 'paused') this.pausedBy = null;
+        },
+        // The curriculum's money shot: a fixed-seed sample at every phase
+        // boundary ("same seed, before vs after fine-tuning"). Text-only and
+        // best-effort — a sampling failure must never kill the run.
+        onPhaseEnd: async (phaseIndex, phase, epochsDone) => {
+          if (phaseIndex < phases.length - 1) this.phaseBoundaries = [...this.phaseBoundaries, epochsDone - 1];
+          const phaseDataset = self.datasets![phase.label];
+          if (!(phaseDataset instanceof TextDataset) || !session.model) return;
+          try {
+            const tf = await loadTf();
+            const text = await generateText({
+              tf: tf as unknown as GenerateTf,
+              model: session.model as GenerateModel,
+              dataset: phaseDataset,
+              seed: 'The ',
+              count: 160,
+              temperature: 0.8,
+            });
+            this.phaseSamples = [...this.phaseSamples, {
+              label: `after phase ${phaseIndex + 1} (${phase.label}, epoch ${epochsDone})`,
+              text: `The ${text}`,
+            }];
+          } catch (sampleError) {
+            console.warn('[TrainingZone] phase-boundary sample failed:', sampleError);
+          }
+        },
+      });
+      this.phaseProgress = {
+        phaseIndex: 0,
+        phaseCount: phases.length,
+        label: phases[0]!.label,
+        epochsDone: 0,
+        epochsTotal: controller.epochsTotal,
+      };
+      self.activeRun = controller;
       try {
-        await watchTraining(
-          this.chartData0, this.chartData1,
-          // Dataset satisfies the engine seam at runtime; only its nullable
-          // `shape` keeps it from typing as TrainingDataset — hence the cast.
-          (callbacks) => session.fit(data as unknown as TrainingDataset, callbacks),
-          () => this.cancelRequested,
-          'cancelRequested',
-          // onEpochEnd is sync — persist fire-and-forget, never blocking a fit.
-          (m) => { runHandle?.epoch(m).catch(() => {}); },
-        );
-        await finishRun('completed');
+        const outcome = await controller.run();
+        await finishRun(outcome);
       }
       catch (error) {
-        if (error == "cancelRequested") { await finishRun('cancelled'); return; }
         await finishRun('error', String(error));
         console.error('[TrainingZone] Training error:', error);
         alert(error);
+      }
+      finally {
+        self.activeRun = undefined;
       }
     },
     async loadDataset(name: string, progressionCallback?: (fraction: number) => void) {
@@ -420,21 +582,38 @@ export default defineComponent({
 
       self.datasets = self.datasets || {};
       if (!(name in self.datasets)){
+        const config = this.loadableDatasets[name]![0];
+        if (config.kind === 'text') {
+          if (debugEnabled) {
+            console.log(`[TrainingZone] Dataset ${name} not cached, loading text from: ${config.textPath}`);
+          }
+          const newTextDataset = new TextDataset(config.textPath, config.textChecksum, config.seqLen);
+          try {
+            await newTextDataset.load(progressionCallback);
+            self.datasets[name] = newTextDataset;
+            if (debugEnabled) console.log(`[TrainingZone] Dataset ${name} loaded and cached successfully`);
+          } catch (error) {
+            if (debugEnabled) console.error(`[TrainingZone] Error loading dataset ${name}:`, error);
+            throw error;
+          }
+          return;
+        }
+        const imageConfig: DatasetSourceConfig = config;
         if (debugEnabled) {
           console.log(`[TrainingZone] Dataset ${name} not cached, loading from:`);
-          console.log(`  - Images: ${this.loadableDatasets[name]![0].imagesSpritePath}`);
-          console.log(`  - Labels: ${this.loadableDatasets[name]![0].labelsPath}`);
+          console.log(`  - Images: ${imageConfig.imagesSpritePath}`);
+          console.log(`  - Labels: ${imageConfig.labelsPath}`);
         }
 
         const newDataset = new Dataset(
-          this.loadableDatasets[name]![0].imagesSpritePath,
-          this.loadableDatasets[name]![0].imagesSpriteChecksum,
-          this.loadableDatasets[name]![0].shape,
-          this.loadableDatasets[name]![0].labelsPath,
-          this.loadableDatasets[name]![0].labelsChecksum,
+          imageConfig.imagesSpritePath,
+          imageConfig.imagesSpriteChecksum,
+          imageConfig.shape,
+          imageConfig.labelsPath,
+          imageConfig.labelsChecksum,
           10,  // number of classes
-          this.loadableDatasets[name]![0].numDatasetElements,
-          this.loadableDatasets[name]![0].numTrainElements,
+          imageConfig.numDatasetElements,
+          imageConfig.numTrainElements,
         );
 
         if (debugEnabled) console.log(`[TrainingZone] Starting newDataset.load() for: ${name}`);
@@ -453,13 +632,14 @@ export default defineComponent({
     },
     getWarningMessage(name: string, progressionCallback?: unknown): string | undefined {
       const self = this as unknown as TrainingZoneNonReactive; // non-reactive by design
-      // `self.datasets!` preserves the historical behavior: before any load,
-      // datasets is undefined and a warning-carrying entry would throw here.
-      if (this.loadableDatasets[name]!.length >= 3 && !self.datasets![name]) {
+      // Optional chaining (was `self.datasets!`): selecting a warning-carrying
+      // dataset FIRST — before anything ever loaded — used to throw here,
+      // which silently swallowed the selection instead of showing the warning.
+      if (this.loadableDatasets[name]!.length >= 3 && !self.datasets?.[name]) {
         return this.loadableDatasets[name]![2];
       }
     },
-    getDatasets(): Record<string, Dataset> {
+    getDatasets(): Record<string, Dataset | TextDataset> {
       const self = this as unknown as TrainingZoneNonReactive; // non-reactive by design
       const debugEnabled = (window as DebugWindow).nnvp?.debug?.enableDatasets;
       if (debugEnabled) console.log('[TrainingZone] getDatasets called, returning:', Object.keys(self.datasets || {}));
@@ -470,7 +650,8 @@ export default defineComponent({
     trainingZoneSize: Number,
     cdnDir: {
       type: String,
-      default: "https://datasets.nnvp.io/datasets/",
+      default: () => (import.meta as ImportMetaWithEnv).env?.VITE_DATASETS_CDN
+        || "https://datasets.nnvp.io/datasets/",
     },
   },
   watch: {

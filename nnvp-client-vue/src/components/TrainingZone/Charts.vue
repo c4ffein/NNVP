@@ -1,5 +1,35 @@
 <template>
   <div id="Charts" class="Charts">
+    <!-- Pause/resume strip: only for engines that can pause; the Resume
+         button renders on the tab that initiated the pause (pausedBy). -->
+    <div
+      v-if="canPause && (trainingState === 'running' || trainingState === 'paused')"
+      class="charts-training-controls"
+      data-testid="charts-training-controls"
+    >
+      <button
+        v-if="trainingState === 'running'"
+        class="charts-pause-button"
+        data-testid="charts-pause-button"
+        v-on:click="pauseTraining('Charts')"
+      >⏸ Pause</button>
+      <button
+        v-else-if="pausedBy === 'Charts'"
+        class="charts-pause-button charts-resume"
+        data-testid="charts-resume-button"
+        v-on:click="resumeTraining()"
+      >▶ Resume</button>
+      <span v-else class="charts-paused-elsewhere" data-testid="charts-paused-elsewhere">
+        Training paused — resume from the {{ pausedBy }} tab.
+      </span>
+      <span v-if="phaseProgress" class="charts-phase-progress" data-testid="charts-phase-progress">
+        <template v-if="phaseProgress.phaseCount > 1">
+          Phase {{ phaseProgress.phaseIndex + 1 }}/{{ phaseProgress.phaseCount }}
+          ({{ phaseProgress.label }}) —
+        </template>
+        epoch {{ phaseProgress.epochsDone }}/{{ phaseProgress.epochsTotal }}
+      </span>
+    </div>
     <LineChart
       title="Batch Results"
       :chartData="batchData"
@@ -10,10 +40,19 @@
     <LineChart
       title="Epoch Results"
       :chartData="epochData"
+      :markers="phaseBoundaries"
       class="chart-instance"
       has-help
       @show-help="helpTopic = 'epoch'"
     />
+
+    <!-- Curriculum boundary samples: same seed, before vs after fine-tuning -->
+    <div v-if="phaseSamples.length > 0" class="phase-samples" data-testid="phase-samples">
+      <div v-bind:key="sample.label" v-for="sample in phaseSamples" class="phase-sample">
+        <div class="phase-sample-label">{{ sample.label }}</div>
+        <pre class="phase-sample-text">{{ sample.text }}</pre>
+      </div>
+    </div>
 
     <!-- Same help-modal chrome as the layer (?) buttons -->
     <Teleport to="body">
@@ -100,6 +139,28 @@ export default defineComponent({
   props: {
     batchData: { type: Object as PropType<ChartData>, default: () => ({ labels: [], series: [] }) },
     epochData: { type: Object as PropType<ChartData>, default: () => ({ labels: [], series: [] }) },
+    // Pause/resume strip (TrainingZone's run controller surface).
+    trainingState: { type: String, default: 'idle' },
+    pausedBy: { type: String as PropType<string | null>, default: null },
+    canPause: { type: Boolean, default: false },
+    pauseTraining: {
+      type: Function as PropType<(by: string) => Promise<boolean>>,
+      default: () => Promise.resolve(false),
+    },
+    resumeTraining: { type: Function as PropType<() => void>, default: () => {} },
+    // Curriculum surface: epoch chart markers + phase-boundary text samples.
+    phaseBoundaries: { type: Array as PropType<number[]>, default: () => [] },
+    phaseSamples: {
+      type: Array as PropType<{ label: string; text: string }[]>,
+      default: () => [],
+    },
+    phaseProgress: {
+      type: Object as PropType<{
+        phaseIndex: number; phaseCount: number; label: string;
+        epochsDone: number; epochsTotal: number;
+      } | null>,
+      default: null,
+    },
   },
   data() {
     return { helpTopic: null as 'batch' | 'epoch' | null };
@@ -135,6 +196,68 @@ export default defineComponent({
   padding: 1%;
   grid-template-columns: 50% 50%;
   gap: 20px;
+}
+
+.charts-training-controls {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+}
+.charts-pause-button {
+  padding: 4px 14px;
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  background-color: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+}
+.charts-pause-button:hover {
+  background-color: var(--bg-hover);
+}
+.charts-pause-button.charts-resume {
+  background-color: var(--fill-strong);
+  border-color: var(--fill-strong);
+  color: var(--fill-strong-text);
+}
+.charts-paused-elsewhere {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.charts-phase-progress {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.phase-samples {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 15px;
+  align-items: stretch;
+}
+.phase-sample {
+  flex: 1;
+  min-width: 0;
+}
+.phase-sample-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.phase-sample-text {
+  margin: 0;
+  padding: 8px;
+  max-height: 140px;
+  overflow: auto;
+  white-space: pre-wrap;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-primary);
 }
 
 .chart-instance {

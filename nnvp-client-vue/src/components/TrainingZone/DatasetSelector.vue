@@ -56,6 +56,7 @@ import { loadTf } from '../../lib/tf/loadTf';
 import type { Tensor3D } from '@tensorflow/tfjs';
 import type { DatasetSourceEntry } from '../../lib/JSDatasets/datasets-sources';
 import type Dataset from '../../lib/JSDatasets/google-data-loader';
+import TextDataset from '../../lib/JSDatasets/text-data-loader';
 
 type DebugWindow = Window & { nnvp?: { debug?: { enableDatasets?: boolean } } };
 
@@ -72,7 +73,7 @@ export default defineComponent({
   props: {
     value: {type: String, default: null},
     loadableDatasets: {type: Object as PropType<Record<string, DatasetSourceEntry>>, default: {}},
-    getDatasets: {type: Function as PropType<() => Record<string, Dataset>>, default: () => ({})},
+    getDatasets: {type: Function as PropType<() => Record<string, Dataset | TextDataset>>, default: () => ({})},
     // The cast keeps the historical fallback (returns null where the real
     // prop returns a Promise) without changing it — type-only.
     loadDataset: {type: Function as PropType<LoadDataset>, default: (() => null) as unknown as LoadDataset},
@@ -202,6 +203,15 @@ export default defineComponent({
         drawArea.innerHTML = `<div style="color: var(--text-primary); padding: 20px; text-align: center;">Error: Dataset "${name}" could not be loaded</div>`;
         return;
       }
+      // Text corpora preview as text: an excerpt from the test region, not
+      // canvases — tf.browser.toPixels below is meaningless for them.
+      if (dataset instanceof TextDataset) {
+        const pre = document.createElement('pre');
+        pre.className = 'dataset-text-excerpt';
+        pre.textContent = dataset.excerpt(600);
+        drawArea.appendChild(pre);
+        return;
+      }
       const examples = dataset.nextTestBatch(40);
       const numExamples = examples.xs.shape[0];
       for (let i = 0; i < numExamples; i += 1) {
@@ -304,6 +314,18 @@ export default defineComponent({
 }
 #samples {
   margin: 15px 0 0 0;
+}
+.dataset-text-excerpt {
+  margin: 0 15px 15px 0;
+  padding: 10px;
+  max-height: 100%;
+  overflow: auto;
+  white-space: pre-wrap;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-primary);
 }
 
 /* Dataset load error (inline, in the description column) */

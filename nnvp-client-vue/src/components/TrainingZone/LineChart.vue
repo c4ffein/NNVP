@@ -76,6 +76,22 @@
           </text>
         </g>
 
+        <!-- Phase-boundary markers (curriculum runs): vertical dashed lines -->
+        <g class="phase-markers">
+          <g v-for="(marker, i) in markerLines" :key="`marker-${i}`">
+            <line
+              :x1="marker.x"
+              :y1="margin.top"
+              :x2="marker.x"
+              :y2="svgHeight - margin.bottom"
+              class="phase-marker-line"
+            />
+            <text :x="marker.x + 4" :y="margin.top + 12" class="phase-marker-label">
+              phase {{ i + 2 }}
+            </text>
+          </g>
+        </g>
+
         <!-- Data lines -->
         <g class="lines">
           <path
@@ -183,7 +199,12 @@ export default defineComponent({
     chartData: {
       type: Object as PropType<ChartData>,
       required: true
-    }
+    },
+    /** Label values (x-axis units) where a curriculum phase ended. */
+    markers: {
+      type: Array as PropType<number[]>,
+      default: () => [],
+    },
   },
   data() {
     return {
@@ -237,6 +258,16 @@ export default defineComponent({
     xExtent(): [number, number] {
       if (this.labels.length === 0) return [0, 1];
       return [0, Math.max(...this.labels)];
+    },
+
+    // Phase markers, kept to the ones inside the plotted range. The marker
+    // sits at the LAST epoch of its phase; drawn at +0.5 so the line falls
+    // between that point and the next phase's first.
+    markerLines(): { x: number }[] {
+      const [min, max] = this.xExtent;
+      return this.markers
+        .filter(marker => marker >= min && marker < max)
+        .map(marker => ({ x: this.xScale(marker + 0.5) }));
     },
 
     // Scaling functions
@@ -430,6 +461,17 @@ export default defineComponent({
   stroke-width: 2;
   stroke-linejoin: round;
   stroke-linecap: round;
+}
+
+.phase-marker-line {
+  stroke: var(--text-muted);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+}
+
+.phase-marker-label {
+  font-size: 11px;
+  fill: var(--text-muted);
 }
 
 .line-acc {
