@@ -12,6 +12,9 @@ import type { GeneratorGraph } from '../KerasInterface/KerasGenerator';
 const SHAPE_PRESERVING = new Set([
   'BatchNormalization', 'Dropout', 'Activation', 'ReLU', 'LeakyReLU',
   'Sigmoid', 'Tanh', 'Softmax', 'ELU', 'SELU', 'GELU', 'Output',
+  // Normalizations and the NNVP text layers (textLayers.ts) preserve shape.
+  'LayerNormalization', 'UnitNormalization', 'RMSNormalization',
+  'PositionalEmbedding', 'TransformerBlock',
 ]);
 
 function asPositiveInt(value: unknown): number | null {
@@ -93,6 +96,20 @@ export default function walkShapes(
       if (units !== null && source) shape = [...source.slice(0, -1), units];
     } else if (SHAPE_PRESERVING.has(name)) {
       shape = source ? source.slice() : null;
+    } else if (name === 'Embedding') {
+      // Appends an output_dim axis: [T] -> [T, D].
+      const outputDim = asPositiveInt(p.output_dim);
+      if (source && outputDim !== null) shape = [...source, outputDim];
+    } else if (name === 'LSTM' || name === 'GRU' || name === 'SimpleRNN') {
+      // units on the feature axis; the timestep axis survives only with
+      // return_sequences (Keras semantics).
+      const units = asPositiveInt(p.units);
+      if (units !== null && source && source.length >= 1) {
+        shape = p.return_sequences === true ? [source[0]!, units] : [units];
+      }
+    } else if (name === 'LastToken') {
+      // NNVP text layer: [T, D] -> [D].
+      if (source && source.length >= 2) shape = [source[source.length - 1]!];
     } else if (name === 'Flatten') {
       if (source) shape = [source.reduce((acc, dim) => acc * dim, 1)];
     } else if (name === 'Conv1D' || name === 'Conv2D' || name === 'Conv3D') {
