@@ -179,7 +179,7 @@ export function buildTools(): AnthropicTool[] {
     },
     {
       name: 'connect_layers',
-      description: '[Modifies the model] Connect two layers (data flows source -> target), like dragging an edge on the board. Self-loops, duplicates and cycles are refused.',
+      description: '[Modifies the model] Connect two layers (data flows source -> target), like dragging an edge on the board. Self-loops and duplicates are refused; a connection that closes a cycle is allowed but the model cannot generate code until the loop is removed.',
       input_schema: {
         type: 'object',
         properties: {

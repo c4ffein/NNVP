@@ -7,6 +7,7 @@
 // tool-use loop can surface friendly errors instead of throwing opaquely.
 
 import { tutorials } from '../Tutorial/tutorials';
+import { bus } from '../Events/bus';
 import layerHelp from '../KerasInterface/layerHelp';
 import categoryHelp from '../KerasInterface/categoryHelp';
 import type BoardInterface from '../BoardInterface/BoardInterface';
@@ -41,16 +42,17 @@ export default class AssistantActions {
     this.kerasInterface = kerasInterface;
   }
 
-  // Internal: the active D3Model, or throw a friendly error if no graph is ready.
-  requireModel() {
+  // Internal: throw a friendly error if no graph is ready. Reads then go
+  // through the facade's typed getters (getLayers/getEdges/...).
+  requireBoard(): BoardInterface {
     const graph = this.boardInterface.activeGraph;
     if (graph === null || graph === undefined || graph.model === undefined) {
       throw new Error('No active graph is available yet.');
     }
-    return graph.model;
+    return this.boardInterface;
   }
 
-  // The type name the Keras generators use for a given d3 layer.
+  // The type name the Keras generators use for a given board layer.
   static layerType(layer: LayerWrapper): string {
     if (layer.kerasLayer && layer.kerasLayer.name) return layer.kerasLayer.name;
     return layer.class || 'Unknown';
@@ -81,10 +83,10 @@ export default class AssistantActions {
       const available = Object.keys(catalog).join(', ');
       throw new Error(`Unknown layer type "${typeName}". Available types: ${available}.`);
     }
-    const model = this.requireModel();
-    const beforeIds = new Set(model.d3Layers.map(layer => layer.id));
+    const board = this.requireBoard();
+    const beforeIds = new Set(board.getLayers().map(layer => layer.id));
     this.boardInterface.addLayer(template.clone());
-    const created = model.d3Layers.find(layer => !beforeIds.has(layer.id));
+    const created = board.getLayers().find(layer => !beforeIds.has(layer.id));
     return {
       id: created ? created.id : null,
       type: typeName,
@@ -93,8 +95,8 @@ export default class AssistantActions {
 
   // Current layers with id, type, name and parameter values.
   listLayers() {
-    const model = this.requireModel();
-    return model.d3Layers.map(layer => ({
+    const board = this.requireBoard();
+    return board.getLayers().map(layer => ({
       id: layer.id,
       type: AssistantActions.layerType(layer),
       name: layer.name,
@@ -129,13 +131,13 @@ export default class AssistantActions {
 
   // Counts (layers / inputs / outputs / edges) plus a compact layer list.
   getModelSummary() {
-    const model = this.requireModel();
+    const board = this.requireBoard();
     return {
-      layerCount: model.d3Layers.length,
-      inputCount: model.modelInputs.length,
-      outputCount: model.modelOutputs.length,
-      edgeCount: model.d3Edges.length,
-      layers: model.d3Layers.map(layer => ({
+      layerCount: board.getLayers().length,
+      inputCount: board.getModelInputs().length,
+      outputCount: board.getModelOutputs().length,
+      edgeCount: board.getEdges().length,
+      layers: board.getLayers().map(layer => ({
         id: layer.id,
         type: AssistantActions.layerType(layer),
         name: layer.name,
@@ -170,15 +172,16 @@ export default class AssistantActions {
   }
 
   // Connect two layers (source output -> target input), like dragging an
-  // edge on the board. Same rules: self-loops, duplicates and cycles refused.
+  // edge on the board. Same rules: self-loops and duplicates refused;
+  // cycle-closing edges are allowed (marked red, codegen refuses them).
   connectLayers(sourceId: NnvpLayerId, targetId: NnvpLayerId) {
     this.requireLayer(sourceId, 'source');
     this.requireLayer(targetId, 'target');
     const connected = this.boardInterface.connectLayers(sourceId, targetId);
     if (!connected) {
       throw new Error(
-        `Cannot connect ${sourceId} -> ${targetId}: the connection already exists, `
-        + 'is a self-loop, or would create a cycle.',
+        `Cannot connect ${sourceId} -> ${targetId}: the connection already exists `
+        + 'or is a self-loop.',
       );
     }
     return { connected: true, source: sourceId, target: targetId };
@@ -230,8 +233,8 @@ export default class AssistantActions {
       throw new Error(`Unknown template "${name}". Available templates: ${available.join(', ')}.`);
     }
     this.boardInterface.loadTemplate(name);
-    const model = this.requireModel();
-    return { loaded: name, layerCount: model.d3Layers.length };
+    const board = this.requireBoard();
+    return { loaded: name, layerCount: board.getLayers().length };
   }
 
   // The app's guided tutorials: what exists and what each walks through.
@@ -246,7 +249,7 @@ export default class AssistantActions {
   }
 
   // Start (or switch to) a guided tutorial. Tutorial state lives in App.vue,
-  // so this bridges over a window event (same pattern as nnvp:auth-changed);
+  // so this bridges over a bus event (same pattern as auth.changed);
   // App listens and drives the overlay. Navigation, not a graph mutation —
   // available even in read-only mode.
   startTutorial(tutorialId: string) {
@@ -255,7 +258,7 @@ export default class AssistantActions {
       const available = tutorials.map(tutorial => tutorial.id).join(', ');
       throw new Error(`Unknown tutorial "${tutorialId}". Available ids: ${available}.`);
     }
-    window.dispatchEvent(new CustomEvent('nnvp:start-tutorial', { detail: { id: tutorialId } }));
+    bus.emit('ui.start-tutorial', { id: tutorialId });
     return { started: tutorialId, title: known.title };
   }
 
@@ -263,7 +266,7 @@ export default class AssistantActions {
   // pattern as startTutorial: App.vue listens and opens the window.
   // Navigation, not a graph mutation — available even in read-only mode.
   openTrainingPanel() {
-    window.dispatchEvent(new CustomEvent('nnvp:open-training'));
+    bus.emit('ui.open-training');
     return { opened: true };
   }
 
