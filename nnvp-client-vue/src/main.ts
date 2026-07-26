@@ -4,6 +4,7 @@ import App from './App.vue';
 import KerasInterface from './lib/KerasInterface/KerasInterface';
 import BoardInterface from './lib/BoardInterface/BoardInterface';
 import jsonLayersFile from './lib/KerasInterface/generatedKerasLayers.json';
+import { textLayerCatalogEntries } from './lib/KerasInterface/textLayers';
 import KeyboardListener from './lib/KeyboardListener/KeyboardListener';
 import ApiClient from './lib/Backend/apiClient';
 import { installSyncOnAuth } from './lib/Backend/sync';
@@ -31,7 +32,13 @@ type DebugWindow = Window & {
 
   // This file is generated from api/keras_layers.py. Temporary file for early
   // development versions, should later be automatically generated at build time.
-  const kerasInterface = new KerasInterface(jsonLayersFile as KerasLayerCatalog);
+  // NNVP's own text/transformer layers (textLayers.ts) are merged in here — the
+  // generated file would drop them on regeneration.
+  const catalog = jsonLayersFile as KerasLayerCatalog;
+  const kerasInterface = new KerasInterface({
+    aliasToCanonical: catalog.aliasToCanonical,
+    layers: { ...catalog.layers, ...textLayerCatalogEntries },
+  });
 
   app.config.globalProperties.$kerasInterface = kerasInterface;
   const boardInterface = new BoardInterface();
