@@ -17,9 +17,17 @@ import type {
   HistoryDriver, RecordsDriver, TrainingDriver, WindowName, WindowsDriver, World,
 } from './define';
 
-// Dev-only debug handle main.ts installs (same local-typing pattern).
+// Dev-only debug handle main.ts installs (same local-typing pattern). `bus`
+// is the app-wide event bus (src/lib/Events/bus) — typed structurally here so
+// page.evaluate callbacks stay serializable-import-free.
 type NnvpDebugWindow = Window & {
-  nnvp: { debug: { graphEditor: FlowGraphEditor; recordStore: RecordStore } };
+  nnvp: {
+    debug: {
+      graphEditor: FlowGraphEditor;
+      recordStore: RecordStore;
+      bus: { emit(type: 'auth.changed'): void };
+    };
+  };
 };
 
 export function makeBrowserWorld(page: Page, canvas: CanvasDriver, expect: Expect, options: { exposePage: true }): E2EWorld;
@@ -272,7 +280,7 @@ export function makeBrowserWorld(
       await page.evaluate((on) => {
         if (on) window.localStorage.setItem('nnvp_backend_token', 'test-token');
         else window.localStorage.removeItem('nnvp_backend_token');
-        window.dispatchEvent(new CustomEvent('nnvp:auth-changed'));
+        (window as unknown as NnvpDebugWindow).nnvp.debug.bus.emit('auth.changed');
       }, signedIn);
     },
     async open() {

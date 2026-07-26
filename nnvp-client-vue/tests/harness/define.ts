@@ -196,10 +196,27 @@ export interface HistoryDriver {
 }
 
 /** What the fake backend holds, full records per kind (lists serve uuid
- *  projections of these, exactly like the real server). */
+ *  projections of these, exactly like the real server). `events` seeds the
+ *  event endpoints, given CLIENT-shaped (camelCase DomainEvent) events — the
+ *  fake stores them in the wire shape like the real server would. */
 export interface BackendFakeData {
   runs?: StoredRecord[];
   conversations?: StoredRecord[];
+  events?: DomainEventLike[];
+}
+
+/** Structural stand-in for src DomainEvent (keeps define.ts's import surface
+ *  small; the fake maps it through the real eventToWire). */
+export interface DomainEventLike {
+  uuid: string;
+  type: string;
+  streamId: string | null;
+  deviceId: string;
+  instanceId: string;
+  seq: number;
+  dependsOn: string[];
+  wallTime: string;
+  payload: unknown;
 }
 
 /**

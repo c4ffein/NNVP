@@ -19,6 +19,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'bun:test';
 import ApiClient, { ApiError, ERROR_CODES } from '../../src/lib/Backend/apiClient';
+import type { DomainEvent } from '../../src/lib/Events/domainEvent';
 
 const BACKEND_URL = process.env.NNVP_BACKEND_URL || 'http://127.0.0.1:8123';
 const MAIL_DIR = process.env.NNVP_MAIL_DIR || '';
@@ -158,9 +159,9 @@ function realisticGraph() {
 function smallGraph() {
   return {
     layers: [
-      { class: 'D3Layer', x: 10, y: 10, width: 80, height: 40, id: 0, htmlID: 'Layer_0', name: 'Input', inputLayers: [], outputLayers: [1], kerasLayer: { name: 'Input' } },
-      { class: 'D3Layer', x: 10, y: 90, width: 80, height: 40, id: 1, htmlID: 'Layer_1', name: 'Dense', inputLayers: [0], outputLayers: [2], kerasLayer: { name: 'Dense', parameterValues: { units: 4, activation: 'relu' } } },
-      { class: 'D3Layer', x: 10, y: 170, width: 80, height: 40, id: 2, htmlID: 'Layer_2', name: 'Output', inputLayers: [1], outputLayers: [], kerasLayer: { name: 'Output' } },
+      { class: 'Layer', x: 10, y: 10, width: 80, height: 40, id: 0, htmlID: 'Layer_0', name: 'Input', inputLayers: [], outputLayers: [1], kerasLayer: { name: 'Input' } },
+      { class: 'Layer', x: 10, y: 90, width: 80, height: 40, id: 1, htmlID: 'Layer_1', name: 'Dense', inputLayers: [0], outputLayers: [2], kerasLayer: { name: 'Dense', parameterValues: { units: 4, activation: 'relu' } } },
+      { class: 'Layer', x: 10, y: 170, width: 80, height: 40, id: 2, htmlID: 'Layer_2', name: 'Output', inputLayers: [1], outputLayers: [], kerasLayer: { name: 'Output' } },
     ],
     edges: [
       { id: 's0_t1', source: 0, target: 1 },
@@ -446,6 +447,92 @@ describe(`API contract against real backend at ${BACKEND_URL}`, () => {
 
       const projects = await alice.client.listProjects() as ProjectOut[];
       expect(projects.some((p) => p.id === aliceProjectId)).toBe(false);
+    });
+  });
+
+  describe('events (sync v2: uuid diff, idempotent batch-put, purge-by-stream)', () => {
+    // Client-shaped events; the ApiClient owns the snake_case wire mapping.
+    const streamA = crypto.randomUUID();
+    const streamB = crypto.randomUUID();
+    const makeEvent = (streamId: string, seq: number, dependsOn: string[] = []): DomainEvent => ({
+      uuid: crypto.randomUUID(),
+      type: 'run.epoch',
+      streamId,
+      deviceId: 'contract-device',
+      instanceId: 'contract-instance',
+      seq,
+      dependsOn,
+      wallTime: new Date().toISOString(),
+      payload: { epoch: seq, acc: 0.5 + seq / 100 },
+    });
+    const aliceEvents = [
+      makeEvent(streamA, 1),
+      makeEvent(streamA, 2),
+      makeEvent(streamB, 1),
+    ];
+    aliceEvents[1] = { ...aliceEvents[1]!, dependsOn: [aliceEvents[0]!.uuid] };
+
+    it('batch-put creates, a re-put answers exists and never touches the stored event', async () => {
+      const first = await alice.client.batchPutEvents(aliceEvents);
+      expect(first.map((r) => r.status)).toEqual(['created', 'created', 'created']);
+
+      // Same uuid, different payload: per-item idempotent, stored event wins.
+      const impostor = { ...aliceEvents[0]!, payload: { epoch: 999 } };
+      const again = await alice.client.batchPutEvents([impostor]);
+      expect(again[0]!.status).toBe('exists');
+      const [stored] = await alice.client.batchGetEvents([aliceEvents[0]!.uuid]);
+      expect(stored!.payload).toEqual(aliceEvents[0]!.payload);
+    });
+
+    it('uuid listing paginates to a null cursor and narrows by stream_id', async () => {
+      // Page size 2 over 3 events: exactly two pages, cursor chained.
+      const first = await alice.client.listEventUuids({ limit: 2 });
+      expect(first.uuids.length).toBe(2);
+      expect(first.nextCursor).not.toBeNull();
+      const second = await alice.client.listEventUuids({ cursor: first.nextCursor!, limit: 2 });
+      expect(second.nextCursor).toBeNull();
+      const all = [...first.uuids, ...second.uuids].sort();
+      expect(all).toEqual(aliceEvents.map((e) => e.uuid).sort());
+
+      const onlyB = await alice.client.listEventUuids({ streamId: streamB });
+      expect(onlyB.uuids).toEqual([aliceEvents[2]!.uuid]);
+    });
+
+    it('batch-get round-trips the full envelope and omits unknown uuids silently', async () => {
+      const fetched = await alice.client.batchGetEvents([
+        aliceEvents[1]!.uuid, crypto.randomUUID(), // one real, one unknown
+      ]);
+      expect(fetched.length).toBe(1);
+      expect(fetched[0]).toEqual(aliceEvents[1]!); // camelCase, dependsOn intact
+    });
+
+    it('cap violations are 422', async () => {
+      await expectApiError(
+        alice.client.listEventUuids({ limit: 1001 }),
+        { code: ERROR_CODES.http, status: 422 },
+      );
+      await expectApiError(
+        alice.client.batchGetEvents(Array.from({ length: 501 }, () => crypto.randomUUID())),
+        { code: ERROR_CODES.http, status: 422 },
+      );
+    });
+
+    it('events are owner-isolated: foreign uuids omitted, foreign purge deletes 0', async () => {
+      const [aliceUuid] = [aliceEvents[0]!.uuid];
+      expect(await bob.client.batchGetEvents([aliceUuid!])).toEqual([]);
+      const bobList = await bob.client.listEventUuids();
+      expect(bobList.uuids.some((uuid) => uuid === aliceUuid)).toBe(false);
+      expect(await bob.client.purgeEventStream(streamA)).toBe(0);
+      // Alice's stream survived Bob's purge attempt.
+      const still = await alice.client.listEventUuids({ streamId: streamA });
+      expect(still.uuids.length).toBe(2);
+    });
+
+    it('purge-by-stream deletes exactly that stream and reports the count', async () => {
+      expect(await alice.client.purgeEventStream(streamA)).toBe(2);
+      expect(await alice.client.purgeEventStream(streamA)).toBe(0); // now empty
+      const left = await alice.client.listEventUuids();
+      expect(left.uuids).toEqual([aliceEvents[2]!.uuid]); // streamB untouched
     });
   });
 });

@@ -19,6 +19,7 @@ import { resetWindowRects } from '../../src/lib/windowing';
 import { resetChatSession } from '../../src/lib/Assistant/chatSession';
 import { resetTrainingConfig } from '../../src/lib/Training/trainingConfig';
 import { askAssistant } from '../../src/lib/Assistant/askAssistant';
+import { bus } from '../../src/lib/Events/bus';
 import { MemoryRecordStore } from '../../src/lib/LocalStore/recordStore';
 import { setRecordStoreForTests } from '../../src/lib/LocalStore/db';
 import { createFakeBackend } from './fakeBackend';
@@ -402,7 +403,7 @@ export function makeChatDriver(): ChatDriver & Teardown {
     async setSignedIn(signedIn) {
       if (signedIn) localStorage.setItem('nnvp_backend_token', 'test-token');
       else localStorage.removeItem('nnvp_backend_token');
-      window.dispatchEvent(new CustomEvent('nnvp:auth-changed'));
+      bus.emit('auth.changed');
     },
     async open() {
       // Mounting IS opening now: App mounts ChatBubble when Panels > Chat is
