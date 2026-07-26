@@ -3,6 +3,8 @@ export type SpriteEntry = [number, number, string];
 
 /** The Dataset constructor options one entry of this registry provides. */
 export interface DatasetSourceConfig {
+  /** Absent means image — every pre-text entry predates the discriminator. */
+  kind?: 'image';
   imagesSpritePath: SpriteEntry[] | string;
   imagesSpriteChecksum: string[];
   shape: number[];
@@ -13,8 +15,26 @@ export interface DatasetSourceConfig {
   labelClassNames?: string[];
 }
 
+/**
+ * A character-level text corpus (TextDataset): one plain .txt on the CDN,
+ * pre-normalized to the fixed text-vocab by scripts/prepare_poetry_datasets.py.
+ * `textChecksum` is an SRI string ("sha256-<base64>", printed by that script)
+ * or null while a corpus is still unhosted — fetch() then skips integrity.
+ */
+export interface TextDatasetSourceConfig {
+  kind: 'text';
+  textPath: string;
+  textChecksum: string | null;
+  /** Model context window: text templates' Input shape must equal [seqLen]. */
+  seqLen: number;
+}
+
+export type AnyDatasetSourceConfig = DatasetSourceConfig | TextDatasetSourceConfig;
+
 /** [config, description] plus an optional "are you sure" warning message. */
-export type DatasetSourceEntry = [DatasetSourceConfig, string] | [DatasetSourceConfig, string, string];
+export type DatasetSourceEntry =
+  | [AnyDatasetSourceConfig, string]
+  | [AnyDatasetSourceConfig, string, string];
 
 export default (cdnDir: string): Record<string, DatasetSourceEntry> => {return{
   'MNIST': [
@@ -143,5 +163,54 @@ export default (cdnDir: string): Record<string, DatasetSourceEntry> => {return{
     'airplanes, cars, birds, cats, deer, dogs, frogs, horses, ships, and trucks. ' +
     'Please provide a [32, 32, 3] input shape.',
     'This dataset is particularly heavy for web browsers. Are you sure you want to load it?',
+  ],
+  'TinyShakespeare': [
+    {
+      kind: 'text',
+      textPath: cdnDir+"tinyshakespeare/tinyshakespeare.txt",
+      textChecksum: null, // printed by scripts/prepare_poetry_datasets.py once hosted
+      seqLen: 40,
+    },
+    'Complete works of Shakespeare concatenated (~1MB of dialogue in verse) — ' +
+    'the classic character-level language-modeling corpus. ' +
+    'Use a text template (e.g. "Char-LSTM Poetry"): the model reads 40 characters ' +
+    'and learns to predict the next one.',
+  ],
+  'GutenbergPoetry': [
+    {
+      kind: 'text',
+      textPath: cdnDir+"gutenberg_poetry/gutenberg_poetry.txt",
+      textChecksum: null, // printed by scripts/prepare_poetry_datasets.py once hosted
+      seqLen: 40,
+    },
+    'A few megabytes of public-domain English poetry lines, cut from the ' +
+    'Gutenberg Poetry Corpus (A. Parrish). ' +
+    'Use a text template (e.g. "Char-LSTM Poetry"): the model reads 40 characters ' +
+    'and learns to predict the next one.',
+  ],
+  'ShakespeareSonnets': [
+    {
+      kind: 'text',
+      textPath: cdnDir+"shakespeare_sonnets/shakespeare_sonnets.txt",
+      textChecksum: null, // printed by scripts/prepare_poetry_datasets.py once hosted
+      seqLen: 96,
+    },
+    'All 154 of Shakespeare\'s sonnets (~100KB) with a 96-character window. ' +
+    'Deliberately tiny: training on it from scratch overfits fast — it exists ' +
+    'as the FINE-TUNING phase of a curriculum (pretrain on GutenbergPoetryXL ' +
+    'with the "GPT-Mini Poetry" template, then continue here).',
+  ],
+  'GutenbergPoetryXL': [
+    {
+      kind: 'text',
+      textPath: cdnDir+"gutenberg_poetry_xl/gutenberg_poetry_xl.txt",
+      textChecksum: null, // printed by scripts/prepare_poetry_datasets.py once hosted
+      seqLen: 96,
+    },
+    '~25MB of public-domain English poetry (Gutenberg Poetry Corpus, A. Parrish) ' +
+    'with a 96-character context window — enough diversity that every ' +
+    'pause/resume cycle trains on fresh text. ' +
+    'Pair it with the "GPT-Mini Poetry" template (its Input shape is [96]).',
+    'This dataset is a ~25MB download. Are you sure you want to load it?',
   ],
 };};
