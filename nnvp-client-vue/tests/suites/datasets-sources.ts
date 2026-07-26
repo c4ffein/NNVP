@@ -4,7 +4,7 @@
  */
 import { logicTest } from '../harness/define';
 import loadableDatasets from '../../src/lib/JSDatasets/datasets-sources';
-import type { DatasetSourceConfig } from '../../src/lib/JSDatasets/datasets-sources';
+import type { AnyDatasetSourceConfig } from '../../src/lib/JSDatasets/datasets-sources';
 
 // datasets-sources exports (cdnDir) => ({ NAME: [config, description, ...], ... }).
 // The default cdnDir (see TrainingZone.vue) ends with a trailing slash, so every
@@ -14,7 +14,8 @@ import type { DatasetSourceConfig } from '../../src/lib/JSDatasets/datasets-sour
 const CDN_DIR = 'https://datasets.nnvp.io/datasets/';
 
 // Collect every fully-qualified URL a dataset config references.
-function urlsForDataset(config: DatasetSourceConfig): string[] {
+function urlsForDataset(config: AnyDatasetSourceConfig): string[] {
+  if (config.kind === 'text') return [config.textPath];
   const urls: string[] = [];
   if (Array.isArray(config.imagesSpritePath)) {
     for (const entry of config.imagesSpritePath) {
@@ -34,7 +35,10 @@ function pathAfterScheme(url: string): string {
 const datasets = loadableDatasets(CDN_DIR);
 
 logicTest('datasets-sources: defines the expected datasets, each with a config and a description', ({ expect }) => {
-  expect(Object.keys(datasets).sort()).toEqual(['CIFAR10', 'FashionMNIST', 'MNIST']);
+  expect(Object.keys(datasets).sort()).toEqual([
+    'CIFAR10', 'FashionMNIST', 'GutenbergPoetry', 'GutenbergPoetryXL',
+    'MNIST', 'ShakespeareSonnets', 'TinyShakespeare',
+  ]);
   for (const [name, entry] of Object.entries(datasets)) {
     expect(Array.isArray(entry), `${name} entry is a tuple`).toBe(true);
     expect(typeof entry[0], `${name} has a config object`).toBe('object');
@@ -56,7 +60,15 @@ logicTest('datasets-sources: builds well-formed URLs with no double slash after 
 });
 
 logicTest('datasets-sources: references each dataset under its own directory', ({ expect }) => {
-  const dirByName = { MNIST: 'mnist/', FashionMNIST: 'fashion_mnist/', CIFAR10: 'cifar10/' };
+  const dirByName = {
+    MNIST: 'mnist/',
+    FashionMNIST: 'fashion_mnist/',
+    CIFAR10: 'cifar10/',
+    TinyShakespeare: 'tinyshakespeare/',
+    GutenbergPoetry: 'gutenberg_poetry/',
+    GutenbergPoetryXL: 'gutenberg_poetry_xl/',
+    ShakespeareSonnets: 'shakespeare_sonnets/',
+  };
   for (const [name, dir] of Object.entries(dirByName)) {
     for (const url of urlsForDataset(datasets[name]![0])) {
       expect(url.includes(dir), `${name}: ${url} should live under ${dir}`).toBe(true);

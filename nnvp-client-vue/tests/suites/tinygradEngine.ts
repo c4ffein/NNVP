@@ -508,8 +508,8 @@ logicTest('tinygradEngine: prepare traces with the graph shape and the configure
   // Session contract: no tf model (Inspect shows its hint), graph snapshot kept.
   expect(session.model).toBe(null);
   expect(session.graphJson).toBe(graphJson);
-  expect(engine.capabilities).toEqual({ dynamicBatch: false, liveLr: true });
-  expect(session.capabilities).toEqual({ dynamicBatch: false, liveLr: true });
+  expect(engine.capabilities).toEqual({ dynamicBatch: false, liveLr: true, canPause: false });
+  expect(session.capabilities).toEqual({ dynamicBatch: false, liveLr: true, canPause: false });
   expect(step.calls.length).toBe(0); // prepare never trains
   // Defaults when no params are set: lr 0.01, plain sgd.
   const { engine: engine2, runtime: runtime2 } = makeEngine();

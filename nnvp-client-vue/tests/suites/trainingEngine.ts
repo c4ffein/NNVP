@@ -115,9 +115,9 @@ function makeFakeDataset() {
 logicTest('trainingEngine: capabilities are the tfjs record on engine and session', async ({ expect }) => {
   await setup(expect);
   const engine = createTfjsEngine({ loadTf: async () => tf });
-  expect(engine.capabilities).toEqual({ dynamicBatch: true, liveLr: true });
+  expect(engine.capabilities).toEqual({ dynamicBatch: true, liveLr: true, canPause: true });
   const session = await engine.prepare(null, makeOpts());
-  expect(session.capabilities).toEqual({ dynamicBatch: true, liveLr: true });
+  expect(session.capabilities).toEqual({ dynamicBatch: true, liveLr: true, canPause: true });
 });
 
 logicTest('trainingEngine: prepare evals the generated code, compiles, and keeps the Inspector contract', async ({ expect }) => {
