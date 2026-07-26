@@ -30,6 +30,10 @@ export interface TrainingConfigSnapshot {
   optimizerParams: Record<string, unknown>;
   epochs: number;
   loss: string;
+  /** Curriculum fine-tuning phase — journaled only when it was enabled;
+   *  absent on single-phase (and every pre-curriculum) record. */
+  phase2Dataset?: string;
+  phase2Epochs?: number;
 }
 
 export interface RunRecord {

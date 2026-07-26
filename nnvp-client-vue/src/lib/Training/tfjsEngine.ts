@@ -12,7 +12,7 @@
  * cheap to import under bun and keeps tfjs out of the initial bundle.
  */
 import type {
-  NamedWeights, TrainingCallbacks, TrainingDataset, TrainingEngine,
+  FitOptions, NamedWeights, TrainingCallbacks, TrainingDataset, TrainingEngine,
   TrainingPrepareOptions, TrainingSession,
 } from './engine';
 import { TrainingPrepareError } from './engine';
@@ -78,7 +78,7 @@ const BATCH_SIZE = 64;
 const TRAIN_DATA_SIZE = 500;
 const TEST_DATA_SIZE = 100;
 
-const capabilities = Object.freeze({ dynamicBatch: true, liveLr: true });
+const capabilities = Object.freeze({ dynamicBatch: true, liveLr: true, canPause: true });
 
 interface TfjsSessionInit {
   tf: Tf;
@@ -97,15 +97,25 @@ function createSession({ tf, model, graphJson, epochs, batchSize }: TfjsSessionI
     // test slices from the dataset, then model.fit with the caller's
     // callbacks (watchTraining's onBatchEnd/onEpochEnd feed the charts, and
     // throw from inside a callback to cancel).
-    async fit(dataset: TrainingDataset, fitCallbacks: TrainingCallbacks) {
+    async fit(dataset: TrainingDataset, fitCallbacks: TrainingCallbacks, fitOptions?: FitOptions) {
       const shape = dataset.shape;
+      // Pause/resume (capabilities.canPause): a resume segment trains
+      // `fitOptions.epochs` MORE epochs on a freshly drawn slice, numbering
+      // them from initialEpoch so charts/journal keep one absolute axis.
+      // model.stopTraining is tfjs's own stop flag — clear it or a resumed
+      // fit would end after its first batch.
+      const fitEpochs = fitOptions?.epochs !== undefined ? fitOptions.epochs : epochs;
+      const initialEpoch = fitOptions?.initialEpoch !== undefined ? fitOptions.initialEpoch : 0;
+      model.stopTraining = false;
+      const trainSize = dataset.trainSliceSize !== undefined ? dataset.trainSliceSize : TRAIN_DATA_SIZE;
+      const testSize = dataset.testSliceSize !== undefined ? dataset.testSliceSize : TEST_DATA_SIZE;
       const [trainXs, trainYs] = tf.tidy(() => {
-        const d = dataset.nextTrainBatch(TRAIN_DATA_SIZE) as { xs: Tf; labels: Tf };
-        return [d.xs.reshape([TRAIN_DATA_SIZE, ...shape]), d.labels];
+        const d = dataset.nextTrainBatch(trainSize) as { xs: Tf; labels: Tf };
+        return [d.xs.reshape([trainSize, ...shape]), d.labels];
       });
       const [testXs, testYs] = tf.tidy(() => {
-        const d = dataset.nextTestBatch(TEST_DATA_SIZE) as { xs: Tf; labels: Tf };
-        return [d.xs.reshape([TEST_DATA_SIZE, ...shape]), d.labels];
+        const d = dataset.nextTestBatch(testSize) as { xs: Tf; labels: Tf };
+        return [d.xs.reshape([testSize, ...shape]), d.labels];
       });
 
       // Debug: Log actual TensorFlow.js training configuration
@@ -123,7 +133,10 @@ function createSession({ tf, model, graphJson, epochs, batchSize }: TfjsSessionI
       return model.fit(trainXs, trainYs, {
         batchSize,
         validationData: [testXs, testYs],
-        epochs: epochs,
+        // tfjs semantics: trains until `epochs` is reached, counting from
+        // initialEpoch — so a resume passes epochs = initialEpoch + remaining.
+        epochs: initialEpoch + fitEpochs,
+        initialEpoch,
         shuffle: true,
         callbacks: fitCallbacks,
       });

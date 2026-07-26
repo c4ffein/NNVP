@@ -45,7 +45,9 @@ const LOSS_READBACK_EVERY = 10;
 const SUPPORTED_LOSSES = ['categoricalCrossentropy', 'sparseCategoricalCrossentropy'];
 const SGD_PARAMS = ['learningRate', 'momentum', 'nesterov'];
 
-const capabilities = Object.freeze({ dynamicBatch: false, liveLr: true });
+// canPause: false — the traced pipeline COULD pause at a step boundary, but
+// resume-with-fit-options is not wired; the pause UI hides itself.
+const capabilities = Object.freeze({ dynamicBatch: false, liveLr: true, canPause: false });
 
 const unsupported = (what: string): Error => new Error(`${what} is not supported by the tinygrad engine yet`);
 

@@ -20,6 +20,23 @@ export interface TrainingCapabilities {
   readonly dynamicBatch: boolean;
   /** The learning rate can be adjusted while a fit is in flight. */
   readonly liveLr: boolean;
+  /**
+   * stop() mid-fit keeps the session warm (weights AND optimizer state), and
+   * a follow-up fit(..., { epochs, initialEpoch }) continues training — the
+   * pause/resume contract lib/Training/runController builds on. Engines
+   * without it (the traced tinygrad pipeline, for now) get no pause UI.
+   */
+  readonly canPause: boolean;
+}
+
+/**
+ * Per-fit overrides for resuming a paused run: train `epochs` MORE epochs,
+ * reporting epoch numbers starting at `initialEpoch` (so charts and the run
+ * journal stay on one absolute epoch axis across pause boundaries).
+ */
+export interface FitOptions {
+  readonly epochs?: number;
+  readonly initialEpoch?: number;
 }
 
 /**
@@ -61,6 +78,14 @@ export interface TrainingDataset {
   readonly shape: number[];
   nextTrainBatch(batchSize: number): { xs: unknown; labels: unknown };
   nextTestBatch(batchSize: number): { xs: unknown; labels: unknown };
+  /**
+   * How many train/validation samples ONE fit should draw, when the dataset
+   * knows better than the engine's historical demo constants (500/100).
+   * Char-level text datasets set these: one window teaches a single next-char
+   * fact, so 500 windows would starve the model.
+   */
+  readonly trainSliceSize?: number;
+  readonly testSliceSize?: number;
   /** Flat normalized pixels, sample-major (google-data-loader.trainImages). */
   readonly trainImages?: Float32Array;
   /** One class index per sample (google-data-loader.trainLabels). */
@@ -102,8 +127,12 @@ export interface TrainingSession {
   /** The graph JSON snapshot this session's model was generated from. */
   readonly graphJson: string | null;
   readonly capabilities: TrainingCapabilities;
-  /** Resolves when training completes; rejects if a callback throws (cancel). */
-  fit(dataset: TrainingDataset, callbacks: TrainingCallbacks): Promise<unknown>;
+  /**
+   * Resolves when training completes; rejects if a callback throws (cancel).
+   * `fitOptions` is the pause/resume hook (see FitOptions) — engines without
+   * canPause ignore it.
+   */
+  fit(dataset: TrainingDataset, callbacks: TrainingCallbacks, fitOptions?: FitOptions): Promise<unknown>;
   /** Sync for tfjs; a Promise for engines whose weights live on the GPU. */
   getWeights(): NamedWeights | Promise<NamedWeights>;
   /** Writes the provided names back; names absent from `weights` are left as-is. */

@@ -13,6 +13,9 @@ export interface TrainingConfigSnapshot {
   optimizerParams: Record<string, unknown>;
   epochs: number;
   loss: string;
+  /** Curriculum: the fine-tuning phase, present only when enabled. */
+  phase2Dataset?: string;
+  phase2Epochs?: number;
 }
 
 // The training compile options outlive the Training window: closing it
@@ -28,6 +31,11 @@ export const trainingConfig = reactive({
   optimizerParams: {} as Record<string, unknown>,
   epochs: 10,
   selectedLoss: 'categoricalCrossentropy',
+  // Curriculum (pretrain → fine-tune): when enabled, the run continues on
+  // phase2Dataset for phase2Epochs after the main epochs complete.
+  phase2Enabled: false,
+  phase2Dataset: 'ShakespeareSonnets',
+  phase2Epochs: 10,
 });
 
 export function resetTrainingConfig(): void {
@@ -36,15 +44,23 @@ export function resetTrainingConfig(): void {
   trainingConfig.optimizerParams = {};
   trainingConfig.epochs = 10;
   trainingConfig.selectedLoss = 'categoricalCrossentropy';
+  trainingConfig.phase2Enabled = false;
+  trainingConfig.phase2Dataset = 'ShakespeareSonnets';
+  trainingConfig.phase2Epochs = 10;
 }
 
 /** A plain (non-reactive) copy of the current config, safe to journal as JSON. */
 export function snapshotTrainingConfig(): TrainingConfigSnapshot {
-  return {
+  const snapshot: TrainingConfigSnapshot = {
     dataset: trainingConfig.selectedDataset,
     optimizer: trainingConfig.selectedOptimizer,
     optimizerParams: { ...trainingConfig.optimizerParams },
     epochs: trainingConfig.epochs,
     loss: trainingConfig.selectedLoss,
   };
+  if (trainingConfig.phase2Enabled) {
+    snapshot.phase2Dataset = trainingConfig.phase2Dataset;
+    snapshot.phase2Epochs = trainingConfig.phase2Epochs;
+  }
+  return snapshot;
 }
