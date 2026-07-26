@@ -31,6 +31,32 @@ const debugLogChartUpdate = (kind: string, chartData: ChartData): void => {
   );
 };
 
+/**
+ * The chart accumulation of one training RUN, which may span several fit
+ * segments when the run is paused and resumed: pass the same WatchState to
+ * each watchTraining call and the curves continue instead of resetting.
+ */
+export interface WatchState {
+  batchLabels: number[];
+  batchMetrics: { loss: number[]; acc: (number | undefined)[] };
+  epochLabels: number[];
+  epochMetrics: {
+    loss: number[];
+    val_loss: (number | undefined)[];
+    acc: (number | undefined)[];
+    val_acc: (number | undefined)[];
+  };
+}
+
+export const createWatchState = (): WatchState => ({
+  batchLabels: [],
+  batchMetrics: { loss: [], acc: [] },
+  epochLabels: [],
+  epochMetrics: {
+    loss: [], val_loss: [], acc: [], val_acc: [],
+  },
+});
+
 export default async (
   chartData0: ChartData,
   chartData1: ChartData,
@@ -41,18 +67,11 @@ export default async (
   // check — a cancel-interrupted epoch is dropped from charts and journal
   // alike. Structural type: this module stays decoupled from runJournal.
   onEpoch?: (m: { epoch: number; acc?: number; loss?: number; valAcc?: number; valLoss?: number }) => void,
+  // Fresh by default (the historical one-fit-per-run behavior); a resumed
+  // run passes its own state so curves accumulate across segments.
+  state: WatchState = createWatchState(),
 ): Promise<unknown> => {
-  const batchLabels: number[] = [];
-  const batchMetrics: { loss: number[]; acc: (number | undefined)[] } = { loss: [], acc: [] };
-  const epochLabels: number[] = [];
-  const epochMetrics: {
-    loss: number[];
-    val_loss: (number | undefined)[];
-    acc: (number | undefined)[];
-    val_acc: (number | undefined)[];
-  } = {
-    loss: [], val_loss: [], acc: [], val_acc: [],
-  };
+  const { batchLabels, batchMetrics, epochLabels, epochMetrics } = state;
   const callbacks: TrainingCallbacks = {
     onBatchEnd(batchNumber, s) {
       if (cancelRequestedAccessor()) throw stopError;
