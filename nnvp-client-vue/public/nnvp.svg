@@ -1,7 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- The N is the graph: four layer nodes, three edges tracing the letter's
+       stroke (left bar up, diagonal down, right bar up). Node blue is the
+       app's --accent token (#5566ee, App.vue); edges match the board's gray.
+       Regenerate favicon.ico with: bun scripts/generate-favicon.ts -->
   <rect width="32" height="32" rx="7" fill="#16161d"/>
-  <path d="M16 8.5 L9.5 23 M16 8.5 L22.5 23" stroke="#8a8a96" stroke-width="1.6" fill="none"/>
-  <circle cx="16" cy="8.5" r="3.6" fill="#f5f5f7"/>
-  <circle cx="9.5" cy="23" r="3.6" fill="#5b8def"/>
-  <circle cx="22.5" cy="23" r="3.6" fill="#5b8def"/>
+  <path d="M9.5 23 L9.5 9 L22.5 23 L22.5 9" stroke="#8a8a96" stroke-width="1.6" fill="none"/>
+  <circle cx="9.5" cy="23" r="3.4" fill="#5566ee"/>
+  <circle cx="9.5" cy="9" r="3.4" fill="#f5f5f7"/>
+  <circle cx="22.5" cy="23" r="3.4" fill="#f5f5f7"/>
+  <circle cx="22.5" cy="9" r="3.4" fill="#5566ee"/>
 </svg>

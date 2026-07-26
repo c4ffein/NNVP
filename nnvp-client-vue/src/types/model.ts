@@ -1,7 +1,9 @@
-// The NNVP model format: what .nnvp files contain, what D3Model.toJSON
-// emitted historically, and what FlowInterface/adapter's flowToNnvp emits /
-// nnvpToFlow accepts today. This is the persisted contract — change it only
-// in ways old saved files still satisfy.
+// The NNVP model format (format version 2): what .nnvp files contain and what
+// FlowInterface/adapter's flowToNnvp emits / nnvpToFlow accepts today. The
+// shape is what D3Model.toJSON emitted historically, with the D3-flavored
+// names made honest in v2 (class "Layer"/"Group", htmlID "layer-N"). This is
+// the persisted contract — change it only through a new migration in
+// lib/ModelFormat/migrations.ts so old saved files keep loading.
 
 // --- Keras layer definitions -------------------------------------------------
 
@@ -75,10 +77,22 @@ export interface NnvpEdge {
   htmlID: string;
   source: NnvpLayerId;
   target: NnvpLayerId;
+  /**
+   * Phase D2, on cycle-closing (feedback) edges only: how many steps the
+   * imperative code generators unroll the loop this edge closes (shared
+   * weights). ADDITIVE field — absent means 3, old files stay valid, no
+   * format-version bump; the adapter carries it losslessly either way.
+   */
+  unrollSteps?: number;
 }
 
 export interface NnvpLayer {
-  class: 'D3Layer' | 'D3LayerComposite';
+  /**
+   * "Layer" for a plain layer, "Group" for a composite (grouped) layer.
+   * Format v1 files spelled these "D3Layer" / "D3LayerComposite" — the 1->2
+   * migration (lib/ModelFormat/migrations.ts) renames them on load.
+   */
+  class: 'Layer' | 'Group';
   id: NnvpLayerId;
   htmlID: string;
   name: string;

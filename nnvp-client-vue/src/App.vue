@@ -65,7 +65,7 @@ import TutorialOverlay from './components/Tutorial/TutorialOverlay.vue';
 import TutorialMenu from './components/Tutorial/TutorialMenu.vue';
 import { getTutorial } from './lib/Tutorial/tutorials';
 import type { TutorialDef } from './lib/Tutorial/tutorials';
-import { ASK_EVENT } from './lib/Assistant/askAssistant';
+import { bus } from './lib/Events/bus';
 
 // import.meta.env is Vite-only (absent under bun/unit tests) — typed locally
 // instead of pulling in vite/client types (same choice as BoardInterface.ts).
@@ -75,11 +75,12 @@ type ImportMetaWithEnv = ImportMeta & { env?: { VITE_ENABLE_BACKEND?: string } }
 type PanelKey = 'showLeftPanel' | 'showRightPanel' | 'showChat';
 
 // Non-reactive instance fields assigned outside data() (pure typing pass:
-// keeping them out of data() preserves their non-reactive nature).
+// keeping them out of data() preserves their non-reactive nature). These hold
+// the bus unsubscribers between mounted() and beforeUnmount().
 interface AppInstanceExtra {
-  onStartTutorial?: (event: Event) => void;
-  onAskAssistant?: () => void;
-  onOpenTraining?: () => void;
+  offStartTutorial?: () => void;
+  offAskAssistant?: () => void;
+  offOpenTraining?: () => void;
 }
 
 // Panel visibility survives reloads. Anything but an explicit '0' means
@@ -229,30 +230,26 @@ export default defineComponent({
       this.openAccount('magic');
     }
     const self = this as unknown as AppInstanceExtra;
-    // The assistant starts/switches tutorials through this event
+    // The assistant starts/switches tutorials through this bus event
     // (assistantActions.startTutorial) — same bridge pattern as auth changes.
-    self.onStartTutorial = (event: Event) => {
-      const { detail } = event as CustomEvent<{ id?: string }>;
-      if (detail && detail.id) this.startTutorial(detail.id);
-    };
-    window.addEventListener('nnvp:start-tutorial', self.onStartTutorial);
+    self.offStartTutorial = bus.on('ui.start-tutorial', ({ id }) => {
+      if (id) this.startTutorial(id);
+    });
     // "Ask the assistant" from a help modal must work when the chat widget is
     // hidden via the View menu: mount it, and ChatBubble consumes the pending
-    // ask on mount (see lib/Assistant/askAssistant.js).
-    self.onAskAssistant = () => {
+    // ask on mount (see lib/Assistant/askAssistant.ts).
+    self.offAskAssistant = bus.on('ui.ask-assistant', () => {
       if (this.backendEnabled && !this.showChat) this.togglePanel('showChat');
-    };
-    window.addEventListener(ASK_EVENT, self.onAskAssistant);
-    // The assistant opens the Training panel through this event
+    });
+    // The assistant opens the Training panel through this bus event
     // (assistantActions.openTrainingPanel).
-    self.onOpenTraining = () => this.openTrainer();
-    window.addEventListener('nnvp:open-training', self.onOpenTraining);
+    self.offOpenTraining = bus.on('ui.open-training', () => this.openTrainer());
   },
   beforeUnmount() {
     const self = this as unknown as AppInstanceExtra;
-    window.removeEventListener('nnvp:start-tutorial', self.onStartTutorial!);
-    window.removeEventListener(ASK_EVENT, self.onAskAssistant!);
-    window.removeEventListener('nnvp:open-training', self.onOpenTraining!);
+    self.offStartTutorial!();
+    self.offAskAssistant!();
+    self.offOpenTraining!();
   },
 });
 </script>

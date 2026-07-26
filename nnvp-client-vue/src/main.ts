@@ -9,6 +9,7 @@ import KeyboardListener from './lib/KeyboardListener/KeyboardListener';
 import ApiClient from './lib/Backend/apiClient';
 import { installSyncOnAuth } from './lib/Backend/sync';
 import { getRecordStore } from './lib/LocalStore/db';
+import { bus } from './lib/Events/bus';
 import type { KerasLayerCatalog } from './types/model';
 
 // import.meta.env is Vite-only (absent under bun/unit tests) — typed locally
@@ -46,11 +47,9 @@ type DebugWindow = Window & {
   app.config.globalProperties.$keyboardListener = new KeyboardListener(boardInterface, kerasInterface);
 
   // Local↔cloud record sync (runs, conversations): syncs now when a token is
-  // already stored, and again on every auth change. Progressive enhancement —
-  // failures only warn, and logged-out is a no-op.
-  installSyncOnAuth({
-    target: window, apiClient: new ApiClient(), store: getRecordStore(),
-  });
+  // already stored, and again on every 'auth.changed' bus event. Progressive
+  // enhancement — failures only warn, and logged-out is a no-op.
+  installSyncOnAuth({ apiClient: new ApiClient(), store: getRecordStore() });
 
   // Initialize debug namespace
   const win = window as DebugWindow;
@@ -69,6 +68,9 @@ type DebugWindow = Window & {
     // The app's RecordStore singleton, for the browser test world's records
     // driver (seed/read runs and conversations through the app's own store).
     win.nnvp.debug.recordStore = getRecordStore();
+    // The app-wide event bus (lib/Events/bus), so the browser test world can
+    // emit/observe the same signals the app uses (e.g. 'auth.changed').
+    win.nnvp.debug.bus = bus;
   }
 
   app.mount('#app');
