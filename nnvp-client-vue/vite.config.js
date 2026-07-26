@@ -13,6 +13,15 @@ export default defineConfig({
     // at the repo root runs one there.
     proxy: {
       '/api': 'http://127.0.0.1:8000',
+      // Dataset-source v0 (docs/tasks.md "Dataset registry & sources"): when a
+      // dev .env.local points VITE_DATASETS_CDN at the same-origin /datasets/,
+      // corpora dropped in public/datasets/ are served locally while the image
+      // datasets below keep coming from the production CDN through this proxy
+      // (same bytes, so their pinned SRI checksums still pass). Per-directory
+      // entries on purpose: a blanket /datasets proxy would shadow public/.
+      '/datasets/mnist': { target: 'https://datasets.nnvp.io', changeOrigin: true },
+      '/datasets/fashion_mnist': { target: 'https://datasets.nnvp.io', changeOrigin: true },
+      '/datasets/cifar10': { target: 'https://datasets.nnvp.io', changeOrigin: true },
     },
   },
   resolve: {
