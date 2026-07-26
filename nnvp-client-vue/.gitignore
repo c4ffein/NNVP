@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local dataset corpora served in dev via VITE_DATASETS_CDN=/datasets/ (v0 shim)
+public/datasets/
