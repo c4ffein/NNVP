@@ -12,6 +12,8 @@
 
 import inferFeatureDims from './KerasGeneratorDimInference';
 import type { InferredDims } from './KerasGeneratorDimInference';
+import { textLayerTorchSource, usedTextLayers } from './textLayers';
+import type { TextLayerName } from './textLayers';
 import { quoteString, assertSafeIdSuffix } from './codegenSafety';
 import type { GeneratorGraph } from './KerasGenerator';
 import type { NnvpLayerId, ParameterValue } from '../../types/model';
@@ -178,6 +180,27 @@ export default class KerasGeneratorPyTorchHelper {
         const todo = inferred !== null ? '' : '  # TODO: set input_size (could not infer from graph)';
         return `${this.recurrentModule(name)}(${inputSize}, ${units}, batch_first=True)${todo}`;
       }
+      case 'PositionalEmbedding': {
+        // Torch has no lazy Parameter: both dims come from the graph. seq_len
+        // is the Input's first axis, dim the predecessor's feature count.
+        const inputShape = this.graph[this.inputs[0]!]?.keras_data?.parameterValues?.shape;
+        const seqLen = Array.isArray(inputShape) && typeof inputShape[0] === 'number'
+          ? inputShape[0] : null;
+        const dim = this.inferredInputFeatures(node);
+        if (seqLen === null || dim === null) {
+          return 'NnvpPositionalEmbedding(1, 1)  # TODO: set (seq_len, dim) (could not infer from graph)';
+        }
+        return `NnvpPositionalEmbedding(${seqLen}, ${dim})`;
+      }
+      case 'TransformerBlock': {
+        const dim = this.inferredInputFeatures(node);
+        const args = [dim !== null ? `${dim}` : '1'];
+        if (p.num_heads !== undefined) args.push(`num_heads=${this.renderValue(p.num_heads)}`);
+        if (p.ff_dim !== undefined) args.push(`ff_dim=${this.renderValue(p.ff_dim)}`);
+        if (p.dropout !== undefined) args.push(`dropout=${this.renderValue(p.dropout)}`);
+        const todo = dim !== null ? '' : '  # TODO: set dim (could not infer from graph)';
+        return `NnvpTransformerBlock(${args.join(', ')})${todo}`;
+      }
       case 'Activation':
         return this.activationModule(p.activation);
       case 'ReLU':
@@ -213,10 +236,17 @@ export default class KerasGeneratorPyTorchHelper {
     return !!(params && params.return_sequences);
   }
 
+  // LastToken is a pure slice: no module, wired directly in forward().
+  isForwardOnly(name: string): boolean {
+    return name === 'LastToken';
+  }
+
   // True when a node maps to nothing we know how to emit -> TODO placeholder.
   isUnsupportedNode(node: NnvpLayerId): boolean {
     const { name } = this.graph[node]!.keras_data!;
-    if (name === 'Input' || name === 'Output' || this.isMerge(name)) return false;
+    if (name === 'Input' || name === 'Output' || this.isMerge(name) || this.isForwardOnly(name)) {
+      return false;
+    }
     return this.moduleConstructor(node) === null;
   }
 
@@ -247,6 +277,8 @@ export default class KerasGeneratorPyTorchHelper {
         if (!this.returnSequences(node)) {
           rs += '    x = x[:, -1, :]\n';
         }
+      } else if (this.isForwardOnly(name)) {
+        rs += '    x = x[:, -1, :]\n';
       } else if (this.isModuleNode(node)) {
         rs += `    x = self.${this.nodeName(node)}(x)\n`;
       } else if (this.isUnsupportedNode(node)) {
@@ -266,6 +298,9 @@ export default class KerasGeneratorPyTorchHelper {
     }
     if (name === 'Add') {
       return sources.join(' + ');
+    }
+    if (this.isForwardOnly(name)) {
+      return `${sources[0]}[:, -1, :]`;
     }
     if (this.isModuleNode(node)) {
       return `self.${this.nodeName(node)}(${sources.join(', ')})`;
@@ -303,10 +338,22 @@ export default class KerasGeneratorPyTorchHelper {
     return rs;
   }
 
+  // Module class definitions for the NNVP text layers present in this graph
+  // (LastToken has no torch module — it is sliced inline in forward()).
+  textLayerPreamble(): string {
+    const names = usedTextLayers(this.list.map(node => this.graph[node]!.keras_data!.name));
+    const sources = names
+      .map((name: TextLayerName) => textLayerTorchSource(name))
+      .filter((source): source is string => source !== undefined);
+    if (sources.length === 0) return '';
+    return `${sources.join('\n\n\n')}\n\n\n`;
+  }
+
   generateSequential(): string {
     let rs = 'import torch\n';
     rs += 'import torch.nn as nn\n';
     rs += '\n\n';
+    rs += this.textLayerPreamble();
     rs += 'class Model(nn.Module):\n';
     rs += this.generateInit();
     rs += '\n';
@@ -318,6 +365,7 @@ export default class KerasGeneratorPyTorchHelper {
     let rs = 'import torch\n';
     rs += 'import torch.nn as nn\n';
     rs += '\n\n';
+    rs += this.textLayerPreamble();
     rs += 'class Model(nn.Module):\n';
     rs += this.generateInit();
     rs += '\n';

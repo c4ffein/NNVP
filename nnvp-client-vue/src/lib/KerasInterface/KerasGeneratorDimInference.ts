@@ -148,6 +148,19 @@ export default function inferFeatureDims(
         shape = source.shape ? source.shape.slice() : null;
         features = source.features;
         break;
+      case 'PositionalEmbedding':
+      case 'TransformerBlock':
+        // NNVP text layers (textLayers.ts): both are shape-preserving.
+        shape = source.shape ? source.shape.slice() : null;
+        features = source.features;
+        break;
+      case 'LastToken':
+        // Drops the timestep axis, keeps the feature axis.
+        features = source.features;
+        if (source.shape && source.shape.length >= 2) {
+          shape = [source.shape[source.shape.length - 1]!];
+        }
+        break;
       case 'Flatten':
         // Only computable when the full predecessor shape is known.
         if (source.shape) {

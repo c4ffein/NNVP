@@ -5,6 +5,9 @@
 /* eslint-disable no-param-reassign */
 
 import { quoteString, assertSafeIdentifier, assertSafeIdSuffix } from './codegenSafety';
+import {
+  isTextLayer, textLayerClassName, textLayerPythonSource, usedTextLayers,
+} from './textLayers';
 import type { GeneratorGraph } from './KerasGenerator';
 import type { NnvpLayerId, ParameterDef, ParameterValue } from '../../types/model';
 
@@ -103,8 +106,10 @@ export default class KerasGeneratorPythonHelper {
       return '';
     }
 
-    rs += 'keras.layers.';
-    rs += assertSafeIdentifier(this.graph[node]!.keras_data!.name, 'layer type name');
+    const layerName = this.graph[node]!.keras_data!.name;
+    rs += isTextLayer(layerName)
+      ? textLayerClassName(layerName)
+      : `keras.layers.${assertSafeIdentifier(layerName, 'layer type name')}`;
     // Using parameterDef for filtering and special handling
     rs += `(${this.generateParams(
       this.graph[node]!.keras_data!.parameterValues, this.graph[node]!.keras_data!.parameterDef,
@@ -140,8 +145,11 @@ export default class KerasGeneratorPythonHelper {
             ArrayLike<unknown>,
         )}`}`;
 
-    return `model.add(keras.layers.${
-      assertSafeIdentifier(this.graph[node]!.keras_data!.name, 'layer type name')}(${
+    const layerName = this.graph[node]!.keras_data!.name;
+    const constructorName = isTextLayer(layerName)
+      ? textLayerClassName(layerName)
+      : `keras.layers.${assertSafeIdentifier(layerName, 'layer type name')}`;
+    return `model.add(${constructorName}(${
       this.generateParams(
         this.graph[node]!.keras_data!.parameterValues, this.graph[node]!.keras_data!.parameterDef,
       ).slice(0, -1)}${
@@ -174,8 +182,17 @@ export default class KerasGeneratorPythonHelper {
     return rs;
   }
 
+  // The class definitions the generated script must carry, for the text
+  // layers present in this graph (empty string when none are).
+  textLayerPreamble(): string {
+    const names = usedTextLayers(this.list.map(node => this.graph[node]!.keras_data!.name));
+    if (names.length === 0) return '';
+    return `\n\n${names.map(name => textLayerPythonSource(name)).join('\n\n')}\n`;
+  }
+
   generateFunctional(): string {
     let rs = 'import keras\n';
+    rs += this.textLayerPreamble();
     rs += '\n';
     rs += 'def build_model():\n';
     this.list.forEach((node) => {
@@ -191,6 +208,7 @@ export default class KerasGeneratorPythonHelper {
 
   generateSequential(): string {
     let rs = 'import keras\n';
+    rs += this.textLayerPreamble();
     rs += '\n';
     rs += 'def build_model():\n';
     rs += '    model = keras.models.Sequential()\n';

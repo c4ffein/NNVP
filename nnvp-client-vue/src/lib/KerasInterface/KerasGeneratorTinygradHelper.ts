@@ -17,6 +17,8 @@
 
 import inferFeatureDims from './KerasGeneratorDimInference';
 import type { InferredDims } from './KerasGeneratorDimInference';
+import { textLayerTinygradSource, usedTextLayers } from './textLayers';
+import type { TextLayerName } from './textLayers';
 import { quoteString, assertSafeIdSuffix } from './codegenSafety';
 import type { GeneratorGraph } from './KerasGenerator';
 import type { NnvpLayerId, ParameterValue } from '../../types/model';
@@ -164,6 +166,33 @@ export default class KerasGeneratorTinygradHelper {
         if (inferred !== null) return `nn.BatchNorm2d(${this.renderValue(inferred)})`;
         return 'nn.BatchNorm2d(1)  # TODO: set num_features (could not infer from graph)';
       }
+      case 'Embedding': {
+        const args = [];
+        if (p.input_dim !== undefined) args.push(this.renderValue(p.input_dim));
+        if (p.output_dim !== undefined) args.push(this.renderValue(p.output_dim));
+        return `nn.Embedding(${args.join(', ')})`;
+      }
+      case 'PositionalEmbedding': {
+        // No lazy tensors in tinygrad either: both dims come from the graph
+        // (seq_len = the Input's first axis, dim = predecessor features).
+        const inputShape = this.graph[this.inputs[0]!]?.keras_data?.parameterValues?.shape;
+        const seqLen = Array.isArray(inputShape) && typeof inputShape[0] === 'number'
+          ? inputShape[0] : null;
+        const dim = this.inferredInputFeatures(node);
+        if (seqLen === null || dim === null) {
+          return 'NnvpPositionalEmbedding(1, 1)  # TODO: set (seq_len, dim) (could not infer from graph)';
+        }
+        return `NnvpPositionalEmbedding(${seqLen}, ${dim})`;
+      }
+      case 'TransformerBlock': {
+        const dim = this.inferredInputFeatures(node);
+        const args = [dim !== null ? `${dim}` : '1'];
+        if (p.num_heads !== undefined) args.push(`num_heads=${this.renderValue(p.num_heads)}`);
+        if (p.ff_dim !== undefined) args.push(`ff_dim=${this.renderValue(p.ff_dim)}`);
+        if (p.dropout !== undefined) args.push(`dropout=${this.renderValue(p.dropout)}`);
+        const todo = dim !== null ? '' : '  # TODO: set dim (could not infer from graph)';
+        return `NnvpTransformerBlock(${args.join(', ')})${todo}`;
+      }
       default:
         return null;
     }
@@ -176,6 +205,9 @@ export default class KerasGeneratorTinygradHelper {
     switch (name) {
       case 'Flatten':
         return '.flatten(1)';
+      case 'LastToken':
+        // A pure slice, not a method — the suffix concatenation still applies.
+        return '[:, -1, :]';
       case 'MaxPooling2D':
       case 'AveragePooling2D': {
         // tinygrad's stride defaults to kernel_size, exactly like Keras' strides
@@ -310,9 +342,21 @@ export default class KerasGeneratorTinygradHelper {
     return rs;
   }
 
+  // Class definitions for the NNVP text layers present in this graph
+  // (LastToken has no class — it is sliced inline).
+  textLayerPreamble(): string {
+    const names = usedTextLayers(this.list.map(node => this.graph[node]!.keras_data!.name));
+    const sources = names
+      .map((name: TextLayerName) => textLayerTinygradSource(name))
+      .filter((source): source is string => source !== undefined);
+    if (sources.length === 0) return '';
+    return `${sources.join('\n\n\n')}\n\n\n`;
+  }
+
   generateSequential(): string {
     let rs = 'from tinygrad import Tensor, nn\n';
     rs += '\n\n';
+    rs += this.textLayerPreamble();
     rs += 'class Model:\n';
     rs += this.generateInit();
     rs += '\n';
@@ -323,6 +367,7 @@ export default class KerasGeneratorTinygradHelper {
   generateFunctional(): string {
     let rs = 'from tinygrad import Tensor, nn\n';
     rs += '\n\n';
+    rs += this.textLayerPreamble();
     rs += 'class Model:\n';
     rs += this.generateInit();
     rs += '\n';

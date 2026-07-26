@@ -5,6 +5,12 @@
  * `category` values used in generatedKerasLayers.json.
  */
 const categoryHelp: Record<string, string> = {
+  'Text (NNVP)': `
+          <h2>Text Layers (NNVP)</h2>
+          <p><strong>What this category groups:</strong> NNVP's own building blocks for character-level text generation - a learned <em>PositionalEmbedding</em>, a causal <em>TransformerBlock</em> (self-attention + feed-forward, pre-LayerNorm), and <em>LastToken</em>, which keeps only the final timestep as the prediction head's input.</p>
+          <p><strong>When to reach for it:</strong> After an Embedding over a text dataset (TinyShakespeare, GutenbergPoetry), to build a small GPT-style next-character model that trains right in the browser. These are not stock Keras layers: the generated code ships a matching self-contained class definition on every target (tfjs, Keras, PyTorch, tinygrad).</p>
+          <p><strong>Flagship layers:</strong> <strong>TransformerBlock</strong> is one full attention block (num_heads, ff_dim, dropout); stack two or three between PositionalEmbedding and LastToken and finish with a softmax Dense over the 96-character vocabulary.</p>
+        `,
   'Activation': `
           <h2>Activation Layers</h2>
           <p><strong>What this category groups:</strong> Standalone non-linearity layers - ReLU, LeakyReLU, ELU, PReLU, and Softmax - that transform values element-wise without any spatial or temporal structure.</p>

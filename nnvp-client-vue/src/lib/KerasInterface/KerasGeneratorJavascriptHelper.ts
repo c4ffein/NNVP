@@ -2,6 +2,9 @@
 /* eslint-disable class-methods-use-this */
 
 import { quoteString, assertSafeIdentifier, assertSafeIdSuffix } from './codegenSafety';
+import {
+  isTextLayer, textLayerClassName, textLayerJsSource, usedTextLayers,
+} from './textLayers';
 import type { GeneratorGraph } from './KerasGenerator';
 import type { GeneratorParamDef } from './KerasGeneratorPythonHelper';
 import type { NnvpLayerId, ParameterDef, ParameterValue } from '../../types/model';
@@ -28,6 +31,15 @@ export default class KerasGeneratorJavascriptHelper {
   }
 
   pythonToJsLayerName(layerName: string): string {
+    // Acronym-named layers escape the lowercase-first-letter rule: tfjs
+    // exposes them fully lowercased (tf.layers.lstm, not tf.layers.lSTM).
+    // ReLU/LeakyReLU are NOT exceptions — tfjs really names those reLU /
+    // leakyReLU, which the generic rule already produces.
+    const acronymFactories: Record<string, string> = {
+      LSTM: 'lstm', GRU: 'gru', ELU: 'elu', PReLU: 'prelu',
+    };
+    const acronym = acronymFactories[layerName];
+    if (acronym !== undefined) return acronym;
     return layerName.replace(
       /(.)(.*?)([1-3]D)?$/,
       (m, f: string, s: string, l: string | undefined) =>
@@ -92,6 +104,29 @@ export default class KerasGeneratorJavascriptHelper {
     return paramString;
   }
 
+  // The constructor expression for one node: a stock tf.layers factory call,
+  // or `new Nnvp<Name>(...)` for the NNVP text layers whose class definitions
+  // the generate*() entrypoints prepend.
+  layerConstructor(node: NnvpLayerId): string {
+    const { name } = this.graph[node]!.keras_data!;
+    const params = this.generateParams(
+      this.graph[node]!.keras_data!.parameterValues, this.graph[node]!.keras_data!.parameterDef,
+    );
+    if (isTextLayer(name)) {
+      return `new ${textLayerClassName(name)}(${params})`;
+    }
+    return `tf.layers.${
+      assertSafeIdentifier(this.pythonToJsLayerName(name), 'layer type name')}(${params})`;
+  }
+
+  // The class definitions the generated code must carry, for the text layers
+  // present in this graph (empty string when none are).
+  textLayerPreamble(): string {
+    const names = usedTextLayers(this.list.map(node => this.graph[node]!.keras_data!.name));
+    if (names.length === 0) return '';
+    return `${names.map(name => textLayerJsSource(name)).join('\n')}\n`;
+  }
+
   // Return a string containing Javascript instructions to add the node.
   // Options are set to defaults for now, only 3 layer types are used.
   generateJavascriptFromNode(node: NnvpLayerId): string {
@@ -100,14 +135,7 @@ export default class KerasGeneratorJavascriptHelper {
       return '';
     }
 
-    rs += 'tf.layers.';
-    rs += assertSafeIdentifier(
-      this.pythonToJsLayerName(this.graph[node]!.keras_data!.name), 'layer type name',
-    );
-    // Using parameterDef for type conversions and special handling
-    rs += `(${this.generateParams(
-      this.graph[node]!.keras_data!.parameterValues, this.graph[node]!.keras_data!.parameterDef,
-    )})`;
+    rs += this.layerConstructor(node);
 
     if (this.graph[node]!.sources.length > 0) {
       rs += '.apply(';
@@ -139,11 +167,13 @@ export default class KerasGeneratorJavascriptHelper {
             || [100, 100]) as ParameterValue,
       }
       : this.graph[node]!.keras_data!.parameterValues;
-    return `model.add(tf.layers.${
-      assertSafeIdentifier(
-        this.pythonToJsLayerName(this.graph[node]!.keras_data!.name), 'layer type name',
-      )}(${
-      this.generateParams(params, this.graph[node]!.keras_data!.parameterDef)}));\n`;
+    const { name } = this.graph[node]!.keras_data!;
+    const paramString = this.generateParams(params, this.graph[node]!.keras_data!.parameterDef);
+    const constructor = isTextLayer(name)
+      ? `new ${textLayerClassName(name)}(${paramString})`
+      : `tf.layers.${
+        assertSafeIdentifier(this.pythonToJsLayerName(name), 'layer type name')}(${paramString})`;
+    return `model.add(${constructor});\n`;
   }
 
   // Generate the line responsible for the Keras Model instanciation
@@ -174,7 +204,8 @@ export default class KerasGeneratorJavascriptHelper {
 
   generateFunctional(): string {
     // Could optionally start by let rs = 'import * as tf from \'@tensorflow/tfjs\';\n';
-    let rs = 'function createModel() {\n';
+    let rs = this.textLayerPreamble();
+    rs += 'function createModel() {\n';
     this.list.forEach((node) => {
       const jsLine = this.generateJavascriptFromNode(node);
       if (jsLine !== '') {
@@ -189,7 +220,8 @@ export default class KerasGeneratorJavascriptHelper {
 
   generateSequential(): string {
     // Could optionally start by let rs = 'import * as tf from \'@tensorflow/tfjs\';\n';
-    let rs = 'function createModel() {\n';
+    let rs = this.textLayerPreamble();
+    rs += 'function createModel() {\n';
     rs += '    const model = tf.sequential();\n';
     this.list.forEach((node, index) => {
       const jsLine = this.generateSequentialJavascriptFromNode(node, index === 1);
