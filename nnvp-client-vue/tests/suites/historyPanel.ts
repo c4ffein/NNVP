@@ -188,16 +188,20 @@ appTest('historyPanel: signed in with no reachable backend degrades to the hide-
 appTest('historyPanel: cloud-held streams offer all three; cloud purges + detaches, both also hides', async ({ backend, chat, history, records, expect }) => {
   await records.seed('runs', [olderRun(), newerRun()]);
   // The cloud holds one event of each stream (uuids must differ from what the
-  // local explosion mints — the fake backend serves them by stream_id).
+  // local explosion mints — the fake backend serves them by stream_id). The
+  // type must be a NEUTRAL one (an orphan run.epoch folds harmlessly): both
+  // worlds run the app's real sync-on-auth wiring, so these events get pulled
+  // into the local store on sign-in — a run.hidden here would hide the very
+  // rows this test deletes (the browser half caught exactly that).
   await backend.serve({
     events: [
       {
-        uuid: 'cloud-evt-newer', type: 'run.hidden', streamId: 'run-newer',
+        uuid: 'cloud-evt-newer', type: 'run.epoch', streamId: 'run-newer',
         deviceId: 'other-device', instanceId: 'other-instance', seq: 1,
         dependsOn: [], wallTime: '2026-07-20T11:00:00.000Z', payload: {},
       },
       {
-        uuid: 'cloud-evt-older', type: 'run.hidden', streamId: 'run-older',
+        uuid: 'cloud-evt-older', type: 'run.epoch', streamId: 'run-older',
         deviceId: 'other-device', instanceId: 'other-instance', seq: 2,
         dependsOn: [], wallTime: '2026-07-20T11:00:00.000Z', payload: {},
       },
@@ -212,8 +216,12 @@ appTest('historyPanel: cloud-held streams offer all three; cloud purges + detach
   // the cloud stream is gone, and the local events are flagged never-push.
   await history.confirmDelete('cloud');
   expect(await history.rowCount()).toBe(2);
+  // Sign-in also PUSHED the local exploded events cloudward (the real sync,
+  // in flight since setSignedIn) — so assert stream semantics, not the exact
+  // set: run-newer's stream is gone from the cloud, run-older's survives.
   const cloudUuids = await backend.uuids('events');
-  expect(cloudUuids).toEqual(['cloud-evt-older']);
+  expect(cloudUuids).toContain('cloud-evt-older');
+  expect(cloudUuids).not.toContain('cloud-evt-newer');
   const events = await records.list<StoredDomainEvent & { uuid: string }>('events');
   const newerEvents = events.filter(event => event.streamId === 'run-newer');
   expect(newerEvents.length).toBeGreaterThan(0);

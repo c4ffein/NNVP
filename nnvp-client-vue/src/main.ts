@@ -6,8 +6,7 @@ import BoardInterface from './lib/BoardInterface/BoardInterface';
 import jsonLayersFile from './lib/KerasInterface/generatedKerasLayers.json';
 import { textLayerCatalogEntries } from './lib/KerasInterface/textLayers';
 import KeyboardListener from './lib/KeyboardListener/KeyboardListener';
-import ApiClient from './lib/Backend/apiClient';
-import { installSyncOnAuth } from './lib/Backend/sync';
+import { installAppServices } from './lib/appServices';
 import { getRecordStore } from './lib/LocalStore/db';
 import { bus } from './lib/Events/bus';
 import type { KerasLayerCatalog } from './types/model';
@@ -46,10 +45,9 @@ type DebugWindow = Window & {
   app.config.globalProperties.$boardInterface = boardInterface;
   app.config.globalProperties.$keyboardListener = new KeyboardListener(boardInterface, kerasInterface);
 
-  // Local↔cloud record sync (runs, conversations): syncs now when a token is
-  // already stored, and again on every 'auth.changed' bus event. Progressive
-  // enhancement — failures only warn, and logged-out is a no-op.
-  installSyncOnAuth({ apiClient: new ApiClient(), store: getRecordStore() });
+  // Local↔cloud sync and any future non-Vue services — shared with the bun
+  // test world (worldBun.ts), which calls this exact function for parity.
+  installAppServices();
 
   // Initialize debug namespace
   const win = window as DebugWindow;

@@ -288,30 +288,32 @@ export function makeRecordsDriver(): RecordsDriver & Teardown {
 
 /**
  * The BackendDriver under bun: swap globalThis.fetch for the fake /api
- * router. Components bind fetch when they construct their ApiClient (on
- * mount), so serve() must run before the driver open() that mounts them —
- * the contract define.ts documents. Non-/api requests fall through to the
- * real fetch.
+ * router. The shim is installed at driver CREATION (world boot), not at
+ * serve(): ApiClients bind globalThis.fetch when they are constructed, and
+ * the world's own service wiring (installAppServices) constructs one at
+ * boot — before any test body runs. Until serve() provides a fake, every
+ * request falls through to the real fetch; non-/api requests always do.
  */
 export function makeBackendDriver(): BackendDriver & Teardown {
   const originalFetch = globalThis.fetch;
   let fake: FakeBackend | null = null;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (!fake) return originalFetch(input as RequestInfo, init);
+    const url = typeof input === 'string' || input instanceof URL
+      ? String(input) : input.url;
+    const method = init?.method
+      || (input instanceof Request ? input.method : 'GET');
+    const body = typeof init?.body === 'string' ? init.body : null;
+    const answer = fake.handle(method, url, body);
+    if (!answer) return originalFetch(input as RequestInfo, init);
+    return new Response(answer.body, {
+      status: answer.status,
+      headers: answer.body === null ? undefined : { 'Content-Type': 'application/json' },
+    });
+  }) as typeof fetch;
   return {
     async serve(data) {
       fake = createFakeBackend(data);
-      globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-        const url = typeof input === 'string' || input instanceof URL
-          ? String(input) : input.url;
-        const method = init?.method
-          || (input instanceof Request ? input.method : 'GET');
-        const body = typeof init?.body === 'string' ? init.body : null;
-        const answer = fake!.handle(method, url, body);
-        if (!answer) return originalFetch(input as RequestInfo, init);
-        return new Response(answer.body, {
-          status: answer.status,
-          headers: answer.body === null ? undefined : { 'Content-Type': 'application/json' },
-        });
-      }) as typeof fetch;
     },
     async uuids(kind) {
       return fake ? [...fake.state[kind].keys()] : [];

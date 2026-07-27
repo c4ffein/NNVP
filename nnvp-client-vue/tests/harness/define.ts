@@ -220,10 +220,12 @@ export interface DomainEventLike {
 }
 
 /**
- * A fake same-origin /api. serve() must be called BEFORE open()ing any UI
- * that talks to it (components bind fetch when they mount). The bun world
- * swaps globalThis.fetch; the browser world intercepts with page.route —
- * either way the app's own ApiClient does the talking.
+ * A fake same-origin /api. serve() must be called BEFORE the first request
+ * the test cares about — in particular before chat.setSignedIn(true), which
+ * triggers a real sync pass (the worlds run the app's installAppServices
+ * wiring). The bun world installs a fetch shim at world boot (live until
+ * serve() feeds it, requests fall through to real fetch); the browser world
+ * intercepts with page.route — either way the app's own ApiClient talks.
  */
 export interface BackendDriver {
   serve(data: BackendFakeData): Promise<void>;

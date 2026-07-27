@@ -265,9 +265,11 @@ board state.
   device/cloud/both `deleteEverywhere` matrix with the `localOnly` flag as
   the tombstone-free detach.
 - Sync triggers: once at boot if a token is stored, and on every
-  `auth.changed` bus event (`installSyncOnAuth`, wired in `main.ts`; the
-  emitter is injectable for tests). Coalesced, progressive-enhancement —
-  failures warn, never break the app.
+  `auth.changed` bus event. The wiring lives in `installAppServices`
+  (`lib/appServices.ts`) — the app's non-Vue boot services as a callable
+  function, invoked by `main.ts` AND by the bun test world, so both run the
+  identical wiring (the emitter stays injectable for pure sync tests).
+  Coalesced, progressive-enhancement — failures warn, never break the app.
 - **Projects are not records.** They are cloud-only full-graph blobs with their
   own CRUD + lineage endpoints, saved/loaded explicitly through AccountPanel;
   `currentProject` is just a localStorage pointer. Don't conflate them with
@@ -362,9 +364,11 @@ board state.
   (needs `page`/`canvas`; a ≥20-char reason is enforced at registration).
 - The world drivers (`board, chat, catalog, windows, charts, training,
   history, records, backend`, …) are the intersection contract. The bun world
-  mounts real components and fakes only the true boundaries (fetch,
-  localStorage, the RecordStore); the browser world drives the real UI and
-  reaches app singletons through `window.nnvp.debug`.
+  mounts real components, fakes only the true boundaries (fetch,
+  localStorage, the RecordStore), and runs the app's own boot wiring
+  (`installAppServices` — the same function `main.ts` calls), so e.g.
+  sign-in triggers a real sync pass in BOTH worlds; the browser world drives
+  the real UI and reaches app singletons through `window.nnvp.debug`.
 - The fake backend is one pure router (`fakeBackend.ts`) with two transports:
   fetch-swap under bun, `page.route` under Playwright.
 - Contract tests (see Backend above) are the only tests that need a real
@@ -394,6 +398,18 @@ board state.
    model go through the facade's typed getters — no `activeGraph.model`
    access outside `lib/FlowInterface` + `lib/BoardInterface`.
 10. Default assistant mode is read-only; `MUTATING_TOOLS` is the single gate.
+
+## Practices (how new UX lands)
+
+- **Verb-first.** A new user-facing capability lands as a `$boardInterface`
+  verb (or bus event) with dual-harness tests FIRST; the pixels that trigger
+  it come second, as a thin binding. The verb layer is what both test worlds
+  drive and what the assistant/tutorial reuse for free — a feature that only
+  exists as a click handler is invisible to all of them. (Current example of
+  the gap: `unrollSteps` has no verb yet, so no UI can set it.)
+- The bun world runs the app's real boot wiring (`installAppServices`); when
+  `main.ts` grows a new service, it goes through that function so both the
+  app and the tests keep executing the identical path.
 
 ## Known leaks and quirks (accepted, not aspirational)
 

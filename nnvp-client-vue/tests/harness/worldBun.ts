@@ -11,6 +11,7 @@ import FlowGraphEditor from '../../src/lib/FlowInterface/FlowGraphEditor';
 import { isInvalidConnection } from '../../src/lib/FlowInterface/adapter';
 import KerasInterface from '../../src/lib/KerasInterface/KerasInterface';
 import generatedKerasLayers from '../../src/lib/KerasInterface/generatedKerasLayers.json';
+import { installAppServices } from '../../src/lib/appServices';
 import {
   makeBackendDriver, makeChatDriver, makeCatalogDriver, makeHistoryDriver, makeRecordsDriver,
   makeChartsDriver, makeTrainingDriver, makeWindowsDriver,
@@ -145,6 +146,10 @@ export function makeBunWorld(expect: Expect): World {
   });
   const records = makeRecordsDriver();
   const backend = makeBackendDriver();
+  // The REAL app service wiring (main.ts calls the same function): sync-on-auth
+  // over the world's store singleton and the backend driver's fetch shim. This
+  // is what makes chat.setSignedIn(true) trigger an actual sync, like the app.
+  const uninstallServices = installAppServices();
   return {
     expect,
     board,
@@ -157,6 +162,7 @@ export function makeBunWorld(expect: Expect): World {
     records,
     backend,
     async dispose() {
+      uninstallServices();
       await chat.teardown();
       await catalog.teardown();
       await windows.teardown();
