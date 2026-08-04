@@ -117,3 +117,18 @@ e2eOnly(
     expect(await page.locator(canvas.selectedEdge).count()).toBe(1);
   },
 );
+
+appTest('layer comments are edited from the options panel and survive save/load', async ({ board, expect }) => {
+  await board.addLayer('Dense');
+  await board.addLayer('Dropout');
+  await board.setComment(1, 'regularize hard');
+  expect(await board.comment(1)).toBe('regularize hard');
+  expect(await board.comment(0)).toBe('');
+  const json = await board.graphJSON();
+  const model = JSON.parse(json) as NnvpModel;
+  expect(model.layers[1]!.comment).toBe('regularize hard');
+  expect('comment' in model.layers[0]!).toBe(false);
+  await board.clearBoard();
+  await board.loadJSON(json);
+  expect(await board.comment(1)).toBe('regularize hard');
+});

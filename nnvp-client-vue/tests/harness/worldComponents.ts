@@ -15,6 +15,7 @@ import LayerCatalog from '../../src/components/LayerCatalog/LayerCatalog.vue';
 import FloatingWindow from '../../src/components/FloatingWindow.vue';
 import Charts from '../../src/components/TrainingZone/Charts.vue';
 import TrainingZone from '../../src/components/TrainingZone/TrainingZone.vue';
+import ModelsWindow from '../../src/components/Models/ModelsWindow.vue';
 import { resetWindowRects } from '../../src/lib/windowing';
 import { resetChatSession } from '../../src/lib/Assistant/chatSession';
 import { resetTrainingConfig } from '../../src/lib/Training/trainingConfig';
@@ -25,8 +26,8 @@ import { setRecordStoreForTests } from '../../src/lib/LocalStore/db';
 import { createFakeBackend } from './fakeBackend';
 import type { FakeBackend } from './fakeBackend';
 import type {
-  BackendDriver, CatalogDriver, ChartsDriver, ChatDriver, HistoryDriver, RecordsDriver,
-  TrainingDriver, WindowsDriver, WindowName,
+  BackendDriver, CatalogDriver, ChartsDriver, ChatDriver, HistoryDriver, ModelsDriver,
+  RecordsDriver, TrainingDriver, WindowsDriver, WindowName,
 } from './define';
 
 // The mounted-wrapper seam: each driver hosts one arbitrary component, so the
@@ -215,6 +216,10 @@ export function makeWindowsDriver(): WindowsDriver & Teardown {
         ? { width: 300, height: 250 }
         : { width: 300, height: 250 };
     },
+    async toggleMaximize(name) {
+      await el(name).find('.floating-window-maximize').trigger('click');
+      await wrapper!.vm.$nextTick();
+    },
     async teardown() {
       if (wrapper) wrapper.unmount();
     },
@@ -339,6 +344,17 @@ export interface HistoryBoardSeam {
 export function makeHistoryDriver(boardSeam: HistoryBoardSeam): HistoryDriver & Teardown {
   let wrapper: Wrapper | null = null;
   const rows = () => wrapper!.findAll('.history-row');
+  // The panel's refresh awaits crypto.subtle digests (modelIdentity) — NATIVE
+  // async that one flushPromises pass does not chain. A few macrotask turns
+  // let those resolve deterministically (the browser world settles on real
+  // time for the same reason).
+  const settle = async () => {
+    for (let turn = 0; turn < 5; turn += 1) {
+      await flushPromises();
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+    await flushPromises();
+  };
   return {
     async open() {
       wrapper = mount(TrainingZone, {
@@ -348,7 +364,7 @@ export function makeHistoryDriver(boardSeam: HistoryBoardSeam): HistoryDriver & 
       const tabs = wrapper.findAll('.TrainingZone.bar-button');
       await tabs.find(tab => tab.text() === 'History')!.trigger('click');
       // The panel's mounted() listRuns round-trip is a promise: let it land.
-      await flushPromises();
+      await settle();
     },
     async close() {
       wrapper!.unmount();
@@ -366,7 +382,7 @@ export function makeHistoryDriver(boardSeam: HistoryBoardSeam): HistoryDriver & 
     },
     async view(index) {
       await wrapper!.findAll('.history-view')[index]!.trigger('click');
-      await flushPromises();
+      await settle();
     },
     async curvesVisible() {
       return wrapper!.find('.history-curves').exists();
@@ -379,21 +395,204 @@ export function makeHistoryDriver(boardSeam: HistoryBoardSeam): HistoryDriver & 
     },
     async restore(index) {
       await wrapper!.findAll('.history-restore')[index]!.trigger('click');
-      await flushPromises();
+      await settle();
     },
     async requestDelete(index) {
       await wrapper!.findAll('.history-delete')[index]!.trigger('click');
-      await flushPromises(); // the deleteChoices promise decides the buttons
+      await settle(); // the deleteChoices promise decides the buttons
       return wrapper!.findAll('.history-confirm-delete').map(button => button.text());
     },
     async confirmDelete(label) {
       const buttons = wrapper!.findAll('.history-confirm-delete, .history-cancel-delete');
       await buttons.find(button => button.text() === label)!.trigger('click');
-      await flushPromises();
+      await settle();
+    },
+    async groupHeaders() {
+      return wrapper!.findAll('.history-group').map(header => header.text());
+    },
+    async setFilter(name, value) {
+      await wrapper!.find(`.history-filters select[data-filter="${name}"]`).setValue(value);
+      await settle();
+    },
+    async setShowHidden(on) {
+      await wrapper!.find('.history-show-hidden input').setValue(on);
+      await settle();
+    },
+    async unhide(index) {
+      await wrapper!.findAll('.history-unhide')[index]!.trigger('click');
+      await settle();
+    },
+    async provenanceText() {
+      const line = wrapper!.find('.history-provenance');
+      return line.exists() ? line.text() : '';
+    },
+    async selectForCompare(index) {
+      await wrapper!.findAll('.history-compare-check')[index]!.setValue(true);
+      await settle();
+    },
+    async compare() {
+      await wrapper!.find('.history-compare-button').trigger('click');
+      await settle(); // the verdict's identity hashes are async
+    },
+    async compareText() {
+      return wrapper!.find('.ComparePanel').text();
+    },
+    async compareSeriesCount() {
+      return wrapper!.findAll('.compare-chart .lines path').length;
     },
     async teardown() {
       if (wrapper) wrapper.unmount();
       resetTrainingConfig(); // module state must not leak between tests
+    },
+  };
+}
+
+/**
+ * The Models window (Phase G3), mounted directly (mounting IS opening, the
+ * TrainingZone pattern). Same macrotask settle as the history driver — the
+ * evolution graph awaits crypto.subtle identity hashes.
+ */
+export function makeModelsDriver(boardSeam: HistoryBoardSeam): ModelsDriver & Teardown {
+  let wrapper: Wrapper | null = null;
+  const settle = async () => {
+    for (let turn = 0; turn < 5; turn += 1) {
+      await flushPromises();
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+    await flushPromises();
+  };
+  return {
+    async open() {
+      wrapper = mount(ModelsWindow, {
+        global: { mocks: { $boardInterface: boardSeam, $kerasInterface: {} } },
+        attachTo: document.body,
+      });
+      await settle();
+    },
+    async close() {
+      wrapper!.unmount();
+      wrapper = null;
+    },
+    async text() {
+      return wrapper!.find('.ModelsWindow').text();
+    },
+    async showGraph() {
+      await wrapper!.find('.models-view-graph').trigger('click');
+      // A big journal means hundreds of sequential identity digests — real
+      // async TIME, not a fixed number of turns. Poll until the panel has an
+      // answer (nodes rendered, or the empty line) instead of guessing.
+      for (let attempt = 0; attempt < 400; attempt += 1) {
+        await flushPromises();
+        if (wrapper!.find('.evolution-node').exists() || wrapper!.find('.models-empty').exists()) break;
+        await new Promise(resolve => setTimeout(resolve, 5));
+      }
+      await flushPromises();
+    },
+    async nodeCount() {
+      return wrapper!.findAll('.evolution-node').length;
+    },
+    async select(index) {
+      await wrapper!.findAll('.evolution-node')[index]!.trigger('click');
+      await settle();
+    },
+    async next() {
+      await wrapper!.find('.models-next').trigger('click');
+      await settle();
+    },
+    async prev() {
+      await wrapper!.find('.models-prev').trigger('click');
+      await settle();
+    },
+    async previewBoxCount() {
+      return wrapper!.findAll('.models-preview rect').length;
+    },
+    async loadSelected() {
+      await wrapper!.find('.models-load').trigger('click');
+      await settle();
+    },
+    async setFilter(name, value) {
+      await wrapper!.find(`[data-mfilter="${name}"]`).setValue(value);
+      await settle();
+    },
+    async toggleOrder() {
+      await wrapper!.find('.models-order').trigger('click');
+      await settle();
+    },
+    async showMap() {
+      await wrapper!.find('.models-view-map').trigger('click');
+      for (let attempt = 0; attempt < 400; attempt += 1) {
+        await flushPromises();
+        if (wrapper!.find('.evolution-map-node').exists() || wrapper!.find('.models-empty').exists()) break;
+        await new Promise(resolve => setTimeout(resolve, 5));
+      }
+      await flushPromises();
+    },
+    async mapNodeCount() {
+      return wrapper!.findAll('.evolution-map-node').length;
+    },
+    async mapThumbBoxCount() {
+      return wrapper!.findAll('.map-thumb rect').length;
+    },
+    async selectMapNode(index) {
+      await wrapper!.findAll('.evolution-map-node')[index]!.trigger('click');
+      await settle();
+    },
+    async rate(value) {
+      await wrapper!.find('.models-rating-slider').setValue(String(value));
+      await settle();
+    },
+    async mapZoom(deltaY) {
+      await wrapper!.find('.evolution-map').trigger('wheel', { deltaY, ctrlKey: true });
+      await settle();
+    },
+    async mapClusterCount() {
+      return wrapper!.findAll('.map-cluster').length;
+    },
+    async openFiles() {
+      await wrapper!.find('.models-view-files').trigger('click');
+      await settle();
+    },
+    async filesText() {
+      return wrapper!.find('.models-files').text();
+    },
+    async newFolder(name) {
+      await wrapper!.find('.files-new-input').setValue(name);
+      await wrapper!.find('.files-new-btn').trigger('click');
+      await settle();
+    },
+    async openFolder(name) {
+      const row = wrapper!.findAll('.files-subfolder')
+        .find(candidate => candidate.text().startsWith(`${name}/`));
+      await row!.trigger('click');
+      await settle();
+    },
+    async filesUp() {
+      await wrapper!.find('.files-up').trigger('click');
+      await settle();
+    },
+    async favoriteSelected() {
+      await wrapper!.find('.models-fav').trigger('click');
+      await settle();
+    },
+    async startSaveTo() {
+      await wrapper!.find('.models-save-to').trigger('click');
+      await settle();
+    },
+    async saveHere() {
+      await wrapper!.find('.files-save-here').trigger('click');
+      await settle();
+    },
+    async fileLoad(index) {
+      await wrapper!.findAll('.files-entry-load')[index]!.trigger('click');
+      await settle();
+    },
+    async fileUnlink(index) {
+      await wrapper!.findAll('.files-entry-remove')[index]!.trigger('click');
+      await settle();
+    },
+    async teardown() {
+      if (wrapper) wrapper.unmount();
+      resetWindowRects();
     },
   };
 }

@@ -62,7 +62,9 @@ export default class {
           break;
         case 'KeyS':
           if (modKeyPressed) {
-            boardInterface.saveBoard();
+            // Phase G2: Ctrl+S pins a checkpoint (identity-deduped) instead
+            // of downloading a file — Export > Model (.nnvp) is the download.
+            void boardInterface.checkpoint();
             event.preventDefault();
           }
           break;

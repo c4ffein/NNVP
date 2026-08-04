@@ -6,6 +6,10 @@ import path from 'path'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [vue(), vueJsx()],
+  // The training worker lazy-imports tfjs (trainingWorker.ts), so its bundle
+  // code-splits — Vite's default iife worker format refuses that at build
+  // time. ES-module workers are fine on every browser the app targets.
+  worker: { format: 'es' },
   server: {
     allowedHosts: true,
     // The cloud backend is same-origin at /api (the SPA never configures a

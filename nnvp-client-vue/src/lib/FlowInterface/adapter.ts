@@ -39,6 +39,9 @@ function layerToNode(layer: NnvpLayer, parent: NnvpLayer | null): FlowNode {
         id: layer.id,
         htmlID: layer.htmlID,
         name: layer.name,
+        // Comment (Phase F) — additive, kept only when present so files
+        // without it round-trip byte-identically (like edges' unrollSteps).
+        ...(layer.comment === undefined ? {} : { comment: layer.comment }),
         width: layer.width,
         height: layer.height,
         kerasLayer: layer.kerasLayer,
@@ -123,6 +126,7 @@ function nodeToLayer(
     id: nnvp.id,
     htmlID: nnvp.htmlID,
     name: nnvp.name,
+    ...(nnvp.comment === undefined ? {} : { comment: nnvp.comment }),
     // Wiring is recomputed from the flow edges (the source of truth after
     // editing), preserving edge order like the D3 editor did.
     inputLayers: (edgesByTarget.get(node.id) || []).map(e => e.sourceNnvpId),

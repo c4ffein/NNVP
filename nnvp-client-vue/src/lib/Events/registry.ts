@@ -41,6 +41,21 @@ export interface AppEvents {
   'run.hidden': DomainEvent;
   /** The run was brought back into history. */
   'run.unhidden': DomainEvent;
+  /** A board checkpoint: graph snapshot + recorded parent state (docHash). */
+  'graph.checkpoint': DomainEvent;
+  /** The user's rating claim: {workHash, score 0..1000} (Phase H3). */
+  'model.rated': DomainEvent;
+  /** RETIRED same-day pairwise experiment (2026-08-04) — kept so any
+   *  recorded judgments stay known events; nothing folds them anymore. */
+  'model.compared': DomainEvent;
+  /** A model hard-linked into a folder: {path, workHash} (Phase H5). */
+  'folder.linked': DomainEvent;
+  /** One link removed (the model survives everywhere else). */
+  'folder.unlinked': DomainEvent;
+  /** An (empty) folder brought into existence: {path}. */
+  'folder.created': DomainEvent;
+  /** An empty folder removed; links are the truth and override this. */
+  'folder.removed': DomainEvent;
 }
 
 export type AppEventType = keyof AppEvents;
@@ -56,6 +71,13 @@ export const EVENT_RETENTION: { readonly [K in AppEventType]: Retention } = {
   'run.finished': 'stored',
   'run.hidden': 'stored',
   'run.unhidden': 'stored',
+  'graph.checkpoint': 'stored',
+  'model.rated': 'stored',
+  'model.compared': 'stored',
+  'folder.linked': 'stored',
+  'folder.unlinked': 'stored',
+  'folder.created': 'stored',
+  'folder.removed': 'stored',
 };
 
 export function isKnownEventType(type: string): type is AppEventType {

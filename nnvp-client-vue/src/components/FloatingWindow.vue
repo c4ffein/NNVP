@@ -25,6 +25,14 @@
       <span v-if="$slots.actions" class="floating-window-actions" @pointerdown.stop>
         <slot name="actions" />
       </span>
+      <button
+        type="button"
+        class="floating-window-maximize"
+        :aria-label="(preMax ? 'Restore ' : 'Maximize ') + title"
+        :title="preMax ? 'Restore' : 'Maximize'"
+        @pointerdown.stop
+        @click="toggleMaximize"
+      >{{ preMax ? '❐' : '□' }}</button>
     </div>
     <div class="floating-window-body"><slot /></div>
     <!-- Resize zones: bottom corners are 2-axis, left/right/bottom edges are
@@ -112,6 +120,9 @@ export default defineComponent({
       preDock: null as { width: number; height: number } | null,
       // Which dock zone this window currently occupies (null = free-floating).
       dockedZone: null as DockZone | null,
+      // Rect before maximize; the toggle restores it exactly (Phase G3).
+      // Like every window rect: in-memory only, a reload resets the layout.
+      preMax: null as WindowRect | null,
     };
   },
   created() {
@@ -137,6 +148,26 @@ export default defineComponent({
   methods: {
     raise() {
       this.z = bringToFront();
+    },
+    /** Fill the viewport; toggling back restores the exact previous rect. */
+    toggleMaximize() {
+      this.raise();
+      if (this.preMax) {
+        this.rect = { ...this.preMax };
+        this.preMax = null;
+      } else {
+        this.preMax = { ...this.rect };
+        this.rect = {
+          x: 0, y: 0, width: window.innerWidth, height: window.innerHeight,
+        };
+        // A maximized window left its dock; dragging away later restores the
+        // pre-max size under the pointer through the existing preDock path.
+        this.dockedZone = null;
+        this.preDock = { width: this.preMax.width, height: this.preMax.height };
+      }
+      rememberRect(this.windowId, this.rect);
+      // Same signal a manual resize sends — content re-measures itself.
+      window.dispatchEvent(new Event('resize'));
     },
     startDrag(event: PointerEvent) {
       this.startTracking(event, 'move');
@@ -175,6 +206,7 @@ export default defineComponent({
           this.rect.height = this.preDock.height;
           this.preDock = null;
           this.dockedZone = null;
+          this.preMax = null; // dragged away: the maximize toggle starts fresh
           from.x = event.clientX - this.rect.width / 2;
           from.y = event.clientY - 12;
           from.px = event.clientX;
@@ -312,6 +344,28 @@ export default defineComponent({
   align-items: center;
   gap: 4px;
   cursor: default;
+}
+
+.floating-window-maximize {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: 4px;
+  border: 1px solid var(--panel-border);
+  background-color: var(--bg-elevated);
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.floating-window-maximize:hover {
+  color: var(--text-primary);
+  background-color: var(--bg-hover);
 }
 
 

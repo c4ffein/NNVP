@@ -38,6 +38,21 @@
       </svg>
     </button>
     <button
+      v-if="backendEnabled"
+      type="button"
+      class="corner-btn chat-btn"
+      title="Assistant chat"
+      aria-label="Assistant chat"
+      @click="$emit('toggle-chat')"
+    >
+      <svg class="corner-icon" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+        <path
+          d="M21 12a8 8 0 0 1-8 8H5.5L3 22V12a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8z"
+          fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"
+        />
+      </svg>
+    </button>
+    <button
       type="button"
       class="corner-btn settings-btn"
       title="Settings"
@@ -104,7 +119,7 @@ interface CornerControlsInstanceExtra {
 
 export default defineComponent({
   name: 'CornerControls',
-  emits: ['open-about', 'open-account', 'open-settings', 'open-viz3d'],
+  emits: ['open-about', 'open-account', 'open-settings', 'open-viz3d', 'toggle-chat'],
   data() {
     return {
       backendEnabled: !!(import.meta as ImportMetaWithEnv).env?.VITE_ENABLE_BACKEND,

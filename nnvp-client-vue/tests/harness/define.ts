@@ -69,6 +69,11 @@ export interface BoardDriver {
   layerCount(): Promise<number>;
   edgeCount(): Promise<number>;
   layerLabels(): Promise<(string | null)[]>;
+  /** Set the free-text comment on the layer at `index` (as the options
+   *  panel's comment box does); blank clears it. */
+  setComment(index: number, text: string): Promise<void>;
+  /** The layer's comment; '' when it has none (what an empty box shows). */
+  comment(index: number): Promise<string>;
   /** The committed NNVP model as a JSON string (FlowGraphEditor.toJSON). */
   graphJSON(): Promise<string>;
   loadJSON(json: string | NnvpModel): Promise<void>;
@@ -96,6 +101,8 @@ export interface WindowsDriver {
   borderOverhead(): Promise<number>;
   /** The initial (default) rect the named window opens with. */
   defaults(name: WindowName): Promise<{ width: number; height: number }>;
+  /** Click the titlebar's maximize/restore toggle (Phase G3). */
+  toggleMaximize(name: WindowName): Promise<void>;
 }
 
 /** The training Charts tab and its per-chart help modals. */
@@ -193,6 +200,84 @@ export interface HistoryDriver {
   requestDelete(index: number): Promise<string[]>;
   /** Click the inline confirm button with that exact label (or "Cancel"). */
   confirmDelete(label: string): Promise<void>;
+  /** The per-architecture group header texts, top to bottom. */
+  groupHeaders(): Promise<string[]>;
+  /** Set a filter select ('dataset'|'outcome'|'ranOn'|'lib'); '' = all. */
+  setFilter(name: string, value: string): Promise<void>;
+  /** Toggle the show-hidden checkbox (re-lists with hidden runs included). */
+  setShowHidden(on: boolean): Promise<void>;
+  /** Click the row's Unhide (shown on hidden rows in the show-hidden view). */
+  unhide(index: number): Promise<void>;
+  /** The provenance line inside the expanded detail row ('' when closed). */
+  provenanceText(): Promise<string>;
+  /** Tick the row's compare checkbox. */
+  selectForCompare(index: number): Promise<void>;
+  /** Click "Compare (n)" — TrainingZone switches to the Compare tab. */
+  compare(): Promise<void>;
+  /** The whole Compare panel's text (verdict, config diff, empty hint). */
+  compareText(): Promise<string>;
+  /** SVG series lines in the Compare overlay chart. */
+  compareSeriesCount(): Promise<number>;
+}
+
+/** The Models window (Phase G3): the architecture story as its own window —
+ *  timeline list, evolution graph, read-only preview, explicit restore. */
+export interface ModelsDriver {
+  /** Open the Models window (Panels > Models in the browser). */
+  open(): Promise<void>;
+  close(): Promise<void>;
+  /** The whole window's text (list steps, node labels, empty hint). */
+  text(): Promise<string>;
+  /** Switch to the graph view (list is the default). */
+  showGraph(): Promise<void>;
+  /** Rendered evolution-graph state nodes. */
+  nodeCount(): Promise<number>;
+  /** Select the state node at `index` (preview only — never the board). */
+  select(index: number): Promise<void>;
+  next(): Promise<void>;
+  prev(): Promise<void>;
+  /** Boxes drawn in the read-only preview SVG. */
+  previewBoxCount(): Promise<number>;
+  /** Click "Load this state" — the one board mutation, undoable. */
+  loadSelected(): Promise<void>;
+  /** Set a shared filter-bar control ('from'|'to' dates, 'seen', 'when'). */
+  setFilter(name: string, value: string): Promise<void>;
+  /** Click the order button (newest-first ⇄ oldest-first, both views). */
+  toggleOrder(): Promise<void>;
+  /** Switch to the Map tab (states as a 2D canvas-style graph). */
+  showMap(): Promise<void>;
+  /** Rendered map cards. */
+  mapNodeCount(): Promise<number>;
+  /** Architecture boxes drawn inside the cards' thumbnails, all cards. */
+  mapThumbBoxCount(): Promise<number>;
+  /** Click the map card at `index` (selection only — never the board). */
+  selectMapNode(index: number): Promise<void>;
+  /** Move the detail strip's rating slider for the SELECTED state (0..1000). */
+  rate(value: number): Promise<void>;
+  /** Wheel-zoom the Map (positive delta zooms out — Obsidian semantics). */
+  mapZoom(deltaY: number): Promise<void>;
+  /** Rendered cluster blobs at the coarsest zoom level. */
+  mapClusterCount(): Promise<number>;
+  /** Switch to the Files tab (the folder namespace, Phase H5). */
+  openFiles(): Promise<void>;
+  /** The Files tab's full text (folders, entries, empty hints). */
+  filesText(): Promise<string>;
+  /** Create a folder (one segment) under the CURRENT Files location. */
+  newFolder(name: string): Promise<void>;
+  /** Click into a subfolder of the current Files location. */
+  openFolder(name: string): Promise<void>;
+  /** Navigate up one level ('..'). */
+  filesUp(): Promise<void>;
+  /** Toggle ★ /favorites for the SELECTED state (detail strip). */
+  favoriteSelected(): Promise<void>;
+  /** Start the Save-As flow for the SELECTED state (opens Files saving). */
+  startSaveTo(): Promise<void>;
+  /** In saving mode: link the saved model into the current folder. */
+  saveHere(): Promise<void>;
+  /** Click Load on the nth Files entry (the one board mutation). */
+  fileLoad(index: number): Promise<void>;
+  /** Remove the nth Files entry's link. */
+  fileUnlink(index: number): Promise<void>;
 }
 
 /** What the fake backend holds, full records per kind (lists serve uuid
@@ -242,6 +327,7 @@ export interface World extends LogicWorld {
   charts: ChartsDriver;
   training: TrainingDriver;
   history: HistoryDriver;
+  models: ModelsDriver;
   records: RecordsDriver;
   backend: BackendDriver;
   /** Bun world only (unmount + reset between tests); the runner calls it, suites never do. */

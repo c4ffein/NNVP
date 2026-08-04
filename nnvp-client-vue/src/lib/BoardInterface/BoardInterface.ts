@@ -6,6 +6,8 @@
 // FlowGraphEditor touches `activeGraph.model` directly.
 
 import { migrateModel } from '../ModelFormat/migrations';
+import { appendCheckpoint } from '../Training/checkpoints';
+import { modelIdentityOf } from '../Training/modelIdentity';
 import type { LayerVizParams } from '../Viz3D/sceneBuild';
 import type FlowGraphEditor from '../FlowInterface/FlowGraphEditor';
 import type {
@@ -48,6 +50,15 @@ export default class BoardInterface {
   inspectionState: unknown;
   /** 3D view: per-layer display overrides (channel window, slice layout). */
   layerVizParams: Record<string, LayerVizParams>;
+  /**
+   * Lineage (Phase G2): the docHash of the state this editing session
+   * evolved from — set by loads/checkpoints, null after New. Stamped as
+   * `parent` into graph.checkpoint and run.started events (a recorded fact,
+   * content-addressed so forks converge across devices).
+   */
+  lineageParent: string | null;
+  /** Any graph change since the last checkpoint/load (the unload warning). */
+  dirtySinceCheckpoint: boolean;
 
   constructor() {
     this.graphEditors = [];
@@ -63,10 +74,12 @@ export default class BoardInterface {
     this.inspectionState = null;
     // 3D view: per-layer display overrides, set from the 3D layer panel.
     this.layerVizParams = {};
-    // Only warn about unsaved data if graph is not empty
-    // Future improvement: track dirty state (modified but not saved) instead of just checking emptiness
+    this.lineageParent = null;
+    this.dirtySinceCheckpoint = false;
+    // Warn only when there are edits no checkpoint/load has pinned (Phase G2
+    // — the real dirty state the old emptiness check stood in for).
     window.onbeforeunload = () => {
-      if (this.getLayers().length > 0) {
+      if (this.dirtySinceCheckpoint && this.getLayers().length > 0) {
         return 'Warning : all unsaved data will be lost';
       }
       // Return undefined to allow navigation without warning
@@ -199,8 +212,52 @@ export default class BoardInterface {
   addGraphEditor(graphEditor: FlowGraphEditor) {
     this.graphEditors.push(graphEditor);
     graphEditor.onSelectionChanged(() => { this.emit('selection-changed'); });
-    graphEditor.onGraphChanged(() => { this.emit('graph-changed'); });
+    graphEditor.onGraphChanged(() => {
+      this.dirtySinceCheckpoint = true;
+      this.emit('graph-changed');
+    });
     if (this.graphEditors.length === 1) this.setActiveGraphEditor(graphEditor);
+  }
+
+  // --- Checkpoints and lineage (Phase G2) ------------------------------------
+
+  getLineageParent(): string | null {
+    return this.lineageParent;
+  }
+
+  isDirty(): boolean {
+    return this.dirtySinceCheckpoint;
+  }
+
+  /**
+   * Pin the current board as a graph.checkpoint event, parented on the state
+   * this session evolved from. Deduped by identity: when the board's docHash
+   * equals the lineage parent nothing changed, so nothing is appended.
+   * Returns null when there is no board (or an unusable snapshot).
+   */
+  async checkpoint(): Promise<{ appended: boolean; docHash: string } | null> {
+    // An empty board is not a state worth pinning ("unnamed model" nodes).
+    if (this.getLayers().length === 0) return null;
+    const graphJson = this.getGraphJSON();
+    if (graphJson === null) return null;
+    const identity = await modelIdentityOf(graphJson);
+    if (identity === null) return null;
+    if (identity.docHash === this.lineageParent) {
+      this.dirtySinceCheckpoint = false; // verified: nothing changed
+      return { appended: false, docHash: identity.docHash };
+    }
+    await appendCheckpoint(graphJson, this.lineageParent);
+    this.lineageParent = identity.docHash;
+    this.dirtySinceCheckpoint = false;
+    return { appended: true, docHash: identity.docHash };
+  }
+
+  /** Loads re-enter the lineage tree: parent = the loaded state's identity. */
+  private async refreshLineageFromBoard(): Promise<void> {
+    const graphJson = this.getGraphJSON();
+    const identity = graphJson === null ? null : await modelIdentityOf(graphJson);
+    this.lineageParent = identity === null ? null : identity.docHash;
+    this.dirtySinceCheckpoint = false;
   }
 
   addLayer(kerasLayer: KerasLayerInstance) {
@@ -217,6 +274,12 @@ export default class BoardInterface {
   disconnectLayers(sourceId: NnvpLayerId, targetId: NnvpLayerId): boolean {
     if (this.activeGraph === null) return false;
     return this.activeGraph.disconnectLayers(sourceId, targetId);
+  }
+
+  /** Set (blank text: clear) a layer's free-text comment; one undoable step. */
+  setLayerComment(id: NnvpLayerId, comment: string): boolean {
+    if (this.activeGraph === null) return false;
+    return this.activeGraph.setLayerComment(id, comment);
   }
 
   setLeftBarRemountCallback(func: () => unknown) {
@@ -320,6 +383,12 @@ export default class BoardInterface {
   clearBoard() {
     if (this.activeGraph !== null) {
       this.activeGraph.clearBoard(false);
+      // File > New starts a fresh lineage root (whether or not the user
+      // confirmed, an empty board carries nothing worth warning about).
+      if (this.getLayers().length === 0) {
+        this.lineageParent = null;
+        this.dirtySinceCheckpoint = false;
+      }
     }
   }
 
@@ -331,7 +400,7 @@ export default class BoardInterface {
     return this.activeGraph.toJSON();
   }
 
-  loadGraphFromJSON(graphJSON: string | NnvpModel) {
+  async loadGraphFromJSON(graphJSON: string | NnvpModel): Promise<void> {
     if (this.activeGraph === null) return;
     // Migrate BEFORE touching the board, so a model from a newer NNVP throws
     // the clear FormatVersionError (surfaced by the cloud panels' handleError)
@@ -341,12 +410,17 @@ export default class BoardInterface {
     this.activeGraph.clearBoard(true);
     this.activeGraph.model.loadJSON(migrated);
     this.activeGraph.updateGraph();
+    // A loaded state re-enters the lineage tree (Phase G2). Callers that
+    // don't care may ignore the promise — the board itself is already live.
+    await this.refreshLineageFromBoard();
   }
 
   // Templates functions
   loadTemplate(name: string) {
     if (this.activeGraph !== null) {
       this.activeGraph.loadTemplate(name);
+      // Templates are known states too — their lineage converges by content.
+      void this.refreshLineageFromBoard();
     }
   }
 

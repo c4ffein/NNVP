@@ -96,6 +96,16 @@ board state.
   programmatic change; `commit()` (coalesced per microtask, no-op if JSON
   unchanged) records a change Vue Flow *already applied* (interactive connect,
   drag-stop). Mixing them up corrupts the undo stack.
+- **Checkpoints and lineage (Phase G2)** are facade side state: Ctrl+S /
+  File > Save call `checkpoint()` — a `graph.checkpoint` stored event
+  carrying the graph snapshot plus its RECORDED parent (the docHash of the
+  state this editing session evolved from), deduped by identity so an
+  unchanged board appends nothing. Loads (`loadGraphFromJSON`, templates)
+  re-enter the lineage tree by content; File > New starts a root; the same
+  parent is stamped into `run.started`. The `onbeforeunload` warning keys
+  off changed-since-last-checkpoint, not board emptiness. The .nnvp
+  download is Export > Model (.nnvp); the cloud modal moved to
+  File > Projects….
 - Vue Flow's own delete key is disabled; deletion goes through the facade so the
   undo snapshot and composite-children cleanup happen exactly once.
 
@@ -119,6 +129,11 @@ board state.
   `node.data.nnvp` / `edge.data.nnvp`, so load→save round-trips are
   byte-faithful. Wiring (`inputLayers`/`outputLayers`) is recomputed from flow
   edges on save — edges are the truth after editing.
+- Additive annotation fields (emitted only when present, so old files keep
+  saving byte-identically): `unrollSteps` on edges (feedback, below) and
+  `comment` on layers — free text, set through the `setLayerComment` facade
+  verb (undoable) and edited in LayerOptions. Comments are annotation-grade:
+  they feed `docHash`, never `workHash` (see model identity under Training).
 - Quirk preserved from D3 days: `outputs` in the format are **the layers feeding
   an Output node** (in edge order), not the Output nodes themselves. Replicated
   in adapter, syncDerived, and Keras import. Easy to misread.
@@ -232,7 +247,45 @@ board state.
 - One run at a time by design (single `activeRun` slot).
 - `TinygradRuntime` is an ahead-of-time pipeline: Pyodide worker traces the
   generated tinygrad model and emits a standalone WebGPU runner module +
-  safetensors weights; its engine loops the pre-recorded step. Not user-exposed.
+  safetensors weights; its engine loops the pre-recorded step. Not
+  user-exposed. Its display name in provenance is **tinyloop** (the
+  trace-once-loop-the-step binder).
+- **Model identity is derived, never stored** (`lib/Training/modelIdentity`,
+  the git tree-hash/commit-hash split): `workHash` hashes the computation
+  alone (leaf layer types + params, wiring, unroll counts — equal workHash =
+  same semantics, NOT byte-identical emitted code), `docHash` adds the
+  annotation layer (names, comments, grouping; annotation fields hash only
+  when present). Positions and presentation are in neither. Identity is
+  document-scoped: layer ids are part of the projection, so the same net
+  rebuilt from scratch hashes differently — canonical labeling is parked.
+- **Run provenance is a recorded fact, displayed through one table.**
+  `run.started` carries an optional additive `hardware` payload (best-effort
+  browser capture: cores + unmasked WebGL renderer; masked → field absent);
+  `engineId` stays the recorded fact and `lib/Training/engineInfo`'s
+  registry-style table derives the "Ran on"/"Lib" columns (unknown ids
+  degrade to '—', never throw). Facts are recorded at event time and never
+  recomputed — a rule that will extend to remote runs' cost.
+- **History/Compare are thin bindings over pure view modules.** The
+  History tab groups folds by workHash with filter predicates
+  (`historyView`), hosts the unhide action (reversing `run.hidden`), and
+  hands checked runs to the Compare tab (`compareView`: overlay chart,
+  differ-only config table, three-level identity verdict — identical /
+  same-network / different-network). Compare selection is TrainingZone
+  component state, deliberately not persisted.
+- **The Models window is the architecture story's own document window**
+  (Phase G3 — deliberately OUTSIDE the Training zone: training is
+  bottom-docked telemetry, this is something you study, usually
+  maximized). One owner component (`ModelsWindow`, the TrainingZone
+  pattern) over pure modules: `modelTimeline` (oldest-first list, runs +
+  checkpoints, `structuralDiff` annotations — computation changes kept
+  apart from renames/comments), `evolutionGraph` (states by docHash, edges
+  from RECORDED parentage only — an unknown parent degrades to a root,
+  nothing is ever inferred — commit-graph lanes), and `modelPreview`
+  (read-only geometry from the snapshot's stored positions; also the
+  History-thumbnail machinery). Prev/next move the SELECTION; the one
+  board mutation is the explicit "Load this state" through the undoable
+  `loadGraphFromJSON` path. Everything derives from events already in the
+  journal — no new stores.
 - Inspect/Viz3D coupling is indirect and goes through the facade: InspectPanel
   probes the trained model → `boardInterface.setInspection` →
   `inspection-changed` → Viz3D recolors. Viz3D never reads training metrics.
@@ -302,7 +355,8 @@ board state.
   other subscribers.
 - `registry.ts` is THE auditable table: every event type is declared there
   with its retention — `'ephemeral'` (bus-only, never persisted) or
-  `'stored'` (persisted + synced; the `run.*` lifecycle events). Retention is
+  `'stored'` (persisted + synced; the `run.*` lifecycle events and
+  `graph.checkpoint`). Retention is
   decided per type in the table, never at call sites; the event store refuses
   to append `'ephemeral'` types. Emitting an unregistered type warns in dev but still delivers —
   an unknown event must never brick the app.
@@ -348,9 +402,18 @@ board state.
   race: an ask that *causes* ChatBubble to mount is consumed on mount instead
   of lost. No window CustomEvents remain.
 - Floating windows: per-window rect/drag/dock state lives in each
-  `FloatingWindow.vue`; cross-window mechanics (z-stack, snap, dock, live
-  registry, remembered rects) live in `lib/windowing.ts`. Rects survive
-  close/reopen but deliberately not reload.
+  `FloatingWindow.vue` (including maximize/restore — the titlebar toggle
+  fills the viewport and restores the exact prior rect); cross-window
+  mechanics (z-stack, snap, dock, live registry, remembered rects) live in
+  `lib/windowing.ts`. Rects survive close/reopen but deliberately not
+  reload.
+- Menus (Phase G1): File holds document verbs (New/Load/Templates/
+  Save-as-checkpoint/Projects…), Export holds the outputs (four code
+  targets + the .nnvp download; the menu tree supports separators via
+  em-dash keys). Panels ticks every toggleable window (Catalog, Options,
+  Training, 3D View, Models, Chat); the corner controls duplicate 3D and
+  chat as icons on purpose — menu entries are for finding, icons for
+  reaching.
 - Tutorials are declarative defs (`lib/Tutorial/tutorials.ts`) run by one
   generic overlay engine that observes progress through `$boardInterface`
   events plus a poll backup; step predicates read the facade's typed read

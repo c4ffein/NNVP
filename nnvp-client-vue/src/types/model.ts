@@ -96,6 +96,14 @@ export interface NnvpLayer {
   id: NnvpLayerId;
   htmlID: string;
   name: string;
+  /**
+   * Free-text user note on the layer (Phase F). ADDITIVE field like
+   * NnvpEdge.unrollSteps — absent means "no comment", old files stay valid,
+   * no format-version bump; the adapter emits it only when present.
+   * Annotation-grade: part of docHash, never of workHash (lib/Training/
+   * modelIdentity).
+   */
+  comment?: string;
   x: number;
   y: number;
   width?: number;
@@ -136,6 +144,7 @@ export interface NnvpNodeData {
     id: NnvpLayerId;
     htmlID: string;
     name: string;
+    comment?: string;
     width?: number;
     height?: number;
     kerasLayer: KerasLayerJSON | null;

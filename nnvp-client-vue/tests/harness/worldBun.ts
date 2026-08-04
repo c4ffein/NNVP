@@ -13,8 +13,8 @@ import KerasInterface from '../../src/lib/KerasInterface/KerasInterface';
 import generatedKerasLayers from '../../src/lib/KerasInterface/generatedKerasLayers.json';
 import { installAppServices } from '../../src/lib/appServices';
 import {
-  makeBackendDriver, makeChatDriver, makeCatalogDriver, makeHistoryDriver, makeRecordsDriver,
-  makeChartsDriver, makeTrainingDriver, makeWindowsDriver,
+  makeBackendDriver, makeChatDriver, makeCatalogDriver, makeHistoryDriver, makeModelsDriver,
+  makeRecordsDriver, makeChartsDriver, makeTrainingDriver, makeWindowsDriver,
 } from './worldComponents';
 import type {
   FlowEdge, FlowNode, KerasLayerCatalog, NnvpLayerId, NnvpModel,
@@ -116,6 +116,15 @@ export function makeBoardDriver() {
       return store.getNodes().map(node => node.data.label);
     },
 
+    async setComment(index: number, text: string) {
+      editor.setLayerComment(state.nodes[index]!.data.nnvp.id, text);
+      await flush();
+    },
+
+    async comment(index: number) {
+      return state.nodes[index]!.data.nnvp.comment ?? '';
+    },
+
     async graphJSON() {
       return editor.toJSON();
     },
@@ -138,12 +147,15 @@ export function makeBunWorld(expect: Expect): World {
   const board = makeBoardDriver();
   // A history Restore must land on the SAME board the suite asserts through —
   // the seam replicates worldBun's own loadJSON contract.
-  const history = makeHistoryDriver({
+  const boardSeam = {
     loadGraphFromJSON(json: string) {
       board.editor.model.loadJSON(json);
       board.editor.updateGraph();
     },
-  });
+  };
+  const history = makeHistoryDriver(boardSeam);
+  // The Models window restores through the same seam — one board to assert on.
+  const models = makeModelsDriver(boardSeam);
   const records = makeRecordsDriver();
   const backend = makeBackendDriver();
   // The REAL app service wiring (main.ts calls the same function): sync-on-auth
@@ -159,6 +171,7 @@ export function makeBunWorld(expect: Expect): World {
     charts,
     training,
     history,
+    models,
     records,
     backend,
     async dispose() {
@@ -169,6 +182,7 @@ export function makeBunWorld(expect: Expect): World {
       await charts.teardown();
       await training.teardown();
       await history.teardown();
+      await models.teardown();
       await records.teardown();
       await backend.teardown();
     },

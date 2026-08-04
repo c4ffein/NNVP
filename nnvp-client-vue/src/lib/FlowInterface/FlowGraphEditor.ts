@@ -72,6 +72,8 @@ export interface LayerWrapper {
   id: NnvpLayerId;
   name: string;
   class: 'Layer' | 'Group';
+  /** Free-text user note (Phase F); undefined when the layer has none. */
+  comment?: string;
   kerasLayer: KerasLayerJSON | null;
   /** nnvp ids of the layers feeding this one — spliced in place, never reassigned. */
   inputLayers: NnvpLayerId[];
@@ -280,6 +282,27 @@ export default class FlowGraphEditor {
       source,
       target,
     }]);
+    this.committed = this.toJSON();
+    this.updateGraph();
+    return true;
+  }
+
+  /**
+   * Set (or, with blank text, remove) the free-text comment on a layer —
+   * one undoable step, like every facade verb. Trimmed-empty text deletes
+   * the field entirely so uncommented layers keep saving byte-identically.
+   * Returns false (and pushes no undo entry) for unknown ids and unchanged
+   * text.
+   */
+  setLayerComment(id: NnvpLayerId, comment: string): boolean {
+    const node = this.store.getNodes().find(candidate => candidate.id === String(id));
+    if (!node) return false;
+    const trimmed = comment.trim();
+    const next = trimmed === '' ? undefined : trimmed;
+    if (node.data.nnvp.comment === next) return false;
+    this.saveState();
+    if (next === undefined) delete node.data.nnvp.comment;
+    else node.data.nnvp.comment = next;
     this.committed = this.toJSON();
     this.updateGraph();
     return true;
@@ -650,6 +673,7 @@ export default class FlowGraphEditor {
         || { id: nnvp.id, name: nnvp.name, class: 'Layer', kerasLayer: null, inputLayers: [] };
       wrapper.id = nnvp.id;
       wrapper.name = nnvp.name;
+      wrapper.comment = nnvp.comment;
       wrapper.class = node.type === COMPOSITE_NODE ? 'Group' : 'Layer';
       wrapper.kerasLayer = nnvp.kerasLayer || null;
       const inputs = inputsByTarget.get(node.id) || [];

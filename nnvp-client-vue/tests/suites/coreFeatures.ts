@@ -899,8 +899,9 @@ e2eOnly(
     const fileMenu2 = await page.$('text=File');
     await fileMenu2!.click();
     await page.waitForTimeout(50);
-    // File > Save opens the cloud-aware modal; the device path downloads.
-    const saveOption = await page.$('text=Save');
+    // Phase G2: File > Save is a checkpoint now; the device download lives in
+    // File > Projects… (the cloud-aware modal's device path).
+    const saveOption = await page.$('text=Projects…');
     expect(saveOption).not.toBeNull();
     await saveOption!.click();
     await page.waitForTimeout(100);

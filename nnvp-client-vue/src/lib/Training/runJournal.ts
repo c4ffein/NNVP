@@ -29,7 +29,7 @@ import {
   foldRun, legacyRunEvents,
 } from './runEvents';
 import type {
-  EpochMetrics, FoldedRun, RunFinishedPayload, RunOutcome, RunStartedPayload,
+  EpochMetrics, FoldedRun, RunFinishedPayload, RunHardware, RunOutcome, RunStartedPayload,
   TrainingConfigSnapshot,
 } from './runEvents';
 import type { DomainEvent } from '../Events/domainEvent';
@@ -100,7 +100,15 @@ export function ensureLegacyRunsExploded(store: RecordStore = getRecordStore()):
  * so the stream stays causally ordered even across a future device handoff.
  */
 export async function startRun(
-  init: { engineId: string; config: TrainingConfigSnapshot; graphJson: string },
+  init: {
+    engineId: string;
+    config: TrainingConfigSnapshot;
+    graphJson: string;
+    /** The executing device's hardware fact (Phase F) — recorded as given. */
+    hardware?: RunHardware;
+    /** The lineage parent's docHash (Phase G2); null = root, absent = pre-G. */
+    parent?: string | null;
+  },
   store: RecordStore = getRecordStore(),
 ): Promise<RunHandle> {
   await ensureLegacyRunsExploded(store);
@@ -108,7 +116,14 @@ export async function startRun(
   const streamId = crypto.randomUUID();
   const started = makeEvent<RunStartedPayload>('run.started', {
     streamId,
-    payload: { engineId: init.engineId, config: init.config, graphJson: init.graphJson },
+    payload: {
+      engineId: init.engineId,
+      config: init.config,
+      graphJson: init.graphJson,
+      // Only when given — pre-Phase-F payload bytes stay reproducible.
+      ...(init.hardware === undefined ? {} : { hardware: init.hardware }),
+      ...(init.parent === undefined ? {} : { parent: init.parent }),
+    },
   });
   await appendEvent(started, { store });
   let previousUuid = started.uuid;

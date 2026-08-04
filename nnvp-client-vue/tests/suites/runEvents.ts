@@ -268,3 +268,17 @@ logicTest('legacyRunEvents: a stale "running" record explodes WITHOUT a finish e
   expect(fold.outcome).toBe(null);
   expect(isStale(fold, Date.parse('2026-07-26T00:00:00Z'))).toBe(true);
 });
+
+logicTest('foldRun: carries the run.started hardware payload; absent means null', ({ expect }) => {
+  const withHardware = fullStream();
+  (withHardware[0]!.payload as Record<string, unknown>).hardware = { backend: 'webgl', cores: 8 };
+  expect(foldRun(withHardware).hardware).toEqual({ backend: 'webgl', cores: 8 });
+  expect(foldRun(fullStream()).hardware).toBeNull();
+});
+
+logicTest('foldRun: carries the run.started lineage parent; absent means null', ({ expect }) => {
+  const withParent = fullStream();
+  (withParent[0]!.payload as Record<string, unknown>).parent = 'parent-doc-hash';
+  expect(foldRun(withParent).parent).toBe('parent-doc-hash');
+  expect(foldRun(fullStream()).parent).toBeNull();
+});

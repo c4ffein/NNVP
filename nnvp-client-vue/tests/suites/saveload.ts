@@ -12,7 +12,7 @@ e2eOnly(
   'Walks the Save/Load modal chrome while signed out — device-first buttons, the cloud pitch heading, and the hand-off to the account modal — all rendered modal UI only a browser shows.',
   async ({ page, expect }) => {
     await page.click('text=File');
-    await page.click('text=Save');
+    await page.click('text=Projects…');
     await expect(page.locator('#saveload-title')).toHaveText('Save model');
     await expect(page.locator('button:has-text("Save to this device")')).toBeVisible();
     await expect(page.locator('h2:has-text("Or use the cloud")')).toBeVisible();
@@ -123,7 +123,7 @@ e2eOnly(
     await page.click('.LayerTemplate:has-text("Dense")');
     await page.waitForTimeout(50);
     await page.click('text=File');
-    await page.click('#GeneralMenu .dropdown-item-content:text-is("Save")');
+    await page.click('#GeneralMenu .dropdown-item-content:text-is("Projects…")');
     await expect(page.locator('.saveload-content .hint')).toContainText('continuation of');
     await page.fill('.saveload-content input[type="text"] >> nth=0', 'grandchild');
     await page.fill('input[placeholder="mnist, cnn, experiment"]', 'v2, best');

@@ -2,7 +2,7 @@
   <div id="canvas-background" class="canvas-background">
     <FlowBoard :isTraining="isTraining"/>
   </div>
-  <div id="generalMenu" class="floating-panel general-menu"><GeneralMenu @open-trainer="openTrainer" @open-tutorial="openTutorialMenu" @open-account="openAccount" @open-save-load="openSaveLoad" :views="{ left: showLeftPanel, right: showRightPanel, training: trainerHeight > 0, chat: backendEnabled && showChat, chatAvailable: backendEnabled }" @toggle-view="togglePanel"/><CornerControls @open-account="openAccount()" @open-settings="openAccount('settings')" @open-about="showAboutModal = true" @open-viz3d="showViz3D = !showViz3D"/></div>
+  <div id="generalMenu" class="floating-panel general-menu"><GeneralMenu @open-trainer="openTrainer" @open-tutorial="openTutorialMenu" @open-account="openAccount" @open-save-load="openSaveLoad" :views="{ left: showLeftPanel, right: showRightPanel, training: trainerHeight > 0, chat: backendEnabled && showChat, chatAvailable: backendEnabled, viz3d: showViz3D, models: showModels }" @toggle-view="togglePanel"/><CornerControls @open-account="openAccount()" @open-settings="openAccount('settings')" @open-about="showAboutModal = true" @open-viz3d="showViz3D = !showViz3D" @toggle-chat="togglePanel('showChat')"/></div>
   <FloatingWindow
     id="layerCatalog"
     v-show="showLeftPanel"
@@ -36,6 +36,7 @@
     <TrainingZone @close-trainer="closeTrainer" :trainingZoneSize="trainerHeight" @training-started="isTraining = true" @training-stopped="isTraining = false"/>
   </FloatingWindow>
   <Viz3DWindow v-if="showViz3D" @close="showViz3D = false" @open-settings="openAccount('settings')"/>
+  <ModelsWindow v-if="showModels" @close="showModels = false"/>
   <AboutModal :show="showAboutModal" @close="showAboutModal = false" @open-tutorials="openTutorialsFromAbout"/>
   <TutorialMenu :show="showTutorialMenu" @close="showTutorialMenu = false" @start="startTutorial"/>
   <!-- Always rendered: without a backend build it still hosts the
@@ -60,6 +61,7 @@ import SaveLoadModal from './components/SaveLoad/SaveLoadModal.vue';
 import CornerControls from './components/CornerControls.vue';
 import FloatingWindow from './components/FloatingWindow.vue';
 import Viz3DWindow from './components/Viz3D/Viz3DWindow.vue';
+import ModelsWindow from './components/Models/ModelsWindow.vue';
 import ChatBubble from './components/Assistant/ChatBubble.vue';
 import TutorialOverlay from './components/Tutorial/TutorialOverlay.vue';
 import TutorialMenu from './components/Tutorial/TutorialMenu.vue';
@@ -72,7 +74,7 @@ import { bus } from './lib/Events/bus';
 type ImportMetaWithEnv = ImportMeta & { env?: { VITE_ENABLE_BACKEND?: string } };
 
 // The panel flags togglePanel flips (the training zone is handled apart).
-type PanelKey = 'showLeftPanel' | 'showRightPanel' | 'showChat';
+type PanelKey = 'showLeftPanel' | 'showRightPanel' | 'showChat' | 'showViz3D' | 'showModels';
 
 // Non-reactive instance fields assigned outside data() (pure typing pass:
 // keeping them out of data() preserves their non-reactive nature). These hold
@@ -110,6 +112,7 @@ export default defineComponent({
     CornerControls,
     FloatingWindow,
     Viz3DWindow,
+    ModelsWindow,
     ChatBubble,
     TutorialOverlay,
     TutorialMenu,
@@ -164,8 +167,11 @@ export default defineComponent({
       }
       this[key] = !this[key];
       try {
-        const side = { showLeftPanel: 'left', showRightPanel: 'right', showChat: 'chat' }[key];
-        localStorage.setItem(`nnvp-panel-${side}`, this[key] ? '1' : '0');
+        const side = {
+          showLeftPanel: 'left', showRightPanel: 'right', showChat: 'chat', showViz3D: null, showModels: null,
+        }[key];
+        // 3D/Models deliberately have no remembered pref (like window rects).
+        if (side) localStorage.setItem(`nnvp-panel-${side}`, this[key] ? '1' : '0');
       } catch { /* localStorage unavailable */ }
     },
   },
@@ -186,6 +192,7 @@ export default defineComponent({
       showSaveLoad: false,
       saveLoadMode: 'load',
       showViz3D: false,
+      showModels: false,
       isTraining: false,
       // Each window opens where its fixed panel used to live (56 = menu
       // height + margins); computed once at startup from the viewport.

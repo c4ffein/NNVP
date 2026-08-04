@@ -43,6 +43,16 @@
           v-bind:idFunc="e => e"
           v-bind:nameFunc="e => $boardInterface.findLayerById(e)!.kerasLayer!.name"
         />
+        <div class="LayerOptions param layer-comment">
+          <span class="layer-comment-label">Comment</span>
+          <textarea
+            class="layer-comment-input"
+            rows="2"
+            placeholder="Notes about this layer"
+            :value="selectedLayer.comment ?? ''"
+            @change="applyComment(selectedLayer, $event)"
+          ></textarea>
+        </div>
         <div v-if="index != selectedNode.e.length - 1">
           <br>
         </div>
@@ -233,6 +243,11 @@ export default defineComponent({
     toggleLayer(id: string) {
       document.getElementById(id)!.classList.toggle('closed');
     },
+    // Applied on change (blur/enter), not per keystroke, so one edit is one
+    // undo step — the verb already no-ops when the text didn't change.
+    applyComment(layer: LayerWrapper, event: Event) {
+      this.$boardInterface.setLayerComment(layer.id, (event.target as HTMLTextAreaElement).value);
+    },
   },
 });
 </script>
@@ -289,5 +304,23 @@ export default defineComponent({
 .LayerOptions.param {
   text-align: left;
   padding: 8px 0;
+}
+.layer-comment-label {
+  display: block;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.layer-comment-input {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-primary);
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  padding: 4px 6px;
 }
 </style>

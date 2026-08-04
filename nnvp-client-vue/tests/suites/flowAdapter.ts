@@ -328,3 +328,27 @@ logicTest('flowAdapter: newLayerNode builds a node the converters can round-trip
   });
   expect(model.layers[0]!.kerasLayer!.parameterValues).toEqual({ units: 3 });
 });
+
+// --- Layer comments (additive v2 field) --------------------------------------
+
+logicTest('flowAdapter: a layer comment rides through load -> save; absent comments stay absent', ({ expect }) => {
+  const withComment: NnvpModel = JSON.parse(compositeFixture());
+  withComment.layers[0]!.comment = 'the input — 8 features';
+  const { nodes, edges } = nnvpToFlow(withComment);
+  expect(nodes[0]!.data.nnvp.comment).toBe('the input — 8 features');
+  const saved: NnvpModel = JSON.parse(flowToNnvp(nodes, edges));
+  expect(saved.layers[0]!.comment).toBe('the input — 8 features');
+  // Layers that never had a comment must not gain the key on save (the same
+  // byte-stability contract unrollSteps follows).
+  expect('comment' in saved.layers[1]!).toBe(false);
+  expect('comment' in saved.layers[2]!).toBe(false);
+});
+
+logicTest('flowAdapter: a comment on a composite child survives the round-trip', ({ expect }) => {
+  const model: NnvpModel = JSON.parse(compositeFixture());
+  model.layers[1]!.children![0]!.comment = 'hidden bottleneck';
+  const { nodes, edges } = nnvpToFlow(model);
+  const saved: NnvpModel = JSON.parse(flowToNnvp(nodes, edges));
+  const group = saved.layers.find(l => l.id === 10)!;
+  expect(group.children!.find(c => c.id === 1)!.comment).toBe('hidden bottleneck');
+});

@@ -82,7 +82,9 @@ appTest('historyPanel: lists runs newest-first with formatted metrics', async ({
   expect(first).toContain('0.235'); // final loss, 3 digits
   const second = await history.rowText(1);
   expect(second).toContain('Fashion MNIST');
-  expect(second).toContain('tinygrad');
+  // Phase F: the raw engineId moved to the detail expand; the row shows the
+  // derived provenance columns ('tinygrad' the engine = the tinyloop binder).
+  expect(second).toContain('tinyloop');
   expect(second).toContain('error');
   expect(second).toContain('0 / 10');
   expect(second).toContain('—'); // no epoch metrics → both cells em-dashed
@@ -286,4 +288,173 @@ appTest('historyPanel: empty journal shows the muted empty line', async ({ histo
   await history.open();
   expect(await history.rowCount()).toBe(0);
   expect(await history.emptyText()).toContain('No training runs recorded yet');
+});
+
+// --- Phase F: grouping, filters, provenance, unhide --------------------------
+
+/** A minimal real architecture: Input -> Dense(units) -> Output. The display
+ *  name of the Dense layer is annotation-grade — same units, different
+ *  `denseName` = same network under another naming (docHash-only change). */
+function smallGraph(units: number, denseName = 'Dense'): string {
+  const kl = (name: string, parameterValues: Record<string, unknown>) => ({
+    name, category: 'test', searchTerms: [], parameterDef: {}, parameterValues, customUserLayer: false,
+  });
+  return JSON.stringify({
+    formatVersion: 2,
+    layers: [
+      {
+        class: 'Layer', id: 0, htmlID: 'layer-0', name: 'Input', x: 0, y: 0,
+        inputLayers: [], outputLayers: [1], children: null, kerasLayer: kl('Input', { shape: [4] }), parentID: null,
+      },
+      {
+        class: 'Layer', id: 1, htmlID: 'layer-1', name: denseName, x: 100, y: 0,
+        inputLayers: [0], outputLayers: [2], children: null, kerasLayer: kl('Dense', { units }), parentID: null,
+      },
+      {
+        class: 'Layer', id: 2, htmlID: 'layer-2', name: 'Output', x: 200, y: 0,
+        inputLayers: [1], outputLayers: [], children: null, kerasLayer: kl('Output', {}), parentID: null,
+      },
+    ],
+    edges: [
+      { source: 0, target: 1, id: 's0_t1', htmlID: 's0_t1' },
+      { source: 1, target: 2, id: 's1_t2', htmlID: 's1_t2' },
+    ],
+    inputs: [0],
+    outputs: [1],
+  });
+}
+
+appTest('historyPanel: groups runs by architecture with a skimmable header', async ({ history, records, expect }) => {
+  await records.seed('runs', [
+    makeRun({ uuid: 'run-a1', startedAt: '2026-07-20T10:00:00.000Z', graphJson: smallGraph(8) }),
+    makeRun({ uuid: 'run-a2', startedAt: '2026-07-20T09:00:00.000Z', graphJson: smallGraph(8) }),
+    makeRun({ uuid: 'run-b', startedAt: '2026-07-19T10:00:00.000Z', graphJson: smallGraph(32) }),
+  ]);
+  await history.open();
+  const headers = await history.groupHeaders();
+  expect(headers.length).toBe(2);
+  expect(headers[0]).toContain('Input → Dense → Output');
+  expect(headers[0]).toContain('2 runs');
+  expect(await history.rowCount()).toBe(3);
+});
+
+appTest('historyPanel: derives Ran on / Lib columns from the engine table', async ({ history, records, expect }) => {
+  await records.seed('runs', [newerRun()]);
+  await history.open();
+  const row = await history.rowText(0);
+  expect(row).toContain('browser');
+  expect(row).toContain('tfjs');
+  // Legacy runs recorded no hardware: the cell degrades to the em dash.
+  expect(row).toContain('—');
+});
+
+appTest('historyPanel: the dataset filter narrows the table to matching runs', async ({ history, records, expect }) => {
+  await records.seed('runs', [olderRun(), newerRun()]);
+  await history.open();
+  expect(await history.rowCount()).toBe(2);
+  await history.setFilter('dataset', 'MNIST');
+  expect(await history.rowCount()).toBe(1);
+  expect(await history.rowText(0)).toContain('MNIST');
+  await history.setFilter('dataset', '');
+  expect(await history.rowCount()).toBe(2);
+});
+
+appTest('historyPanel: hidden runs reappear under show-hidden and can be unhidden', async ({ history, records, expect }) => {
+  const base = {
+    streamId: 'run-hid', deviceId: 'device-a', instanceId: 'instance-1', dependsOn: [] as string[],
+  };
+  await records.seed('events', [
+    {
+      ...base, uuid: 'ev-start', type: 'run.started', seq: 1, wallTime: '2026-07-20T10:00:00.000Z',
+      payload: {
+        engineId: 'tfjs',
+        config: {
+          dataset: 'MNIST', optimizer: 'rmsprop', optimizerParams: {}, epochs: 5,
+          loss: 'categoricalCrossentropy',
+        },
+        graphJson: smallGraph(8),
+      },
+    },
+    {
+      ...base, uuid: 'ev-finish', type: 'run.finished', seq: 2, wallTime: '2026-07-20T10:01:00.000Z',
+      payload: { outcome: 'completed' },
+    },
+    {
+      ...base, uuid: 'ev-hide', type: 'run.hidden', seq: 3, wallTime: '2026-07-20T10:02:00.000Z',
+      payload: {},
+    },
+  ] as StoredDomainEvent[]);
+  await history.open();
+  expect(await history.rowCount()).toBe(0); // hidden by default
+  await history.setShowHidden(true);
+  expect(await history.rowCount()).toBe(1);
+  await history.unhide(0);
+  await history.setShowHidden(false);
+  expect(await history.rowCount()).toBe(1); // unhidden for good
+});
+
+appTest('historyPanel: the detail expand shows the recorded hardware fact', async ({ history, records, expect }) => {
+  await records.seed('events', [
+    {
+      streamId: 'run-hw', deviceId: 'device-a', instanceId: 'instance-1', dependsOn: [],
+      uuid: 'ev-hw-start', type: 'run.started', seq: 1, wallTime: '2026-07-20T10:00:00.000Z',
+      payload: {
+        engineId: 'tfjs-worker',
+        config: {
+          dataset: 'MNIST', optimizer: 'rmsprop', optimizerParams: {}, epochs: 5,
+          loss: 'categoricalCrossentropy',
+        },
+        graphJson: smallGraph(8),
+        hardware: { backend: 'webgl', cores: 8, gpu: 'Apple M2' },
+      },
+    },
+  ] as StoredDomainEvent[]);
+  await history.open();
+  await history.view(0);
+  const provenance = await history.provenanceText();
+  expect(provenance).toContain('tfjs-worker');
+  expect(provenance).toContain('webgl');
+  expect(provenance).toContain('8 cores');
+  expect(provenance).toContain('Apple M2');
+});
+
+appTest('historyPanel: Compare overlays the picked runs and diffs only what changed', async ({ history, records, expect }) => {
+  await records.seed('runs', [
+    makeRun({
+      uuid: 'run-cmp-a', startedAt: '2026-07-20T10:00:00.000Z', graphJson: smallGraph(8),
+      epochMetrics: [{ epoch: 0, valAcc: 0.5, acc: 0.5, loss: 1 }, { epoch: 1, valAcc: 0.7, acc: 0.7, loss: 0.6 }],
+    }),
+    makeRun({
+      uuid: 'run-cmp-b', startedAt: '2026-07-20T09:00:00.000Z', graphJson: smallGraph(8),
+      config: {
+        dataset: 'MNIST', optimizer: 'adam', optimizerParams: {}, epochs: 5,
+        loss: 'categoricalCrossentropy',
+      },
+      epochMetrics: [{ epoch: 0, valAcc: 0.6, acc: 0.6, loss: 0.9 }],
+    }),
+  ]);
+  await history.open();
+  await history.selectForCompare(0);
+  await history.selectForCompare(1);
+  await history.compare();
+  const text = await history.compareText();
+  expect(text).toContain('Identical models');
+  expect(text).toContain('optimizer');
+  expect(text).toContain('rmsprop');
+  expect(text).toContain('adam');
+  // Identical config rows are dropped — the shared loss never shows.
+  expect(text).not.toContain('categoricalCrossentropy');
+  expect(await history.compareSeriesCount()).toBe(2);
+});
+
+appTest('historyPanel: Compare tells naming variants apart from real changes', async ({ history, records, expect }) => {
+  await records.seed('runs', [
+    makeRun({ uuid: 'run-nv-a', startedAt: '2026-07-20T10:00:00.000Z', graphJson: smallGraph(8) }),
+    makeRun({ uuid: 'run-nv-b', startedAt: '2026-07-20T09:00:00.000Z', graphJson: smallGraph(8, 'encoder') }),
+  ]);
+  await history.open();
+  await history.selectForCompare(0);
+  await history.selectForCompare(1);
+  await history.compare();
+  expect(await history.compareText()).toContain('Same network — naming/comments differ');
 });

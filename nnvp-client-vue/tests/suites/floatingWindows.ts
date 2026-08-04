@@ -225,3 +225,19 @@ appTest('panel windows: the bottom bar goes full width and side docks make room,
   expect(Math.round((await windows.size('a')).height)).toBe(Math.round(sideHeight) + overhead);
   expect(Math.round((await windows.position('a')).y)).toBe(56);
 });
+
+appTest('windows: maximize fills the viewport; the toggle restores the exact rect', async ({ windows, expect }) => {
+  await windows.open();
+  const positionBefore = await windows.position('a');
+  const sizeBefore = await windows.size('a');
+  await windows.toggleMaximize('a');
+  const viewport = await windows.viewport();
+  const maximized = await windows.size('a');
+  const overhead = await windows.borderOverhead();
+  expect(maximized.width).toBe(viewport.width + overhead);
+  expect(maximized.height).toBe(viewport.height + overhead);
+  expect((await windows.position('a')).x).toBeLessThanOrEqual(1);
+  await windows.toggleMaximize('a');
+  expect(await windows.size('a')).toEqual(sizeBefore);
+  expect(await windows.position('a')).toEqual(positionBefore);
+});

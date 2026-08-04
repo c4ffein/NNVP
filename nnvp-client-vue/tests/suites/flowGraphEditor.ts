@@ -360,3 +360,41 @@ logicTest('flowGraphEditor: disconnectLayers removes exactly the named edge', ({
   expect(store.state.edges[0]!.source).toBe(b);
   expect(editor.disconnectLayers(a, b)).toBe(false); // already gone
 });
+
+// --- Layer comments (Phase F) ------------------------------------------------
+
+logicTest('flowGraphEditor: setLayerComment stamps the comment, undoably', async ({ expect }) => {
+  const { store, editor } = makeEditor();
+  editor.addLayer(kl('Dense'));
+  const id = store.state.nodes[0]!.data.nnvp.id;
+  expect(editor.setLayerComment(id, 'bigger than it looks')).toBe(true);
+  expect(store.state.nodes[0]!.data.nnvp.comment).toBe('bigger than it looks');
+  expect(JSON.parse(editor.toJSON()).layers[0].comment).toBe('bigger than it looks');
+  // The derived wrapper the panels read carries it too.
+  expect(editor.findLayerById(id)!.comment).toBe('bigger than it looks');
+  editor.undo();
+  expect(store.state.nodes[0]!.data.nnvp.comment).toBeUndefined();
+  editor.redo();
+  expect(store.state.nodes[0]!.data.nnvp.comment).toBe('bigger than it looks');
+});
+
+logicTest('flowGraphEditor: setLayerComment with blank text clears the field entirely', ({ expect }) => {
+  const { store, editor } = makeEditor();
+  editor.addLayer(kl('Dense'));
+  const id = store.state.nodes[0]!.data.nnvp.id;
+  editor.setLayerComment(id, 'temp');
+  expect(editor.setLayerComment(id, '   ')).toBe(true);
+  expect('comment' in store.state.nodes[0]!.data.nnvp).toBe(false);
+  expect('comment' in JSON.parse(editor.toJSON()).layers[0]).toBe(false);
+});
+
+logicTest('flowGraphEditor: setLayerComment is a no-op on unknown ids and unchanged text', ({ expect }) => {
+  const { store, editor } = makeEditor();
+  editor.addLayer(kl('Dense'));
+  const id = store.state.nodes[0]!.data.nnvp.id;
+  expect(editor.setLayerComment('nope', 'x')).toBe(false);
+  editor.setLayerComment(id, 'same');
+  const undoDepth = editor.undoStack.length;
+  expect(editor.setLayerComment(id, 'same')).toBe(false); // unchanged: no undo entry
+  expect(editor.undoStack.length).toBe(undoDepth);
+});

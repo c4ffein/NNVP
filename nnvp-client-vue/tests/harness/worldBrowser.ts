@@ -14,7 +14,7 @@ import type { FakeBackend } from './fakeBackend';
 import type { CanvasDriver } from './canvas';
 import type {
   BackendDriver, BoardDriver, CatalogDriver, ChartsDriver, ChatDriver, E2EWorld, Expect,
-  HistoryDriver, RecordsDriver, TrainingDriver, WindowName, WindowsDriver, World,
+  HistoryDriver, ModelsDriver, RecordsDriver, TrainingDriver, WindowName, WindowsDriver, World,
 } from './define';
 
 // Dev-only debug handle main.ts installs (same local-typing pattern). `bus`
@@ -100,6 +100,19 @@ export function makeBrowserWorld(
     layerCount: () => canvas.layerCount(page),
     edgeCount: () => canvas.edgeCount(page),
     layerLabels: () => canvas.layerLabels(page),
+    async setComment(index, text) {
+      // The user's path: select the layer, type in the options panel's
+      // comment box, and blur (the box applies on change).
+      await board.select(index);
+      const input = page.locator('#layerOptions .layer-comment-input');
+      await input.fill(text);
+      await input.blur();
+      await settle();
+    },
+    async comment(index) {
+      await board.select(index);
+      return page.locator('#layerOptions .layer-comment-input').inputValue();
+    },
     graphJSON: () => page.evaluate(() => (window as unknown as NnvpDebugWindow).nnvp.debug.graphEditor.toJSON()),
     async loadJSON(json) {
       await page.evaluate((raw) => {
@@ -205,6 +218,10 @@ export function makeBrowserWorld(
       return name === 'a'
         ? { width: 220, height: height - 68 }
         : { width: 240, height: height - 68 };
+    },
+    async toggleMaximize(name) {
+      await page.click(`${winSel(name)} .floating-window-maximize`);
+      await settle();
     },
   };
 
@@ -486,10 +503,172 @@ export function makeBrowserWorld(
         .click();
       await settle();
     },
+    async groupHeaders() {
+      return page.locator('.history-group').allTextContents();
+    },
+    async setFilter(name, value) {
+      await page.selectOption(`.history-filters select[data-filter="${name}"]`, value);
+      await settle();
+    },
+    async setShowHidden(on) {
+      await page.locator('.history-show-hidden input').setChecked(on);
+      await settle();
+    },
+    async unhide(index) {
+      await page.locator('.history-unhide').nth(index).click();
+      await settle();
+    },
+    async provenanceText() {
+      const line = page.locator('.history-provenance');
+      return (await line.count()) ? (await line.first().textContent()) ?? '' : '';
+    },
+    async selectForCompare(index) {
+      await page.locator('.history-compare-check').nth(index).setChecked(true);
+      await settle();
+    },
+    async compare() {
+      await page.locator('.history-compare-button').click();
+      await settle();
+    },
+    async compareText() {
+      return (await page.locator('.ComparePanel').textContent()) ?? '';
+    },
+    async compareSeriesCount() {
+      return page.locator('.compare-chart .lines path').count();
+    },
+  };
+
+  const models: ModelsDriver = {
+    async open() {
+      await page.click('#GeneralMenu .menuTitle:has-text("Panels")');
+      await page.click('#GeneralMenu .menuItem:has-text("Models")');
+      await settle();
+    },
+    async close() {
+      await page.click('#modelsWindow .floating-window-close');
+      await settle();
+    },
+    async text() {
+      return (await page.locator('#modelsWindow .ModelsWindow').textContent()) ?? '';
+    },
+    async showGraph() {
+      await page.click('#modelsWindow .models-view-graph');
+      // Big journals hash for a while — wait for the panel's answer, either
+      // rendered nodes or the empty line (same reasoning as the bun world).
+      await page.waitForSelector('#modelsWindow .evolution-node, #modelsWindow .models-empty');
+      await settle();
+    },
+    async nodeCount() {
+      return page.locator('#modelsWindow .evolution-node').count();
+    },
+    async select(index) {
+      await page.locator('#modelsWindow .evolution-node').nth(index).click();
+      await settle();
+    },
+    async next() {
+      await page.click('#modelsWindow .models-next');
+      await settle();
+    },
+    async prev() {
+      await page.click('#modelsWindow .models-prev');
+      await settle();
+    },
+    async previewBoxCount() {
+      return page.locator('#modelsWindow .models-preview rect').count();
+    },
+    async loadSelected() {
+      await page.click('#modelsWindow .models-load');
+      await settle();
+    },
+    async setFilter(name, value) {
+      const selector = `#modelsWindow [data-mfilter="${name}"]`;
+      const tag = await page.$eval(selector, el => el.tagName);
+      if (tag === 'SELECT') await page.selectOption(selector, value);
+      else await page.fill(selector, value);
+      await settle();
+    },
+    async toggleOrder() {
+      await page.click('#modelsWindow .models-order');
+      await settle();
+    },
+    async showMap() {
+      await page.click('#modelsWindow .models-view-map');
+      await page.waitForSelector('#modelsWindow .evolution-map-node, #modelsWindow .models-empty');
+      await settle();
+    },
+    async mapNodeCount() {
+      return page.locator('#modelsWindow .evolution-map-node').count();
+    },
+    async mapThumbBoxCount() {
+      return page.locator('#modelsWindow .map-thumb rect').count();
+    },
+    async selectMapNode(index) {
+      await page.locator('#modelsWindow .evolution-map-node').nth(index).click();
+      await settle();
+    },
+    async rate(value) {
+      // Range inputs refuse fill(); set the value and fire change directly.
+      await page.$eval('#modelsWindow .models-rating-slider', (el, v) => {
+        const input = el as HTMLInputElement;
+        input.value = String(v);
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      }, value);
+      await settle();
+    },
+    async mapZoom(deltaY) {
+      await page.locator('#modelsWindow .evolution-map').dispatchEvent('wheel', { deltaY, ctrlKey: true });
+      await settle();
+    },
+    async mapClusterCount() {
+      return page.locator('#modelsWindow .map-cluster').count();
+    },
+    async openFiles() {
+      await page.click('#modelsWindow .models-view-files');
+      await page.waitForSelector('#modelsWindow .models-files');
+      await settle();
+    },
+    async filesText() {
+      return (await page.locator('#modelsWindow .models-files').textContent()) ?? '';
+    },
+    async newFolder(name) {
+      await page.fill('#modelsWindow .files-new-input', name);
+      await page.click('#modelsWindow .files-new-btn');
+      await settle();
+    },
+    async openFolder(name) {
+      await page.locator('#modelsWindow .files-subfolder')
+        .filter({ hasText: `${name}/` }).first().click();
+      await settle();
+    },
+    async filesUp() {
+      await page.click('#modelsWindow .files-up');
+      await settle();
+    },
+    async favoriteSelected() {
+      await page.click('#modelsWindow .models-fav');
+      await settle();
+    },
+    async startSaveTo() {
+      await page.click('#modelsWindow .models-save-to');
+      await page.waitForSelector('#modelsWindow .files-saving-banner');
+      await settle();
+    },
+    async saveHere() {
+      await page.click('#modelsWindow .files-save-here');
+      await settle();
+    },
+    async fileLoad(index) {
+      await page.locator('#modelsWindow .files-entry-load').nth(index).click();
+      await settle();
+    },
+    async fileUnlink(index) {
+      await page.locator('#modelsWindow .files-entry-remove').nth(index).click();
+      await settle();
+    },
   };
 
   const world: World & { page?: Page; canvas?: CanvasDriver } = {
-    expect, board, chat, catalog, windows, charts, training, history, records, backend,
+    expect, board, chat, catalog, windows, charts, training, history, models, records, backend,
     dispose: async () => {},
   };
   if (exposePage) {

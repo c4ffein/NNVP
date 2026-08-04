@@ -5,7 +5,7 @@ import { clearCurrentProject } from '../lib/Backend/currentProject';
 
 // import.meta.env is Vite-only (absent under bun/unit tests) — typed locally
 // instead of pulling in vite/client types (same choice as BoardInterface.ts).
-type ImportMetaWithEnv = ImportMeta & { env?: { VITE_ENABLE_BACKEND?: string } };
+type ImportMetaWithEnv = ImportMeta & { env?: { VITE_ENABLE_BACKEND?: string; DEV?: boolean } };
 
 // Panel visibility flags owned by App.vue (the `views` prop).
 interface ViewsState {
@@ -14,6 +14,8 @@ interface ViewsState {
   training?: boolean;
   chat: boolean;
   chatAvailable: boolean;
+  viz3d?: boolean;
+  models?: boolean;
 }
 
 // The menu tree: a leaf is an action (run with the component as `this` via
@@ -23,9 +25,29 @@ type MenuAction = (this: ComponentPublicInstance) => unknown;
 type MenuEntry = MenuAction | [MenuAction, () => boolean] | MenuSubtree | string;
 interface MenuSubtree { [label: string]: MenuEntry }
 
-// Non-reactive instance field assigned outside data() (pure typing pass:
-// keeping it out of data() preserves its non-reactive nature).
-interface GeneralMenuInstanceExtra { templatesChangeHandler?: () => void }
+// Non-reactive instance fields assigned outside data() (pure typing pass:
+// keeping them out of data() preserves their non-reactive nature).
+// `hoverSwitchedTo`: the title the LAST hover-switch opened — the click that
+// carried the pointer there must not toggle it straight back closed.
+interface GeneralMenuInstanceExtra {
+  templatesChangeHandler?: () => void;
+  hoverSwitchedTo?: HTMLElement | null;
+}
+
+// The dev-only Debug menu's tree key. Its TITLE renders as a drawn bug icon
+// (same stroke language as the corner controls — an emoji here depends on
+// the platform's emoji fonts and breaks the menubar's look).
+const DEBUG_MENU_KEY = '🐞';
+const bugIcon = () => (
+  <svg class="menu-title-icon" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+    <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <ellipse cx="12" cy="14" rx="5.5" ry="6.5"/>
+      <path d="M12 7.5v13"/>
+      <path d="M9.5 4.5 8 2.5M14.5 4.5 16 2.5"/>
+      <path d="M6.5 11H3M6.5 15H3M7.5 18.5 4.5 21M17.5 11H21M17.5 15H21M16.5 18.5 19.5 21"/>
+    </g>
+  </svg>
+);
 
 // The render sticks the raw [title, content] entry on each top-level <li> as
 // a plain `obj` attribute (kept as-is by this typing pass); teach Vue's JSX
@@ -46,6 +68,11 @@ export default defineComponent({
       if (typeof (menu) === 'string') menu = (this as unknown as Record<string, MenuSubtree | undefined>)[menu] || {}; // eslint-disable-line no-param-reassign
       if (typeof (menu) !== 'function' && !Array.isArray(menu)) {
         const rows = Object.entries(menu).map((entry, i) => {
+          // Keys starting with an em dash are separators (values ignored) —
+          // object keys must be unique, hence '—1', '—2', … (Phase G1).
+          if (entry[0].startsWith('—')) {
+            return (<li key={i} class="menuSeparator GeneralMenu" role="separator"></li>);
+          }
           const itemKey = `${level}-${i}-${entry[0]}`;
           const isDisabled = this.isItemDisabled(entry[0], entry[1]);
           const hasSubmenu = typeof entry[1] === 'string'
@@ -79,12 +106,13 @@ export default defineComponent({
             <div class="menuTitle GeneralMenu"
               role="menuitem"
               tabindex="0"
+              aria-label={object[0] === DEBUG_MENU_KEY ? 'Debug' : undefined}
               aria-haspopup={typeof object[1] !== 'function' ? 'true' : undefined}
               onClick={event => this.level0ClickHandler(object[0], object[1], event)}
               onKeydown={event => this.level0KeyHandler(object[0], object[1], event)}
               onMouseover={event => this.level0HoverHandler(object[0], object[1], event)}
             >
-              {object[0]}
+              {object[0] === DEBUG_MENU_KEY ? bugIcon() : object[0]}
             </div>
             {generateMenu(object[1], 1)}
           </li>
@@ -158,21 +186,37 @@ export default defineComponent({
             else this.$boardInterface.loadBoard();
           },
           Templates: 'templatesMenu',
+          // Phase G2: Save is a CHECKPOINT (a graph.checkpoint event pinning
+          // this state into the model's history) — deduped by identity, so an
+          // unchanged board appends nothing. The .nnvp download moved to
+          // Export; cloud Projects keep their modal under Projects….
           Save() {
-            if (backendEnabled) this.$emit('open-save-load', 'save');
-            else this.$boardInterface.saveBoard();
+            void this.$boardInterface.checkpoint();
           },
-          'Generate TF - Python': function generateTfPython() {
+          ...(backendEnabled ? {
+            'Projects…': function openProjects() {
+              this.$emit('open-save-load', 'save');
+            },
+          } : {}),
+        },
+        // Code generation got its own menu (Phase G1): File is document
+        // operations, Export is outputs — and the target list will grow.
+        Export: {
+          'Python (Keras)': function exportPython() {
             this.$boardInterface.generatePythonInBrowser(this.$kerasInterface);
           },
-          'Generate TF - JavaScript': function generateTfJavascript() {
+          'JavaScript (tfjs)': function exportJavascript() {
             this.$boardInterface.generateJavascriptInBrowser(this.$kerasInterface);
           },
-          Generate_PyTorch() {
+          PyTorch() {
             this.$boardInterface.generatePyTorchInBrowser(this.$kerasInterface);
           },
-          Generate_Tinygrad() {
+          tinygrad() {
             this.$boardInterface.generateTinygradInBrowser(this.$kerasInterface);
+          },
+          '—1': '—',
+          'Model (.nnvp)': function exportNnvp() {
+            this.$boardInterface.saveBoard();
           },
         },
         Edit: {
@@ -185,6 +229,8 @@ export default defineComponent({
           [`${tick(this.views.left)} Layer Catalog`]: () => this.$emit('toggle-view', 'showLeftPanel'),
           [`${tick(this.views.right)} Layer Options`]: () => this.$emit('toggle-view', 'showRightPanel'),
           [`${tick(this.views.training)} Training`]: () => this.$emit('toggle-view', 'training'),
+          [`${tick(this.views.viz3d)} 3D View`]: () => this.$emit('toggle-view', 'showViz3D'),
+          [`${tick(this.views.models)} Models`]: () => this.$emit('toggle-view', 'showModels'),
           ...(this.views.chatAvailable ? {
             [`${tick(this.views.chat)} Chat`]: () => this.$emit('toggle-view', 'showChat'),
           } : {}),
@@ -192,6 +238,26 @@ export default defineComponent({
         // Settings and About moved off the menubar: the corner controls'
         // gear and ? buttons open them as tabs of the account panel.
         Tutorial: () => { this.$emit('open-tutorial'); },
+        // Dev builds only (like window.nnvp.debug): UX-at-scale probes. The
+        // seed is localOnly + content-addressed + 'debug-seed'-tagged, so it
+        // never syncs, re-seeding appends nothing, and removal is exact.
+        // Dynamic imports on purpose: DEV is statically false in prod builds,
+        // so the whole seeder chunk drops out of the bundle — absent, not
+        // merely hidden.
+        ...((import.meta as ImportMetaWithEnv).env?.DEV ? {
+          [DEBUG_MENU_KEY]: {
+            'Seed a month of history': async () => {
+              const { seedMonthOfHistory } = await import('../lib/Debug/monthOfUse');
+              const { appended, total } = await seedMonthOfHistory();
+              window.alert(`Debug seed: ${appended} of ${total} events appended `
+                + '(0 appended = already seeded). See History and the Models window.');
+            },
+            'Remove seeded history': async () => {
+              const { removeSeededHistory } = await import('../lib/Debug/monthOfUse');
+              window.alert(`Debug seed: removed ${await removeSeededHistory()} events.`);
+            },
+          },
+        } : {}),
       };
     },
     templatesMenu(): MenuSubtree {
@@ -220,10 +286,23 @@ export default defineComponent({
         // so the bare call never actually relies on `this`.
         (menuContent as () => unknown)();
       } else if (this.$data.activatedState) {
-        this.deactivateChain();
+        // Switching menus by CLICK: the hover that carried the pointer here
+        // already opened this title (level0HoverHandler) — closing it now
+        // would make every menu-to-menu click read as a dead click. Only a
+        // second, deliberate click on the same title closes.
+        const self = this as unknown as GeneralMenuInstanceExtra;
+        const menuElement = this.getMenuElement(event.target);
+        if (menuElement && self.hoverSwitchedTo === menuElement) {
+          self.hoverSwitchedTo = null; // consumed: the next click closes
+        } else {
+          this.deactivateChain();
+        }
       } else {
+        // Guarded: an unresolvable target must never half-open the menu
+        // state (that wedge is what killed the whole bar).
+        const menuElement = this.getMenuElement(event.target);
+        if (!menuElement) return;
         this.$data.activatedState = true;
-        const menuElement = this.getMenuElement(event.target)!;
         this.$data.activatedChain = [menuElement];
         menuElement.classList.toggle('activated');
         document.body.addEventListener('click', this.clickElseWhere);
@@ -238,12 +317,17 @@ export default defineComponent({
     level0HoverHandler(menuTitle: string, menuContent: MenuEntry, event: MouseEvent) {
       if (typeof (menuContent) !== 'function') {
         if (this.$data.activatedState) {
+          const menuElement = this.getMenuElement(event.target);
+          if (!menuElement) return;
+          const alreadyOpen = this.$data.activatedChain[0] === menuElement;
           this.deactivateChain();
-          const menuElement = this.getMenuElement(event.target)!;
           this.$data.activatedChain = [menuElement];
           this.$data.activatedState = true;
           menuElement.classList.toggle('activated');
           document.body.addEventListener('click', this.clickElseWhere);
+          // Remember the switch so the incoming click doesn't toggle it
+          // closed (re-entering the already-open title is not a switch).
+          (this as unknown as GeneralMenuInstanceExtra).hoverSwitchedTo = alreadyOpen ? null : menuElement;
         }
       }
     },
@@ -304,16 +388,14 @@ export default defineComponent({
       this.$data.activatedChain = [];
     },
     getMenuElement(element: EventTarget | null): HTMLElement | undefined {
-      // The original walked whatever the event handed it; a non-element target
-      // would throw then as it would now — the cast preserves that behavior.
-      let el = element as HTMLElement;
-      while (el.classList.contains('GeneralMenu')) {
-        if (el.classList.contains('menu') || el.classList.contains('menuItem')) {
-          return el;
-        }
-        el = el.parentElement!;
-      }
-      return undefined;
+      // closest() instead of the historical parent-walk: a click on the
+      // Debug title lands on the icon's SVG internals, which carry none of
+      // the GeneralMenu classes the walk required — it returned undefined
+      // and the caller's `.classList` blew up, wedging the whole menubar.
+      // closest() crosses the svg→div boundary and needs no per-node class.
+      if (!(element instanceof Element)) return undefined;
+      return (element.closest('.menu.GeneralMenu, .menuItem.GeneralMenu') as HTMLElement | null)
+        ?? undefined;
     },
   },
 });
@@ -365,6 +447,10 @@ export default defineComponent({
   transition: transform 0.15s ease;
 }
 
+.menu-title-icon {
+  vertical-align: -2px;
+}
+
 .menuTitle:hover {
   transform: translate(1px, -1px);
   cursor: pointer;
@@ -387,6 +473,11 @@ export default defineComponent({
 #GeneralMenu .activated > .dropdown-content {
   display: block;
 }
+.menuSeparator {
+  border-top: 1px solid var(--panel-border);
+  margin: 4px 8px;
+}
+
 .dropdown-content .menuItem {
  position: relative;
  color: var(--text-primary);

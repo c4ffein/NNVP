@@ -44,6 +44,13 @@
       >
         History
       </div>
+      <div
+        class="TrainingZone bar-button"
+        :class="{ active: selectedPanel === 'ComparePanel' }"
+        v-on:click="selectedPanel = 'ComparePanel'"
+      >
+        Compare
+      </div>
     </div>
     <div id="training-zone-selector">
       <keep-alive>
@@ -89,6 +96,9 @@
           v-bind:deleteRun="deleteRun"
           v-bind:deleteChoices="deleteRunChoices"
           v-bind:restoreRun="restoreRun"
+          v-bind:unhideRun="unhideRunByUuid"
+          v-bind:compareRuns="compareRuns"
+          v-bind:compareSelection="compareSelection"
         ></component>
       </keep-alive>
     </div>
@@ -114,8 +124,9 @@ import { createWorkerEngine } from '../../lib/Training/workerEngine';
 import { settings } from '../../lib/Settings/settings';
 import { trainingConfig, snapshotTrainingConfig } from '../../lib/Training/trainingConfig';
 import {
-  startRun, hideRun, listRuns as journalListRuns,
+  startRun, hideRun, listRuns as journalListRuns, unhideRun as journalUnhideRun,
 } from '../../lib/Training/runJournal';
+import { captureBrowserHardware } from '../../lib/Training/engineInfo';
 import type { FoldedRun, RunHandle } from '../../lib/Training/runJournal';
 import { setStreamLocalOnly } from '../../lib/Events/store';
 import ApiClient from '../../lib/Backend/apiClient';
@@ -123,6 +134,7 @@ import type { DeleteWhere } from '../../lib/Backend/sync';
 import { getRecordStore } from '../../lib/LocalStore/db';
 
 import Charts from './Charts.vue';
+import ComparePanel from './ComparePanel.vue';
 import CompileOptions from './CompileOptions.vue';
 import DatasetSelector from './DatasetSelector.vue';
 import InspectPanel from './InspectPanel.vue';
@@ -177,6 +189,7 @@ export default defineComponent({
   components: {
     BenchPanel,
     Charts,
+    ComparePanel,
     CompileOptions,
     DatasetSelector,
     HistoryPanel,
@@ -191,6 +204,9 @@ export default defineComponent({
       trainingState: 'idle' as 'idle' | 'running' | 'paused',
       pausedBy: null as string | null,
       canPause: false,
+      // The runs picked in History for the Compare tab (folds are plain
+      // JSON-shaped data — safe to keep reactive, no tensors anywhere).
+      compareSelection: null as FoldedRun[] | null,
       // Curriculum surface: epoch indices where a phase ended (chart markers)
       // and the fixed-seed text sample taken at each phase boundary.
       phaseBoundaries: [] as number[],
@@ -303,8 +319,17 @@ export default defineComponent({
     },
     // --- History tab plumbing (HistoryPanel gets everything via props, the
     // BenchPanel pattern — it never imports the journal itself).
-    listRuns(): Promise<FoldedRun[]> {
-      return journalListRuns();
+    listRuns(options?: { includeHidden?: boolean }): Promise<FoldedRun[]> {
+      return journalListRuns(getRecordStore(), options);
+    },
+    /** The Unhide button's verb — reverses a run.hidden event. */
+    unhideRunByUuid(uuid: string): Promise<void> {
+      return journalUnhideRun(uuid);
+    },
+    /** History's Compare button lands here: keep the picks, switch tabs. */
+    compareRuns(runs: FoldedRun[]): void {
+      this.compareSelection = runs;
+      this.selectedPanel = 'ComparePanel';
     },
     /**
      * The locations this run can be removed from: only the ones actually
@@ -445,6 +470,8 @@ export default defineComponent({
         engineId: engineChoice,
         config: snapshotTrainingConfig(),
         graphJson: graphJson || '',
+        hardware: captureBrowserHardware(),
+        parent: this.$boardInterface.getLineageParent(),
       }).catch((journalError) => {
         console.warn('[TrainingZone] run journal unavailable:', journalError);
         return null;

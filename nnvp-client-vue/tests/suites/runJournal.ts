@@ -243,3 +243,27 @@ logicTest('legacy explosion: ensureLegacyRunsExploded memoizes per store', async
   await first;
   expect((await listEventsByStream('run-legacy-1', store)).length).toBe(4);
 });
+
+logicTest('runJournal: startRun stamps hardware into run.started only when given', async ({ expect }) => {
+  const store = new MemoryRecordStore();
+  await startRun({ ...init, hardware: { cores: 8 } }, store);
+  await startRun(init, store);
+  const started = (await listAllEvents(store)).filter(e => e.type === 'run.started');
+  const payloads = started.map(e => e.payload as Record<string, unknown>);
+  expect(payloads.some(p => JSON.stringify(p.hardware) === '{"cores":8}')).toBe(true);
+  // The no-hardware run's payload must not gain the key (byte-stable payloads).
+  expect(payloads.some(p => !('hardware' in p))).toBe(true);
+});
+
+logicTest('runJournal: startRun stamps the lineage parent only when given', async ({ expect }) => {
+  const store = new MemoryRecordStore();
+  await startRun({ ...init, parent: 'parent-doc-hash' }, store);
+  await startRun({ ...init, parent: null }, store);
+  await startRun(init, store);
+  const payloads = (await listAllEvents(store))
+    .filter(e => e.type === 'run.started')
+    .map(e => e.payload as Record<string, unknown>);
+  expect(payloads.some(p => p.parent === 'parent-doc-hash')).toBe(true);
+  expect(payloads.some(p => 'parent' in p && p.parent === null)).toBe(true); // explicit root
+  expect(payloads.some(p => !('parent' in p))).toBe(true); // pre-G payload shape
+});

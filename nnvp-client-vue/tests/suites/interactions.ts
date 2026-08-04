@@ -74,6 +74,7 @@ e2eOnly(
     expect(fileMenuItems.length).toBeGreaterThan(0);
     expect(fileMenuItems).toContain('File');
     expect(fileMenuItems).toContain('Edit');
+    expect(fileMenuItems).toContain('Export'); // code generation menu (Phase G1)
     expect(fileMenuItems).toContain('Panels'); // Training lives under Panels now
     expect(fileMenuItems).toContain('Tutorial');
     // Settings and About left the menubar for the corner controls' gear and
@@ -118,14 +119,16 @@ e2eOnly(
     }
     // Try to find menu items
     const menuItemsText = await page.textContent('body');
-    const hasGenerate = menuItemsText!.includes('Generate');
+    // Code generation moved to its own Export menu (Phase G1): File keeps the
+    // document verbs, the targets live under Export with tidied labels.
+    const hasExportTarget = menuItemsText!.includes('Python (Keras)');
     const hasSave = menuItemsText!.includes('Save');
     const hasLoad = menuItemsText!.includes('Load');
-    console.log('Has Generate option:', hasGenerate);
+    console.log('Has Export target:', hasExportTarget);
     console.log('Has Save option:', hasSave);
     console.log('Has Load option:', hasLoad);
     expect(dropdownVisible).toBe(true);
-    expect(hasGenerate).toBe(true);
+    expect(hasExportTarget).toBe(true);
     expect(hasSave).toBe(true);
     expect(hasLoad).toBe(true);
     expect(consoleErrors.length).toBe(0);
@@ -303,5 +306,43 @@ e2eOnly(
     console.log('Beforeunload result with layers:', beforeunloadResult);
     expect(beforeunloadResult).toBe('Warning : all unsaved data will be lost');
     expect(consoleErrors.length).toBe(0);
+  },
+);
+
+e2eOnly(
+  'interactions: clicking another menu title while one is open switches to it',
+  'Real pointer semantics: the hover that precedes a click already switches the open menu, so only a browser mouse reproduces the hover-then-click toggle bug this pins.',
+  async ({ page, expect }) => {
+    await page.click('#GeneralMenu .menuTitle:has-text("File")');
+    await page.waitForTimeout(100);
+    expect(await page.isVisible('.menu.activated > .dropdown-content')).toBe(true);
+    // The regression this guards: this click used to toggle the freshly
+    // hover-opened Panels straight back closed — a dead click.
+    await page.click('#GeneralMenu .menuTitle:has-text("Panels")');
+    await page.waitForTimeout(100);
+    expect(await page.isVisible('.menu.activated > .dropdown-content')).toBe(true);
+    const openTitle = await page.textContent('.menu.activated .menuTitle');
+    expect(openTitle).toContain('Panels');
+    // A second deliberate click on the SAME title still closes.
+    await page.click('#GeneralMenu .menuTitle:has-text("Panels")');
+    await page.waitForTimeout(100);
+    expect(await page.isVisible('.menu.activated > .dropdown-content')).toBe(false);
+  },
+);
+
+e2eOnly(
+  'interactions: the icon-titled Debug menu opens and never wedges the menubar',
+  'The regression this pins: clicking the SVG bug icon made event.target an svg internal node, getMenuElement returned undefined and the thrown TypeError wedged menu state — only a real browser dispatches clicks to SVG internals.',
+  async ({ page, expect }) => {
+    // Dev server = dev build, so the Debug menu exists here.
+    await page.click('#GeneralMenu .menuTitle:has(svg)');
+    await page.waitForTimeout(100);
+    expect(await page.isVisible('.menu.activated > .dropdown-content')).toBe(true);
+    await page.click('#GeneralMenu .menuTitle:has(svg)'); // close it again
+    await page.waitForTimeout(100);
+    // The aftermath that mattered: the REST of the bar must still work.
+    await page.click('#GeneralMenu .menuTitle:has-text("File")');
+    await page.waitForTimeout(100);
+    expect(await page.isVisible('.menu.activated > .dropdown-content')).toBe(true);
   },
 );
