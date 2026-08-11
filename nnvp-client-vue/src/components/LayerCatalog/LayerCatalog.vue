@@ -18,7 +18,7 @@
     </div>
     <div class="catalog-scroll">
     <div
-      v-for="(layers, categoryName) in $kerasInterface.getCategories()"
+      v-for="(layers, categoryName) in orderedCategories"
       v-bind:key="(categoryName as any).id"
       v-bind:id="divId(categoryName)"
       class="layerCategory"
@@ -72,6 +72,11 @@
           <div class="layer-help-modal-body">
             <div v-html="helpHtml"></div>
           </div>
+          <div v-if="helpConceptTitle" class="layer-help-ask-row">
+            <button type="button" class="layer-help-ask" @click="openConceptFromHelp">
+              📖 Read the concept: {{ helpConceptTitle }}
+            </button>
+          </div>
           <div v-if="backendEnabled" class="layer-help-ask-row">
             <button type="button" class="layer-help-ask" @click="askInChat">
               💬 Ask the assistant about {{ helpLayerType || helpCategory }}
@@ -90,6 +95,8 @@ import LayerTemplate from './LayerTemplate.vue';
 import layerHelp from '../../lib/KerasInterface/layerHelp';
 import categoryHelp from '../../lib/KerasInterface/categoryHelp';
 import { askAssistant } from '../../lib/Assistant/askAssistant';
+import { conceptForCatalogTopic, getConcept } from '../../lib/Tutorial/concepts';
+import { bus } from '../../lib/Events/bus';
 import type KerasLayer from '../../lib/KerasInterface/KerasLayer';
 
 // import.meta.env is Vite-only (absent under bun/unit tests) — typed locally
@@ -107,6 +114,31 @@ export default defineComponent({
     LayerTemplate,
   },
   computed: {
+    /**
+     * The catalog's categories with "Input / Output" pinned first — every
+     * model starts there, so it must not sit buried in the generated JSON's
+     * order. A display choice made HERE: the KerasInterface data (and the
+     * assistant's view of it) keeps its natural order.
+     */
+    orderedCategories(): Record<string, Record<string, KerasLayer>> {
+      const categories = this.$kerasInterface.getCategories();
+      const ordered: Record<string, Record<string, KerasLayer>> = {};
+      const pinned = 'Input / Output';
+      if (categories[pinned]) ordered[pinned] = categories[pinned];
+      for (const [name, layers] of Object.entries(categories)) {
+        if (name !== pinned) ordered[name] = layers;
+      }
+      return ordered;
+    },
+    /** The Concepts-book article behind the open help topic, if one exists. */
+    helpConceptId(): string | null {
+      const topic = this.helpLayerType || this.helpCategory;
+      return topic ? conceptForCatalogTopic(topic) : null;
+    },
+    helpConceptTitle(): string | null {
+      const concept = this.helpConceptId ? getConcept(this.helpConceptId) : undefined;
+      return concept ? concept.title : null;
+    },
     helpHtml(): string {
       if (this.helpCategory) return categoryHelp[this.helpCategory] || '';
       if (!this.helpLayerType) return '';
@@ -127,6 +159,12 @@ export default defineComponent({
     closeHelp() {
       this.helpLayerType = null;
       this.helpCategory = null;
+    },
+    /** Hand the topic to the Concepts book (App hosts it) and step aside. */
+    openConceptFromHelp() {
+      if (!this.helpConceptId) return;
+      bus.emit('ui.open-concept', { id: this.helpConceptId });
+      this.closeHelp();
     },
     // Hand the topic over to the chat widget (which opens and seeds the
     // conversation) and get the modal out of its way.

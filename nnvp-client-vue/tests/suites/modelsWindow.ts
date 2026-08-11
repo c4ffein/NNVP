@@ -202,7 +202,7 @@ appTest('modelsWindow: recursive folders — navigate, save-as, hard links every
   await models.select(0);
   await models.favoriteSelected(); // ★ → a link in /favorites
   await models.openFiles();
-  expect(await models.filesText()).toContain('favorites/'); // a subfolder at root
+  expect(await models.filesText()).toContain('favorites'); // a subfolder at root
   // Build a NESTED path by navigating: /experiments/convnets.
   await models.newFolder('experiments');
   await models.openFolder('experiments');
@@ -224,8 +224,11 @@ appTest('modelsWindow: recursive folders — navigate, save-as, hard links every
   await models.openFolder('favorites');
   text = await models.filesText();
   expect(text).toContain('Input → Dense');
-  // Unlinking here leaves the convnets link untouched.
-  await models.fileUnlink(0);
+  // Deleting here (select → Delete → confirm) leaves the convnets link alone.
+  await models.selectEntry(0);
+  await models.deleteSelected();
+  expect(await models.filesText()).toContain('Delete 1 item'); // the modal asks first
+  await models.confirmDialog();
   expect(await models.filesText()).not.toContain('Input → Dense');
   const events = await records.list<{ uuid: string; type: string }>('events');
   expect(events.some(event => event.type === 'folder.linked')).toBe(true);
@@ -247,4 +250,64 @@ appTest('modelsWindow: the detail strip shows every folder holding the model; Fi
   expect(await board.layerCount()).toBe(0);
   await models.fileLoad(0); // the one board mutation, undoable as ever
   expect(await board.layerCount()).toBe(2);
+});
+
+appTest('modelsWindow: file-manager grammar — copy/cut/paste and rename re-point links', async ({ models, records, expect }) => {
+  await records.seed('events', [
+    checkpointEvent('cp-a', '2026-08-01T10:00:00.000Z', smallGraph(8), null),
+  ]);
+  await models.open();
+  await models.showGraph();
+  await models.select(0);
+  await models.favoriteSelected(); // a link in /favorites to work with
+  await models.openFiles();
+  await models.newFolder('projects');
+  // COPY: a paste is just another hard link.
+  await models.openFolder('favorites');
+  await models.selectEntry(0);
+  await models.copySelected();
+  await models.filesUp();
+  await models.openFolder('projects');
+  await models.paste();
+  expect(await models.filesText()).toContain('Input → Dense');
+  await models.filesUp();
+  await models.openFolder('favorites');
+  expect(await models.filesText()).toContain('Input → Dense'); // original survives a copy
+  // CUT: the move variant — the origin link goes.
+  await models.selectEntry(0);
+  await models.cutSelected();
+  await models.filesUp();
+  await models.openFolder('projects');
+  await models.paste(); // already linked here: harmless, but favorites empties
+  await models.filesUp();
+  // The cut emptied /favorites — and being link-implied (★ never emits
+  // folder.created), the folder itself rightly vanishes from the tree.
+  expect(await models.filesText()).not.toContain('favorites');
+  // RENAME: the folder moves, its links follow (reverse lookup agrees).
+  await models.selectFolder('projects');
+  await models.renameSelected('archive');
+  const text = await models.filesText();
+  expect(text).toContain('archive');
+  expect(text).not.toContain('projects');
+  await models.showGraph();
+  await models.select(0);
+  expect(await models.text()).toContain('in: /archive');
+});
+
+appTest('modelsWindow: Drive-style history — the arrows retrace your navigation', async ({ models, records, expect }) => {
+  await records.seed('events', [
+    checkpointEvent('cp-a', '2026-08-01T10:00:00.000Z', smallGraph(8), null),
+  ]);
+  await models.open();
+  await models.showGraph();
+  await models.select(0);
+  await models.favoriteSelected();
+  await models.openFiles();
+  await models.openFolder('favorites');
+  expect(await models.filesText()).toContain('Input → Dense'); // inside
+  await models.filesBack();
+  expect(await models.filesText()).not.toContain('Input → Dense'); // back at root
+  expect(await models.filesText()).toContain('favorites');
+  await models.filesForward();
+  expect(await models.filesText()).toContain('Input → Dense'); // forward again
 });

@@ -1,175 +1,41 @@
-// Tutorial registry + completion tracking.
+// Tutorial registry.
 //
 // One generic overlay component (TutorialOverlay) plays ANY tutorial listed
-// here; the tutorial menu lists them with a completion bar. Definitions are
-// declarative data — same step schema as mnistTutorial.ts — and progress is
-// persisted per tutorial id in localStorage, so the menu, the overlay and the
-// About modal all read one source of truth.
+// here; the tutorial menu lists them with completion bars, grouped by course.
+// Definitions are declarative data (steps + predicates from ./predicates,
+// chapters under ./course); progress persistence lives in ./progress and is
+// re-exported here so consumers keep one import surface.
 //
-// Like mnistTutorial.ts this module is Vue-agnostic and unit-testable: DOM and
+// Like the predicates this module is Vue-agnostic and unit-testable: DOM and
 // localStorage access is guarded, predicates never throw.
 
-import mnistSteps, { placedLayers, countLayersNamed, trainingPanelIsOpen } from './mnistTutorial';
-import type { TutorialBoard, TutorialStep } from './mnistTutorial';
+import type { TutorialStep } from './predicates';
+import { courseChapters } from './course';
 
 export interface TutorialDef {
   id: string;
   title: string;
   description: string;
   steps: TutorialStep[];
+  /** Course membership: chapters carry the course id and a 1-based order. */
+  course?: { id: string; order: number };
 }
 
-/** Edge count on the active graph, 0 when the editor is not ready. */
-export function placedEdgeCount($d3: TutorialBoard): number {
-  if (!$d3 || typeof $d3.getEdges !== 'function') return 0;
-  const edges = $d3.getEdges();
-  return Array.isArray(edges) ? edges.length : 0;
-}
+export {
+  readProgress,
+  markStepReached,
+  markCompleted,
+  completionRatio,
+  resetProgress,
+} from './progress';
+export type { TutorialProgress, TutorialProgressEntry } from './progress';
 
-/** Number of currently selected layers, 0 when the editor is not ready. */
-export function selectedLayerCount($d3: TutorialBoard): number {
-  const selected = $d3 && typeof $d3.getActiveElements === 'function' && $d3.getActiveElements();
-  return Array.isArray(selected) ? selected.length : 0;
-}
-
-export const tutorials: TutorialDef[] = [
-  {
-    id: 'mnist-cnn',
-    title: 'Build an MNIST CNN',
-    description: 'Place and configure the layers of a small convolutional network, step by step.',
-    steps: mnistSteps,
-  },
-  {
-    id: 'connect-layers',
-    title: 'Connect layers',
-    description: 'Add two layers and draw your first connection between them.',
-    steps: [
-      {
-        id: 'add-first-dense',
-        title: 'Add a Dense layer',
-        instruction: 'Click "Dense" in the left Layer Catalog to place a layer on the canvas.',
-        target: '#layer-template-Dense',
-        isComplete: $d3 => countLayersNamed($d3, 'Dense') >= 1,
-      },
-      {
-        id: 'add-second-dense',
-        title: 'Add another Dense layer',
-        instruction: 'Click "Dense" again — you need two layers to make a connection.',
-        target: '#layer-template-Dense',
-        isComplete: $d3 => countLayersNamed($d3, 'Dense') >= 2,
-      },
-      {
-        id: 'connect-them',
-        title: 'Connect the layers',
-        instruction:
-          'Hover a layer to reveal its connection dots, then drag from the right dot '
-          + 'of one layer onto the other layer.',
-        target: '#FlowBoard',
-        isComplete: $d3 => placedEdgeCount($d3) >= 1,
-      },
-    ],
-  },
-  {
-    id: 'explore-templates',
-    title: 'Explore a template',
-    description: 'Load a ready-made network, inspect a layer, and open the training zone.',
-    steps: [
-      {
-        id: 'load-template',
-        title: 'Load a template',
-        instruction: 'Open File > Templates in the top menu and pick any template.',
-        target: '#generalMenu',
-        isComplete: $d3 => placedLayers($d3).length >= 5,
-      },
-      {
-        id: 'inspect-layer',
-        title: 'Inspect a layer',
-        instruction: 'Click a layer on the canvas — its parameters appear in the right panel.',
-        target: '#layerOptions',
-        isComplete: $d3 => selectedLayerCount($d3) >= 1,
-      },
-      {
-        id: 'open-training',
-        title: 'Open the training zone',
-        instruction: 'Open "Training" in the top menu to see how you would train this network.',
-        target: '#generalMenu',
-        isComplete: () => trainingPanelIsOpen(),
-      },
-    ],
-  },
-];
+/** Every playable tutorial — today, the six chapters of the course. */
+export const tutorials: TutorialDef[] = [...courseChapters];
 
 /** Look up a tutorial definition by id. */
 export function getTutorial(id: string): TutorialDef | undefined {
   return tutorials.find(tutorial => tutorial.id === id);
-}
-
-// --- Progress persistence ----------------------------------------------------
-
-const STORAGE_KEY = 'nnvp-tutorial-progress';
-
-export interface TutorialProgressEntry {
-  furthestStep: number;
-  completed: boolean;
-}
-
-/** All stored progress, keyed by tutorial id. */
-export type TutorialProgress = Record<string, TutorialProgressEntry>;
-
-function storage(): Storage | null {
-  try {
-    if (typeof localStorage !== 'undefined') return localStorage;
-  } catch { /* SSR / privacy mode */ }
-  return null;
-}
-
-/** All stored progress: { [tutorialId]: { furthestStep, completed } }. */
-export function readProgress(): TutorialProgress {
-  const store = storage();
-  if (!store) return {};
-  try {
-    return JSON.parse(store.getItem(STORAGE_KEY)!) || {};
-  } catch {
-    return {};
-  }
-}
-
-function writeProgress(all: TutorialProgress): void {
-  const store = storage();
-  if (!store) return;
-  try {
-    store.setItem(STORAGE_KEY, JSON.stringify(all));
-  } catch { /* quota / privacy mode */ }
-}
-
-/** Record that `stepIndex` of a tutorial was reached (monotonic). */
-export function markStepReached(tutorialId: string, stepIndex: number): void {
-  const all = readProgress();
-  const entry = all[tutorialId] || { furthestStep: 0, completed: false };
-  entry.furthestStep = Math.max(entry.furthestStep, stepIndex);
-  all[tutorialId] = entry;
-  writeProgress(all);
-}
-
-/** Record that a tutorial was finished. */
-export function markCompleted(tutorialId: string): void {
-  const all = readProgress();
-  const entry = all[tutorialId] || { furthestStep: 0, completed: false };
-  entry.completed = true;
-  all[tutorialId] = entry;
-  writeProgress(all);
-}
-
-/**
- * Completion ratio in [0, 1] for the menu's progress bars: 1 when finished,
- * otherwise the fraction of steps reached so far.
- */
-export function completionRatio(tutorial: TutorialDef, progress: TutorialProgress = readProgress()): number {
-  const entry = progress[tutorial.id];
-  if (!entry) return 0;
-  if (entry.completed) return 1;
-  if (!tutorial.steps.length) return 0;
-  return Math.min(entry.furthestStep / tutorial.steps.length, 1);
 }
 
 export default tutorials;

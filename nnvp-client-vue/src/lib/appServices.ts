@@ -12,12 +12,15 @@ import { installSyncOnAuth } from './Backend/sync';
 import type { AuthedSyncApiClient } from './Backend/sync';
 import { getRecordStore } from './LocalStore/db';
 import type { RecordStore } from './LocalStore/recordStore';
+import { installSessionSignals } from './Tutorial/sessionSignals';
 
 /**
- * Local↔cloud sync (events, conversations): syncs now when a token is
- * already stored, and again on every 'auth.changed' bus event. Progressive
- * enhancement — failures only warn, and logged-out is a no-op. Returns the
- * uninstaller.
+ * - Local↔cloud sync (events, conversations): syncs now when a token is
+ *   already stored, and again on every 'auth.changed' bus event. Progressive
+ *   enhancement — failures only warn, and logged-out is a no-op.
+ * - Tutorial session signals: the sync-readable cache of this session's
+ *   run/checkpoint events that course-step predicates poll.
+ * Returns the composed uninstaller.
  */
 export function installAppServices({
   apiClient = new ApiClient(),
@@ -26,5 +29,10 @@ export function installAppServices({
   apiClient?: AuthedSyncApiClient;
   store?: RecordStore;
 } = {}): () => void {
-  return installSyncOnAuth({ apiClient, store });
+  const uninstallSync = installSyncOnAuth({ apiClient, store });
+  const uninstallSignals = installSessionSignals();
+  return () => {
+    uninstallSignals();
+    uninstallSync();
+  };
 }

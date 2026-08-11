@@ -636,12 +636,20 @@ export function makeBrowserWorld(
       await settle();
     },
     async openFolder(name) {
-      await page.locator('#modelsWindow .files-subfolder')
-        .filter({ hasText: `${name}/` }).first().click();
+      await page.locator(`#modelsWindow .files-subfolder:has(.files-subfolder-name:text-is("${name}"))`)
+        .first().dblclick();
       await settle();
     },
     async filesUp() {
-      await page.click('#modelsWindow .files-up');
+      await page.locator('#modelsWindow .files-crumb').nth(-2).click();
+      await settle();
+    },
+    async filesBack() {
+      await page.click('#modelsWindow .files-back');
+      await settle();
+    },
+    async filesForward() {
+      await page.click('#modelsWindow .files-forward');
       await settle();
     },
     async favoriteSelected() {
@@ -661,8 +669,39 @@ export function makeBrowserWorld(
       await page.locator('#modelsWindow .files-entry-load').nth(index).click();
       await settle();
     },
-    async fileUnlink(index) {
-      await page.locator('#modelsWindow .files-entry-remove').nth(index).click();
+    async selectEntry(index) {
+      await page.locator('#modelsWindow .files-entry').nth(index).click();
+      await settle();
+    },
+    async selectFolder(name) {
+      await page.locator(`#modelsWindow .files-subfolder:has(.files-subfolder-name:text-is("${name}"))`)
+        .first().click();
+      await settle();
+    },
+    async deleteSelected() {
+      await page.click('#modelsWindow .files-delete');
+      await settle();
+    },
+    async confirmDialog() {
+      await page.click('#modelsWindow .files-dialog-confirm');
+      await settle();
+    },
+    async renameSelected(newName) {
+      await page.click('#modelsWindow .files-rename');
+      await page.fill('#modelsWindow .files-dialog-input', newName);
+      await page.click('#modelsWindow .files-dialog-confirm');
+      await settle();
+    },
+    async cutSelected() {
+      await page.click('#modelsWindow .files-cut');
+      await settle();
+    },
+    async copySelected() {
+      await page.click('#modelsWindow .files-copy');
+      await settle();
+    },
+    async paste() {
+      await page.click('#modelsWindow .files-paste');
       await settle();
     },
   };

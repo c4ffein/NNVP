@@ -18,10 +18,18 @@ describe('vue single-file components under bun', () => {
   });
 
   it('mounts TutorialMenu and emits start on item click', async () => {
+    // Seed a started course so the book card is undimmed and emits directly
+    // (the fresh-user interstitial is covered by the e2e suite).
+    localStorage.setItem('nnvp-tutorial-progress',
+      JSON.stringify({ welcome: { furthestStep: 1, completed: false } }));
     const wrapper = mount(TutorialMenu, { props: { show: true } });
-    const items = wrapper.findAll('.tutorial-menu-item');
-    expect(items.length).toBeGreaterThan(0);
-    await items[0]!.trigger('click');
+    // The first .tutorial-menu-item is the Concepts-book card; chapters follow.
+    const chapters = wrapper.findAll('.tutorial-menu-item:not(.concepts-book-link)');
+    expect(chapters.length).toBeGreaterThan(0);
+    await chapters[0]!.trigger('click');
     expect(wrapper.emitted('start')).toBeTruthy();
+    await wrapper.find('.concepts-book-link').trigger('click');
+    expect(wrapper.emitted('open-concepts')).toBeTruthy();
+    localStorage.removeItem('nnvp-tutorial-progress');
   });
 });

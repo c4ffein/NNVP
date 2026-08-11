@@ -7,6 +7,7 @@
 // tool-use loop can surface friendly errors instead of throwing opaquely.
 
 import { tutorials } from '../Tutorial/tutorials';
+import { concepts, getConcept as getConceptDef } from '../Tutorial/concepts';
 import { bus } from '../Events/bus';
 import layerHelp from '../KerasInterface/layerHelp';
 import categoryHelp from '../KerasInterface/categoryHelp';
@@ -244,8 +245,47 @@ export default class AssistantActions {
       id: tutorial.id,
       title: tutorial.title,
       description: tutorial.description,
+      course: tutorial.course ?? null,
       steps: tutorial.steps.map(step => step.title),
     }));
+  }
+
+  // The Concepts book: the app's built-in visual theory articles.
+  listConcepts() {
+    return concepts.map(concept => ({
+      id: concept.id,
+      title: concept.title,
+      part: concept.part,
+      hook: concept.hook,
+    }));
+  }
+
+  // One article as plain text (figures are SVG and don't survive the trip —
+  // the description says so, and open_concept shows the real thing).
+  getConcept(conceptId: string) {
+    const concept = getConceptDef(conceptId);
+    if (!concept) {
+      const available = concepts.map(entry => entry.id).join(', ');
+      throw new Error(`Unknown concept "${conceptId}". Available ids: ${available}.`);
+    }
+    return {
+      id: concept.id,
+      title: concept.title,
+      part: concept.part,
+      text: htmlToText(concept.body),
+    };
+  }
+
+  // Open the Concepts book at an article in the UI (same event-bridge
+  // pattern as startTutorial). Navigation, not a graph mutation.
+  openConcept(conceptId: string) {
+    const concept = getConceptDef(conceptId);
+    if (!concept) {
+      const available = concepts.map(entry => entry.id).join(', ');
+      throw new Error(`Unknown concept "${conceptId}". Available ids: ${available}.`);
+    }
+    bus.emit('ui.open-concept', { id: conceptId });
+    return { opened: conceptId, title: concept.title };
   }
 
   // Start (or switch to) a guided tutorial. Tutorial state lives in App.vue,

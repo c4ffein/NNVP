@@ -29,6 +29,8 @@ export interface AppEvents {
   'ui.start-tutorial': { id: string };
   /** The assistant opens the Training window (App.vue owns its height). */
   'ui.open-training': void;
+  /** Open the Concepts book at an article (help modals, assistant). */
+  'ui.open-concept': { id: string };
   /** A help modal hands the user over to the chat ("Ask the assistant about X"). */
   'ui.ask-assistant': { topic: string };
   /** A training run opened: engine, config snapshot, graph JSON (stream = run uuid). */
@@ -65,6 +67,7 @@ export const EVENT_RETENTION: { readonly [K in AppEventType]: Retention } = {
   'auth.changed': 'ephemeral',
   'ui.start-tutorial': 'ephemeral',
   'ui.open-training': 'ephemeral',
+  'ui.open-concept': 'ephemeral',
   'ui.ask-assistant': 'ephemeral',
   'run.started': 'stored',
   'run.epoch': 'stored',

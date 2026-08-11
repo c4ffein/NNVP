@@ -269,6 +269,33 @@ export function buildTools(): AnthropicTool[] {
       },
     },
     {
+      name: 'list_concepts',
+      description: "List the Concepts book's articles (id, title, part, hook) — the app's built-in visual theory book on how neural networks work. Read one with get_concept; show one to the user with open_concept.",
+      input_schema: { type: 'object', properties: {} },
+    },
+    {
+      name: 'get_concept',
+      description: 'One Concepts-book article as plain text (its SVG figures are omitted — use open_concept to show the user the real, illustrated page).',
+      input_schema: {
+        type: 'object',
+        properties: {
+          concept_id: { type: 'string', description: 'A concept id from list_concepts.' },
+        },
+        required: ['concept_id'],
+      },
+    },
+    {
+      name: 'open_concept',
+      description: 'Open the Concepts book at an article in the app, illustrations and all. Navigation only — works in read-only mode.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          concept_id: { type: 'string', description: 'A concept id from list_concepts.' },
+        },
+        required: ['concept_id'],
+      },
+    },
+    {
       name: 'open_training_panel',
       description: 'Open the in-browser Training panel (TensorFlow.js): dataset picker (MNIST, FashionMNIST, CIFAR-10), compile options and live charts. Navigation only — works in read-only mode.',
       input_schema: { type: 'object', properties: {} },
@@ -312,6 +339,9 @@ const TOOL_DISPATCH: Record<string, ToolHandler> = {
   load_template: (actions, input) => actions.loadTemplate(input.name),
   list_tutorials: (actions) => actions.listTutorials(),
   start_tutorial: (actions, input) => actions.startTutorial(input.tutorial_id),
+  list_concepts: (actions) => actions.listConcepts(),
+  get_concept: (actions, input) => actions.getConcept(input.concept_id),
+  open_concept: (actions, input) => actions.openConcept(input.concept_id),
   open_training_panel: (actions) => actions.openTrainingPanel(),
   get_layer_help: (actions, input) => actions.getLayerHelp(input.name),
 };

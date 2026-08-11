@@ -256,6 +256,14 @@ export default defineComponent({
               const { removeSeededHistory } = await import('../lib/Debug/monthOfUse');
               window.alert(`Debug seed: removed ${await removeSeededHistory()} events.`);
             },
+            'Reset tutorial progress': async () => {
+              const { resetProgress } = await import('../lib/Tutorial/progress');
+              const { resetConceptReads } = await import('../lib/Tutorial/concepts/readState');
+              resetProgress();
+              resetConceptReads();
+              window.alert('Tutorial progress and Concepts read marks cleared — '
+                + 'the course and the book are back to a fresh-user state.');
+            },
           },
         } : {}),
       };

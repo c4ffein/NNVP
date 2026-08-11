@@ -266,8 +266,11 @@ export interface ModelsDriver {
   newFolder(name: string): Promise<void>;
   /** Click into a subfolder of the current Files location. */
   openFolder(name: string): Promise<void>;
-  /** Navigate up one level ('..'). */
+  /** Navigate to the parent (clicks the parent breadcrumb, Drive-style). */
   filesUp(): Promise<void>;
+  /** The ← / → history arrows. */
+  filesBack(): Promise<void>;
+  filesForward(): Promise<void>;
   /** Toggle ★ /favorites for the SELECTED state (detail strip). */
   favoriteSelected(): Promise<void>;
   /** Start the Save-As flow for the SELECTED state (opens Files saving). */
@@ -276,8 +279,20 @@ export interface ModelsDriver {
   saveHere(): Promise<void>;
   /** Click Load on the nth Files entry (the one board mutation). */
   fileLoad(index: number): Promise<void>;
-  /** Remove the nth Files entry's link. */
-  fileUnlink(index: number): Promise<void>;
+  /** Toggle selection of the nth model entry (file-manager grammar). */
+  selectEntry(index: number): Promise<void>;
+  /** Toggle selection of a subfolder by name. */
+  selectFolder(name: string): Promise<void>;
+  /** Click Delete in the selection bar (opens the confirmation dialog). */
+  deleteSelected(): Promise<void>;
+  /** Confirm the open dialog (delete or rename). */
+  confirmDialog(): Promise<void>;
+  /** Open Rename for the single selected folder and type the new name. */
+  renameSelected(newName: string): Promise<void>;
+  /** Cut / copy the selected entries; paste into the current folder. */
+  cutSelected(): Promise<void>;
+  copySelected(): Promise<void>;
+  paste(): Promise<void>;
 }
 
 /** What the fake backend holds, full records per kind (lists serve uuid

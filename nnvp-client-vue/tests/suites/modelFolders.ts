@@ -6,7 +6,9 @@
  * resolve by causal order like hide/unhide.
  */
 import { logicTest } from '../harness/define';
-import { foldFolders, normalizePath } from '../../src/lib/Training/modelFolders';
+import {
+  foldFolders, normalizePath, planDelete, planRenameFolder,
+} from '../../src/lib/Training/modelFolders';
 import type { DomainEvent } from '../../src/lib/Events/domainEvent';
 
 let counter = 0;
@@ -80,4 +82,46 @@ logicTest('modelFolders: duplicate delivery and garbage never poison the fold', 
   ]);
   expect(tree.contents.get('/a')).toEqual(['m']);
   expect(tree.contents.get('/no-slash-gets-normalized')).toEqual(['x']);
+});
+
+logicTest('modelFolders: planDelete gathers a subtree — every link, every folder, deepest first', ({ expect }) => {
+  const tree = foldFolders([
+    folderEvent('folder.created', { path: '/a' }),
+    folderEvent('folder.created', { path: '/a/b' }),
+    folderEvent('folder.linked', { path: '/a', workHash: 'm1' }),
+    folderEvent('folder.linked', { path: '/a/b', workHash: 'm2' }),
+    folderEvent('folder.linked', { path: '/keep', workHash: 'm3' }),
+  ]);
+  const plan = planDelete(tree, ['/a'], [{ path: '/keep', workHash: 'm3' }]);
+  expect(plan.unlinks).toContainEqual({ path: '/a', workHash: 'm1' });
+  expect(plan.unlinks).toContainEqual({ path: '/a/b', workHash: 'm2' });
+  expect(plan.unlinks).toContainEqual({ path: '/keep', workHash: 'm3' }); // selected link
+  expect(plan.unlinks.length).toBe(3);
+  expect(plan.removes).toEqual(['/a/b', '/a']); // children before parents
+  // '/keep' the FOLDER survives — only its selected link goes.
+  expect(plan.removes).not.toContain('/keep');
+});
+
+logicTest('modelFolders: planRenameFolder re-points every descendant path and link', ({ expect }) => {
+  const tree = foldFolders([
+    folderEvent('folder.created', { path: '/old' }),
+    folderEvent('folder.created', { path: '/old/deep' }),
+    folderEvent('folder.linked', { path: '/old/deep', workHash: 'm' }),
+  ]);
+  const plan = planRenameFolder(tree, '/old', 'new')!;
+  expect([...plan.creates].sort()).toEqual(['/new', '/new/deep']);
+  expect(plan.links).toEqual([{ path: '/new/deep', workHash: 'm' }]);
+  expect(plan.unlinks).toEqual([{ path: '/old/deep', workHash: 'm' }]);
+  expect([...plan.removes].sort()).toEqual(['/old', '/old/deep']);
+});
+
+logicTest('modelFolders: planRenameFolder refuses collisions and bad names', ({ expect }) => {
+  const tree = foldFolders([
+    folderEvent('folder.created', { path: '/a' }),
+    folderEvent('folder.created', { path: '/b' }),
+  ]);
+  expect(planRenameFolder(tree, '/a', 'b')).toBeNull(); // '/b' already exists
+  expect(planRenameFolder(tree, '/a', 'x/y')).toBeNull(); // one segment only
+  expect(planRenameFolder(tree, '/a', '')).toBeNull();
+  expect(planRenameFolder(tree, '/a', 'a')).toBeNull(); // no-op rename
 });

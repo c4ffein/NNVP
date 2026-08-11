@@ -81,14 +81,30 @@
           >Save here</button>
           <button type="button" class="files-save-cancel" @click="savingHash = null">cancel</button>
         </div>
-        <!-- The breadcrumb: every ancestor is one click away. -->
-        <p class="files-crumbs">
-          <button type="button" class="files-crumb" @click="filesPath = '/'">/</button>
-          <template v-for="crumb in crumbs" :key="crumb.path">
-            <button type="button" class="files-crumb" @click="filesPath = crumb.path">{{
-              crumb.name }}</button><span class="files-crumb-sep">/</span>
-          </template>
-        </p>
+        <!-- Drive-style navigation: back/forward history + the breadcrumb. -->
+        <div class="files-nav">
+          <button
+            type="button"
+            class="files-back"
+            title="Back"
+            :disabled="!filesHistory.back.length"
+            @click="filesBack"
+          >←</button>
+          <button
+            type="button"
+            class="files-forward"
+            title="Forward"
+            :disabled="!filesHistory.forward.length"
+            @click="filesForward"
+          >→</button>
+          <p class="files-crumbs">
+            <button type="button" class="files-crumb" @click="navigateTo('/')">/</button>
+            <template v-for="crumb in crumbs" :key="crumb.path">
+              <button type="button" class="files-crumb" @click="navigateTo(crumb.path)">{{
+                crumb.name }}</button><span class="files-crumb-sep">/</span>
+            </template>
+          </p>
+        </div>
         <div class="files-new">
           <input
             class="files-new-input"
@@ -97,40 +113,107 @@
             @keyup.enter="createFolderFromInput"
           />
           <button type="button" class="files-new-btn" @click="createFolderFromInput">New folder</button>
+          <button
+            v-if="clipboard"
+            type="button"
+            class="files-paste"
+            :disabled="filesPath === '/'"
+            :title="filesPath === '/' ? 'Enter a folder first' : ''"
+            @click="paste"
+          >Paste ({{ clipboard.items.length }}{{ clipboard.mode === 'cut' ? ', move' : '' }})</button>
         </div>
         <ul class="files-list">
-          <li v-if="filesPath !== '/'" class="files-subfolder files-up" @click="goUp">
-            <span class="files-subfolder-name">..</span>
-          </li>
           <li
             v-for="name in subfolders"
             :key="name"
             class="files-subfolder"
-            @click="enterFolder(name)"
+            :class="{ selected: selFolders.includes(name) }"
+            @click="toggleFolderSelect(name)"
+            @dblclick="enterFolder(name)"
           >
-            <span class="files-subfolder-name">{{ name }}/</span>
-            <button
-              v-if="folderRemovable(name)"
-              type="button"
-              class="files-folder-remove"
-              title="Remove empty folder"
-              @click.stop="removeFolderAt(childPath(name))"
-            >×</button>
+            <svg class="files-folder-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path
+                d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4l2 2.5h9A1.5 1.5 0 0 1 21 9v8.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"
+                fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"
+              />
+            </svg>
+            <span class="files-subfolder-name">{{ name }}</span>
           </li>
-          <li v-for="hash in currentEntries" :key="hash" class="files-entry">
+          <li
+            v-for="hash in currentEntries"
+            :key="hash"
+            class="files-entry"
+            :class="{ selected: selEntries.includes(hash) }"
+            @click="toggleEntrySelect(hash)"
+          >
+            <!-- The model's architecture IS its file icon (Drive-style). -->
+            <svg
+              v-if="entryThumb(hash)"
+              class="files-entry-thumb"
+              :viewBox="`${entryThumb(hash)!.viewBox.x} ${entryThumb(hash)!.viewBox.y} ${entryThumb(hash)!.viewBox.width} ${entryThumb(hash)!.viewBox.height}`"
+              preserveAspectRatio="xMidYMid meet"
+            >
+              <line
+                v-for="(line, i) in entryThumb(hash)!.lines"
+                :key="'fl' + i"
+                :x1="line.x1" :y1="line.y1" :x2="line.x2" :y2="line.y2"
+              />
+              <rect
+                v-for="(box, i) in entryThumb(hash)!.boxes"
+                :key="'fb' + i"
+                :x="box.x" :y="box.y" :width="box.width" :height="box.height" rx="10"
+              />
+            </svg>
             <span class="files-entry-label">
               {{ labelOfHash(hash) }}
               <span v-if="ratingLine(hash)" class="files-entry-score"> · {{ ratingLine(hash) }}</span>
             </span>
-            <button type="button" class="files-entry-load" @click="loadHash(hash)">Load</button>
-            <button
-              type="button"
-              class="files-entry-remove"
-              title="Remove this link (the model keeps its other links)"
-              @click="unlinkAt(filesPath, hash)"
-            >×</button>
+            <button type="button" class="files-entry-load" @click.stop="loadHash(hash)">Load</button>
           </li>
         </ul>
+        <!-- The selection toolbar: appears only when something is picked. -->
+        <div v-if="selFolders.length || selEntries.length" class="files-selection-bar">
+          <span class="files-selection-count">{{ selFolders.length + selEntries.length }} selected</span>
+          <button v-if="selEntries.length" type="button" class="files-cut" @click="cutSelection">Cut</button>
+          <button v-if="selEntries.length" type="button" class="files-copy" @click="copySelection">Copy</button>
+          <button
+            v-if="selFolders.length === 1 && !selEntries.length"
+            type="button"
+            class="files-rename"
+            @click="requestRename"
+          >Rename</button>
+          <button type="button" class="files-delete" @click="dialog = { kind: 'delete' }">Delete</button>
+          <button type="button" class="files-clear" @click="clearSelection">Clear</button>
+        </div>
+        <!-- The confirmation / rename dialog: destructive ops always ask. -->
+        <div v-if="dialog" class="files-dialog-backdrop">
+          <div class="files-dialog">
+            <template v-if="dialog.kind === 'delete'">
+              <p class="files-dialog-text">
+                Delete {{ selFolders.length + selEntries.length }} item{{
+                  selFolders.length + selEntries.length === 1 ? '' : 's' }}?
+                Folders delete recursively; model links are removed — the
+                models themselves stay in history.
+              </p>
+              <div class="files-dialog-actions">
+                <button type="button" class="files-dialog-confirm" @click="confirmDialog">Delete</button>
+                <button type="button" class="files-dialog-cancel" @click="dialog = null">Cancel</button>
+              </div>
+            </template>
+            <template v-else>
+              <p class="files-dialog-text">Rename “{{ selFolders[0] }}” to:</p>
+              <input
+                class="files-dialog-input"
+                v-model="dialog.value"
+                @keyup.enter="confirmDialog"
+              />
+              <div class="files-dialog-actions">
+                <button type="button" class="files-dialog-confirm" @click="confirmDialog">Rename</button>
+                <button type="button" class="files-dialog-cancel" @click="dialog = null">Cancel</button>
+              </div>
+            </template>
+          </div>
+        </div>
         <p v-if="!subfolders.length && !currentEntries.length" class="files-folder-empty">
           {{ filesPath === '/' ? 'No folders yet — create one above, or ★ a model.' : 'empty' }}
         </p>
@@ -391,7 +474,8 @@ import { formatWhen, inRange, pickSeen } from '../../lib/Training/modelsView';
 import type { SeenMode, SeenRange, WhenMode } from '../../lib/Training/modelsView';
 import { appendRating, foldRatings } from '../../lib/Training/modelRatings';
 import {
-  FAVORITES_PATH, createFolder, foldFolders, linkModel, removeFolder, unlinkModel,
+  FAVORITES_PATH, applyPlan, createFolder, foldFolders, linkModel, planDelete,
+  planRenameFolder, unlinkModel,
 } from '../../lib/Training/modelFolders';
 import type { FolderTree } from '../../lib/Training/modelFolders';
 import type { RatingTable } from '../../lib/Training/modelRatings';
@@ -462,8 +546,17 @@ export default defineComponent({
       newFolderPath: '',
       /** Where the Files browser stands ('/' = root, holds no links). */
       filesPath: '/',
+      /** Browser-style navigation history (the ← → arrows). */
+      filesHistory: { back: [] as string[], forward: [] as string[] },
       /** The network being saved (Save-As mode); null = just browsing. */
       savingHash: null as string | null,
+      /** Multi-selection in the current folder (file-manager grammar). */
+      selEntries: [] as string[],
+      selFolders: [] as string[],
+      /** Cut/copy clipboard — UI state only, never persisted. */
+      clipboard: null as { mode: 'copy' | 'cut'; items: { path: string; workHash: string }[] } | null,
+      /** The confirmation/rename dialog; destructive ops always ask. */
+      dialog: null as { kind: 'delete' } | { kind: 'rename'; value: string } | null,
     };
   },
   mounted() {
@@ -922,19 +1015,102 @@ export default defineComponent({
     childPath(name: string): string {
       return this.filesPath === '/' ? `/${name}` : `${this.filesPath}/${name}`;
     },
+    /** Every navigation goes through here — it feeds the ← → history. */
+    navigateTo(path: string): void {
+      if (path === this.filesPath) return;
+      this.filesHistory.back.push(this.filesPath);
+      this.filesHistory.forward = [];
+      this.filesPath = path;
+      this.clearSelection();
+    },
+    filesBack(): void {
+      const previous = this.filesHistory.back.pop();
+      if (previous === undefined) return;
+      this.filesHistory.forward.push(this.filesPath);
+      this.filesPath = previous;
+      this.clearSelection();
+    },
+    filesForward(): void {
+      const next = this.filesHistory.forward.pop();
+      if (next === undefined) return;
+      this.filesHistory.back.push(this.filesPath);
+      this.filesPath = next;
+      this.clearSelection();
+    },
     enterFolder(name: string): void {
-      this.filesPath = this.childPath(name);
+      this.navigateTo(this.childPath(name));
     },
-    goUp(): void {
-      const segments = this.filesPath.split('/').filter(Boolean);
-      segments.pop();
-      this.filesPath = segments.length ? `/${segments.join('/')}` : '/';
+    /** The model's architecture as its file icon. */
+    entryThumb(workHash: string): PreviewLayout | null {
+      const node = this.workGroups.get(workHash);
+      return node ? previewLayout(node.graphJson) : null;
     },
-    /** A subfolder is removable only when nothing lives at or below it. */
-    folderRemovable(name: string): boolean {
-      const full = this.childPath(name);
-      const hasDescendants = this.folderTree.folders.some(folder => folder.startsWith(`${full}/`));
-      return !hasDescendants && (this.folderTree.contents.get(full) ?? []).length === 0;
+    toggleEntrySelect(workHash: string): void {
+      const at = this.selEntries.indexOf(workHash);
+      if (at === -1) this.selEntries.push(workHash);
+      else this.selEntries.splice(at, 1);
+    },
+    toggleFolderSelect(name: string): void {
+      const at = this.selFolders.indexOf(name);
+      if (at === -1) this.selFolders.push(name);
+      else this.selFolders.splice(at, 1);
+    },
+    clearSelection(): void {
+      this.selEntries = [];
+      this.selFolders = [];
+      this.dialog = null;
+    },
+    requestRename(): void {
+      if (this.selFolders.length === 1) {
+        this.dialog = { kind: 'rename', value: this.selFolders[0]! };
+      }
+    },
+    async confirmDialog(): Promise<void> {
+      const dialog = this.dialog;
+      if (!dialog) return;
+      if (dialog.kind === 'delete') {
+        const plan = planDelete(
+          this.folderTree,
+          this.selFolders.map(name => this.childPath(name)),
+          this.selEntries.map(workHash => ({ path: this.filesPath, workHash })),
+        );
+        await applyPlan(plan);
+      } else {
+        const plan = planRenameFolder(
+          this.folderTree, this.childPath(this.selFolders[0]!), dialog.value,
+        );
+        if (plan === null) return; // invalid/collision: the dialog stays open
+        await applyPlan(plan);
+      }
+      this.clearSelection();
+      await this.loadFolders();
+    },
+    cutSelection(): void {
+      this.clipboard = {
+        mode: 'cut',
+        items: this.selEntries.map(workHash => ({ path: this.filesPath, workHash })),
+      };
+      this.clearSelection();
+    },
+    copySelection(): void {
+      this.clipboard = {
+        mode: 'copy',
+        items: this.selEntries.map(workHash => ({ path: this.filesPath, workHash })),
+      };
+      this.clearSelection();
+    },
+    /** Paste = link here (copy IS a hard link); cut also unlinks the origin. */
+    async paste(): Promise<void> {
+      const clipboard = this.clipboard;
+      if (!clipboard || this.filesPath === '/') return;
+      for (const item of clipboard.items) {
+        await linkModel(this.filesPath, item.workHash);
+        if (clipboard.mode === 'cut' && item.path !== this.filesPath) {
+          await unlinkModel(item.path, item.workHash);
+        }
+      }
+      if (clipboard.mode === 'cut') this.clipboard = null;
+      await this.loadFolders();
     },
     async createFolderFromInput(): Promise<void> {
       const name = this.newFolderPath.trim();
@@ -943,14 +1119,6 @@ export default defineComponent({
         this.newFolderPath = '';
         await this.loadFolders();
       }
-    },
-    async removeFolderAt(path: string): Promise<void> {
-      await removeFolder(path);
-      await this.loadFolders();
-    },
-    async unlinkAt(path: string, workHash: string): Promise<void> {
-      await unlinkModel(path, workHash);
-      await this.loadFolders();
     },
     async toggleFavorite(): Promise<void> {
       const node = this.selectedNode;
@@ -1424,7 +1592,32 @@ export default defineComponent({
   cursor: pointer;
 }
 .files-save-here:disabled { color: var(--text-muted); cursor: default; }
-.files-crumbs { margin: 0 0 8px; display: flex; align-items: center; gap: 2px; }
+.files-nav { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.files-back, .files-forward {
+  font: inherit;
+  font-size: 13px;
+  width: 26px;
+  height: 24px;
+  border: 1px solid var(--panel-border);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  line-height: 1;
+}
+.files-back:disabled, .files-forward:disabled { color: var(--text-muted); cursor: default; }
+.files-crumbs { margin: 0; display: flex; align-items: center; gap: 2px; }
+.files-folder-icon { color: var(--text-muted); flex: 0 0 auto; }
+.files-entry-thumb {
+  width: 46px;
+  height: 26px;
+  flex: 0 0 auto;
+  background: var(--bg-hover);
+  border-radius: 4px;
+  padding: 2px;
+}
+.files-entry-thumb line { stroke: var(--text-muted); stroke-width: 5; }
+.files-entry-thumb rect { fill: var(--bg-elevated); stroke: var(--text-muted); stroke-width: 4; }
 .files-crumb {
   border: none;
   background: none;
@@ -1459,6 +1652,86 @@ export default defineComponent({
   cursor: pointer;
 }
 .models-save-to:hover { color: var(--text-primary); background: var(--bg-hover); }
+.files-selection-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 4px 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: var(--bg-hover);
+}
+.files-selection-count { color: var(--text-muted); font-size: 12px; }
+.files-selection-bar button {
+  font: inherit;
+  font-size: 12px;
+  padding: 2px 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.files-delete { color: #b91c1c; }
+.files-subfolder.selected, .files-entry.selected {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border-radius: 4px;
+}
+.files-entry { cursor: pointer; }
+.files-paste {
+  font: inherit;
+  font-size: 12px;
+  padding: 2px 10px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+}
+.files-paste:disabled { border-color: var(--panel-border); color: var(--text-muted); cursor: default; }
+.files-dialog-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  background: color-mix(in srgb, var(--bg-elevated) 60%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.files-dialog {
+  background: var(--bg-elevated);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  padding: 16px 20px;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.files-dialog-text { margin: 0; }
+.files-dialog-input {
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-primary);
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  padding: 3px 6px;
+}
+.files-dialog-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.files-dialog-actions button {
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.files-dialog-confirm { color: #b91c1c; }
 /* Detail-strip folder controls. */
 .models-fav {
   border: none;

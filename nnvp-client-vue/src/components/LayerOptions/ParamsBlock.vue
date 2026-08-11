@@ -224,7 +224,11 @@ export default defineComponent({
   max-width: 600px;
   width: 90%;
   max-height: 85vh;
-  overflow-y: auto;
+  /* The body scrolls; the action rows below it stay pinned (the same
+     pinned-chrome anatomy as the tutorial menu and the Concepts book). */
+  overflow-y: hidden;
+  display: flex;
+  flex-direction: column;
   box-shadow: var(--panel-shadow);
   position: relative;
   padding: 32px;
@@ -233,6 +237,12 @@ export default defineComponent({
   color: var(--text-primary);
   line-height: 1.6;
   text-align: left;
+}
+
+.layer-help-modal-body {
+  overflow-y: auto;
+  min-height: 0;
+  overscroll-behavior: contain;
 }
 
 /* Same round close button as the window titlebars. */

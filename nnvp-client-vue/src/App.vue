@@ -38,13 +38,14 @@
   <Viz3DWindow v-if="showViz3D" @close="showViz3D = false" @open-settings="openAccount('settings')"/>
   <ModelsWindow v-if="showModels" @close="showModels = false"/>
   <AboutModal :show="showAboutModal" @close="showAboutModal = false" @open-tutorials="openTutorialsFromAbout"/>
-  <TutorialMenu :show="showTutorialMenu" @close="showTutorialMenu = false" @start="startTutorial"/>
+  <TutorialMenu :show="showTutorialMenu" @close="showTutorialMenu = false" @start="startTutorial" @open-concepts="openConceptsFromMenu"/>
+  <ConceptBook :show="showConcepts" :concept-id="activeConceptId" :lesson-active="tutorialActive" @close="showConcepts = false" @select="activeConceptId = $event"/>
   <!-- Always rendered: without a backend build it still hosts the
        device-local Settings tab. -->
   <AccountPanel :show="showAccount" :intent="accountIntent" @close="closeAccount" @pending-login="openAccount()"/>
   <SaveLoadModal v-if="backendEnabled" :show="showSaveLoad" :mode="saveLoadMode" @close="showSaveLoad = false" @open-account="openAccount()"/>
   <ChatBubble v-if="backendEnabled && showChat" @open-account="openAccount($event)" @close="togglePanel('showChat')"/>
-  <TutorialOverlay :active="tutorialActive" :tutorial="activeTutorial" @exit="stopTutorial" @open-menu="openMenuFromTutorial"/>
+  <TutorialOverlay :active="tutorialActive" :tutorial="activeTutorial" @exit="stopTutorial" @open-menu="openMenuFromTutorial" @next="startTutorial" @concept="openConcepts"/>
 </template>
 
 
@@ -65,6 +66,7 @@ import ModelsWindow from './components/Models/ModelsWindow.vue';
 import ChatBubble from './components/Assistant/ChatBubble.vue';
 import TutorialOverlay from './components/Tutorial/TutorialOverlay.vue';
 import TutorialMenu from './components/Tutorial/TutorialMenu.vue';
+import ConceptBook from './components/Tutorial/ConceptBook.vue';
 import { getTutorial } from './lib/Tutorial/tutorials';
 import type { TutorialDef } from './lib/Tutorial/tutorials';
 import { bus } from './lib/Events/bus';
@@ -83,6 +85,7 @@ interface AppInstanceExtra {
   offStartTutorial?: () => void;
   offAskAssistant?: () => void;
   offOpenTraining?: () => void;
+  offOpenConcept?: () => void;
 }
 
 // Panel visibility survives reloads. Anything but an explicit '0' means
@@ -116,6 +119,7 @@ export default defineComponent({
     ChatBubble,
     TutorialOverlay,
     TutorialMenu,
+    ConceptBook,
   },
   methods: {
     openAccount(intent?: unknown) {
@@ -140,6 +144,16 @@ export default defineComponent({
     openMenuFromTutorial() {
       this.stopTutorial();
       this.showTutorialMenu = true;
+    },
+    /** Open the Concepts book — at an article, or at the table of contents.
+     *  An unknown id degrades to the contents page inside the book. */
+    openConcepts(conceptId: string | null = null) {
+      this.activeConceptId = conceptId;
+      this.showConcepts = true;
+    },
+    openConceptsFromMenu() {
+      this.showTutorialMenu = false;
+      this.openConcepts(null);
     },
     startTutorial(tutorialId: string) {
       this.activeTutorial = getTutorial(tutorialId) || null;
@@ -213,6 +227,8 @@ export default defineComponent({
       tutorialActive: false,
       activeTutorial: null as TutorialDef | null,
       showTutorialMenu: false,
+      showConcepts: false,
+      activeConceptId: null as string | null,
     };
   },
   created() {
@@ -251,12 +267,16 @@ export default defineComponent({
     // The assistant opens the Training panel through this bus event
     // (assistantActions.openTrainingPanel).
     self.offOpenTraining = bus.on('ui.open-training', () => this.openTrainer());
+    // Help modals and the assistant open Concepts-book articles through this
+    // event (same bridge pattern; unknown ids degrade to the contents page).
+    self.offOpenConcept = bus.on('ui.open-concept', ({ id }) => this.openConcepts(id || null));
   },
   beforeUnmount() {
     const self = this as unknown as AppInstanceExtra;
     self.offStartTutorial!();
     self.offAskAssistant!();
     self.offOpenTraining!();
+    self.offOpenConcept!();
   },
 });
 </script>

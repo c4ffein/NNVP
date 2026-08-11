@@ -414,10 +414,39 @@ board state.
   Training, 3D View, Models, Chat); the corner controls duplicate 3D and
   chat as icons on purpose — menu entries are for finding, icons for
   reaching.
-- Tutorials are declarative defs (`lib/Tutorial/tutorials.ts`) run by one
-  generic overlay engine that observes progress through `$boardInterface`
-  events plus a poll backup; step predicates read the facade's typed read
-  getters (never `activeGraph.model` directly).
+- Tutorials are declarative defs (`lib/Tutorial/tutorials.ts`; the six-chapter
+  course lives one file per chapter under `lib/Tutorial/course/`, chapters =
+  ordinary defs carrying `course: {id, order}` — ordering is advisory, no
+  locking) run by one generic overlay engine that observes progress through
+  `$boardInterface` events plus a poll backup. Step predicates
+  (`lib/Tutorial/predicates.ts`) read the facade's typed read getters (never
+  `activeGraph.model` directly) plus two blessed non-board singletons: the
+  `trainingConfig` reactive module and `lib/Tutorial/sessionSignals` — a
+  sync-readable cache of THIS session's `run.*`/`graph.checkpoint` events
+  (fed by the bus emit inside the event store's append, filtered by
+  instanceId so sync pulls and legacy explosions never complete a step),
+  installed by `installAppServices` so both worlds run the identical wiring.
+  Steps may carry a declarative `action` ("Do it for me" — the overlay
+  validates and routes through the normal facade verbs, so it's undoable) and
+  a `detail` explainer; the overlay auto-advances only from the
+  furthest-reached step (Back stays put) and chains course chapters via a
+  `next` emit that App.vue feeds back into `startTutorial`. Progress
+  persistence is `lib/Tutorial/progress.ts` (localStorage, re-exported
+  through `tutorials.ts`).
+- The **Concepts book** (`lib/Tutorial/concepts/`) is the theory layer under
+  the course: one article per file — checked-in HTML with inline theme-aware
+  SVG figures (CSS-variable strokes), rendered via v-html by
+  `ConceptBook.vue` (the layerHelp trusted-content precedent; nothing
+  user-supplied enters these strings). The registry (`concepts/index.ts`)
+  owns book order, parts, prev/next, and the catalog-topic→article table;
+  read marks live in `concepts/readState.ts` (localStorage, separate key).
+  Entry points all converge on App.vue's one book instance: tutorial steps'
+  `concept` field (the card's "Learn" link), the Tutorial menu's book card,
+  `<a data-concept>` cross-links inside articles, the layer/category help
+  modals, and the assistant's `open_concept` — the latter two through the
+  ephemeral `ui.open-concept` bus event. The assistant also reads the book
+  (`list_concepts` / `get_concept`, HTML stripped). Unknown article ids
+  degrade to the table of contents, never an error.
 
 ## Test architecture (the dual harness)
 

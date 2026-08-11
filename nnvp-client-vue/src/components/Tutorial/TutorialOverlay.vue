@@ -28,7 +28,7 @@
     >
       <div class="tutorial-card-content">
       <div class="tutorial-card-header">
-        <span class="tutorial-progress">Step {{ currentStep + 1 }} / {{ totalSteps }}</span>
+        <span class="tutorial-progress">{{ progressLabel }}</span>
         <span class="tutorial-card-actions">
           <button class="tutorial-menu-link" type="button" @click="openMenu">All tutorials</button>
           <button class="tutorial-exit" type="button" @click="exit">Exit</button>
@@ -36,6 +36,16 @@
       </div>
       <h3 class="tutorial-title">{{ step.title }}</h3>
       <p class="tutorial-instruction">{{ step.instruction }}</p>
+      <p v-if="step.detail" class="tutorial-detail">{{ step.detail }}</p>
+      <div v-if="conceptLinks.length" class="tutorial-concept-links">
+        <button
+          v-for="link in conceptLinks"
+          :key="link.id"
+          type="button"
+          class="tutorial-concept-link"
+          @click="$emit('concept', link.id)"
+        >📖 Learn: {{ link.title }}</button>
+      </div>
       <div class="tutorial-card-footer">
         <button
           class="tutorial-btn"
@@ -45,11 +55,23 @@
         >Back</button>
         <span v-if="stepComplete" class="tutorial-done">✓ Done</span>
         <button
+          v-if="step.action"
+          class="tutorial-btn"
+          type="button"
+          @click="runStepAction"
+        >Do it for me</button>
+        <button
           v-if="currentStep < totalSteps - 1"
           class="tutorial-btn tutorial-btn-primary"
           type="button"
           @click="next"
         >Next</button>
+        <button
+          v-else-if="nextId"
+          class="tutorial-btn tutorial-btn-primary"
+          type="button"
+          @click="nextLesson"
+        >Next lesson →</button>
         <button
           v-else
           class="tutorial-btn tutorial-btn-primary"
@@ -67,7 +89,9 @@ import { defineComponent } from 'vue';
 import type { ComponentPublicInstance, PropType } from 'vue';
 import { markStepReached, markCompleted } from '../../lib/Tutorial/tutorials';
 import type { TutorialDef } from '../../lib/Tutorial/tutorials';
-import type { TutorialStep } from '../../lib/Tutorial/mnistTutorial';
+import type { TutorialStep } from '../../lib/Tutorial/predicates';
+import { chaptersOf, nextChapterId } from '../../lib/Tutorial/course';
+import { getConcept } from '../../lib/Tutorial/concepts';
 import FloatingWindow from '../FloatingWindow.vue';
 
 interface HighlightRect {
@@ -89,6 +113,7 @@ interface TutorialOverlayInternal {
 export default defineComponent({
   name: 'TutorialOverlay',
   components: { FloatingWindow },
+  emits: ['exit', 'open-menu', 'next', 'concept'],
   props: {
     active: {
       type: Boolean,
@@ -103,15 +128,21 @@ export default defineComponent({
   },
   data() {
     const width = Math.min(440, window.innerWidth - 48);
+    const height = 290; // room for the optional detail explainer
     return {
       // Opens bottom-center, like the fixed card used to.
       cardRect: {
         x: Math.round((window.innerWidth - width) / 2),
-        y: Math.max(12, window.innerHeight - 24 - 240),
+        y: Math.max(12, window.innerHeight - 24 - height),
         width,
-        height: 240,
+        height,
       },
       currentStep: 0,
+      // Auto-advance gate: the deepest step reached this play-through. A user
+      // who navigates Back can read a completed step in peace — only the
+      // furthest step auto-advances (predicates are mostly monotonic, so
+      // anything behind it would otherwise snap forward instantly).
+      furthestStep: 0,
       stepComplete: false,
       highlight: null as HighlightRect | null,
     };
@@ -122,6 +153,23 @@ export default defineComponent({
     },
     totalSteps(): number {
       return this.steps.length;
+    },
+    /** The step's Concepts-book links (unknown ids silently dropped). */
+    conceptLinks(): { id: string; title: string }[] {
+      const ids = (this.step && this.step.concepts) || [];
+      return ids
+        .map((id) => ({ id, title: getConcept(id)?.title ?? '' }))
+        .filter(link => link.title !== '');
+    },
+    /** The next course chapter's id, or null outside a course / at the end. */
+    nextId(): string | null {
+      return this.tutorial && this.tutorial.course ? nextChapterId(this.tutorial.id) : null;
+    },
+    progressLabel(): string {
+      const stepPart = `Step ${this.currentStep + 1} / ${this.totalSteps}`;
+      const course = this.tutorial && this.tutorial.course;
+      if (!course) return stepPart;
+      return `Chapter ${course.order} / ${chaptersOf(course.id).length} · ${stepPart}`;
     },
     // `!` preserves the original behavior: an out-of-range index was already
     // possible in JS and consumers guard (try/catch) or render nothing.
@@ -137,7 +185,16 @@ export default defineComponent({
         this.teardown();
       }
     },
+    // Chaining swaps the def while the overlay stays active: full reset, and
+    // teardown first so the board/bus subscriptions are never doubled.
+    tutorial() {
+      if (this.active) {
+        this.teardown();
+        this.startTutorial();
+      }
+    },
     currentStep(step: number) {
+      this.furthestStep = Math.max(this.furthestStep, step);
       if (this.tutorial) markStepReached(this.tutorial.id, step);
       this.refreshState();
     },
@@ -159,6 +216,7 @@ export default defineComponent({
     startTutorial() {
       const self = this as typeof this & TutorialOverlayInternal;
       this.currentStep = 0;
+      this.furthestStep = 0;
       this.stepComplete = false;
       this.$boardInterface.on('graph-changed', self.stateChangeHandler);
       this.$boardInterface.on('selection-changed', self.stateChangeHandler);
@@ -204,12 +262,36 @@ export default defineComponent({
         complete = false;
       }
       this.stepComplete = complete;
-      // Auto-advance when the current step becomes complete.
-      if (complete && this.currentStep < this.totalSteps - 1) {
-        this.currentStep += 1;
-      } else if (complete && this.tutorial) {
+      if (!complete) return;
+      if (this.currentStep < this.totalSteps - 1) {
+        // Auto-advance only from the furthest step reached: a step the user
+        // navigated Back to just shows "✓ Done" and waits for Next.
+        if (this.currentStep === this.furthestStep) this.currentStep += 1;
+      } else if (this.tutorial) {
         // Last step done by actually performing it (not just Finish-clicked).
         markCompleted(this.tutorial.id);
+      }
+    },
+    /** Interpret the step's declarative "Do it for me" action. */
+    runStepAction() {
+      const action = this.step && this.step.action;
+      if (!action || action.kind !== 'loadTemplate') return;
+      try {
+        const names = this.$boardInterface.getTemplatesContainer().e || [];
+        if (!names.includes(action.template)) return;
+        this.$boardInterface.loadTemplate(action.template);
+      } catch {
+        // The overlay must never crash the app; the predicate simply stays
+        // unfulfilled and the user can follow the manual path.
+      }
+    },
+    /** Course chaining: complete this chapter and ask App to start the next. */
+    nextLesson() {
+      if (this.tutorial) markCompleted(this.tutorial.id);
+      if (this.nextId) {
+        this.$emit('next', this.nextId);
+      } else {
+        this.exit();
       }
     },
     resolveTarget(): Element | null {
@@ -328,10 +410,43 @@ export default defineComponent({
 }
 
 .tutorial-instruction {
-  margin: 0 0 14px 0;
+  margin: 0 0 10px 0;
   font-size: 14px;
   line-height: 1.45;
   color: var(--text-muted);
+}
+
+/* The step's links into the Concepts book. */
+.tutorial-concept-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 12px 0;
+}
+
+.tutorial-concept-link {
+  display: inline-block;
+  padding: 3px 10px;
+  background: transparent;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  color: var(--accent);
+  font-family: var(--font-regular);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.tutorial-concept-link:hover {
+  background: var(--bg-hover);
+}
+
+/* The optional "why" explainer under the instruction. */
+.tutorial-detail {
+  margin: 0 0 14px 0;
+  font-size: 13px;
+  line-height: 1.45;
+  font-style: italic;
+  color: var(--text-muted);
+  opacity: 0.85;
 }
 
 .tutorial-card-footer {

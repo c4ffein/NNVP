@@ -358,10 +358,10 @@ logicTest('assistantActions: startTutorial emits the app-level bus event', ({ ex
   const received: unknown[] = [];
   const off = bus.on('ui.start-tutorial', payload => received.push(payload));
   try {
-    const result = actions.startTutorial('connect-layers');
-    expect(result.started).toBe('connect-layers');
+    const result = actions.startTutorial('hello-layer');
+    expect(result.started).toBe('hello-layer');
     expect(typeof result.title).toBe('string');
-    expect(received).toEqual([{ id: 'connect-layers' }]);
+    expect(received).toEqual([{ id: 'hello-layer' }]);
   } finally {
     off();
   }
@@ -448,6 +448,9 @@ logicTest('anthropicClient: builds a valid tools array from the actions', ({ exp
     'load_template',
     'list_tutorials',
     'start_tutorial',
+    'list_concepts',
+    'get_concept',
+    'open_concept',
     'open_training_panel',
     'get_layer_help',
   ]);
@@ -519,6 +522,9 @@ logicTest('anthropicClient: marks exactly the mutating tools', ({ expect }) => {
   expect(isMutatingTool('list_tutorials')).toBe(false);
   expect(isMutatingTool('start_tutorial')).toBe(false); // navigation, not a graph edit
   expect(isMutatingTool('open_training_panel')).toBe(false); // navigation too
+  expect(isMutatingTool('list_concepts')).toBe(false);
+  expect(isMutatingTool('get_concept')).toBe(false);
+  expect(isMutatingTool('open_concept')).toBe(false); // opens the book, touches no graph
   expect(isMutatingTool('auto_layout')).toBe(true); // moves every layer
   expect(isMutatingTool('propose_choices')).toBe(false); // pure UI affordance
   expect(isMutatingTool('get_layer_help')).toBe(false);
@@ -890,6 +896,44 @@ logicTest('assistantActions: lists the real tutorials with their step titles', (
     expect(typeof tutorial.description).toBe('string');
     expect(Array.isArray(tutorial.steps)).toBe(true);
     expect(tutorial.steps.length).toBeGreaterThan(0);
+  }
+  // Course chapters expose their membership so the assistant can present the
+  // course in order; standalone tutorials would carry null.
+  const welcome = listed.find(tutorial => tutorial.id === 'welcome')!;
+  expect(welcome.course).toEqual({ id: 'browser-poet', order: 1 });
+  const chapter = listed.find(tutorial => tutorial.id === 'hello-layer')!;
+  expect(chapter.course).toEqual({ id: 'browser-poet', order: 2 });
+});
+
+logicTest('assistantActions: lists and reads Concepts-book articles as plain text', ({ expect }) => {
+  const { actions } = setup();
+  const listed = actions.listConcepts();
+  expect(listed.length).toBeGreaterThanOrEqual(10);
+  for (const concept of listed) {
+    expect(typeof concept.id).toBe('string');
+    expect(typeof concept.title).toBe('string');
+    expect(typeof concept.part).toBe('string');
+    expect(typeof concept.hook).toBe('string');
+  }
+  const article = actions.getConcept('attention');
+  expect(article.title).toBe('Attention');
+  expect(article.text.length).toBeGreaterThan(200);
+  expect(article.text).not.toContain('<'); // HTML and SVG stripped
+  expect(() => actions.getConcept('ghost-concept')).toThrow(/Available ids: /);
+});
+
+logicTest('assistantActions: openConcept validates and emits the app-level bus event', ({ expect }) => {
+  const { actions } = setup();
+  const received: unknown[] = [];
+  const off = bus.on('ui.open-concept', payload => received.push(payload));
+  try {
+    const result = actions.openConcept('gradient-descent');
+    expect(result).toEqual({ opened: 'gradient-descent', title: 'Gradient descent' });
+    expect(received).toEqual([{ id: 'gradient-descent' }]);
+    expect(() => actions.openConcept('ghost-concept')).toThrow(/Available ids: /);
+    expect(received.length).toBe(1); // the invalid id emitted nothing
+  } finally {
+    off();
   }
 });
 

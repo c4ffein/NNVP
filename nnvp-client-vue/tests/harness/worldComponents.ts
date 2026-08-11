@@ -562,12 +562,21 @@ export function makeModelsDriver(boardSeam: HistoryBoardSeam): ModelsDriver & Te
     },
     async openFolder(name) {
       const row = wrapper!.findAll('.files-subfolder')
-        .find(candidate => candidate.text().startsWith(`${name}/`));
-      await row!.trigger('click');
+        .find(candidate => candidate.find('.files-subfolder-name').text() === name);
+      await row!.trigger('dblclick');
       await settle();
     },
     async filesUp() {
-      await wrapper!.find('.files-up').trigger('click');
+      const crumbs = wrapper!.findAll('.files-crumb');
+      await crumbs[crumbs.length - 2]!.trigger('click');
+      await settle();
+    },
+    async filesBack() {
+      await wrapper!.find('.files-back').trigger('click');
+      await settle();
+    },
+    async filesForward() {
+      await wrapper!.find('.files-forward').trigger('click');
       await settle();
     },
     async favoriteSelected() {
@@ -586,8 +595,40 @@ export function makeModelsDriver(boardSeam: HistoryBoardSeam): ModelsDriver & Te
       await wrapper!.findAll('.files-entry-load')[index]!.trigger('click');
       await settle();
     },
-    async fileUnlink(index) {
-      await wrapper!.findAll('.files-entry-remove')[index]!.trigger('click');
+    async selectEntry(index) {
+      await wrapper!.findAll('.files-entry')[index]!.trigger('click');
+      await settle();
+    },
+    async selectFolder(name) {
+      const row = wrapper!.findAll('.files-subfolder')
+        .find(candidate => candidate.find('.files-subfolder-name').text() === name);
+      await row!.trigger('click');
+      await settle();
+    },
+    async deleteSelected() {
+      await wrapper!.find('.files-delete').trigger('click');
+      await settle();
+    },
+    async confirmDialog() {
+      await wrapper!.find('.files-dialog-confirm').trigger('click');
+      await settle();
+    },
+    async renameSelected(newName) {
+      await wrapper!.find('.files-rename').trigger('click');
+      await wrapper!.find('.files-dialog-input').setValue(newName);
+      await wrapper!.find('.files-dialog-confirm').trigger('click');
+      await settle();
+    },
+    async cutSelected() {
+      await wrapper!.find('.files-cut').trigger('click');
+      await settle();
+    },
+    async copySelected() {
+      await wrapper!.find('.files-copy').trigger('click');
+      await settle();
+    },
+    async paste() {
+      await wrapper!.find('.files-paste').trigger('click');
       await settle();
     },
     async teardown() {
