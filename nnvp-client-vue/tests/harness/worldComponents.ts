@@ -80,22 +80,81 @@ export function makeChartsDriver(): ChartsDriver & Teardown {
 // IS opening — App renders it under v-if, so close/reopen is unmount/remount,
 // which is exactly what the persistence tests exercise). The browser world
 // reaches the same contract through the real Panels > Training window.
-export function makeTrainingDriver(): TrainingDriver & Teardown {
+/**
+ * What TrainingZone reaches on $boardInterface outside of a training run:
+ * the Inspect panel's event hooks and the weights import's "fresh model of
+ * the board's graph" (getGraphJSON + generated code). Everything else stays
+ * inert — these tests never train.
+ */
+export interface TrainingBoardSeam {
+  on(): void;
+  off(): void;
+  setInspection(): void;
+  getGraphJSON(): string;
+  generateJavascriptNoSave(kerasInterface: unknown): string | null;
+}
+
+const INERT_TRAINING_SEAM: TrainingBoardSeam = {
+  on() {},
+  off() {},
+  setInspection() {},
+  getGraphJSON: () => '',
+  generateJavascriptNoSave: () => null,
+};
+
+export function makeTrainingDriver(boardSeam: TrainingBoardSeam = INERT_TRAINING_SEAM): TrainingDriver & Teardown {
   let wrapper: Wrapper | null = null;
   const optimizerSelect = () => wrapper!.find('.optimizer-section select');
   const epochsInput = () => wrapper!.find('.training-params-section input[type="number"]');
+  const mountZone = async (tab: string) => {
+    wrapper = mount(TrainingZone, {
+      // startTraining is never reached; the seam covers Inspect + weights import
+      // (same inert-mock pattern as ChatBubble for the rest).
+      global: { mocks: { $boardInterface: boardSeam, $kerasInterface: {} } },
+      attachTo: document.body,
+    });
+    const tabs = wrapper.findAll('.TrainingZone.bar-button');
+    await tabs.find(t => t.text() === tab)!.trigger('click');
+    await wrapper.vm.$nextTick();
+  };
+  // Weights import awaits tfjs (prepare on the cpu backend) then crypto
+  // digests — real async; poll the rendered outcome instead of guessing turns.
+  const waitForStatus = async () => {
+    const deadline = Date.now() + 20000;
+    while (Date.now() < deadline) {
+      await flushPromises();
+      if (wrapper!.find('[data-testid="weights-status"]').exists()) return;
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    throw new Error('weights row never reported an outcome');
+  };
   return {
     async open() {
-      wrapper = mount(TrainingZone, {
-        // startTraining is the only $boardInterface consumer; these tests
-        // never train, so inert stubs are enough (same pattern as ChatBubble).
-        global: { mocks: { $boardInterface: {}, $kerasInterface: {} } },
-        attachTo: document.body,
-      });
       // Land on the Options tab, where the compile options form lives.
-      const tabs = wrapper.findAll('.TrainingZone.bar-button');
-      await tabs.find(tab => tab.text() === 'Options')!.trigger('click');
-      await wrapper.vm.$nextTick();
+      await mountZone('Options');
+    },
+    async openInspect() {
+      await mountZone('Inspect');
+    },
+    async weightsRow() {
+      const status = wrapper!.find('[data-testid="weights-status"]');
+      const hint = wrapper!.find('[data-testid="inspect-no-model-hint"]');
+      return {
+        downloadEnabled: !(wrapper!.find('[data-testid="weights-download-button"]').element as HTMLButtonElement).disabled,
+        loadEnabled: !(wrapper!.find('[data-testid="weights-load-button"]').element as HTMLButtonElement).disabled,
+        status: status.exists() ? status.text() : null,
+        statusIsError: status.exists() && status.classes().includes('inspect-error'),
+        hint: hint.exists() ? hint.text() : null,
+      };
+    },
+    async loadWeightsFile(name, bytes) {
+      const input = wrapper!.find('[data-testid="weights-file-input"]');
+      const file = new File([bytes as BlobPart], name);
+      // A file input's `files` is read-only; the chooser is the one thing a
+      // test can't click, so it is set the way the browser would.
+      Object.defineProperty(input.element, 'files', { value: [file], configurable: true });
+      await input.trigger('change');
+      await waitForStatus();
     },
     async close() {
       wrapper!.unmount();

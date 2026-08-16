@@ -29,6 +29,8 @@ bun run build
 
 **Testing:**
 ```bash
+make test      # Run all tests (unit + e2e)
+make test-unit # Run unit tests headlessly
 make test-e2e  # Run Playwright e2e tests
 ```
 

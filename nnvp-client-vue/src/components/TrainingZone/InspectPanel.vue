@@ -13,9 +13,45 @@
         v-on:click="resumeTraining()"
       >▶ Resume training</button>
     </div>
+    <!-- Weights as a file: the anonymous durability path (PLAN.md section I).
+         Download = the current model's weights; Load = a fresh model of the
+         board's network gets the file's weights, verified first. -->
+    <div class="inspect-row inspect-weights-row" data-testid="inspect-weights-row">
+      <button
+        class="inspect-button inspect-weights-button"
+        data-testid="weights-download-button"
+        v-bind:disabled="!hasTrainedModel || weightsBusy"
+        v-bind:title="hasTrainedModel ? 'Save this model\'s weights as a .safetensors file' : 'Train a model first'"
+        v-on:click="downloadWeights"
+      >Download weights</button>
+      <button
+        class="inspect-button inspect-weights-button"
+        data-testid="weights-load-button"
+        v-bind:disabled="weightsBusy || trainingState === 'running'"
+        title="Load a .safetensors file saved from this network"
+        v-on:click="pickWeightsFile"
+      >Load weights…</button>
+      <input
+        ref="weightsFileInput"
+        type="file"
+        accept=".safetensors,application/octet-stream"
+        class="inspect-weights-input"
+        data-testid="weights-file-input"
+        aria-label="Weights file"
+        v-on:change="onWeightsFilePicked"
+      />
+    </div>
+    <div
+      v-if="weightsStatus"
+      class="inspect-weights-status"
+      v-bind:class="{ 'inspect-error': weightsStatusIsError }"
+      data-testid="weights-status"
+      v-bind:role="weightsStatusIsError ? 'alert' : 'status'"
+    >{{ weightsStatus }}</div>
     <div v-if="!hasTrainedModel" class="inspect-hint" data-testid="inspect-no-model-hint">
-      Train a model first — Inspect runs a dataset sample through your trained
-      network and shows each layer's activations on the board.
+      Train a model first (or load a weights file saved from this network) —
+      Inspect runs a dataset sample through your trained network and shows
+      each layer's activations on the board.
     </div>
     <div v-else-if="!datasetReady" class="inspect-hint" data-testid="inspect-no-dataset-hint">
       Load a dataset in the Dataset tab first.
@@ -146,6 +182,8 @@ import { sampleFromProbs } from '../../lib/Inspector/textSampler';
 import type Dataset from '../../lib/JSDatasets/google-data-loader';
 import TextDataset from '../../lib/JSDatasets/text-data-loader';
 import { indexToChar } from '../../lib/JSDatasets/text-vocab';
+import { saveAs } from 'file-saver';
+import type { ExportedWeights } from '../../lib/Training/weightsFile';
 import type { NnvpLayerId } from '../../types/model';
 
 /** What TrainingZone.getTrainedModel hands over (the tf model, un-proxied). */
@@ -183,9 +221,22 @@ export default defineComponent({
       default: () => Promise.resolve(false),
     },
     resumeTraining: { type: Function as PropType<() => void>, default: () => {} },
+    // Weights file seam (TrainingZone.exportWeightsFile / importWeightsFile).
+    exportWeights: {
+      type: Function as PropType<() => Promise<ExportedWeights>>,
+      default: () => Promise.reject(new Error('Weights export is not available here.')),
+    },
+    importWeights: {
+      type: Function as PropType<(bytes: ArrayBuffer) => Promise<{ applied: number; workHash: string }>>,
+      default: () => Promise.reject(new Error('Weights import is not available here.')),
+    },
   },
   data() {
     return {
+      // Weights row: one operation at a time, and its last outcome.
+      weightsBusy: false,
+      weightsStatus: null as string | null,
+      weightsStatusIsError: false,
       datasetReady: false,
       isTextDataset: false,
       numClasses: 0,
@@ -233,6 +284,55 @@ export default defineComponent({
     },
   },
   methods: {
+    setWeightsStatus(message: string | null, isError = false) {
+      this.weightsStatus = message;
+      this.weightsStatusIsError = isError;
+    },
+    async downloadWeights() {
+      if (!this.hasTrainedModel || this.weightsBusy) return;
+      this.weightsBusy = true;
+      this.setWeightsStatus(null);
+      try {
+        const exported = await this.exportWeights();
+        saveAs(new Blob([exported.bytes as BlobPart], { type: 'application/octet-stream' }), exported.fileName);
+        this.setWeightsStatus(`Saved ${exported.fileName} (${exported.tensorCount} tensors). Keep it — the browser stores no weights.`);
+      } catch (error) {
+        this.setWeightsStatus((error as Error).message || String(error), true);
+      } finally {
+        this.weightsBusy = false;
+      }
+    },
+    pickWeightsFile() {
+      if (this.weightsBusy) return;
+      (this.$refs.weightsFileInput as HTMLInputElement).click();
+    },
+    async onWeightsFilePicked(event: Event) {
+      const input = event.target as HTMLInputElement;
+      const file = input.files && input.files[0];
+      // Same file twice must fire change again.
+      input.value = '';
+      if (!file) return;
+      await this.loadWeightsFrom(file);
+    },
+    // Verify + restore through TrainingZone (which builds a fresh model of the
+    // board's network); every failure is a typed message, never a half-loaded model.
+    async loadWeightsFrom(file: Blob & { name?: string }) {
+      if (this.weightsBusy) return;
+      this.weightsBusy = true;
+      this.setWeightsStatus(null);
+      try {
+        const bytes = await file.arrayBuffer();
+        const result = await this.importWeights(bytes);
+        this.setWeightsStatus(`Loaded ${result.applied} tensors from ${file.name || 'the file'} — Inspect is ready.`);
+      } catch (error) {
+        const cause = (error as { cause?: unknown }).cause;
+        const detail = cause instanceof Error ? cause.message : null;
+        const message = (error as Error).message || String(error);
+        this.setWeightsStatus(detail && !message.includes(detail) ? `${message} (${detail})` : message, true);
+      } finally {
+        this.weightsBusy = false;
+      }
+    },
     dataset(): Dataset | TextDataset | undefined {
       return this.getDatasets()[this.value];
     },
@@ -465,6 +565,23 @@ export default defineComponent({
   align-items: center;
   gap: 10px;
   padding: 15px;
+}
+.inspect-weights-row {
+  justify-content: center;
+  padding: 12px 15px 0;
+}
+.inspect-weights-button {
+  font-size: 13px;
+  padding: 4px 12px;
+}
+.inspect-weights-input {
+  display: none;
+}
+.inspect-weights-status {
+  margin: 8px 15px 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
 }
 .inspect-row {
   display: flex;

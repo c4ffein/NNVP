@@ -92,6 +92,8 @@
           v-bind:epochData="chartData1"
           v-bind:hasTrainedModel="hasTrainedModel"
           v-bind:getTrainedModel="getTrainedModel"
+          v-bind:exportWeights="exportWeightsFile"
+          v-bind:importWeights="importWeightsFile"
           v-bind:listRuns="listRuns"
           v-bind:deleteRun="deleteRun"
           v-bind:deleteChoices="deleteRunChoices"
@@ -114,7 +116,11 @@ import TextDataset from '../../lib/JSDatasets/text-data-loader';
 import loadableDatasets from '../../lib/JSDatasets/datasets-sources';
 import type { DatasetSourceConfig } from '../../lib/JSDatasets/datasets-sources';
 import { TrainingPrepareError } from '../../lib/Training/engine';
-import type { TrainingDataset, TrainingSession } from '../../lib/Training/engine';
+import type {
+  TrainingDataset, TrainingEngine, TrainingPrepareOptions, TrainingSession,
+} from '../../lib/Training/engine';
+import { describeWeightsFile, exportWeights, importWeights } from '../../lib/Training/weightsFile';
+import type { ExportedWeights } from '../../lib/Training/weightsFile';
 import RunController from '../../lib/Training/runController';
 import type { RunPhase } from '../../lib/Training/runController';
 import generateText from '../../lib/Inspector/generateText';
@@ -172,6 +178,8 @@ interface TrainingZoneNonReactive {
   trainedModel?: unknown;
   /** The graph JSON snapshot trainedModel was generated from. */
   trainedGraphJson?: string | null;
+  /** The session trainedModel belongs to — the weights export/import seam (getWeights/setWeights). */
+  trainedSession?: TrainingSession;
   /** Loaded-dataset cache, lazily created by loadDataset. */
   datasets?: Record<string, Dataset | TextDataset>;
   /** Backend client for the History tab's cloud-delete plumbing. */
@@ -402,6 +410,67 @@ export default defineComponent({
       const self = this as unknown as TrainingZoneNonReactive; // non-reactive by design
       return { model: self.trainedModel, graphJson: self.trainedGraphJson };
     },
+    // Engine choice is the device-local `trainingEngine` setting (Account
+    // panel → Settings): the historical main-thread tfjs engine (default) or
+    // the Web Worker one. The tinygrad engine stays un-exposed — it lives
+    // behind the ?bench=1 Bench tab until it graduates.
+    makeEngine(engineChoice: string): TrainingEngine {
+      return engineChoice === 'tfjs-worker'
+        ? createWorkerEngine()
+        : createTfjsEngine({ loadTf });
+    },
+    // What prepare() needs from this component's UI state (compile options
+    // + the board's generated code, as a thunk so generation errors surface
+    // through TrainingPrepareError).
+    prepareOptions(): TrainingPrepareOptions {
+      return {
+        generateCode: () => this.$boardInterface.generateJavascriptNoSave(this.$kerasInterface),
+        optimizer: this.selectedOptimizer,
+        optimizerParams: this.optimizerParams,
+        loss: this.selectedLoss,
+        epochs: this.epochs,
+      };
+    },
+    // Inspect mode: keep the model and the graph JSON it was generated from —
+    // lib/Inspector maps its layers back onto the board through that JSON. Any
+    // previous inspection is now stale. The seam allows engines without a tf
+    // model (session.model null): Inspect then shows its "train a model first"
+    // hint instead of probing one.
+    adoptSession(session: TrainingSession) {
+      const self = this as unknown as TrainingZoneNonReactive; // non-reactive by design
+      self.trainedSession = session;
+      self.trainedModel = session.model;
+      self.trainedGraphJson = session.graphJson;
+      this.hasTrainedModel = session.model !== null && session.model !== undefined;
+    },
+    // The trained model's weights as an nnvp weights file (safetensors) —
+    // the anonymous durability path (PLAN.md section I): a file the user
+    // keeps, since the browser keeps nothing. Pure lib does the work; the
+    // panel only saves the bytes.
+    async exportWeightsFile(): Promise<ExportedWeights> {
+      const self = this as unknown as TrainingZoneNonReactive; // non-reactive by design
+      if (!self.trainedSession || !self.trainedGraphJson) {
+        throw new Error('Train a model first — there are no weights to download yet.');
+      }
+      return exportWeights(self.trainedSession, self.trainedGraphJson);
+    },
+    // Load a weights file INTO A FRESH MODEL of the current board graph: the
+    // verifier (lib/Training/weightsFile) checks the file belongs to this
+    // network before any write, so a mismatched file leaves nothing behind.
+    // On success the restored model becomes the Inspect target, exactly as
+    // a trained one would. Refused while a run is in flight (its weights
+    // are moving).
+    async importWeightsFile(bytes: ArrayBuffer): Promise<{ applied: number; workHash: string }> {
+      if (this.isTraining) throw new Error('Stop the current training run before loading weights.');
+      describeWeightsFile(bytes); // unreadable / non-nnvp files are refused before any model is built
+      const graphJson = this.$boardInterface.getGraphJSON();
+      const engine = this.makeEngine(settings.get('trainingEngine'));
+      const session = await engine.prepare(graphJson, this.prepareOptions());
+      const result = await importWeights(session, graphJson || '', bytes);
+      this.$boardInterface.setInspection(null);
+      this.adoptSession(session);
+      return result;
+    },
     async trainClicked() {
       if (this.isTraining) {
         // Stop: between batches while running (the historical flag), through
@@ -479,18 +548,10 @@ export default defineComponent({
       const finishRun = (outcome: 'completed' | 'cancelled' | 'error', message?: string) => (
         runHandle?.finish(outcome, message).catch(() => {}) || Promise.resolve()
       );
-      const engine = engineChoice === 'tfjs-worker'
-        ? createWorkerEngine()
-        : createTfjsEngine({ loadTf });
+      const engine = this.makeEngine(engineChoice);
       let session: TrainingSession;
       try {
-        session = await engine.prepare(graphJson, {
-          generateCode: () => this.$boardInterface.generateJavascriptNoSave(this.$kerasInterface),
-          optimizer: this.selectedOptimizer,
-          optimizerParams: this.optimizerParams,
-          loss: this.selectedLoss,
-          epochs: this.epochs,
-        });
+        session = await engine.prepare(graphJson, this.prepareOptions());
       }
       catch (error) {
         // Errors the engine did not tag (tfjs load, compile) used to escape
@@ -514,16 +575,10 @@ export default defineComponent({
         }
         return;
       }
-      // Inspect mode: keep the (about to be trained) model and the graph JSON
-      // it was generated from — lib/Inspector maps its layers back onto the
-      // board through that JSON. Any previous inspection is now stale. The
-      // seam allows engines without a tf model (session.model null): Inspect
-      // then shows its "train a model first" hint instead of probing one.
+      // The (about to be trained) model becomes the Inspect target (see adoptSession).
       this.$boardInterface.setInspection(null);
       const self = this as unknown as TrainingZoneNonReactive; // non-reactive by design
-      self.trainedModel = session.model;
-      self.trainedGraphJson = session.graphJson;
-      this.hasTrainedModel = session.model !== null && session.model !== undefined;
+      this.adoptSession(session);
 
       // Curriculum: phase 1 is the classic run; an enabled phase 2 continues
       // the SAME warm model on another dataset (pretrain → fine-tune).

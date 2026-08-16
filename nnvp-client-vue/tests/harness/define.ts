@@ -124,6 +124,26 @@ export interface TrainingDriver {
   setEpochs(value: number): Promise<void>;
   optimizer(): Promise<string>;
   epochs(): Promise<number>;
+  /** Open the Training window ON its Inspect tab (where the weights row lives). */
+  openInspect(): Promise<void>;
+  /** The Inspect tab's weights row + hint, as rendered. */
+  weightsRow(): Promise<WeightsRowState>;
+  /**
+   * Hand a file to "Load weights…" through the real <input type=file> and
+   * wait for the row to report an outcome (success or refusal).
+   */
+  loadWeightsFile(name: string, bytes: Uint8Array): Promise<void>;
+}
+
+/** What the Inspect tab's weights row shows. */
+export interface WeightsRowState {
+  downloadEnabled: boolean;
+  loadEnabled: boolean;
+  /** The last outcome line, null when none has been reported yet. */
+  status: string | null;
+  statusIsError: boolean;
+  /** The "train a model first" hint, null once a model (trained or restored) exists. */
+  hint: string | null;
 }
 
 /** The layer catalog's collapse/expand surface. */

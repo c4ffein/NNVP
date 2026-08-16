@@ -42,6 +42,8 @@ import './googleDataLoader';
 import './textDataset';
 import './tfjsTraining';
 import './trainingEngine';
+import './safetensors';
+import './weightsFile';
 import './trainingPause';
 import './tinygradEngine';
 import './workerEngine';

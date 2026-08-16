@@ -10,6 +10,7 @@
 import FlowGraphEditor from '../../src/lib/FlowInterface/FlowGraphEditor';
 import { isInvalidConnection } from '../../src/lib/FlowInterface/adapter';
 import KerasInterface from '../../src/lib/KerasInterface/KerasInterface';
+import KerasGenerator from '../../src/lib/KerasInterface/KerasGenerator';
 import generatedKerasLayers from '../../src/lib/KerasInterface/generatedKerasLayers.json';
 import { installAppServices } from '../../src/lib/appServices';
 import {
@@ -143,8 +144,16 @@ export function makeBunWorld(expect: Expect): World {
   const catalog = makeCatalogDriver();
   const windows = makeWindowsDriver();
   const charts = makeChartsDriver();
-  const training = makeTrainingDriver();
   const board = makeBoardDriver();
+  // The Training window's Inspect tab (weights import) builds a fresh model
+  // of THIS board's graph — the seam replicates BoardInterface's two verbs.
+  const training = makeTrainingDriver({
+    on() {},
+    off() {},
+    setInspection() {},
+    getGraphJSON: () => board.editor.toJSON(),
+    generateJavascriptNoSave: () => new KerasGenerator(JSON.parse(board.editor.toJSON()) as NnvpModel).generateJavascriptFromGraph(),
+  });
   // A history Restore must land on the SAME board the suite asserts through —
   // the seam replicates worldBun's own loadJSON contract.
   const boardSeam = {

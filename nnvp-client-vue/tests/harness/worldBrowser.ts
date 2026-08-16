@@ -274,6 +274,34 @@ export function makeBrowserWorld(
         el => Number((el as HTMLInputElement).value),
       );
     },
+    async openInspect() {
+      await page.click('#GeneralMenu .menuTitle:has-text("Panels")');
+      await page.click('#GeneralMenu .menuItem:has-text("Training")');
+      await page.click('.TrainingZone.bar-button:has-text("Inspect")');
+      await settle();
+    },
+    async weightsRow() {
+      const status = page.locator('[data-testid="weights-status"]');
+      const hint = page.locator('[data-testid="inspect-no-model-hint"]');
+      const hasStatus = (await status.count()) > 0;
+      const hasHint = (await hint.count()) > 0;
+      return {
+        downloadEnabled: await page.locator('[data-testid="weights-download-button"]').isEnabled(),
+        loadEnabled: await page.locator('[data-testid="weights-load-button"]').isEnabled(),
+        status: hasStatus ? (await status.textContent())!.trim() : null,
+        statusIsError: hasStatus && ((await status.getAttribute('class')) ?? '').split(/\s+/).includes('inspect-error'),
+        hint: hasHint ? (await hint.textContent())!.replace(/\s+/g, ' ').trim() : null,
+      };
+    },
+    async loadWeightsFile(name, bytes) {
+      // The chooser can't be clicked; Playwright feeds the hidden input directly.
+      await page.setInputFiles('[data-testid="weights-file-input"]', {
+        name, mimeType: 'application/octet-stream', buffer: Buffer.from(bytes),
+      });
+      // tfjs prepare (cpu) + digests: wait for the rendered outcome, not a fixed delay.
+      await page.waitForSelector('[data-testid="weights-status"]', { timeout: 30000 });
+      await settle();
+    },
   };
 
   // Same contract as worldComponents.makeCatalogDriver, on the real catalog.
