@@ -60,6 +60,7 @@ board state.
 | Inspection snapshot, per-layer viz params | `BoardInterface` (side state on the facade) | none |
 | Layer catalog (all Keras layer defs) | `generatedKerasLayers.json` + `textLayers.ts`, merged at boot into `$kerasInterface` | checked in |
 | Training config | `lib/Training/trainingConfig.ts` reactive singleton | none (snapshotted into runs) |
+| Trained model + weights | `TrainingZone` non-reactive session (tab memory only) | none by design — export/import as a safetensors file |
 | Training runs, assistant conversations | RecordStore (`lib/LocalStore`), IndexedDB db `nnvp`, one store per kind | IndexedDB + cloud sync |
 | Active chat session | `lib/Assistant/chatSession.ts` reactive module singleton | persisted as a ConversationRecord |
 | Auth token, settings, currentProject pointer, panel prefs, tutorial progress, assistant key/mode, deviceId | localStorage (separate keys) | device-only |
@@ -286,6 +287,26 @@ board state.
   board mutation is the explicit "Load this state" through the undoable
   `loadGraphFromJSON` path. Everything derives from events already in the
   journal — no new stores.
+- **Weights leave the browser only as a file** (PLAN.md section I, step (a)).
+  Nothing persists trained weights in the browser — no IndexedDB store, no
+  cache; the trained model lives in the tab's memory and the user's
+  durability is a download. `lib/Training/safetensors.ts` is a pure,
+  F32-only safetensors codec (header layout pinned byte-for-byte against
+  tinygrad's `safe_save` output, every header claim validated against the
+  bytes). `lib/Training/weightsFile.ts` turns a session into an nnvp weights
+  file and back: tensor names are CANONICAL `<layer id>/<weight>` — derived
+  through the Inspector's layer↔node contract, because tfjs's own variable
+  names are uniquified per page and would not survive a reload — and the
+  `__metadata__` carries `nnvp.format` + the network's workHash. The
+  verifier (to be shared by cloud restore) refuses unreadable files,
+  non-nnvp safetensors, other networks (workHash), and tensor-set/shape
+  mismatches BEFORE any write; import is all-or-nothing into a FRESH model of
+  the current board graph, which then becomes the Inspect target exactly like
+  a trained one. Engines with no main-thread model (worker, tinygrad) get a
+  typed `no-model` refusal (the Inspect precedent). The pixels are the
+  Inspect tab's weights row — a thin binding (file-saver + `<input
+  type=file>`) over TrainingZone's `exportWeightsFile` / `importWeightsFile`,
+  which keep the session (not just its model) off reactive state.
 - Inspect/Viz3D coupling is indirect and goes through the facade: InspectPanel
   probes the trained model → `boardInterface.setInspection` →
   `inspection-changed` → Viz3D recolors. Viz3D never reads training metrics.
