@@ -72,8 +72,11 @@
           <div class="layer-help-modal-body">
             <div v-html="helpHtml"></div>
           </div>
+          <!-- Its own class on purpose: the world drivers (and any user of the
+               ask handoff) target `.layer-help-ask`, which must stay unique to
+               the ask button — reusing it here once broke the chat e2e family. -->
           <div v-if="helpConceptTitle" class="layer-help-ask-row">
-            <button type="button" class="layer-help-ask" @click="openConceptFromHelp">
+            <button type="button" class="layer-help-concept" @click="openConceptFromHelp">
               📖 Read the concept: {{ helpConceptTitle }}
             </button>
           </div>

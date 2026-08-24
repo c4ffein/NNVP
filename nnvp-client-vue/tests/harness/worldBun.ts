@@ -14,8 +14,9 @@ import KerasGenerator from '../../src/lib/KerasInterface/KerasGenerator';
 import generatedKerasLayers from '../../src/lib/KerasInterface/generatedKerasLayers.json';
 import { installAppServices } from '../../src/lib/appServices';
 import {
-  makeBackendDriver, makeChatDriver, makeCatalogDriver, makeHistoryDriver, makeModelsDriver,
-  makeRecordsDriver, makeChartsDriver, makeTrainingDriver, makeWindowsDriver,
+  makeBackendDriver, makeChatDriver, makeCatalogDriver, makeDownloadsDriver, makeErrorsDriver,
+  makeHistoryDriver, makeMenuDriver, makeModelsDriver, makePanelDriver, makeRecordsDriver,
+  makeChartsDriver, makeTrainingDriver, makeWindowsDriver,
 } from './worldComponents';
 import type {
   FlowEdge, FlowNode, KerasLayerCatalog, NnvpLayerId, NnvpModel,
@@ -126,6 +127,8 @@ export function makeBoardDriver() {
       return state.nodes[index]!.data.nnvp.comment ?? '';
     },
 
+
+
     async graphJSON() {
       return editor.toJSON();
     },
@@ -167,6 +170,16 @@ export function makeBunWorld(expect: Expect): World {
   const models = makeModelsDriver(boardSeam);
   const records = makeRecordsDriver();
   const backend = makeBackendDriver();
+  // The top menubar: the real GeneralMenu over THIS board's editor, with a
+  // real KerasInterface (the same pair the app's menu handlers receive).
+  const menu = makeMenuDriver(
+    board.editor,
+    new KerasInterface(generatedKerasLayers as KerasLayerCatalog),
+  );
+  const downloads = makeDownloadsDriver();
+  const errors = makeErrorsDriver();
+  // The Layer Options panel over THIS board's live selection shim.
+  const panel = makePanelDriver(board.editor);
   // The REAL app service wiring (main.ts calls the same function): sync-on-auth
   // over the world's store singleton and the backend driver's fetch shim. This
   // is what makes chat.setSignedIn(true) trigger an actual sync, like the app.
@@ -183,8 +196,13 @@ export function makeBunWorld(expect: Expect): World {
     models,
     records,
     backend,
+    menu,
+    downloads,
+    errors,
+    panel,
     async dispose() {
       uninstallServices();
+      await menu.teardown();
       await chat.teardown();
       await catalog.teardown();
       await windows.teardown();

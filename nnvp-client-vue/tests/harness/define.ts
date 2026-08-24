@@ -353,6 +353,62 @@ export interface BackendDriver {
   uuids(kind: RecordStoreName): Promise<string[]>;
 }
 
+/**
+ * The top menubar, as a user walks it. Browser: real clicks/hovers on the
+ * rendered menu. Bun: the SAME labels resolved through the mounted real
+ * GeneralMenu's own menuTree — clickItem invokes the exact handler the pixel
+ * click is bound to, so the label→handler binding is covered in both worlds.
+ */
+export interface MenuDriver {
+  /** Open a top-level menu by its title ("File", "Export", …). */
+  open(title: string): Promise<void>;
+  /** Hover a submenu entry of the open menu (e.g. "Templates"). */
+  hoverSub(label: string): Promise<void>;
+  /** The submenu's entry labels, in order. */
+  entries(subLabel: string): Promise<string[]>;
+  /** Click an entry of the open menu (or its hovered submenu) by label. */
+  clickItem(label: string): Promise<void>;
+}
+
+/**
+ * Capture the file download an action triggers. Browser: the real download
+ * event, artifact read back from disk. Bun: URL.createObjectURL + anchor
+ * click interception around the same saveAs path. Null when the action
+ * downloaded nothing.
+ */
+export interface DownloadsDriver {
+  capture(action: () => Promise<void>): Promise<{ filename: string; content: string } | null>;
+}
+
+/** Console/page-error tracking (the old specs' beforeEach). Browser: page
+ *  console + pageerror listeners (re-navigates first so LOAD-TIME errors are
+ *  caught too). Bun: patched console.error + window 'error' events — the
+ *  load-time half is a deliberate no-op there (no page to reload); that
+ *  coverage exists only in the Playwright run, by design. */
+export interface ErrorsDriver {
+  startTracking(): Promise<{ count(): Promise<number> }>;
+}
+
+/**
+ * The Layer Options panel (the right bar's params block), addressed the way
+ * the D3-era specs drove it: inputs by type and position within
+ * #layeroptions-block. Browser: the real rendered inputs. Bun: the real
+ * LayerOptions SFC mounted over the SAME board's live selection shim —
+ * setInput drives the actual parameter component, which writes through
+ * setParameterValue exactly like a user keystroke.
+ */
+export interface PanelDriver {
+  /** The whole options panel's text ('' when nothing is selected). */
+  text(): Promise<string>;
+  inputCount(type: 'number' | 'text' | 'range'): Promise<number>;
+  inputValue(type: 'number' | 'text' | 'range', index: number): Promise<string>;
+  /** Fill the nth input of that type and fire change (panels commit on change). */
+  setInput(type: 'number' | 'text' | 'range', index: number, value: string): Promise<void>;
+  selectCount(): Promise<number>;
+  selectValue(index: number): Promise<string>;
+  setSelect(index: number, value: string): Promise<void>;
+}
+
 /** What appTest fns receive (in BOTH modes). */
 export interface World extends LogicWorld {
   board: BoardDriver;
@@ -365,6 +421,10 @@ export interface World extends LogicWorld {
   models: ModelsDriver;
   records: RecordsDriver;
   backend: BackendDriver;
+  menu: MenuDriver;
+  downloads: DownloadsDriver;
+  errors: ErrorsDriver;
+  panel: PanelDriver;
   /** Bun world only (unmount + reset between tests); the runner calls it, suites never do. */
   dispose?: () => Promise<void>;
 }

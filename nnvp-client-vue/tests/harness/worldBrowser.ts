@@ -7,6 +7,8 @@
  * test; appTest fns must stay implementation-blind.
  */
 import type { Page } from '@playwright/test';
+import fs from 'node:fs';
+import { EXPORT_MENU_LABELS, HELP_MODAL_ASK_SELECTOR } from './uiLabels';
 import type FlowGraphEditor from '../../src/lib/FlowInterface/FlowGraphEditor';
 import type { RecordStore, RecordStoreName, StoredRecord } from '../../src/lib/LocalStore/recordStore';
 import { createFakeBackend } from './fakeBackend';
@@ -63,9 +65,40 @@ export function makeBrowserWorld(
       await settle();
     },
     async select(index) {
-      const box = (await page.locator(canvas.layer).nth(index).boundingBox())!;
-      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+      const node = page.locator(canvas.layer).nth(index);
+      const nodeId = (await node.getAttribute('data-id'))!;
+      const centerOf = async (): Promise<[number, number]> => {
+        const box = (await node.boundingBox())!;
+        return [box.x + box.width / 2, box.y + box.height / 2];
+      };
+      // A template node can sit under a floating panel (or outside the
+      // viewport): a click there hits the panel, not the node. Ask the DOM
+      // who would receive the click, and only then reposition — the way the
+      // old specs moved layers for drag room (positions are presentational;
+      // wiring is recomputed from edges, so nothing semantic changes).
+      const clickReachesNode = async ([x, y]: [number, number]) => page.evaluate(
+        ([px, py, id, layerSelector]) => {
+          const el = document.elementFromPoint(Number(px), Number(py));
+          const hit = el && el.closest(String(layerSelector));
+          return !!hit && hit.getAttribute('data-id') === id;
+        },
+        [x, y, nodeId, canvas.layer] as const,
+      );
+      let center = await centerOf();
+      if (!(await clickReachesNode(center))) {
+        await canvas.moveLayer(page, nodeId as unknown as Parameters<CanvasDriver['moveLayer']>[1], 450, 360);
+        await settle();
+        center = await centerOf();
+      }
+      await page.mouse.click(center[0], center[1]);
       await settle();
+      // Selection is this verb's POSTCONDITION. The D3-era specs asserted
+      // the .selected class before destructive actions; every caller now
+      // inherits that guard, with the failure localized to the click.
+      const selected = await node.evaluate(el => el.classList.contains('selected'));
+      if (!selected) {
+        throw new Error(`board.select(${index}): node did not gain .selected after the click`);
+      }
     },
     async deleteSelected() {
       await page.keyboard.press('Backspace');
@@ -361,7 +394,7 @@ export function makeBrowserWorld(
       await page.hover(`#layer-template-${topic}`);
       await page.click(`[aria-label="Learn about the ${topic} layer"]`);
       await settle();
-      await page.click('.layer-help-ask');
+      await page.click(HELP_MODAL_ASK_SELECTOR);
       await settle();
     },
     async lastAssistantText() {
@@ -734,8 +767,94 @@ export function makeBrowserWorld(
     },
   };
 
+  // The top menubar as real pixels — the same selectors and settle-waits the
+  // migrated D3-era specs used (menus open on click; submenus on hover).
+  const menu = {
+    async open(title: string) {
+      await page.click(`#GeneralMenu .menuTitle:text-is("${title}")`);
+      await page.waitForTimeout(30);
+    },
+    async hoverSub(label: string) {
+      await (await page.$(`text=${label}`))!.hover();
+      await page.waitForTimeout(50);
+    },
+    async entries(subLabel: string) {
+      return page.$$eval(
+        `.menuItem:has-text("${subLabel}") > .dropdown-content > .menuItem`,
+        els => els.map(el => (el.textContent ?? '').trim()),
+      );
+    },
+    async clickItem(label: string) {
+      await (await page.$(`text=${label}`))!.click();
+      await page.waitForTimeout(100);
+    },
+  };
+  // Real download events, artifacts read back from disk.
+  const downloads = {
+    async capture(action: () => Promise<void>) {
+      const downloadPromise = page.waitForEvent('download', { timeout: 5000 }).catch(() => null);
+      await action();
+      const download = await downloadPromise;
+      if (!download) return null;
+      return {
+        filename: download.suggestedFilename(),
+        content: fs.readFileSync((await download.path()), 'utf-8'),
+      };
+    },
+  };
+  // The old specs' beforeEach: attach collectors, then (re)load the app so
+  // load-time errors are captured too.
+  const errors = {
+    async startTracking() {
+      const consoleErrors: string[] = [];
+      page.on('console', (msg) => {
+        if (msg.type() === 'error') consoleErrors.push(msg.text());
+      });
+      page.on('pageerror', (error) => {
+        consoleErrors.push(`PAGE ERROR: ${error.message}`);
+      });
+      await page.goto(canvas.home);
+      await page.waitForTimeout(50);
+      return { async count() { return consoleErrors.length; } };
+    },
+  };
+  // The Layer Options panel as real pixels — the same selectors the D3-era
+  // specs used (#layerOptions text; typed inputs inside #layeroptions-block,
+  // committed with a change event).
+  const panel = {
+    async text() {
+      return (await page.textContent('#layerOptions')) ?? '';
+    },
+    async inputCount(type: 'number' | 'text' | 'range') {
+      return (await page.$$(`#layeroptions-block input[type="${type}"]`)).length;
+    },
+    async inputValue(type: 'number' | 'text' | 'range', index: number) {
+      const input = (await page.$$(`#layeroptions-block input[type="${type}"]`))[index]!;
+      return input.inputValue();
+    },
+    async setInput(type: 'number' | 'text' | 'range', index: number, value: string) {
+      const input = (await page.$$(`#layeroptions-block input[type="${type}"]`))[index]!;
+      await input.fill(value);
+      await input.dispatchEvent('change');
+      await page.waitForTimeout(100); // Vue reactivity, as the old specs waited
+    },
+    async selectCount() {
+      return (await page.$$('#layeroptions-block select')).length;
+    },
+    async selectValue(index: number) {
+      const select = (await page.$$('#layeroptions-block select'))[index]!;
+      return select.evaluate(el => (el as HTMLSelectElement).value);
+    },
+    async setSelect(index: number, value: string) {
+      const select = (await page.$$('#layeroptions-block select'))[index]!;
+      await select.selectOption(value);
+      await select.dispatchEvent('change');
+      await page.waitForTimeout(100);
+    },
+  };
   const world: World & { page?: Page; canvas?: CanvasDriver } = {
     expect, board, chat, catalog, windows, charts, training, history, models, records, backend,
+    menu, downloads, errors, panel,
     dispose: async () => {},
   };
   if (exposePage) {

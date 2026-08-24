@@ -11,6 +11,8 @@
 import { defineComponent } from 'vue';
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import ChatBubble from '../../src/components/Assistant/ChatBubble.vue';
+import GeneralMenu from '../../src/components/GeneralMenu.vue';
+import LayerOptions from '../../src/components/LayerOptions/LayerOptions.vue';
 import LayerCatalog from '../../src/components/LayerCatalog/LayerCatalog.vue';
 import FloatingWindow from '../../src/components/FloatingWindow.vue';
 import Charts from '../../src/components/TrainingZone/Charts.vue';
@@ -26,8 +28,9 @@ import { setRecordStoreForTests } from '../../src/lib/LocalStore/db';
 import { createFakeBackend } from './fakeBackend';
 import type { FakeBackend } from './fakeBackend';
 import type {
-  BackendDriver, CatalogDriver, ChartsDriver, ChatDriver, HistoryDriver, ModelsDriver,
-  RecordsDriver, TrainingDriver, WindowsDriver, WindowName,
+  BackendDriver, CatalogDriver, ChartsDriver, ChatDriver, DownloadsDriver, ErrorsDriver,
+  HistoryDriver, MenuDriver, ModelsDriver, PanelDriver, RecordsDriver, TrainingDriver,
+  WindowsDriver, WindowName,
 } from './define';
 
 // The mounted-wrapper seam: each driver hosts one arbitrary component, so the
@@ -813,5 +816,271 @@ export function makeChatDriver(): ChatDriver & Teardown {
       resetWindowRects(); // window positions must not leak between tests
       resetChatSession(); // neither does the conversation
     },
+  };
+}
+
+// --- The top menubar (bun half of MenuDriver) --------------------------------
+// Mounts the REAL GeneralMenu and resolves clicked labels through its own
+// menuTree computed: clickItem invokes the exact handler the pixel click is
+// bound to (see define.ts MenuDriver). The facade below wraps the SAME
+// FlowGraphEditor the board driver drives, so menu actions land on the same
+// board the suite asserts through.
+interface MenuEditorSeam {
+  templates: { list(): string[] };
+  loadTemplate(name: string): void;
+  generatePythonInBrowser(kerasInterface: unknown): void;
+  generateJavascriptInBrowser(kerasInterface: unknown): void;
+  generatePyTorchInBrowser(kerasInterface: unknown): void;
+  generateTinygradInBrowser(kerasInterface: unknown): void;
+}
+
+type MenuSubtreeLike = Record<string, unknown>;
+
+export function makeMenuDriver(editor: MenuEditorSeam, kerasInterface: unknown):
+MenuDriver & { teardown(): Promise<void> } {
+  let wrapper: VueWrapper | null = null;
+  let openTitle: string | null = null;
+  let hoveredSub: string | null = null;
+
+  // Only what GeneralMenu's render + the exercised handlers touch; every
+  // OTHER facade verb is absent on purpose — an unexpected menu action
+  // fails loudly instead of silently no-oping.
+  const menuFacade = {
+    on() {}, off() {}, setLeftBarRemountCallback() {},
+    getUndoStackContainer: () => ({ e: [] as unknown[] }),
+    getRedoStackContainer: () => ({ e: [] as unknown[] }),
+    getTemplatesContainer: () => ({ e: editor.templates.list() }),
+    loadTemplate: (name: string) => editor.loadTemplate(name),
+    generatePythonInBrowser: (k: unknown) => editor.generatePythonInBrowser(k),
+    generateJavascriptInBrowser: (k: unknown) => editor.generateJavascriptInBrowser(k),
+    generatePyTorchInBrowser: (k: unknown) => editor.generatePyTorchInBrowser(k),
+    generateTinygradInBrowser: (k: unknown) => editor.generateTinygradInBrowser(k),
+  };
+
+  const vm = () => {
+    if (!wrapper) {
+      wrapper = mount(GeneralMenu, {
+        props: {
+          views: {
+            left: true, right: true, training: false, chat: false,
+            chatAvailable: false, viz3d: false, models: false,
+          },
+        },
+        global: { mocks: { $boardInterface: menuFacade, $kerasInterface: kerasInterface } },
+      });
+    }
+    // Typing-only view of the real computeds ('templatesMenu' indirection
+    // included): the menu declares subtrees either inline or as the name of
+    // a computed holding one.
+    return wrapper.vm as unknown as Record<string, MenuSubtreeLike> & { menuTree: MenuSubtreeLike };
+  };
+
+  /** Resolve a subtree of the OPEN menu (following computed-name strings). */
+  const subtreeOf = (label: string): MenuSubtreeLike | null => {
+    if (!openTitle) return null;
+    const menuRoot = vm().menuTree[openTitle] as MenuSubtreeLike | undefined;
+    const sub = menuRoot?.[label];
+    if (typeof sub === 'string') return vm()[sub] as MenuSubtreeLike;
+    return (sub as MenuSubtreeLike | undefined) ?? null;
+  };
+
+  return {
+    async open(title) {
+      if (!(title in vm().menuTree)) {
+        throw new Error(`menu.open: no top-level menu titled "${title}"`);
+      }
+      openTitle = title;
+      hoveredSub = null;
+    },
+    async hoverSub(label) {
+      if (subtreeOf(label) === null) {
+        throw new Error(`menu.hoverSub: "${openTitle}" has no submenu "${label}"`);
+      }
+      hoveredSub = label;
+    },
+    async entries(subLabel) {
+      const sub = subtreeOf(subLabel);
+      if (sub === null) throw new Error(`menu.entries: no submenu "${subLabel}" under "${openTitle}"`);
+      return Object.keys(sub);
+    },
+    async clickItem(label) {
+      // The hovered submenu first, then the open menu's direct entries —
+      // the same resolution order a user's pointer implies.
+      const scopes: (MenuSubtreeLike | null)[] = [
+        hoveredSub ? subtreeOf(hoveredSub) : null,
+        openTitle ? (vm().menuTree[openTitle] as MenuSubtreeLike) : null,
+      ];
+      for (const scope of scopes) {
+        const handler = scope?.[label];
+        if (typeof handler === 'function') {
+          await (handler as (this: unknown) => unknown).call(vm());
+          await flushPromises();
+          openTitle = null;
+          hoveredSub = null;
+          return;
+        }
+      }
+      throw new Error(
+        `menu.clickItem: no entry labeled "${label}" under "${openTitle}"`
+        + (hoveredSub ? ` > "${hoveredSub}"` : ''),
+      );
+    },
+    async teardown() {
+      wrapper?.unmount();
+      wrapper = null;
+    },
+  };
+}
+
+// --- Download capture (bun half of DownloadsDriver) --------------------------
+// The app downloads through file-saver: createObjectURL(blob) + a synthetic
+// anchor click. Intercept exactly those two browser APIs for the duration of
+// the action — same seam, one layer below the OS file dialog.
+export function makeDownloadsDriver(): DownloadsDriver {
+  return {
+    async capture(action) {
+      let blob: Blob | null = null;
+      let filename = '';
+      const originalCreate = URL.createObjectURL;
+      const originalRevoke = URL.revokeObjectURL;
+      const originalCreateElement = document.createElement.bind(document);
+      URL.createObjectURL = ((b: Blob) => { blob = b; return 'blob:captured'; }) as typeof URL.createObjectURL;
+      URL.revokeObjectURL = (() => {}) as typeof URL.revokeObjectURL;
+      // Instrument the anchors born inside the capture window at the
+      // INSTANCE level (own properties beat whichever click/dispatch path
+      // file-saver picks — happy-dom's prototype dispatch proved bypassable).
+      (document as { createElement: typeof document.createElement }).createElement = ((
+        tag: string, options?: ElementCreationOptions,
+      ) => {
+        const element = originalCreateElement(tag, options);
+        if (String(tag).toLowerCase() === 'a') {
+          const anchor = element as HTMLAnchorElement;
+          const originalDispatch = anchor.dispatchEvent.bind(anchor);
+          anchor.click = () => { filename = anchor.download || filename; };
+          anchor.dispatchEvent = (event: Event) => {
+            if (event.type === 'click') {
+              filename = anchor.download || filename;
+              return true;
+            }
+            return originalDispatch(event);
+          };
+        }
+        return element;
+      }) as typeof document.createElement;
+      try {
+        await action();
+        await flushPromises();
+        // file-saver defers its anchor click by one MACROtask
+        // (`setTimeout(click, 0)`); flushPromises only drains microtasks, so
+        // wait a real timer tick before reading the captured filename.
+        await new Promise((resolve) => { setTimeout(resolve, 0); });
+        await flushPromises();
+      } finally {
+        URL.createObjectURL = originalCreate;
+        URL.revokeObjectURL = originalRevoke;
+        (document as { createElement: typeof document.createElement }).createElement = originalCreateElement;
+      }
+      if (blob === null) return null;
+      return { filename, content: await (blob as Blob).text() };
+    },
+  };
+}
+
+// --- Console/page-error tracking (bun half of ErrorsDriver) ------------------
+// One global console.error patch, installed once; each startTracking swaps in
+// a fresh sink (so repeated tests don't stack wrappers). The original still
+// runs — tracking must not silence real output.
+let errorSink: string[] | null = null;
+let consoleErrorPatched = false;
+
+export function makeErrorsDriver(): ErrorsDriver {
+  return {
+    async startTracking() {
+      const errors: string[] = [];
+      errorSink = errors;
+      if (!consoleErrorPatched) {
+        consoleErrorPatched = true;
+        const original = console.error.bind(console);
+        console.error = (...args: unknown[]) => {
+          errorSink?.push(args.map(String).join(' '));
+          original(...args);
+        };
+      }
+      if (typeof window !== 'undefined') {
+        window.addEventListener('error', (event) => {
+          errorSink?.push(`PAGE ERROR: ${(event as ErrorEvent).message}`);
+        });
+      }
+      return { async count() { return errors.length; } };
+    },
+  };
+}
+
+// --- The Layer Options panel (bun half of PanelDriver) -----------------------
+// Mounts the REAL LayerOptions SFC over the board's live selection shim
+// (editor.selectedNodes), fresh per verb so no reactivity plumbing is faked:
+// parameter edits persist because the parameter components write through
+// setParameterValue on the shared KerasLayer instances, exactly like a user
+// keystroke in the rendered panel.
+interface PanelEditorSeam {
+  selectedNodes: unknown[];
+  model: { layers: unknown[]; modelInputs: unknown[]; modelOutputs: unknown[] };
+  findLayerById(id: unknown): unknown;
+}
+
+export function makePanelDriver(editor: PanelEditorSeam): PanelDriver {
+  const panelFacade = {
+    on() {}, off() {},
+    setLayerComment() {},
+    getActiveElementsContainer: () => ({ e: editor.selectedNodes }),
+    getActiveElements: () => editor.selectedNodes,
+    getLayers: () => editor.model.layers,
+    getModelInputs: () => editor.model.modelInputs,
+    getModelOutputs: () => editor.model.modelOutputs,
+    findLayerById: (id: unknown) => editor.findLayerById(id),
+    // The Model Inputs/Outputs OrderParameter blocks read the shims directly.
+    activeGraph: { model: editor.model } as unknown,
+  };
+
+  async function withMount<T>(fn: (wrapper: VueWrapper) => Promise<T> | T): Promise<T> {
+    const wrapper = mount(LayerOptions, {
+      attachTo: document.body,
+      global: { mocks: { $boardInterface: panelFacade, $kerasInterface: {} } },
+    });
+    await flushPromises();
+    try {
+      return await fn(wrapper);
+    } finally {
+      wrapper.unmount();
+    }
+  }
+
+  const inputs = (wrapper: VueWrapper, type: string) =>
+    wrapper.findAll(`#layeroptions-block input[type="${type}"]`);
+
+  return {
+    text: () => withMount(wrapper => wrapper.text()),
+    inputCount: (type) => withMount(wrapper => inputs(wrapper, type).length),
+    inputValue: (type, index) => withMount(
+      wrapper => (inputs(wrapper, type)[index]!.element as HTMLInputElement).value,
+    ),
+    setInput: (type, index, value) => withMount(async (wrapper) => {
+      const input = inputs(wrapper, type)[index]!;
+      await input.setValue(value);
+      await input.trigger('change');
+      await flushPromises();
+    }),
+    selectCount: () => withMount(
+      wrapper => wrapper.findAll('#layeroptions-block select').length,
+    ),
+    selectValue: (index) => withMount(
+      wrapper => (wrapper.findAll('#layeroptions-block select')[index]!.element as HTMLSelectElement).value,
+    ),
+    setSelect: (index, value) => withMount(async (wrapper) => {
+      const select = wrapper.findAll('#layeroptions-block select')[index]!;
+      await select.setValue(value);
+      await select.trigger('change');
+      await flushPromises();
+    }),
   };
 }

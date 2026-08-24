@@ -18,7 +18,7 @@
     "lint": "oxlint src tests",
     "typecheck": "bun scripts/vue-tsc-bun.js --noEmit",
     "typecheck:tsc": "tsc",
-    "test:fast": "bun test tests/harness/bun.test.ts tests/harness/vueLoader.test.ts",
+    "test:fast": "bun test tests/harness/bun.test.ts tests/harness/vueLoader.test.ts tests/harness/uiContract.test.ts",
     "lint:fix": "oxlint src tests --fix"
   },
   "dependencies": {

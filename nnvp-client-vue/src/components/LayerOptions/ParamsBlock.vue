@@ -278,7 +278,11 @@ export default defineComponent({
   display: flex;
   justify-content: center;
 }
-.layer-help-ask {
+/* .layer-help-concept (the Concepts-book link) shares the look but NOT the
+   class: `.layer-help-ask` must stay unique to the ask button — the world
+   drivers click it by class. */
+.layer-help-ask,
+.layer-help-concept {
   cursor: pointer;
   font-size: 13px;
 }
