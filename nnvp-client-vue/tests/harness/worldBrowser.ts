@@ -28,6 +28,7 @@ type NnvpDebugWindow = Window & {
       graphEditor: FlowGraphEditor;
       recordStore: RecordStore;
       bus: { emit(type: 'auth.changed'): void };
+      boardInterface: unknown;
     };
   };
 };
@@ -148,10 +149,13 @@ export function makeBrowserWorld(
     },
     graphJSON: () => page.evaluate(() => (window as unknown as NnvpDebugWindow).nnvp.debug.graphEditor.toJSON()),
     async loadJSON(json) {
-      await page.evaluate((raw) => {
-        const editor = (window as unknown as NnvpDebugWindow).nnvp.debug.graphEditor;
-        editor.model.loadJSON(raw);
-        editor.updateGraph();
+      // Through the REAL facade (like every app load path) so its lifecycle
+      // runs — migration, lineage, inspection clearing.
+      await page.evaluate(async (raw) => {
+        const bi = (window as unknown as NnvpDebugWindow).nnvp.debug.boardInterface as {
+          loadGraphFromJSON(json: unknown): Promise<void>;
+        };
+        await bi.loadGraphFromJSON(raw);
       }, json);
       await settle();
     },
@@ -852,9 +856,64 @@ export function makeBrowserWorld(
       await page.waitForTimeout(100);
     },
   };
+  // The facade's inspection lifecycle, through the app's REAL
+  // $boardInterface (dev debug handle). Every read awaits the facade's async
+  // workHash checks, mirroring the bun driver.
+  const inspection = {
+    async seed(byLayerId: Record<string, unknown>) {
+      await page.evaluate(async (snapshot) => {
+        const w = window as unknown as { __nnvpInvalidated?: number } & NnvpDebugWindow;
+        const bi = w.nnvp.debug.boardInterface as {
+          on(event: string, cb: () => void): void;
+          setInspection(data: unknown): void;
+          whenInspectionSettled(): Promise<void>;
+        };
+        if (w.__nnvpInvalidated === undefined) {
+          w.__nnvpInvalidated = 0;
+          bi.on('inspection-invalidated', () => { w.__nnvpInvalidated! += 1; });
+        }
+        bi.setInspection({ byLayerId: snapshot });
+        await bi.whenInspectionSettled();
+      }, byLayerId);
+    },
+    async get() {
+      return page.evaluate(async () => {
+        const bi = (window as unknown as NnvpDebugWindow).nnvp.debug.boardInterface as {
+          getInspection(): unknown; whenInspectionSettled(): Promise<void>;
+        };
+        await bi.whenInspectionSettled();
+        return bi.getInspection() ?? null;
+      });
+    },
+    async setVizParams(layerId: string, params: Record<string, unknown>) {
+      await page.evaluate(([id, p]) => {
+        const bi = (window as unknown as NnvpDebugWindow).nnvp.debug.boardInterface as {
+          setLayerVizParams(layerId: string, params: unknown): void;
+        };
+        bi.setLayerVizParams(String(id), p);
+      }, [layerId, params] as const);
+    },
+    async vizParamsCount() {
+      return page.evaluate(async () => {
+        const bi = (window as unknown as NnvpDebugWindow).nnvp.debug.boardInterface as {
+          layerVizParams: Record<string, unknown>; whenInspectionSettled(): Promise<void>;
+        };
+        await bi.whenInspectionSettled();
+        return Object.keys(bi.layerVizParams).length;
+      });
+    },
+    async invalidatedCount() {
+      return page.evaluate(async () => {
+        const w = window as unknown as { __nnvpInvalidated?: number } & NnvpDebugWindow;
+        const bi = w.nnvp.debug.boardInterface as { whenInspectionSettled(): Promise<void> };
+        await bi.whenInspectionSettled();
+        return w.__nnvpInvalidated ?? 0;
+      });
+    },
+  };
   const world: World & { page?: Page; canvas?: CanvasDriver } = {
     expect, board, chat, catalog, windows, charts, training, history, models, records, backend,
-    menu, downloads, errors, panel,
+    menu, downloads, errors, panel, inspection,
     dispose: async () => {},
   };
   if (exposePage) {

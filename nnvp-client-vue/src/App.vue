@@ -45,6 +45,7 @@
   <AccountPanel :show="showAccount" :intent="accountIntent" @close="closeAccount" @pending-login="openAccount()"/>
   <SaveLoadModal v-if="backendEnabled" :show="showSaveLoad" :mode="saveLoadMode" @close="showSaveLoad = false" @open-account="openAccount()"/>
   <ChatBubble v-if="backendEnabled && showChat" @open-account="openAccount($event)" @close="togglePanel('showChat')"/>
+  <InspectionGuardModal/>
   <TutorialOverlay :active="tutorialActive" :tutorial="activeTutorial" @exit="stopTutorial" @open-menu="openMenuFromTutorial" @next="startTutorial" @concept="openConcepts"/>
 </template>
 
@@ -67,6 +68,7 @@ import ChatBubble from './components/Assistant/ChatBubble.vue';
 import TutorialOverlay from './components/Tutorial/TutorialOverlay.vue';
 import TutorialMenu from './components/Tutorial/TutorialMenu.vue';
 import ConceptBook from './components/Tutorial/ConceptBook.vue';
+import InspectionGuardModal from './components/FlowBoard/InspectionGuardModal.vue';
 import { getTutorial } from './lib/Tutorial/tutorials';
 import type { TutorialDef } from './lib/Tutorial/tutorials';
 import { bus } from './lib/Events/bus';
@@ -120,6 +122,7 @@ export default defineComponent({
     TutorialOverlay,
     TutorialMenu,
     ConceptBook,
+    InspectionGuardModal,
   },
   methods: {
     openAccount(intent?: unknown) {

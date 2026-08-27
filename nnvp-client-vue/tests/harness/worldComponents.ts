@@ -836,7 +836,11 @@ interface MenuEditorSeam {
 
 type MenuSubtreeLike = Record<string, unknown>;
 
-export function makeMenuDriver(editor: MenuEditorSeam, kerasInterface: unknown):
+export function makeMenuDriver(
+  editor: MenuEditorSeam,
+  kerasInterface: unknown,
+  boardInterface?: unknown,
+):
 MenuDriver & { teardown(): Promise<void> } {
   let wrapper: VueWrapper | null = null;
   let openTitle: string | null = null;
@@ -866,7 +870,7 @@ MenuDriver & { teardown(): Promise<void> } {
             chatAvailable: false, viz3d: false, models: false,
           },
         },
-        global: { mocks: { $boardInterface: menuFacade, $kerasInterface: kerasInterface } },
+        global: { mocks: { $boardInterface: boardInterface ?? menuFacade, $kerasInterface: kerasInterface } },
       });
     }
     // Typing-only view of the real computeds ('templatesMenu' indirection
@@ -1026,6 +1030,8 @@ interface PanelEditorSeam {
   selectedNodes: unknown[];
   model: { layers: unknown[]; modelInputs: unknown[]; modelOutputs: unknown[] };
   findLayerById(id: unknown): unknown;
+  /** Records an already-applied edit (the panels' notifyGraphEdited path). */
+  commit(): void;
 }
 
 export function makePanelDriver(editor: PanelEditorSeam): PanelDriver {
@@ -1038,6 +1044,10 @@ export function makePanelDriver(editor: PanelEditorSeam): PanelDriver {
     getModelInputs: () => editor.model.modelInputs,
     getModelOutputs: () => editor.model.modelOutputs,
     findLayerById: (id: unknown) => editor.findLayerById(id),
+    // Parameter edits report through the same commit path the app uses —
+    // the REAL facade wired to this editor hears it (undo, dirty,
+    // inspection invalidation).
+    notifyGraphEdited: () => editor.commit(),
     // The Model Inputs/Outputs OrderParameter blocks read the shims directly.
     activeGraph: { model: editor.model } as unknown,
   };

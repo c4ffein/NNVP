@@ -2,9 +2,14 @@ import { test, expect } from './canvas';
 // Logic tests may touch DOM globals (localStorage, window events); bun gets
 // them from bunfig preload, this runner registers the same happy-dom shim.
 import './happydom';
-import '../suites/index';
 import { getRegistry } from './define';
 import { makeBrowserWorld } from './worldBrowser';
+import { discoverSuites } from './discoverSuites';
+
+// Suites register at import time; discovery replaces the old hand-listed
+// manifest (see discoverSuites.ts). Top-level await: Playwright awaits the
+// spec module's evaluation, so the registry is complete before collection.
+await discoverSuites();
 
 // The Playwright runner for the dual-mode registry (see tests/harness/define.ts):
 // - app tests run click-by-click against the real UI (the SAME functions run

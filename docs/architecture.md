@@ -310,6 +310,18 @@ board state.
 - Inspect/Viz3D coupling is indirect and goes through the facade: InspectPanel
   probes the trained model → `boardInterface.setInspection` →
   `inspection-changed` → Viz3D recolors. Viz3D never reads training metrics.
+- **Inspection lifecycle:** the snapshot (and the per-layer 3D viz params)
+  are keyed by layer id, and ids restart at 0 per document — so the facade
+  drops both silently on every document replacement (New / Load / template),
+  and INVALIDATES them on any workHash-changing edit (structure or params;
+  annotation edits — names on wrappers, comments, positions — keep them:
+  attribution stays honest). Invalidation emits `inspection-invalidated`
+  carrying the dropped snapshot; the App-hosted guard modal offers
+  keep-or-undo (undo restores the snapshot — the workHash matches again) and
+  a persisted don't-warn flag that mutes ONLY the dialog, never the clearing.
+  Parameter panels report edits through `notifyGraphEdited()` (a commit-based
+  bubble hook in LayerOptions) — which also makes param edits undoable and
+  dirty-tracked like every other edit.
 
 ### Persistence and sync — merge-free by construction
 

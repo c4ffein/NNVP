@@ -48,6 +48,14 @@ export default class BoardInterface {
   listeners: Record<string, BoardListener[]>;
   /** Inspect mode: latest per-layer activation snapshot (null when cleared). */
   inspectionState: unknown;
+  /** The workHash of the graph the inspection snapshot was probed against —
+   *  a later graph-changed with a DIFFERENT workHash invalidates the
+   *  snapshot (annotation/position edits keep the same workHash and keep
+   *  their colors). Null while no inspection is live. */
+  inspectionWorkHash: string | null;
+  /** Serializes the async invalidation checks (workHash is computed via
+   *  crypto); tests await it through whenInspectionSettled(). */
+  inspectionCheck: Promise<void>;
   /** 3D view: per-layer display overrides (channel window, slice layout). */
   layerVizParams: Record<string, LayerVizParams>;
   /**
@@ -72,6 +80,8 @@ export default class BoardInterface {
     this.listeners = {};
     // Inspect mode: latest per-layer activation snapshot (null when cleared).
     this.inspectionState = null;
+    this.inspectionWorkHash = null;
+    this.inspectionCheck = Promise.resolve();
     // 3D view: per-layer display overrides, set from the 3D layer panel.
     this.layerVizParams = {};
     this.lineageParent = null;
@@ -113,10 +123,80 @@ export default class BoardInterface {
   setInspection(data: unknown) {
     this.inspectionState = data || null;
     this.emit('inspection-changed', this.inspectionState);
+    // Remember which COMPUTATION this snapshot describes: a later structural
+    // or parameter edit (workHash change) invalidates it; renames, comments
+    // and moves do not.
+    if (this.inspectionState === null) {
+      this.inspectionWorkHash = null;
+    } else {
+      const json = this.getGraphJSON();
+      this.inspectionCheck = this.inspectionCheck.then(async () => {
+        const identity = json === null ? null : await modelIdentityOf(json);
+        if (this.inspectionState !== null) {
+          this.inspectionWorkHash = identity ? identity.workHash : null;
+        }
+      });
+    }
   }
 
   getInspection(): unknown {
     return this.inspectionState;
+  }
+
+  /** Drop all 3D per-layer display overrides (document replaced). */
+  resetLayerVizParams() {
+    this.layerVizParams = {};
+    this.emit('viz-params-changed', this.layerVizParams);
+  }
+
+  /** Inspection lifecycle checks are async (workHash hashes via crypto);
+   *  await this before asserting inspection state (tests, modal). */
+  whenInspectionSettled(): Promise<void> {
+    return this.inspectionCheck;
+  }
+
+  /**
+   * Called on every graph-changed while an inspection is live: if the
+   * COMPUTATION changed (workHash differs from the one the snapshot was
+   * probed against), clear the snapshot + viz params and announce it —
+   * 'inspection-invalidated' carries the dropped snapshot so a UI can offer
+   * "undo the edit and restore the colors". Annotation-only edits (same
+   * workHash) keep the snapshot: its attribution is still honest.
+   */
+  private checkInspectionInvalidation() {
+    if (this.inspectionState === null || this.inspectionWorkHash === null) return;
+    const json = this.getGraphJSON();
+    this.inspectionCheck = this.inspectionCheck.then(async () => {
+      if (this.inspectionState === null || this.inspectionWorkHash === null) return;
+      const identity = json === null ? null : await modelIdentityOf(json);
+      if (identity !== null && identity.workHash === this.inspectionWorkHash) return;
+      const snapshot = this.inspectionState;
+      this.setInspection(null);
+      this.resetLayerVizParams();
+      this.emit('inspection-invalidated', { snapshot });
+    });
+  }
+
+  /** Document replacement (New / Load / template): the previous inspection
+   *  belongs to a graph that no longer exists — its layer ids would collide
+   *  with the new document's (ids restart at 0 per document) and paint the
+   *  old model's activations onto unrelated layers. Clear silently: there is
+   *  no edit to offer undoing. */
+  private dropInspectionForNewDocument() {
+    if (this.inspectionState !== null) this.setInspection(null);
+    if (Object.keys(this.layerVizParams).length > 0) this.resetLayerVizParams();
+  }
+
+  /**
+   * The options panel's parameter inputs write straight onto the live
+   * KerasLayer (no facade verb yet — the known verb-first gap); this lets the
+   * panel report "an edit happened" the same way Vue Flow interactions do:
+   * commit() records the already-applied change (making the edit undoable and
+   * the board dirty) and fires graph-changed, which runs the inspection
+   * invalidation check like any other edit.
+   */
+  notifyGraphEdited() {
+    if (this.activeGraph !== null) this.activeGraph.commit();
   }
 
   // 3D view: merge one layer's display overrides (channel window, slice
@@ -215,6 +295,7 @@ export default class BoardInterface {
     graphEditor.onGraphChanged(() => {
       this.dirtySinceCheckpoint = true;
       this.emit('graph-changed');
+      this.checkInspectionInvalidation();
     });
     if (this.graphEditors.length === 1) this.setActiveGraphEditor(graphEditor);
   }
@@ -382,6 +463,7 @@ export default class BoardInterface {
   // });
   clearBoard() {
     if (this.activeGraph !== null) {
+      this.dropInspectionForNewDocument();
       this.activeGraph.clearBoard(false);
       // File > New starts a fresh lineage root (whether or not the user
       // confirmed, an empty board carries nothing worth warning about).
@@ -406,6 +488,7 @@ export default class BoardInterface {
     // the clear FormatVersionError (surfaced by the cloud panels' handleError)
     // instead of leaving the user in front of a wiped canvas.
     const migrated = migrateModel(graphJSON);
+    this.dropInspectionForNewDocument();
     this.activeGraph.saveState();
     this.activeGraph.clearBoard(true);
     this.activeGraph.model.loadJSON(migrated);
@@ -418,6 +501,7 @@ export default class BoardInterface {
   // Templates functions
   loadTemplate(name: string) {
     if (this.activeGraph !== null) {
+      this.dropInspectionForNewDocument();
       this.activeGraph.loadTemplate(name);
       // Templates are known states too — their lineage converges by content.
       void this.refreshLineageFromBoard();

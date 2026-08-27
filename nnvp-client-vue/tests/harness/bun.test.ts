@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'bun:test';
-import '../suites/index';
 import { getRegistry } from './define';
 import { makeBunWorld } from './worldBun';
+import { discoverSuites } from './discoverSuites';
+
+// Suites register at import time; discovery replaces the old hand-listed
+// manifest (see discoverSuites.ts) — top-level await so the registry is
+// complete before the describe below enumerates it.
+await discoverSuites();
 
 // The bun runner for the dual-mode registry: every 'both'-mode test executes
 // here headlessly. The e2e-only ones (browser-bound assertions, each with a

@@ -8,6 +8,7 @@
  * real SFCs via tests/harness/vue-loader.ts when they land.
  */
 import FlowGraphEditor from '../../src/lib/FlowInterface/FlowGraphEditor';
+import BoardInterface from '../../src/lib/BoardInterface/BoardInterface';
 import { isInvalidConnection } from '../../src/lib/FlowInterface/adapter';
 import KerasInterface from '../../src/lib/KerasInterface/KerasInterface';
 import KerasGenerator from '../../src/lib/KerasInterface/KerasGenerator';
@@ -46,10 +47,16 @@ export function makeBoardDriver() {
   };
   const editor = new FlowGraphEditor(store);
   const catalog = new KerasInterface(generatedKerasLayers as KerasLayerCatalog).getLayerList();
+  // The REAL facade over THIS editor: document loads route through it (so
+  // its inspection/lineage lifecycle runs), and its graph-changed wiring
+  // hears every editor commit — exactly like the app.
+  const facade = new BoardInterface();
+  facade.addGraphEditor(editor);
 
   return {
     editor,
     store,
+    facade,
 
     async addLayer(name: string) {
       if (!catalog[name]) throw new Error(`no such catalog layer: ${name}`);
@@ -92,7 +99,7 @@ export function makeBoardDriver() {
     },
 
     async loadTemplate(name: string) {
-      editor.loadTemplate(name);
+      facade.loadTemplate(name);
       await flush();
     },
 
@@ -134,8 +141,7 @@ export function makeBoardDriver() {
     },
 
     async loadJSON(json: string | NnvpModel) {
-      editor.model.loadJSON(json);
-      editor.updateGraph();
+      await facade.loadGraphFromJSON(json);
       await flush();
     },
   };
@@ -175,11 +181,38 @@ export function makeBunWorld(expect: Expect): World {
   const menu = makeMenuDriver(
     board.editor,
     new KerasInterface(generatedKerasLayers as KerasLayerCatalog),
+    board.facade,
   );
   const downloads = makeDownloadsDriver();
   const errors = makeErrorsDriver();
   // The Layer Options panel over THIS board's live selection shim.
   const panel = makePanelDriver(board.editor);
+  // The facade's inspection lifecycle — the REAL BoardInterface wired above.
+  const inspection = (() => {
+    let invalidated = 0;
+    board.facade.on('inspection-invalidated', () => { invalidated += 1; });
+    return {
+      async seed(byLayerId: Record<string, unknown>) {
+        board.facade.setInspection({ byLayerId });
+        await board.facade.whenInspectionSettled();
+      },
+      async get() {
+        await board.facade.whenInspectionSettled();
+        return board.facade.getInspection();
+      },
+      async setVizParams(layerId: string, params: Record<string, unknown>) {
+        board.facade.setLayerVizParams(layerId, params as never);
+      },
+      async vizParamsCount() {
+        await board.facade.whenInspectionSettled();
+        return Object.keys(board.facade.layerVizParams).length;
+      },
+      async invalidatedCount() {
+        await board.facade.whenInspectionSettled();
+        return invalidated;
+      },
+    };
+  })();
   // The REAL app service wiring (main.ts calls the same function): sync-on-auth
   // over the world's store singleton and the backend driver's fetch shim. This
   // is what makes chat.setSignedIn(true) trigger an actual sync, like the app.
@@ -200,6 +233,7 @@ export function makeBunWorld(expect: Expect): World {
     downloads,
     errors,
     panel,
+    inspection,
     async dispose() {
       uninstallServices();
       await menu.teardown();

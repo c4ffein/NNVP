@@ -19,7 +19,16 @@
         <span class="stat-value">{{ totalEdges }}</span>
       </div>
     </div>
-    <div id="layeroptions-block" class="layeroptions-block" v-if="nodeIsSelected()">
+    <!-- Native change events BUBBLE here after the parameter component's own
+         handler wrote the value onto the live KerasLayer; the commit-based
+         notify is what makes those edits reach the facade (undo stack, dirty
+         flag, inspection invalidation) like every other edit. -->
+    <div
+      id="layeroptions-block"
+      class="layeroptions-block"
+      v-if="nodeIsSelected()"
+      @change="$boardInterface.notifyGraphEdited()"
+    >
       <ParamsBlock
         v-for="(selectedLayer, index) in activeLayers"
         v-bind:key="selectedLayer.id"

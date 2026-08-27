@@ -409,6 +409,23 @@ export interface PanelDriver {
   setSelect(index: number, value: string): Promise<void>;
 }
 
+/**
+ * The facade's inspection lifecycle (Inspect activation snapshots + 3D viz
+ * params). Browser: the app's real $boardInterface via the dev debug handle.
+ * Bun: a REAL BoardInterface instance wired over the same editor the board
+ * driver drives — the invalidation logic under test is the actual class in
+ * both worlds. Reads await the facade's async workHash checks.
+ */
+export interface InspectionDriver {
+  /** Publish a snapshot as if an Inspect probe ran (per layer id). */
+  seed(byLayerId: Record<string, unknown>): Promise<void>;
+  get(): Promise<unknown | null>;
+  setVizParams(layerId: string, params: Record<string, unknown>): Promise<void>;
+  vizParamsCount(): Promise<number>;
+  /** How many 'inspection-invalidated' events fired since the first seed. */
+  invalidatedCount(): Promise<number>;
+}
+
 /** What appTest fns receive (in BOTH modes). */
 export interface World extends LogicWorld {
   board: BoardDriver;
@@ -425,6 +442,7 @@ export interface World extends LogicWorld {
   downloads: DownloadsDriver;
   errors: ErrorsDriver;
   panel: PanelDriver;
+  inspection: InspectionDriver;
   /** Bun world only (unmount + reset between tests); the runner calls it, suites never do. */
   dispose?: () => Promise<void>;
 }
