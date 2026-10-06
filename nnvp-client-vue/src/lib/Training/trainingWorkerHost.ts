@@ -41,6 +41,15 @@ export interface TrainingWorkerHost {
 export function createTrainingWorkerHost(ctx: TrainingWorkerContext): TrainingWorkerHost {
   let tf: Tf = null;
   let model: Tf = null;
+  // Weights AND optimizer state: when compile got an optimizer instance
+  // (any tuned param), tfjs does not own it and model.dispose() alone
+  // leaves its slot variables behind (tfjsEngine.dispose does the same).
+  const releaseModel = () => {
+    if (!model) return;
+    if (model.optimizer && typeof model.optimizer.dispose === 'function') model.optimizer.dispose();
+    model.dispose();
+    model = null;
+  };
 
   const send = (event: WorkerEvent) => ctx.post(event, transferablesOf(event));
   const fail = (id: number, stage: 'build' | 'create' | null, error: unknown) => {
@@ -83,7 +92,7 @@ export function createTrainingWorkerHost(ctx: TrainingWorkerContext): TrainingWo
       loss: command.loss,
       metrics: ['accuracy'],
     });
-    if (model) model.dispose();
+    releaseModel();
     model = built;
     send({ v: PROTOCOL_VERSION, id: command.id, type: 'prepared', backend: tf.getBackend() });
   }
@@ -197,6 +206,10 @@ export function createTrainingWorkerHost(ctx: TrainingWorkerContext): TrainingWo
           case 'stop':
             // Finish the batch in flight, then the running fit RESOLVES.
             if (model) model.stopTraining = true;
+            send({ v: PROTOCOL_VERSION, id, type: 'ok' });
+            return;
+          case 'dispose':
+            releaseModel();
             send({ v: PROTOCOL_VERSION, id, type: 'ok' });
             return;
           case 'getWeights':

@@ -133,6 +133,14 @@ export interface TrainingDriver {
    * wait for the row to report an outcome (success or refusal).
    */
   loadWeightsFile(name: string, bytes: Uint8Array): Promise<void>;
+  /** Make every dataset download fail (offline CDN) for the rest of the test. */
+  makeDatasetsUnreachable(): Promise<void>;
+  /** Click Start Training and wait until the attempt settled: the run
+   *  ended (or never started) and the button is back, or an error shows. */
+  clickTrain(): Promise<void>;
+  trainButtonLabel(): Promise<string>;
+  /** The "could not start" line by the Train button; null when none shows. */
+  startError(): Promise<string | null>;
 }
 
 /** What the Inspect tab's weights row shows. */
@@ -418,7 +426,9 @@ export interface PanelDriver {
  */
 export interface InspectionDriver {
   /** Publish a snapshot as if an Inspect probe ran (per layer id). */
-  seed(byLayerId: Record<string, unknown>): Promise<void>;
+  /** `settle: false` returns right after publishing (no wait for any
+   *  asynchronous identity work) — for edits racing the probe. */
+  seed(byLayerId: Record<string, unknown>, options?: { settle?: boolean }): Promise<void>;
   get(): Promise<unknown | null>;
   setVizParams(layerId: string, params: Record<string, unknown>): Promise<void>;
   vizParamsCount(): Promise<number>;

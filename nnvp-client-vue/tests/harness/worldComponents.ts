@@ -84,16 +84,19 @@ export function makeChartsDriver(): ChartsDriver & Teardown {
 // which is exactly what the persistence tests exercise). The browser world
 // reaches the same contract through the real Panels > Training window.
 /**
- * What TrainingZone reaches on $boardInterface outside of a training run:
- * the Inspect panel's event hooks and the weights import's "fresh model of
- * the board's graph" (getGraphJSON + generated code). Everything else stays
- * inert — these tests never train.
+ * What TrainingZone reaches on $boardInterface: the Inspect panel's event
+ * hooks, the weights import's "fresh model of the board's graph"
+ * (getGraphJSON + generated code), and the two reads a Train click makes
+ * before anything can fail (the graph + its lineage parent for the run
+ * journal). A test that clicks Train (trainingStart) runs the REAL
+ * startTraining up to the dataset download; everything else stays inert.
  */
 export interface TrainingBoardSeam {
   on(): void;
   off(): void;
   setInspection(): void;
   getGraphJSON(): string;
+  getLineageParent(): string | null;
   generateJavascriptNoSave(kerasInterface: unknown): string | null;
 }
 
@@ -102,16 +105,19 @@ const INERT_TRAINING_SEAM: TrainingBoardSeam = {
   off() {},
   setInspection() {},
   getGraphJSON: () => '',
+  getLineageParent: () => null,
   generateJavascriptNoSave: () => null,
 };
 
 export function makeTrainingDriver(boardSeam: TrainingBoardSeam = INERT_TRAINING_SEAM): TrainingDriver & Teardown {
   let wrapper: Wrapper | null = null;
+  /** The fetch in place before makeDatasetsUnreachable() wrapped it. */
+  let datasetsFetch: typeof fetch | null = null;
   const optimizerSelect = () => wrapper!.find('.optimizer-section select');
   const epochsInput = () => wrapper!.find('.training-params-section input[type="number"]');
   const mountZone = async (tab: string) => {
     wrapper = mount(TrainingZone, {
-      // startTraining is never reached; the seam covers Inspect + weights import
+      // The seam covers Inspect, weights import and a Train click's reads
       // (same inert-mock pattern as ChatBubble for the rest).
       global: { mocks: { $boardInterface: boardSeam, $kerasInterface: {} } },
       attachTo: document.body,
@@ -171,6 +177,41 @@ export function makeTrainingDriver(boardSeam: TrainingBoardSeam = INERT_TRAINING
       await epochsInput().setValue(String(value));
       await wrapper!.vm.$nextTick();
     },
+    async makeDatasetsUnreachable() {
+      // The dataset loaders fetch the CDN through globalThis.fetch (the
+      // backend driver's swap only answers /api); refuse those URLs here.
+      if (datasetsFetch) return;
+      datasetsFetch = globalThis.fetch;
+      const reachable = datasetsFetch;
+      globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === 'string' || input instanceof URL ? String(input) : input.url;
+        if (url.includes('/datasets/')) throw new TypeError(`fetch failed: ${url} (datasets unreachable)`);
+        return reachable(input as RequestInfo, init);
+      }) as typeof fetch;
+    },
+    async clickTrain() {
+      await wrapper!.find('.train-button').trigger('click');
+      // tfjs loads + compiles on the cpu backend before the dataset step:
+      // real async — poll the rendered outcome instead of guessing turns.
+      // (The click lands the zone on the Charts tab, where there is no
+      // button: absent means "still attempting".)
+      const deadline = Date.now() + 20000;
+      while (Date.now() < deadline) {
+        await flushPromises();
+        if (wrapper!.find('[data-testid="train-start-error"]').exists()) return;
+        const button = wrapper!.find('.train-button');
+        if (button.exists() && !button.text().includes('Stop')) return;
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+      throw new Error('the Train click never settled (button still says Stop, no error shown)');
+    },
+    async trainButtonLabel() {
+      return wrapper!.find('.train-button').text();
+    },
+    async startError() {
+      const line = wrapper!.find('[data-testid="train-start-error"]');
+      return line.exists() ? line.text() : null;
+    },
     async optimizer() {
       return (optimizerSelect().element as HTMLSelectElement).value;
     },
@@ -179,6 +220,10 @@ export function makeTrainingDriver(boardSeam: TrainingBoardSeam = INERT_TRAINING
     },
     async teardown() {
       if (wrapper) wrapper.unmount();
+      if (datasetsFetch) {
+        globalThis.fetch = datasetsFetch;
+        datasetsFetch = null;
+      }
       resetTrainingConfig(); // module state must not leak between tests
     },
   };
@@ -1038,6 +1083,7 @@ export function makePanelDriver(editor: PanelEditorSeam): PanelDriver {
   const panelFacade = {
     on() {}, off() {},
     setLayerComment() {},
+    setLayerParam() { return false; },
     getActiveElementsContainer: () => ({ e: editor.selectedNodes }),
     getActiveElements: () => editor.selectedNodes,
     getLayers: () => editor.model.layers,

@@ -158,6 +158,7 @@ function makeFakeSession(): { session: TrainingSession; fitCalls: FakeFitCall[] 
     getWeights: () => ({}),
     setWeights: () => {},
     stop() { stopRequested = true; },
+    dispose() {},
   };
   return { session, fitCalls };
 }

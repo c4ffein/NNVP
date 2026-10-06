@@ -177,6 +177,18 @@ function parseModel(json: string | NnvpModel): NnvpModel | null {
 }
 
 /**
+ * The computation projection as one canonical string — what workHash hashes,
+ * BEFORE hashing. Synchronous (no crypto), so a caller that only needs "is
+ * this the same computation as before?" can compare two keys with no async
+ * window in between (the facade's inspection guard). Null when the input is
+ * not a model.
+ */
+export function workKeyOf(json: string | NnvpModel): string | null {
+  const model = parseModel(json);
+  return model === null ? null : JSON.stringify(workProjection(model));
+}
+
+/**
  * Both hashes + the summary for one snapshot; null when the input is not a
  * model at all (an orphan fold's missing graphJson, a corrupt record).
  */

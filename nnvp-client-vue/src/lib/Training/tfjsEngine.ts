@@ -104,16 +104,32 @@ function createSession({ tf, model, graphJson, epochs, batchSize }: TfjsSessionI
         console.log('[TrainingZone]   Batch Size:', batchSize);
       }
 
-      return model.fit(trainXs, trainYs, {
-        batchSize,
-        validationData: [testXs, testYs],
-        // tfjs semantics: trains until `epochs` is reached, counting from
-        // initialEpoch — so a resume passes epochs = initialEpoch + remaining.
-        epochs: initialEpoch + fitEpochs,
-        initialEpoch,
-        shuffle: true,
-        callbacks: fitCallbacks,
-      });
+      try {
+        return await model.fit(trainXs, trainYs, {
+          batchSize,
+          validationData: [testXs, testYs],
+          // tfjs semantics: trains until `epochs` is reached, counting from
+          // initialEpoch — so a resume passes epochs = initialEpoch + remaining.
+          epochs: initialEpoch + fitEpochs,
+          initialEpoch,
+          shuffle: true,
+          callbacks: fitCallbacks,
+        });
+      } finally {
+        // The slices are this segment's own draw: freed whether fit resolved,
+        // was cancelled (a throwing callback) or failed — the worker host
+        // does the same (trainingWorkerHost.fit).
+        trainXs.dispose();
+        trainYs.dispose();
+        testXs.dispose();
+        testYs.dispose();
+      }
+    },
+    // Weights AND optimizer state (slot variables are the optimizer's, not
+    // the model's — model.dispose() alone leaves them behind).
+    dispose() {
+      if (model.optimizer && typeof model.optimizer.dispose === 'function') model.optimizer.dispose();
+      model.dispose();
     },
     // Named-weight access, v1: a thin map over the model's variables in model
     // order (tfjs variable names are unique per model).

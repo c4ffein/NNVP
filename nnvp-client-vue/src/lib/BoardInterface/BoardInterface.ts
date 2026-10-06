@@ -7,13 +7,13 @@
 
 import { migrateModel } from '../ModelFormat/migrations';
 import { appendCheckpoint } from '../Training/checkpoints';
-import { modelIdentityOf } from '../Training/modelIdentity';
+import { modelIdentityOf, workKeyOf } from '../Training/modelIdentity';
 import type { LayerVizParams } from '../Viz3D/sceneBuild';
 import type FlowGraphEditor from '../FlowInterface/FlowGraphEditor';
 import type {
   CodeGenerator, KerasLayerInstance, LayerWrapper,
 } from '../FlowInterface/FlowGraphEditor';
-import type { FlowEdge, NnvpLayerId, NnvpModel } from '../../types/model';
+import type { FlowEdge, NnvpLayerId, NnvpModel, ParameterValue } from '../../types/model';
 
 /** Listener on the framework-agnostic event bus (on/off/emit). */
 type BoardListener = (data?: unknown) => void;
@@ -48,14 +48,14 @@ export default class BoardInterface {
   listeners: Record<string, BoardListener[]>;
   /** Inspect mode: latest per-layer activation snapshot (null when cleared). */
   inspectionState: unknown;
-  /** The workHash of the graph the inspection snapshot was probed against —
-   *  a later graph-changed with a DIFFERENT workHash invalidates the
-   *  snapshot (annotation/position edits keep the same workHash and keep
-   *  their colors). Null while no inspection is live. */
-  inspectionWorkHash: string | null;
-  /** Serializes the async invalidation checks (workHash is computed via
-   *  crypto); tests await it through whenInspectionSettled(). */
-  inspectionCheck: Promise<void>;
+  /** The computation key (workHash's pre-hash projection, see
+   *  modelIdentity.workKeyOf) of the graph the inspection snapshot was
+   *  probed against — a later graph-changed with a DIFFERENT key
+   *  invalidates the snapshot (annotation/position edits keep the same key
+   *  and keep their colors). Captured SYNCHRONOUSLY with the snapshot, so
+   *  no edit can slip through while an identity hash is still in flight.
+   *  Null while no inspection is live. */
+  inspectionWorkKey: string | null;
   /** 3D view: per-layer display overrides (channel window, slice layout). */
   layerVizParams: Record<string, LayerVizParams>;
   /**
@@ -80,8 +80,7 @@ export default class BoardInterface {
     this.listeners = {};
     // Inspect mode: latest per-layer activation snapshot (null when cleared).
     this.inspectionState = null;
-    this.inspectionWorkHash = null;
-    this.inspectionCheck = Promise.resolve();
+    this.inspectionWorkKey = null;
     // 3D view: per-layer display overrides, set from the 3D layer panel.
     this.layerVizParams = {};
     this.lineageParent = null;
@@ -127,15 +126,10 @@ export default class BoardInterface {
     // or parameter edit (workHash change) invalidates it; renames, comments
     // and moves do not.
     if (this.inspectionState === null) {
-      this.inspectionWorkHash = null;
+      this.inspectionWorkKey = null;
     } else {
       const json = this.getGraphJSON();
-      this.inspectionCheck = this.inspectionCheck.then(async () => {
-        const identity = json === null ? null : await modelIdentityOf(json);
-        if (this.inspectionState !== null) {
-          this.inspectionWorkHash = identity ? identity.workHash : null;
-        }
-      });
+      this.inspectionWorkKey = json === null ? null : workKeyOf(json);
     }
   }
 
@@ -149,32 +143,32 @@ export default class BoardInterface {
     this.emit('viz-params-changed', this.layerVizParams);
   }
 
-  /** Inspection lifecycle checks are async (workHash hashes via crypto);
-   *  await this before asserting inspection state (tests, modal). */
+  /** The inspection lifecycle is synchronous now (the guard compares
+   *  computation keys, no hashing) — this resolves immediately and stays
+   *  for callers written against the async era (drivers, modal). */
   whenInspectionSettled(): Promise<void> {
-    return this.inspectionCheck;
+    return Promise.resolve();
   }
 
   /**
    * Called on every graph-changed while an inspection is live: if the
-   * COMPUTATION changed (workHash differs from the one the snapshot was
-   * probed against), clear the snapshot + viz params and announce it —
-   * 'inspection-invalidated' carries the dropped snapshot so a UI can offer
-   * "undo the edit and restore the colors". Annotation-only edits (same
-   * workHash) keep the snapshot: its attribution is still honest.
+   * COMPUTATION changed (the computation key differs from the one the
+   * snapshot was probed against), clear the snapshot + viz params and
+   * announce it — 'inspection-invalidated' carries the dropped snapshot so
+   * a UI can offer "undo the edit and restore the colors". Annotation-only
+   * edits (same key) keep the snapshot: its attribution is still honest.
+   * Synchronous on purpose: the key is a string compare, so an edit can
+   * never land in an "identity still computing" window.
    */
   private checkInspectionInvalidation() {
-    if (this.inspectionState === null || this.inspectionWorkHash === null) return;
+    if (this.inspectionState === null || this.inspectionWorkKey === null) return;
     const json = this.getGraphJSON();
-    this.inspectionCheck = this.inspectionCheck.then(async () => {
-      if (this.inspectionState === null || this.inspectionWorkHash === null) return;
-      const identity = json === null ? null : await modelIdentityOf(json);
-      if (identity !== null && identity.workHash === this.inspectionWorkHash) return;
-      const snapshot = this.inspectionState;
-      this.setInspection(null);
-      this.resetLayerVizParams();
-      this.emit('inspection-invalidated', { snapshot });
-    });
+    const key = json === null ? null : workKeyOf(json);
+    if (key !== null && key === this.inspectionWorkKey) return;
+    const snapshot = this.inspectionState;
+    this.setInspection(null);
+    this.resetLayerVizParams();
+    this.emit('inspection-invalidated', { snapshot });
   }
 
   /** Document replacement (New / Load / template): the previous inspection
@@ -188,9 +182,10 @@ export default class BoardInterface {
   }
 
   /**
-   * The options panel's parameter inputs write straight onto the live
-   * KerasLayer (no facade verb yet — the known verb-first gap); this lets the
-   * panel report "an edit happened" the same way Vue Flow interactions do:
+   * The options panel's parameter inputs still write straight onto the live
+   * KerasLayer (programmatic callers use the setLayerParam verb instead —
+   * the assistant does); this lets the panel report "an edit happened" the
+   * same way Vue Flow interactions do:
    * commit() records the already-applied change (making the edit undoable and
    * the board dirty) and fires graph-changed, which runs the inspection
    * invalidation check like any other edit.
@@ -361,6 +356,13 @@ export default class BoardInterface {
   setLayerComment(id: NnvpLayerId, comment: string): boolean {
     if (this.activeGraph === null) return false;
     return this.activeGraph.setLayerComment(id, comment);
+  }
+
+  /** Set one parameter value on a layer: undoable, committed, announced
+   *  (the assistant's edit path; see FlowGraphEditor.setLayerParam). */
+  setLayerParam(id: NnvpLayerId, name: string, value: ParameterValue): boolean {
+    if (this.activeGraph === null) return false;
+    return this.activeGraph.setLayerParam(id, name, value);
   }
 
   setLeftBarRemountCallback(func: () => unknown) {

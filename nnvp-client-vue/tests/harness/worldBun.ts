@@ -161,6 +161,7 @@ export function makeBunWorld(expect: Expect): World {
     off() {},
     setInspection() {},
     getGraphJSON: () => board.editor.toJSON(),
+    getLineageParent: () => board.facade.getLineageParent(),
     generateJavascriptNoSave: () => new KerasGenerator(JSON.parse(board.editor.toJSON()) as NnvpModel).generateJavascriptFromGraph(),
   });
   // A history Restore must land on the SAME board the suite asserts through —
@@ -192,9 +193,9 @@ export function makeBunWorld(expect: Expect): World {
     let invalidated = 0;
     board.facade.on('inspection-invalidated', () => { invalidated += 1; });
     return {
-      async seed(byLayerId: Record<string, unknown>) {
+      async seed(byLayerId: Record<string, unknown>, options?: { settle?: boolean }) {
         board.facade.setInspection({ byLayerId });
-        await board.facade.whenInspectionSettled();
+        if (options?.settle !== false) await board.facade.whenInspectionSettled();
       },
       async get() {
         await board.facade.whenInspectionSettled();

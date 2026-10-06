@@ -191,15 +191,22 @@ board state.
 - The Inspector (`lib/Inspector/probe.ts`) and Viz3D shape walk reuse the same
   traversal, relying on the invariant that the JS emitter instantiates exactly
   one tf layer per real node in treatment-list order.
-- Known duplication: Keras import has its own topo sort (`layoutModel`, throws
-  on cycles) separate from the generator's treatment list (silently drops).
+- (The historical duplication — Keras import carrying its own topo sort —
+  is gone: import orders through the shared `orderGraph` too; only the
+  refuse-on-cycle policy stays import-side.)
 
 ### Training — engine seam behind the UI
 
 - `TrainingZone.vue` orchestrates; `lib/Training/` is the Vue-free seam:
   `engine.ts` defines `TrainingEngine`/`TrainingDataset`/`TrainingCallbacks`,
   implemented by `tfjsEngine` (the default), `workerEngine` (opt-in), and
-  `tinygradEngine` (bench-only, behind `?bench=1`).
+  `tinygradEngine` (bench-only, behind `?bench=1`). A `TrainingSession`
+  owns its model until `dispose()` (tfjs: weights + optimizer state; worker:
+  the copy in the worker; tinygrad: the GPU weight buffers) — TrainingZone
+  releases the previous session whenever it adopts a new one, and each
+  `fit` frees the slices it drew. The only leak left is tfjs-internal: a
+  callback that THROWS to cancel (TrainingZone's historical stop) strands
+  the batch in flight (3 tensors per cancel); the seam's `stop()` is clean.
 - **`workerEngine` runs training in a Web Worker** (opt-in via the
   device-local `trainingEngine` setting, default unchanged): the generated
   tfjs code is eval'd with no DOM, no localStorage and no auth token in
@@ -315,13 +322,20 @@ board state.
   drops both silently on every document replacement (New / Load / template),
   and INVALIDATES them on any workHash-changing edit (structure or params;
   annotation edits — names on wrappers, comments, positions — keep them:
-  attribution stays honest). Invalidation emits `inspection-invalidated`
+  attribution stays honest). The check is SYNCHRONOUS: the facade captures
+  the computation key (`modelIdentity.workKeyOf`, workHash's pre-hash
+  projection) together with the snapshot and string-compares it on every
+  graph-changed — no hashing, so no window in which an edit can slip past
+  an identity still being computed. Invalidation emits `inspection-invalidated`
   carrying the dropped snapshot; the App-hosted guard modal offers
   keep-or-undo (undo restores the snapshot — the workHash matches again) and
   a persisted don't-warn flag that mutes ONLY the dialog, never the clearing.
   Parameter panels report edits through `notifyGraphEdited()` (a commit-based
   bubble hook in LayerOptions) — which also makes param edits undoable and
-  dirty-tracked like every other edit.
+  dirty-tracked like every other edit. Programmatic parameter edits go
+  through the `setLayerParam` facade verb (saveState + set + commit +
+  graph-changed, same-value sets are no-ops) — the assistant's `set_param`
+  uses it, so its edits are undoable and invalidate exactly like a panel's.
 
 ### Persistence and sync — merge-free by construction
 
@@ -531,7 +545,10 @@ board state.
   it come second, as a thin binding. The verb layer is what both test worlds
   drive and what the assistant/tutorial reuse for free — a feature that only
   exists as a click handler is invisible to all of them. (Current example of
-  the gap: `unrollSteps` has no verb yet, so no UI can set it.)
+  the gap: `unrollSteps` has no verb yet, so no UI can set it. Closed
+  example: parameter edits got `setLayerParam` when the assistant's
+  `set_param` turned out to bypass undo — the panel still writes directly
+  and bubbles through `notifyGraphEdited`, a leftover to fold in.)
 - The bun world runs the app's real boot wiring (`installAppServices`); when
   `main.ts` grows a new service, it goes through that function so both the
   app and the tests keep executing the identical path.

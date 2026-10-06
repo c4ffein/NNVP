@@ -22,10 +22,15 @@ function escapeHtml(text: string): string {
 function renderInline(escaped: string): string {
   let out = escaped;
   // `code` first, so its content is not further transformed below.
+  // Spans are swapped for a sentinel no prose can contain: two private-use
+  // code points around the index (a plain " N " once collided with every
+  // space-delimited number in the sentence). Any such code points already in
+  // the input are dropped first, so text can never forge a span reference.
   const codeSpans: string[] = [];
+  out = out.replace(/[\uE000\uE001]/g, '');
   out = out.replace(/`([^`]+)`/g, (_, code: string) => {
     codeSpans.push(code);
-    return ` ${codeSpans.length - 1} `;
+    return `\uE000${codeSpans.length - 1}\uE001`;
   });
   out = out.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   out = out.replace(/(^|[^*])\*([^*\s][^*]*)\*/g, '$1<em>$2</em>');
@@ -34,7 +39,7 @@ function renderInline(escaped: string): string {
     /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
     '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>',
   );
-  out = out.replace(/ (\d+) /g, (_, i: string) => `<code>${codeSpans[Number(i)]}</code>`);
+  out = out.replace(/\uE000(\d+)\uE001/g, (_, i: string) => `<code>${codeSpans[Number(i)]}</code>`);
   return out;
 }
 

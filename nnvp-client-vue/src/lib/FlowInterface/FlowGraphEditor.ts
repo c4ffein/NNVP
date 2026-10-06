@@ -25,7 +25,7 @@ import KerasLayerUntyped from '../KerasInterface/KerasLayer';
 import { CyclicGraphError } from '../KerasInterface/orderGraph';
 import autoLayout from '../AutoLayout/autoLayout';
 import { FormatVersionError, migrateModel } from '../ModelFormat/migrations';
-import type { KerasLayerJSON, NnvpLayerId, NnvpModel, FlowNode, FlowEdge } from '../../types/model';
+import type { KerasLayerJSON, NnvpLayerId, NnvpModel, FlowNode, FlowEdge, ParameterValue } from '../../types/model';
 import {
   nnvpToFlow, flowToNnvp, nextLayerId, newLayerNode, groupSelected, COMPOSITE_NODE,
   isInvalidConnection,
@@ -39,6 +39,7 @@ import {
 export type KerasLayerInstance = KerasLayerJSON & {
   clone(): KerasLayerInstance;
   load(json: KerasLayerJSON): KerasLayerInstance;
+  setParameterValue(name: string, value: ParameterValue): void;
 };
 
 // KerasLayer.js's inferred constructor wants (layerName, categoryName); the
@@ -303,6 +304,27 @@ export default class FlowGraphEditor {
     this.saveState();
     if (next === undefined) delete node.data.nnvp.comment;
     else node.data.nnvp.comment = next;
+    this.committed = this.toJSON();
+    this.updateGraph();
+    return true;
+  }
+
+  /**
+   * Set one parameter value on a layer — the programmatic edit verb (the
+   * assistant's set_param). Same lifecycle as every board mutation: undo
+   * snapshot before, commit + graph-changed after (so dirty tracking and
+   * inspection invalidation fire like for a panel edit). Returns false when
+   * the layer is missing, has no parameters, or already holds that value
+   * (no undo entry is pushed then).
+   */
+  setLayerParam(id: NnvpLayerId, name: string, value: ParameterValue): boolean {
+    const node = this.store.getNodes().find(candidate => candidate.id === String(id));
+    if (!node) return false;
+    const layer = node.data.nnvp.kerasLayer as KerasLayerInstance | null;
+    if (!layer) return false;
+    if (JSON.stringify(layer.parameterValues[name]) === JSON.stringify(value)) return false;
+    this.saveState();
+    layer.setParameterValue(name, value);
     this.committed = this.toJSON();
     this.updateGraph();
     return true;

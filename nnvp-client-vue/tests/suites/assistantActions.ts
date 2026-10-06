@@ -22,7 +22,11 @@ import type {
   AnthropicToolResultBlock,
   AssistantActivity,
 } from '../../src/lib/Assistant/anthropicClient';
-import type BoardInterface from '../../src/lib/BoardInterface/BoardInterface';
+import BoardInterface from '../../src/lib/BoardInterface/BoardInterface';
+import FlowGraphEditor from '../../src/lib/FlowInterface/FlowGraphEditor';
+import type { FlowStore } from '../../src/lib/FlowInterface/FlowGraphEditor';
+import KerasLayer from '../../src/lib/KerasInterface/KerasLayer';
+import type { FlowEdge, FlowNode } from '../../src/types/model';
 import type KerasInterface from '../../src/lib/KerasInterface/KerasInterface';
 import type { NnvpLayerId, ParameterValue } from '../../src/types/model';
 import { bus } from '../../src/lib/Events/bus';
@@ -146,6 +150,7 @@ interface FakeBoardInterface {
     toJSON(): string;
     findLayerById(id: NnvpLayerId): FakeLayerEntry | null;
   };
+  setLayerParam(id: NnvpLayerId, name: string, value: ParameterValue): boolean;
   getLayers(): FakeLayerEntry[];
   getEdges(): FakeEdge[];
   getModelInputs(): FakeLayerEntry[];
@@ -202,6 +207,12 @@ function makeFakeBoardInterface(): FakeBoardInterface {
     },
     findLayerById(id) {
       return activeGraph.findLayerById(id);
+    },
+    setLayerParam(id: NnvpLayerId, name: string, value: ParameterValue) {
+      const layer = activeGraph.findLayerById(id);
+      if (!layer || !layer.kerasLayer) return false;
+      layer.kerasLayer.setParameterValue(name, value);
+      return true;
     },
     deleteSelectedElements() {
       this.calls.deleteSelected += 1;
@@ -307,6 +318,64 @@ logicTest('assistantActions: sets a parameter value on a layer', ({ expect }) =>
 
   const layers = actions.listLayers();
   expect(layers[0]!.params.units).toBe(64);
+});
+
+// The REAL editor + facade (the boardInterface suite's store adapter): the
+// assistant's edits must behave like any user edit on the actual classes.
+function makeRealBoard() {
+  const state = {
+    nodes: [] as FlowNode[], edges: [] as FlowEdge[],
+    selectedNodes: [] as FlowNode[], selectedEdges: [] as FlowEdge[],
+  };
+  const store: FlowStore = {
+    getNodes: () => state.nodes,
+    getEdges: () => state.edges,
+    setGraph: (nodes, edges) => { state.nodes = nodes; state.edges = edges; },
+    getSelectedNodes: () => state.selectedNodes,
+    getSelectedEdges: () => state.selectedEdges,
+  };
+  const editor = new FlowGraphEditor(store);
+  const iface = new BoardInterface();
+  iface.addGraphEditor(editor);
+  return { editor, iface, actions: new AssistantActions(iface, {} as KerasInterface) };
+}
+
+logicTest('assistantActions: set_param is an undoable edit that invalidates the inspection', ({ expect }) => {
+  const { editor, iface, actions } = makeRealBoard();
+  const dense = new KerasLayer('Dense', 'Core');
+  dense.parameterDef = { units: { type: 'int' } as never };
+  dense.parameterValues = { units: 3 };
+  editor.addLayer(dense);
+  const id = editor.model.layers[0]!.id;
+  const paramsOf = () => iface.findLayerById(id)!.kerasLayer!.parameterValues;
+  // An Inspect snapshot probed against units=3 …
+  iface.setInspection({ byLayerId: { [String(id)]: {} } });
+
+  const result = actions.setParam(id, 'units', 64);
+  expect(result.params.units).toBe(64);
+  expect(paramsOf().units).toBe(64);
+  // … is stale after a computation edit, exactly as for a panel edit.
+  expect(iface.getInspection()).toBe(null);
+  expect(iface.isDirty()).toBe(true);
+  // And the edit is undoable like every other board mutation (invariant 9).
+  iface.undo();
+  expect(paramsOf().units).toBe(3);
+  iface.redo();
+  expect(paramsOf().units).toBe(64);
+});
+
+logicTest('assistantActions: set_param with the same value is a no-op (no undo entry)', ({ expect }) => {
+  const { editor, iface, actions } = makeRealBoard();
+  const dense = new KerasLayer('Dense', 'Core');
+  dense.parameterDef = { units: { type: 'int' } as never };
+  dense.parameterValues = { units: 3 };
+  editor.addLayer(dense);
+  const id = editor.model.layers[0]!.id;
+  iface.setInspection({ byLayerId: { [String(id)]: {} } });
+  actions.setParam(id, 'units', 3);
+  expect(iface.getInspection()).not.toBe(null);
+  iface.undo(); // undoes the addLayer, not a phantom param edit
+  expect(editor.model.layers.length).toBe(0);
 });
 
 logicTest('assistantActions: throws when setting a param on a missing layer', ({ expect }) => {

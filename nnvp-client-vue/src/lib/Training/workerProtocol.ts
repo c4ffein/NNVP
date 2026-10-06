@@ -79,6 +79,8 @@ export type WorkerCommand =
   | FitCommand
   /** Finish the batch in flight, then let fit resolve (tf's stopTraining). */
   | (Envelope & { type: 'stop' })
+  /** Drop the worker's model (a newer session replaced this one). */
+  | (Envelope & { type: 'dispose' })
   | (Envelope & { type: 'getWeights' })
   | (Envelope & { type: 'setWeights'; weights: NamedWeights })
   | (Envelope & { type: 'evalLogits'; x: Float32Array });

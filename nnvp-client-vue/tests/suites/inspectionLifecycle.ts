@@ -51,6 +51,21 @@ appTest('inspection: a computation edit invalidates the snapshot (and says so)',
   expect(await inspection.invalidatedCount()).toBe(1);
 });
 
+appTest('inspection: an edit landing right after the probe still invalidates', async ({
+  board, inspection, expect,
+}) => {
+  await board.addLayer('Input');
+  await board.addLayer('Dense');
+  await board.connect(0, 1);
+  // The snapshot is published and the computation changes before any
+  // asynchronous identity work could settle — exactly what a fast edit
+  // after an Inspect probe does. The guard must not skip that window.
+  await inspection.seed(SNAPSHOT, { settle: false });
+  await board.addLayer('Dense');
+  expect(await inspection.get()).toBe(null);
+  expect(await inspection.invalidatedCount()).toBe(1);
+});
+
 appTest('inspection: a parameter edit through the options panel invalidates too', async ({
   board, panel, inspection, expect,
 }) => {

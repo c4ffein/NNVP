@@ -61,3 +61,14 @@ logicTest('markdown: plain paragraphs and blank lines survive', ({ expect }) => 
   expect(out).toContain('<br>');
   expect(out).toContain('<p>world</p>');
 });
+
+logicTest('markdown: numbers in prose survive next to inline code (placeholder collision)', ({ expect }) => {
+  // The code-span placeholder used to be " N ", which any space-delimited
+  // number in the sentence also matched — "added 3 layers" became
+  // "added<code>undefined</code>layers" whenever the reply had a code span.
+  const out = renderMarkdown('I added 3 layers and `x` then 0 more');
+  expect(out).toContain('I added 3 layers and <code>x</code> then 0 more');
+  expect(out).not.toContain('undefined');
+  // Private-use sentinels in the input are dropped, never resolved as spans.
+  expect(renderMarkdown('a 0 b `c`')).toContain('a 0 b <code>c</code>');
+});

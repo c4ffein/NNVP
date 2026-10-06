@@ -151,6 +151,13 @@ export interface TrainingSession {
   /** Engine-native stop (finish the batch in flight, then resolve fit). */
   stop(): void;
   /**
+   * Release whatever the session holds (tfjs: model weights + optimizer
+   * state; worker: the model living in the worker). TrainingZone calls it
+   * when a newer session replaces this one — nothing else keeps a trained
+   * model alive, so a session that is dropped without dispose() leaks it.
+   */
+  dispose(): void | Promise<void>;
+  /**
    * Forward-only pass on one batch, returning flat scores
    * ([sampleCount * numClasses]) with dropout INACTIVE — for accuracy /
    * validation probes (abBenchmark.probeMetrics normalizes them through

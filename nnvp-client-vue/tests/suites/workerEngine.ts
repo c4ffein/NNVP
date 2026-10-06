@@ -293,6 +293,23 @@ logicTest('workerEngine: prepare sends the generated code (not the thunk) across
   expect(prepare!.v).toBe(PROTOCOL_VERSION);
 });
 
+logicTest('workerEngine: dispose() drops the model held in the worker (weights AND optimizer state)', async ({ expect }) => {
+  await setup(expect);
+  const engine = createWorkerEngine({ makeWorker: () => makeWorkerPair() });
+  const idle = tf.memory().numTensors;
+  // A learning rate makes compile receive an optimizer instance tfjs does
+  // not own — its slot variables (allocated by the first fit) are the part
+  // model.dispose() alone would leak in the shared worker.
+  const session = await engine.prepare(null, makeOpts({ epochs: 1, optimizerParams: { learningRate: 0.001 } }));
+  const { dataset } = makeRawSliceDataset({ trainSliceSize: 64, testSliceSize: 16 });
+  await session.fit(dataset, { onBatchEnd() {}, onEpochEnd() {} });
+  expect(Object.keys(await session.getWeights()).length).toBeGreaterThan(0);
+  expect(tf.memory().numTensors).toBeGreaterThan(idle);
+  await session.dispose();
+  await expect(session.getWeights()).rejects.toThrow(/holds no model/);
+  expect(tf.memory().numTensors).toBe(idle);
+});
+
 logicTest('workerEngine: fit ships one raw train/test slice and relays the tfjs callback flow', async ({ expect }) => {
   await setup(expect);
   const engine = createWorkerEngine({ makeWorker: () => makeWorkerPair() });

@@ -339,6 +339,27 @@ export function makeBrowserWorld(
       await page.waitForSelector('[data-testid="weights-status"]', { timeout: 30000 });
       await settle();
     },
+    async makeDatasetsUnreachable() {
+      // Dev serves datasets same-origin under /datasets/ (vite proxies the
+      // CDN); production builds fetch the CDN directly — abort both.
+      await page.route(/\/datasets\//, route => route.abort('failed'));
+    },
+    async clickTrain() {
+      await page.click('.train-button');
+      await page.waitForFunction(() => {
+        const button = document.querySelector('.train-button');
+        return (button && !button.textContent!.includes('Stop'))
+          || document.querySelector('[data-testid="train-start-error"]') !== null;
+      }, null, { timeout: 30000 });
+      await settle();
+    },
+    async trainButtonLabel() {
+      return (await page.textContent('.train-button')) ?? '';
+    },
+    async startError() {
+      const line = page.locator('[data-testid="train-start-error"]');
+      return (await line.count()) > 0 ? line.textContent() : null;
+    },
   };
 
   // Same contract as worldComponents.makeCatalogDriver, on the real catalog.
@@ -857,11 +878,12 @@ export function makeBrowserWorld(
     },
   };
   // The facade's inspection lifecycle, through the app's REAL
-  // $boardInterface (dev debug handle). Every read awaits the facade's async
-  // workHash checks, mirroring the bun driver.
+  // $boardInterface (dev debug handle). Reads still await
+  // whenInspectionSettled() (an immediate resolve since the guard went
+  // synchronous), mirroring the bun driver.
   const inspection = {
-    async seed(byLayerId: Record<string, unknown>) {
-      await page.evaluate(async (snapshot) => {
+    async seed(byLayerId: Record<string, unknown>, options?: { settle?: boolean }) {
+      await page.evaluate(async ([snapshot, settle]) => {
         const w = window as unknown as { __nnvpInvalidated?: number } & NnvpDebugWindow;
         const bi = w.nnvp.debug.boardInterface as {
           on(event: string, cb: () => void): void;
@@ -873,8 +895,8 @@ export function makeBrowserWorld(
           bi.on('inspection-invalidated', () => { w.__nnvpInvalidated! += 1; });
         }
         bi.setInspection({ byLayerId: snapshot });
-        await bi.whenInspectionSettled();
-      }, byLayerId);
+        if (settle) await bi.whenInspectionSettled();
+      }, [byLayerId, options?.settle !== false] as const);
     },
     async get() {
       return page.evaluate(async () => {

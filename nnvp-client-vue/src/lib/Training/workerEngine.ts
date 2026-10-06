@@ -249,6 +249,9 @@ export function createWorkerEngine(
         stop() {
           post({ v: PROTOCOL_VERSION, id: nextId++, type: 'stop' }).catch(() => {});
         },
+        async dispose() {
+          await post({ v: PROTOCOL_VERSION, id: nextId++, type: 'dispose' });
+        },
         // Forward-only probe in the worker; the input crosses by copy (it is
         // often a view into a buffer the caller keeps slicing).
         async evaluateLogits(x: Float32Array): Promise<Float32Array> {

@@ -198,6 +198,19 @@ function createSession({ device, step, meta, graphJson, epochs, makeEvalStep }: 
     stop() {
       stopRequested = true;
     },
+    // The weights live in GPU buffers: release them when a newer session
+    // replaces this one — the training runner's, plus the eval runner's own
+    // copies when evaluateLogits ever instantiated it (a failed eval build
+    // holds nothing).
+    async dispose() {
+      const destroyAll = (bufs: Record<string, GPUBuffer>) => {
+        for (const buf of Object.values(bufs)) (buf as { destroy?: () => void }).destroy?.();
+      };
+      destroyAll(step.weightBufs);
+      if (!evalStepPromise) return;
+      const evalStep = await evalStepPromise.catch(() => null);
+      if (evalStep) destroyAll(evalStep.weightBufs);
+    },
     // Forward-only logits on one batch (meta.batchSize), dropout inactive:
     // the eval runner is instantiated lazily on first use, and the CURRENT
     // training weights are GPU-copied into it before every evaluation.

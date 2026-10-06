@@ -14,16 +14,13 @@ import categoryHelp from '../KerasInterface/categoryHelp';
 import type BoardInterface from '../BoardInterface/BoardInterface';
 import type KerasInterface from '../KerasInterface/KerasInterface';
 import type { LayerWrapper } from '../FlowInterface/FlowGraphEditor';
-import type { KerasLayerJSON, NnvpLayerId, ParameterValue } from '../../types/model';
+import type { NnvpLayerId, ParameterValue } from '../../types/model';
 
 /**
  * LayerWrapper types `kerasLayer` as its serialized shape, but live boards
  * hold revived KerasLayer instances (see FlowGraphEditor.restore) — this
  * narrow view adds the one method this facade calls on them.
  */
-type LiveKerasLayer = KerasLayerJSON & {
-  setParameterValue(name: string, value: ParameterValue): void;
-};
 
 // The help entries are HTML written for the in-app modal; the assistant wants
 // readable text.
@@ -123,7 +120,10 @@ export default class AssistantActions {
     if (!layer.kerasLayer) {
       throw new Error(`Layer "${layerId}" has no editable parameters.`);
     }
-    (layer.kerasLayer as LiveKerasLayer).setParameterValue(paramName, value);
+    // Through the facade verb, so the edit is undoable, dirty-tracked and
+    // invalidates a live inspection exactly like a panel edit (invariant 9).
+    // A same-value set is a no-op there — the reply still reports the params.
+    this.boardInterface.setLayerParam(layerId, paramName, value);
     return {
       id: layerId,
       params: layer.kerasLayer.parameterValues,

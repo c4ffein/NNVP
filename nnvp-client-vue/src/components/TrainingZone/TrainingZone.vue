@@ -72,6 +72,7 @@
           v-bind:epochs="epochs"
           @changeEpochs="changeEpochs"
           v-bind:isTraining="isTraining"
+          v-bind:startError="startError"
           @trainClicked="trainClicked"
           v-bind:trainingState="trainingState"
           v-bind:pausedBy="pausedBy"
@@ -206,6 +207,8 @@ export default defineComponent({
   data() {
     return {
       isTraining: false,
+      /** Why the last Train click could not start a run (null: it could). */
+      startError: null as string | null,
       // Pause/resume surface: mirrors the RunController state ('idle' when no
       // run), plus which tab initiated the pause (its Resume button renders
       // there) and whether the session's engine can pause at all.
@@ -438,6 +441,13 @@ export default defineComponent({
     // hint instead of probing one.
     adoptSession(session: TrainingSession) {
       const self = this as unknown as TrainingZoneNonReactive; // non-reactive by design
+      // The previous session's model is unreachable from here on: release it
+      // (weights + optimizer state, or the worker's copy) instead of leaking
+      // one model per Train click. Best-effort — a failed release must not
+      // block the new session.
+      if (self.trainedSession && self.trainedSession !== session) {
+        Promise.resolve(self.trainedSession.dispose()).catch(() => {});
+      }
       self.trainedSession = session;
       self.trainedModel = session.model;
       self.trainedGraphJson = session.graphJson;
@@ -481,13 +491,27 @@ export default defineComponent({
       }
       this.chartsClicked();
       this.isTraining = true;
+      this.startError = null;
       this.$emit('training-started');
-      await this.startTraining();
-      this.cancelRequested = false;
-      this.isTraining = false;
-      this.trainingState = 'idle';
-      this.pausedBy = null;
-      this.$emit('training-stopped');
+      try {
+        await this.startTraining();
+      }
+      catch (error) {
+        // Failures the engine does not tag (tfjs load, an unreachable
+        // dataset CDN, a bad optimizer) used to escape here with isTraining
+        // stuck on true — a permanent "Stop" button on an empty Charts tab.
+        // Nothing started: land back where the click was, and say why.
+        this.startError = error instanceof Error ? error.message : String(error);
+        this.compileOptionsClicked();
+        console.error('[TrainingZone] training could not start:', error);
+      }
+      finally {
+        this.cancelRequested = false;
+        this.isTraining = false;
+        this.trainingState = 'idle';
+        this.pausedBy = null;
+        this.$emit('training-stopped');
+      }
     },
     /**
      * Pause the in-flight run (engine finishes the batch in flight first).

@@ -146,6 +146,9 @@
         >
           {{ isTraining ? '■ Stop Training' : '▶ Start Training' }}
         </button>
+        <div v-if="startError" class="train-start-error" data-testid="train-start-error" role="alert">
+          Couldn't start: {{ startError }}
+        </div>
       </div>
 
     </div>
@@ -379,6 +382,7 @@ export default defineComponent({
     'selectableLosses',
     'epochs',
     'isTraining',
+    'startError',
     // Curriculum (pretrain → fine-tune) fields + the dataset list to pick from.
     'phase2Enabled',
     'phase2Dataset',
@@ -822,6 +826,15 @@ export default defineComponent({
   transition: all 0.2s ease;
   background: #4CAF50;
   color: white;
+}
+
+.train-start-error {
+  margin-top: 8px;
+  max-width: 220px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--edge-error, #d33);
+  word-break: break-word;
 }
 
 .train-button:hover {

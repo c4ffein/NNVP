@@ -225,6 +225,49 @@ logicTest('trainingEngine: fit feeds 500/100 dataset slices and reports the watc
   expect((result as { history: { loss: unknown[] } }).history.loss).toHaveLength(2);
 });
 
+logicTest('trainingEngine: fit frees its dataset slices and dispose() frees the model (no tensor leak)', async ({ expect }) => {
+  await setup(expect);
+  const engine = createTfjsEngine({ loadTf: async () => tf });
+  const idle = tf.memory().numTensors;
+  // A learning rate makes compile receive an optimizer INSTANCE (not a
+  // name): tfjs then does not own it and model.dispose() alone leaves its
+  // slot variables behind — the case the session's dispose() must cover.
+  const session = await engine.prepare(null, makeOpts({ epochs: 1, optimizerParams: { learningRate: 0.001 } }));
+  const callbacks = { onBatchEnd() {}, onEpochEnd() {} };
+  await session.fit(makeFakeDataset(), callbacks);
+  // The first fit legitimately allocates the optimizer's slot variables;
+  // from then on every fit segment (pause/resume, phase 2, next run) must
+  // hand back exactly what it drew — the 500/100 slices included.
+  const afterFirstFit = tf.memory().numTensors;
+  await session.fit(makeFakeDataset(), callbacks);
+  expect(tf.memory().numTensors).toBe(afterFirstFit);
+  // The seam's own cancel (stop(): finish the batch, resolve) is clean too.
+  await session.fit(makeFakeDataset(), { onBatchEnd() { session.stop(); }, onEpochEnd() {} });
+  expect(tf.memory().numTensors).toBe(afterFirstFit);
+  // Disposing the session returns the backend to where it started: model
+  // weights AND optimizer state — TrainingZone replaces sessions this way.
+  await session.dispose();
+  expect(tf.memory().numTensors).toBe(idle);
+});
+
+logicTest('trainingEngine: a fit cancelled by a throwing callback still frees its slices', async ({ expect }) => {
+  await setup(expect);
+  const engine = createTfjsEngine({ loadTf: async () => tf });
+  const session = await engine.prepare(null, makeOpts({ epochs: 1 }));
+  await session.fit(makeFakeDataset(), { onBatchEnd() {}, onEpochEnd() {} });
+  const before = tf.memory().numTensors;
+  await session.fit(makeFakeDataset(), {
+    onBatchEnd() { throw new Error('cancel'); }, onEpochEnd() {},
+  }).catch(() => {});
+  // tfjs itself leaves the batch in flight behind when a callback throws out
+  // of its fit loop (3 tensors on tfjs 4.x cpu, measured) — that is the cost
+  // of the historical throw-to-cancel path and not ours to fix here. The four
+  // slices this engine drew (train/test xs/ys) must NOT be on top of it.
+  const TFJS_THROW_RESIDUE = 3;
+  expect(tf.memory().numTensors - before).toBeLessThanOrEqual(TFJS_THROW_RESIDUE);
+  await session.dispose();
+});
+
 logicTest('trainingEngine: a throwing callback cancels the fit (the stop-button contract)', async ({ expect }) => {
   await setup(expect);
   const engine = createTfjsEngine({ loadTf: async () => tf });
