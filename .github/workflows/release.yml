@@ -1,0 +1,51 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: make install
+
+      - name: Build
+        run: cd nnvp-client-vue && bun run build
+
+      - name: Zip build
+        run: cd nnvp-client-vue/dist && zip -r ../../build.zip . -x _redirects
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "build-${{ github.run_number }}" build.zip
+          --target "${{ github.sha }}"
+          --title "build-${{ github.run_number }}"
+          --notes "Built from ${{ github.sha }}"
+
+      - name: Cleanup old releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          releases=$(gh release list --json tagName,createdAt --limit 100)
+          cutoff=$(date -d '7 days ago' -Iseconds)
+
+          echo "$releases" | jq -r '
+            to_entries
+            | .[]
+            | select(.key >= 5)
+            | select(.value.createdAt < "'"$cutoff"'")
+            | .value.tagName
+          ' | while read -r tag; do
+            echo "Deleting release: $tag"
+            gh release delete "$tag" --cleanup-tag -y
+          done
